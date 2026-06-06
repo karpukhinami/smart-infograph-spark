@@ -9,10 +9,28 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as StylesRouteImport } from './routes/styles'
+import { Route as PromptsRouteImport } from './routes/prompts'
+import { Route as DesignProfilesRouteImport } from './routes/design-profiles'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiLlmRouteImport } from './routes/api/llm'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 
+const StylesRoute = StylesRouteImport.update({
+  id: '/styles',
+  path: '/styles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PromptsRoute = PromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignProfilesRoute = DesignProfilesRouteImport.update({
+  id: '/design-profiles',
+  path: '/design-profiles',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,36 +49,88 @@ const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/design-profiles': typeof DesignProfilesRoute
+  '/prompts': typeof PromptsRoute
+  '/styles': typeof StylesRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/design-profiles': typeof DesignProfilesRoute
+  '/prompts': typeof PromptsRoute
+  '/styles': typeof StylesRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/design-profiles': typeof DesignProfilesRoute
+  '/prompts': typeof PromptsRoute
+  '/styles': typeof StylesRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/generate-image' | '/api/llm'
+  fullPaths:
+    | '/'
+    | '/design-profiles'
+    | '/prompts'
+    | '/styles'
+    | '/api/generate-image'
+    | '/api/llm'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/generate-image' | '/api/llm'
-  id: '__root__' | '/' | '/api/generate-image' | '/api/llm'
+  to:
+    | '/'
+    | '/design-profiles'
+    | '/prompts'
+    | '/styles'
+    | '/api/generate-image'
+    | '/api/llm'
+  id:
+    | '__root__'
+    | '/'
+    | '/design-profiles'
+    | '/prompts'
+    | '/styles'
+    | '/api/generate-image'
+    | '/api/llm'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DesignProfilesRoute: typeof DesignProfilesRoute
+  PromptsRoute: typeof PromptsRoute
+  StylesRoute: typeof StylesRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiLlmRoute: typeof ApiLlmRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/styles': {
+      id: '/styles'
+      path: '/styles'
+      fullPath: '/styles'
+      preLoaderRoute: typeof StylesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prompts': {
+      id: '/prompts'
+      path: '/prompts'
+      fullPath: '/prompts'
+      preLoaderRoute: typeof PromptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design-profiles': {
+      id: '/design-profiles'
+      path: '/design-profiles'
+      fullPath: '/design-profiles'
+      preLoaderRoute: typeof DesignProfilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,9 +157,22 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DesignProfilesRoute: DesignProfilesRoute,
+  PromptsRoute: PromptsRoute,
+  StylesRoute: StylesRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiLlmRoute: ApiLlmRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
