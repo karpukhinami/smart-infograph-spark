@@ -53,7 +53,7 @@ function Workspace() {
   const setPrompt = useSettingsStore((s) => s.setPrompt);
   const styles = useSettingsStore((s) => s.styles);
   const profiles = useSettingsStore((s) => s.profiles);
-  const styleGuidelines = useSettingsStore((s) => s.styleGuidelines);
+  
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
   const [loading, setLoading] = useState<null | "analyze" | "brief" | "image">(null);
