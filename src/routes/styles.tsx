@@ -17,6 +17,8 @@ function StylesPage() {
   const upsert = useSettingsStore((s) => s.upsertStyle);
   const toggle = useSettingsStore((s) => s.toggleStyle);
   const reset = useSettingsStore((s) => s.resetStyles);
+  const guidelines = useSettingsStore((s) => s.styleGuidelines);
+  const setGuidelines = useSettingsStore((s) => s.setStyleGuidelines);
 
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-4">
@@ -24,6 +26,20 @@ function StylesPage() {
         <h1 className="text-lg font-semibold">Infographic Styles</h1>
         <Button variant="outline" size="sm" onClick={reset}>Reset to defaults</Button>
       </div>
+
+      <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+        <Label className="text-sm font-semibold">Общие правила формирования инфографики</Label>
+        <p className="text-xs text-muted-foreground">
+          Эти правила применяются ко всем стилям и передаются модели на этапе создания дизайн-брифа.
+        </p>
+        <Textarea
+          rows={10}
+          value={guidelines}
+          onChange={(e) => setGuidelines(e.target.value)}
+          className="font-mono text-xs"
+        />
+      </div>
+
       {styles.map((s) => <StyleEditor key={s.id} value={s} onChange={upsert} onToggle={toggle} />)}
     </div>
   );
