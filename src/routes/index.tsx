@@ -383,6 +383,7 @@ function Workspace() {
           </Tabs>
         </div>
       </section>
+      </div>
     </div>
   );
 }
