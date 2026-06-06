@@ -153,20 +153,20 @@ function Workspace() {
       <section className="space-y-4">
         <div className="rounded-lg border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">1 · Input</h2>
+            <h2 className="text-sm font-semibold">1 · Исходные данные</h2>
             <Button size="sm" variant="ghost" onClick={resetProject}>
-              <RotateCcw className="size-3.5 mr-1" /> Start over
+              <RotateCcw className="size-3.5 mr-1" /> Начать заново
             </Button>
           </div>
           <Tabs value={source.mode} onValueChange={(v) => setSource({ mode: v as "text" | "file" | "topic" })}>
             <TabsList>
-              <TabsTrigger value="text">Paste text</TabsTrigger>
-              <TabsTrigger value="file">Upload file</TabsTrigger>
-              <TabsTrigger value="topic">Topic only</TabsTrigger>
+              <TabsTrigger value="text">Вставить текст</TabsTrigger>
+              <TabsTrigger value="file">Загрузить файл</TabsTrigger>
+              <TabsTrigger value="topic">Только тема</TabsTrigger>
             </TabsList>
             <TabsContent value="text" className="space-y-2">
               <Textarea
-                placeholder="Paste the source text..."
+                placeholder="Вставьте исходный текст…"
                 rows={8}
                 value={source.text}
                 onChange={(e) => setSource({ text: e.target.value })}
@@ -185,26 +185,26 @@ function Workspace() {
             <TabsContent value="topic" className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <div className="col-span-2">
-                  <Label className="text-xs">Topic</Label>
+                  <Label className="text-xs">Тема</Label>
                   <Input
-                    placeholder="e.g. Клеточное строение растений"
+                    placeholder="например, Клеточное строение растений"
                     value={source.topic ?? ""}
                     onChange={(e) => setSource({ topic: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Subject</Label>
+                  <Label className="text-xs">Предмет</Label>
                   <Select value={source.subject || ""} onValueChange={(v) => setSource({ subject: v })}>
-                    <SelectTrigger><SelectValue placeholder="Subject" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Предмет" /></SelectTrigger>
                     <SelectContent>
                       {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Grade</Label>
+                  <Label className="text-xs">Класс</Label>
                   <Select value={source.grade || ""} onValueChange={(v) => setSource({ grade: v })}>
-                    <SelectTrigger><SelectValue placeholder="Grade" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Класс" /></SelectTrigger>
                     <SelectContent>
                       {GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                     </SelectContent>
@@ -215,17 +215,17 @@ function Workspace() {
           </Tabs>
 
           <div>
-            <Label className="text-xs">Additional instructions</Label>
+            <Label className="text-xs">Дополнительные инструкции</Label>
             <Textarea
               rows={3}
               value={source.userInstructions}
               onChange={(e) => setSource({ userInstructions: e.target.value })}
-              placeholder="What to emphasize, what to skip, audience notes..."
+              placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
             />
           </div>
 
           <PromptDisclosure
-            label="Show analysis prompt"
+            label="Показать промпт анализа"
             value={source.mode === "topic" ? prompts.analysisTopicOnly : prompts.analysisWithContent}
             onChange={(v) =>
               setPrompt(source.mode === "topic" ? "analysisTopicOnly" : "analysisWithContent", v)
@@ -236,7 +236,7 @@ function Workspace() {
           <div className="flex justify-start">
             <Button onClick={onAnalyze} disabled={loading !== null}>
               {loading === "analyze" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-              Analyze
+              Анализировать
             </Button>
           </div>
         </div>
