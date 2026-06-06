@@ -23,8 +23,8 @@ function StylesPage() {
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Infographic Styles</h1>
-        <Button variant="outline" size="sm" onClick={reset}>Reset to defaults</Button>
+        <h1 className="text-lg font-semibold">Стили инфографики</h1>
+        <Button variant="outline" size="sm" onClick={reset}>Сбросить к умолчаниям</Button>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 space-y-2">
