@@ -86,9 +86,9 @@ function Workspace() {
       if (!parsed.content || !parsed.recommendedStyle) throw new Error("Model response missing fields");
       pushContent(parsed);
       setPaneMode("content");
-      toast.success("Content analyzed");
+      toast.success("Контент проанализирован");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Analysis failed");
+      toast.error(e instanceof Error ? e.message : "Не удалось выполнить анализ");
     } finally {
       setLoading(null);
     }
@@ -96,7 +96,7 @@ function Workspace() {
 
   async function onCreateBrief() {
     if (!activeContent) return;
-    if (!activeStyle) { toast.error("Select a style first"); return; }
+    if (!activeStyle) { toast.error("Сначала выберите стиль"); return; }
     try {
       setLoading("brief");
       const filled = prompts.designBrief
@@ -108,13 +108,13 @@ function Workspace() {
       const raw = await callTextLLM({ model: models.brief, prompt: filled });
       const parsed = extractJson<DesignBriefResult>(raw);
       if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
-        throw new Error("Model response missing fields");
+        throw new Error("В ответе модели не хватает полей");
       }
       pushBrief(parsed);
       setPaneMode("wireframe");
-      toast.success("Design brief created");
+      toast.success("Дизайн-бриф создан");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Brief generation failed");
+      toast.error(e instanceof Error ? e.message : "Не удалось создать бриф");
     } finally {
       setLoading(null);
     }
@@ -130,9 +130,9 @@ function Workspace() {
       const dataUrl = await callImageLLM({ model: models.image, prompt });
       pushImage(dataUrl);
       setPaneMode("image");
-      toast.success("Image generated");
+      toast.success("Изображение сгенерировано");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Image generation failed");
+      toast.error(e instanceof Error ? e.message : "Не удалось сгенерировать изображение");
     } finally {
       setLoading(null);
     }
