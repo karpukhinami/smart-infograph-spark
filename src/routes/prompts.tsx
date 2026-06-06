@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { useSettingsStore } from "@/store/useSettingsStore";
 
 export const Route = createFileRoute("/prompts")({
-  head: () => ({ meta: [{ title: "Prompts — AI Infographic Generator" }] }),
+  head: () => ({ meta: [{ title: "Промпты — AI Infographic Generator" }] }),
   component: PromptsPage,
 });
 
@@ -13,22 +13,22 @@ function PromptsPage() {
   const setPrompt = useSettingsStore((s) => s.setPrompt);
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-6">
-      <h1 className="text-lg font-semibold">Base Prompts</h1>
+      <h1 className="text-lg font-semibold">Базовые промпты</h1>
       <p className="text-xs text-muted-foreground">
-        Edits persist for the current session. Each main-page disclosure also edits the same value.
+        Изменения сохраняются на текущую сессию. Те же значения редактируются и через раскрывашки на главной странице.
       </p>
       <Block
-        label="Analysis prompt — with source content"
+        label="Промпт анализа — с исходным текстом"
         value={prompts.analysisWithContent}
         onChange={(v) => setPrompt("analysisWithContent", v)}
       />
       <Block
-        label="Analysis prompt — topic only"
+        label="Промпт анализа — только тема"
         value={prompts.analysisTopicOnly}
         onChange={(v) => setPrompt("analysisTopicOnly", v)}
       />
       <Block
-        label="Design-brief prompt (stage 3)"
+        label="Промпт дизайн-брифа (этап 3)"
         value={prompts.designBrief}
         onChange={(v) => setPrompt("designBrief", v)}
       />
