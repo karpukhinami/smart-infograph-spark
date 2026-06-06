@@ -44,9 +44,11 @@ export const useSettingsStore = create<SettingsState>()(
         analysisTopicOnly: promptAnalysisTopic,
         designBrief: promptDesignBrief,
       },
+      styleGuidelines: DEFAULT_GUIDELINES,
       styles: defaultStyles as InfographicStyle[],
       profiles: [defaultProfile as DesignProfile],
       setPrompt: (k, v) => set((s) => ({ prompts: { ...s.prompts, [k]: v } })),
+      setStyleGuidelines: (v) => set({ styleGuidelines: v }),
       upsertStyle: (s) =>
         set((state) => ({
           styles: state.styles.some((x) => x.id === s.id)
