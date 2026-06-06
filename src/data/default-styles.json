@@ -2,81 +2,81 @@
   {
     "id": "modern-bento",
     "name": "Modern Bento",
-    "shortDescription": "Modular bento-grid layout with cards of varied sizes; suitable for grouping definitions, examples and facts together.",
+    "shortDescription": "Модульная bento-сетка из карточек разного размера; хорошо подходит, чтобы группировать определения, примеры и факты вместе.",
     "enabled": true,
     "guidelines": "Правила для стиля Modern Bento:\n1. Композиция строится из карточек разного размера, объединённых в bento-сетку.\n2. Каждая карточка содержит одну законченную мысль (определение, пример, факт).\n3. Размер карточки соответствует важности информации.\n4. Используй цвет для группировки карточек по категориям.\n5. Между карточками должно быть достаточно воздуха.",
     "rules": {
-      "composition": "bento",
-      "symmetry": "moderate",
-      "primaryCarrier": "mixed",
-      "colorApproach": "color codes categories",
-      "typography": "contrast between headings and body",
-      "illustration": "many small schemes",
-      "character": "modern card"
+      "composition": "бенто-сетка",
+      "symmetry": "умеренная",
+      "primaryCarrier": "смешанный (текст + схемы)",
+      "colorApproach": "цвет кодирует категории",
+      "typography": "контраст между заголовками и основным текстом",
+      "illustration": "много небольших схем",
+      "character": "современные карточки"
     }
   },
   {
     "id": "school-reference-card",
-    "name": "School Reference Card",
-    "shortDescription": "Reference-style layout focused on rules, definitions and quick lookup; dense text-first organisation.",
+    "name": "Школьная справочная карточка",
+    "shortDescription": "Справочная вёрстка, ориентированная на правила, определения и быстрый поиск; плотная текстовая организация.",
     "enabled": true,
-    "guidelines": "Правила для стиля School Reference Card:\n1. Информация организована как справочник: правила, определения, быстрый поиск.\n2. Текст — главный носитель информации, иллюстрации минимальны.\n3. Строгая симметрия и единое типографическое семейство.\n4. Цвет используется сдержанно, только для выделения ключевых терминов.\n5. Чёткая иерархия: заголовок → подзаголовок → определение → пример.",
+    "guidelines": "Правила для стиля «Школьная справочная карточка»:\n1. Информация организована как справочник: правила, определения, быстрый поиск.\n2. Текст — главный носитель информации, иллюстрации минимальны.\n3. Строгая симметрия и единое типографическое семейство.\n4. Цвет используется сдержанно, только для выделения ключевых терминов.\n5. Чёткая иерархия: заголовок → подзаголовок → определение → пример.",
     "rules": {
-      "composition": "card",
-      "symmetry": "strict",
-      "primaryCarrier": "text",
-      "colorApproach": "minimal use of color",
-      "typography": "unified type family",
-      "illustration": "almost no illustrations",
-      "character": "reference"
+      "composition": "карточка",
+      "symmetry": "строгая",
+      "primaryCarrier": "текст",
+      "colorApproach": "минимальное использование цвета",
+      "typography": "единое типографическое семейство",
+      "illustration": "почти без иллюстраций",
+      "character": "справочник"
     }
   },
   {
     "id": "timeline",
-    "name": "Timeline",
-    "shortDescription": "Sequential timeline composition; best when the material is a process, history or step-by-step procedure.",
+    "name": "Таймлайн",
+    "shortDescription": "Последовательная композиция-таймлайн; лучше всего подходит, когда материал — это процесс, история или пошаговая инструкция.",
     "enabled": true,
-    "guidelines": "Правила для стиля Timeline:\n1. Композиция выстраивается вдоль явной временной/процессной оси.\n2. Каждый шаг пронумерован и визуально связан со следующим (стрелки, линии).\n3. Цвет кодирует этапы или фазы процесса.\n4. Подпись к шагу включает краткое название и пояснение.\n5. Главная ось — самый сильный визуальный элемент композиции.",
+    "guidelines": "Правила для стиля «Таймлайн»:\n1. Композиция выстраивается вдоль явной временной или процессной оси.\n2. Каждый шаг пронумерован и визуально связан со следующим (стрелки, линии).\n3. Цвет кодирует этапы или фазы процесса.\n4. Подпись к шагу включает краткое название и пояснение.\n5. Главная ось — самый сильный визуальный элемент композиции.",
     "rules": {
-      "composition": "diagrammatic",
-      "symmetry": "free",
-      "primaryCarrier": "diagrams",
-      "colorApproach": "color codes processes",
-      "typography": "contrast between headings and body",
-      "illustration": "many small schemes",
-      "character": "scientific scheme"
+      "composition": "диаграмма-схема",
+      "symmetry": "свободная",
+      "primaryCarrier": "диаграммы и схемы",
+      "colorApproach": "цвет кодирует этапы процесса",
+      "typography": "контраст между заголовками и основным текстом",
+      "illustration": "много небольших схем",
+      "character": "научная схема"
     }
   },
   {
     "id": "exam-cheat-sheet",
-    "name": "Exam Cheat Sheet",
-    "shortDescription": "High-density cheat sheet with formulas, warnings and key facts compactly arranged for fast recall.",
+    "name": "Шпаргалка к экзамену",
+    "shortDescription": "Плотная шпаргалка с формулами, предупреждениями и ключевыми фактами, компактно расположенными для быстрого запоминания.",
     "enabled": true,
-    "guidelines": "Правила для стиля Exam Cheat Sheet:\n1. Максимальная плотность информации без потери читаемости.\n2. Формулы оформляются отдельным визуальным блоком с собственной типографикой.\n3. Предупреждения и типичные ошибки выделяются цветом-акцентом.\n4. Строгая модульная сетка в стиле журнальной вёрстки.\n5. Минимум декоративных иллюстраций — только смысловые пиктограммы.",
+    "guidelines": "Правила для стиля «Шпаргалка к экзамену»:\n1. Максимальная плотность информации без потери читаемости.\n2. Формулы оформляются отдельным визуальным блоком с собственной типографикой.\n3. Предупреждения и типичные ошибки выделяются цветом-акцентом.\n4. Строгая модульная сетка в стиле журнальной вёрстки.\n5. Минимум декоративных иллюстраций — только смысловые пиктограммы.",
     "rules": {
-      "composition": "magazine",
-      "symmetry": "strict",
-      "primaryCarrier": "text",
-      "colorApproach": "color codes warnings",
-      "typography": "separate treatment for formulas",
-      "illustration": "almost no illustrations",
-      "character": "exam cheat sheet"
+      "composition": "журнальная вёрстка",
+      "symmetry": "строгая",
+      "primaryCarrier": "текст",
+      "colorApproach": "цвет кодирует предупреждения",
+      "typography": "отдельное оформление для формул",
+      "illustration": "почти без иллюстраций",
+      "character": "экзаменационная шпаргалка"
     }
   },
   {
     "id": "editorial-education-poster",
-    "name": "Editorial Education Poster",
-    "shortDescription": "Magazine-style educational poster with a large central visual and editorial typographic hierarchy.",
+    "name": "Редакционный учебный плакат",
+    "shortDescription": "Учебный плакат в журнальном стиле с крупным центральным визуальным объектом и редакционной типографической иерархией.",
     "enabled": true,
-    "guidelines": "Правила для стиля Editorial Education Poster:\n1. В центре композиции — крупный визуальный объект (иллюстрация или фотография).\n2. Типографика выстроена по журнальным правилам: контрастные заголовки, выраженная иерархия.\n3. Свободная асимметричная композиция вокруг центрального образа.\n4. Цвет работает как редакционный акцент, а не как код категорий.\n5. Подписи и факты группируются вокруг главного объекта.",
+    "guidelines": "Правила для стиля «Редакционный учебный плакат»:\n1. В центре композиции — крупный визуальный объект (иллюстрация или фотография).\n2. Типографика выстроена по журнальным правилам: контрастные заголовки, выраженная иерархия.\n3. Свободная асимметричная композиция вокруг центрального образа.\n4. Цвет работает как редакционный акцент, а не как код категорий.\n5. Подписи и факты группируются вокруг главного объекта.",
     "rules": {
-      "composition": "poster",
-      "symmetry": "free",
-      "primaryCarrier": "images",
-      "colorApproach": "color codes categories",
-      "typography": "contrast between headings and body",
-      "illustration": "large central object",
-      "character": "educational poster"
+      "composition": "плакат",
+      "symmetry": "свободная",
+      "primaryCarrier": "изображения",
+      "colorApproach": "цвет кодирует категории",
+      "typography": "контраст между заголовками и основным текстом",
+      "illustration": "крупный центральный объект",
+      "character": "учебный плакат"
     }
   }
 ]
