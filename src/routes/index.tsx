@@ -244,10 +244,10 @@ function Workspace() {
         {/* STAGE 2 controls */}
         {activeContent && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <h2 className="text-sm font-semibold">2 · Style &amp; Design</h2>
+            <h2 className="text-sm font-semibold">2 · Стиль и дизайн</h2>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">Infographic style</Label>
+                <Label className="text-xs">Стиль инфографики</Label>
                 <Select
                   value={selectedStyleId ?? activeContent.value.recommendedStyle}
                   onValueChange={setSelectedStyleId}
@@ -259,7 +259,7 @@ function Workspace() {
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Design profile (colors &amp; fonts)</Label>
+                <Label className="text-xs">Профиль дизайна (цвета и шрифты)</Label>
                 <Select
                   value={selectedProfileName ?? activeProfile?.profileName ?? ""}
                   onValueChange={setSelectedProfileName}
@@ -272,7 +272,7 @@ function Workspace() {
               </div>
             </div>
             <PromptDisclosure
-              label="Show design-brief prompt"
+              label="Показать промпт дизайн-брифа"
               value={prompts.designBrief}
               onChange={(v) => setPrompt("designBrief", v)}
               rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
@@ -280,7 +280,7 @@ function Workspace() {
             <div>
               <Button onClick={onCreateBrief} disabled={loading !== null}>
                 {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Create design brief
+                Создать дизайн-бриф
               </Button>
             </div>
           </div>
@@ -289,18 +289,18 @@ function Workspace() {
         {/* STAGE 3 controls */}
         {activeBrief && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <h2 className="text-sm font-semibold">3 · Image generation</h2>
+            <h2 className="text-sm font-semibold">3 · Генерация изображения</h2>
             <div>
-              <Label className="text-xs">Additional wishes (priority on regeneration)</Label>
+              <Label className="text-xs">Дополнительные пожелания (приоритет при регенерации)</Label>
               <Textarea
                 rows={3}
                 value={userWishes}
                 onChange={(e) => setUserWishes(e.target.value)}
-                placeholder="Anything you'd like to bias the next generation toward..."
+                placeholder="Чем подкорректировать следующую генерацию…"
               />
             </div>
             <PromptDisclosure
-              label="View image prompt"
+              label="Показать промпт изображения"
               value={activeBrief.value.PromptForImageGeneration}
               onChange={(v) => updateActiveBriefPrompt(v)}
               rightSlot={<ModelPicker kind="image" value={models.image} onChange={(v) => setModel("image", v)} />}
@@ -308,7 +308,7 @@ function Workspace() {
             <div>
               <Button onClick={onGenerateImage} disabled={loading !== null}>
                 {loading === "image" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Generate image
+                Сгенерировать изображение
               </Button>
             </div>
           </div>
