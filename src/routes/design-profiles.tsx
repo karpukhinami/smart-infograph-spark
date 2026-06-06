@@ -23,7 +23,7 @@ import {
 } from "@/data/design-options";
 
 export const Route = createFileRoute("/design-profiles")({
-  head: () => ({ meta: [{ title: "Design Profiles — AI Infographic Generator" }] }),
+  head: () => ({ meta: [{ title: "Профили дизайна — AI Infographic Generator" }] }),
   component: ProfilesPage,
 });
 
