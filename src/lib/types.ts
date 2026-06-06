@@ -3,6 +3,7 @@ export interface InfographicStyle {
   name: string;
   shortDescription: string;
   enabled: boolean;
+  guidelines: string;
   rules: {
     composition: string;
     symmetry: string;

@@ -53,7 +53,7 @@ function Workspace() {
   const setPrompt = useSettingsStore((s) => s.setPrompt);
   const styles = useSettingsStore((s) => s.styles);
   const profiles = useSettingsStore((s) => s.profiles);
-  const styleGuidelines = useSettingsStore((s) => s.styleGuidelines);
+  
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
   const [loading, setLoading] = useState<null | "analyze" | "brief" | "image">(null);
@@ -101,7 +101,7 @@ function Workspace() {
       setLoading("brief");
       const filled = prompts.designBrief
         .replace("{{CONTENT_SUMMARY}}", activeContent.value.content)
-        .replace("{{STYLE_GUIDELINES}}", styleGuidelines || "(none)")
+        .replace("{{STYLE_GUIDELINES}}", activeStyle?.guidelines || "(none)")
         .replace("{{USER_WISHES}}", userWishes || "(none)")
         .replace("{{STYLE_SPEC}}", JSON.stringify(activeStyle, null, 2))
         .replace("{{DESIGN_PROFILE}}", JSON.stringify(activeProfile ?? {}, null, 2));

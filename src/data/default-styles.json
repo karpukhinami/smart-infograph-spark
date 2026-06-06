@@ -4,6 +4,7 @@
     "name": "Modern Bento",
     "shortDescription": "Modular bento-grid layout with cards of varied sizes; suitable for grouping definitions, examples and facts together.",
     "enabled": true,
+    "guidelines": "Правила для стиля Modern Bento:\n1. Композиция строится из карточек разного размера, объединённых в bento-сетку.\n2. Каждая карточка содержит одну законченную мысль (определение, пример, факт).\n3. Размер карточки соответствует важности информации.\n4. Используй цвет для группировки карточек по категориям.\n5. Между карточками должно быть достаточно воздуха.",
     "rules": {
       "composition": "bento",
       "symmetry": "moderate",
@@ -19,6 +20,7 @@
     "name": "School Reference Card",
     "shortDescription": "Reference-style layout focused on rules, definitions and quick lookup; dense text-first organisation.",
     "enabled": true,
+    "guidelines": "Правила для стиля School Reference Card:\n1. Информация организована как справочник: правила, определения, быстрый поиск.\n2. Текст — главный носитель информации, иллюстрации минимальны.\n3. Строгая симметрия и единое типографическое семейство.\n4. Цвет используется сдержанно, только для выделения ключевых терминов.\n5. Чёткая иерархия: заголовок → подзаголовок → определение → пример.",
     "rules": {
       "composition": "card",
       "symmetry": "strict",
@@ -34,6 +36,7 @@
     "name": "Timeline",
     "shortDescription": "Sequential timeline composition; best when the material is a process, history or step-by-step procedure.",
     "enabled": true,
+    "guidelines": "Правила для стиля Timeline:\n1. Композиция выстраивается вдоль явной временной/процессной оси.\n2. Каждый шаг пронумерован и визуально связан со следующим (стрелки, линии).\n3. Цвет кодирует этапы или фазы процесса.\n4. Подпись к шагу включает краткое название и пояснение.\n5. Главная ось — самый сильный визуальный элемент композиции.",
     "rules": {
       "composition": "diagrammatic",
       "symmetry": "free",
@@ -49,6 +52,7 @@
     "name": "Exam Cheat Sheet",
     "shortDescription": "High-density cheat sheet with formulas, warnings and key facts compactly arranged for fast recall.",
     "enabled": true,
+    "guidelines": "Правила для стиля Exam Cheat Sheet:\n1. Максимальная плотность информации без потери читаемости.\n2. Формулы оформляются отдельным визуальным блоком с собственной типографикой.\n3. Предупреждения и типичные ошибки выделяются цветом-акцентом.\n4. Строгая модульная сетка в стиле журнальной вёрстки.\n5. Минимум декоративных иллюстраций — только смысловые пиктограммы.",
     "rules": {
       "composition": "magazine",
       "symmetry": "strict",
@@ -64,6 +68,7 @@
     "name": "Editorial Education Poster",
     "shortDescription": "Magazine-style educational poster with a large central visual and editorial typographic hierarchy.",
     "enabled": true,
+    "guidelines": "Правила для стиля Editorial Education Poster:\n1. В центре композиции — крупный визуальный объект (иллюстрация или фотография).\n2. Типографика выстроена по журнальным правилам: контрастные заголовки, выраженная иерархия.\n3. Свободная асимметричная композиция вокруг центрального образа.\n4. Цвет работает как редакционный акцент, а не как код категорий.\n5. Подписи и факты группируются вокруг главного объекта.",
     "rules": {
       "composition": "poster",
       "symmetry": "free",

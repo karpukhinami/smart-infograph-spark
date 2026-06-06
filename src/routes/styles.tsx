@@ -17,8 +17,6 @@ function StylesPage() {
   const upsert = useSettingsStore((s) => s.upsertStyle);
   const toggle = useSettingsStore((s) => s.toggleStyle);
   const reset = useSettingsStore((s) => s.resetStyles);
-  const guidelines = useSettingsStore((s) => s.styleGuidelines);
-  const setGuidelines = useSettingsStore((s) => s.setStyleGuidelines);
 
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-4">
@@ -26,19 +24,9 @@ function StylesPage() {
         <h1 className="text-lg font-semibold">Стили инфографики</h1>
         <Button variant="outline" size="sm" onClick={reset}>Сбросить к умолчаниям</Button>
       </div>
-
-      <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-        <Label className="text-sm font-semibold">Общие правила формирования инфографики</Label>
-        <p className="text-xs text-muted-foreground">
-          Эти правила применяются ко всем стилям и передаются модели на этапе создания дизайн-брифа.
-        </p>
-        <Textarea
-          rows={10}
-          value={guidelines}
-          onChange={(e) => setGuidelines(e.target.value)}
-          className="font-mono text-xs"
-        />
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Для каждого стиля можно задать свои правила формирования инфографики. Эти правила передаются модели на этапе создания дизайн-брифа, когда выбран соответствующий стиль.
+      </p>
 
       {styles.map((s) => <StyleEditor key={s.id} value={s} onChange={upsert} onToggle={toggle} />)}
     </div>
@@ -72,6 +60,16 @@ function StyleEditor({
           rows={2}
           value={value.shortDescription}
           onChange={(e) => onChange({ ...value, shortDescription: e.target.value })}
+        />
+      </div>
+      <div>
+        <Label className="text-xs">Правила формирования инфографики для этого стиля</Label>
+        <Textarea
+          rows={8}
+          value={value.guidelines ?? ""}
+          onChange={(e) => onChange({ ...value, guidelines: e.target.value })}
+          className="font-mono text-xs"
+          placeholder="Опишите правила композиции, иерархии, цвета и типографики именно для этого стиля…"
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
