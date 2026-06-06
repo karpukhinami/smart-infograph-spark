@@ -86,9 +86,9 @@ function Workspace() {
       if (!parsed.content || !parsed.recommendedStyle) throw new Error("Model response missing fields");
       pushContent(parsed);
       setPaneMode("content");
-      toast.success("Content analyzed");
+      toast.success("Контент проанализирован");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Analysis failed");
+      toast.error(e instanceof Error ? e.message : "Не удалось выполнить анализ");
     } finally {
       setLoading(null);
     }
@@ -96,7 +96,7 @@ function Workspace() {
 
   async function onCreateBrief() {
     if (!activeContent) return;
-    if (!activeStyle) { toast.error("Select a style first"); return; }
+    if (!activeStyle) { toast.error("Сначала выберите стиль"); return; }
     try {
       setLoading("brief");
       const filled = prompts.designBrief
@@ -108,13 +108,13 @@ function Workspace() {
       const raw = await callTextLLM({ model: models.brief, prompt: filled });
       const parsed = extractJson<DesignBriefResult>(raw);
       if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
-        throw new Error("Model response missing fields");
+        throw new Error("В ответе модели не хватает полей");
       }
       pushBrief(parsed);
       setPaneMode("wireframe");
-      toast.success("Design brief created");
+      toast.success("Дизайн-бриф создан");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Brief generation failed");
+      toast.error(e instanceof Error ? e.message : "Не удалось создать бриф");
     } finally {
       setLoading(null);
     }
@@ -130,9 +130,9 @@ function Workspace() {
       const dataUrl = await callImageLLM({ model: models.image, prompt });
       pushImage(dataUrl);
       setPaneMode("image");
-      toast.success("Image generated");
+      toast.success("Изображение сгенерировано");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Image generation failed");
+      toast.error(e instanceof Error ? e.message : "Не удалось сгенерировать изображение");
     } finally {
       setLoading(null);
     }
@@ -153,20 +153,20 @@ function Workspace() {
       <section className="space-y-4">
         <div className="rounded-lg border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">1 · Input</h2>
+            <h2 className="text-sm font-semibold">1 · Исходные данные</h2>
             <Button size="sm" variant="ghost" onClick={resetProject}>
-              <RotateCcw className="size-3.5 mr-1" /> Start over
+              <RotateCcw className="size-3.5 mr-1" /> Начать заново
             </Button>
           </div>
           <Tabs value={source.mode} onValueChange={(v) => setSource({ mode: v as "text" | "file" | "topic" })}>
             <TabsList>
-              <TabsTrigger value="text">Paste text</TabsTrigger>
-              <TabsTrigger value="file">Upload file</TabsTrigger>
-              <TabsTrigger value="topic">Topic only</TabsTrigger>
+              <TabsTrigger value="text">Вставить текст</TabsTrigger>
+              <TabsTrigger value="file">Загрузить файл</TabsTrigger>
+              <TabsTrigger value="topic">Только тема</TabsTrigger>
             </TabsList>
             <TabsContent value="text" className="space-y-2">
               <Textarea
-                placeholder="Paste the source text..."
+                placeholder="Вставьте исходный текст…"
                 rows={8}
                 value={source.text}
                 onChange={(e) => setSource({ text: e.target.value })}
@@ -185,26 +185,26 @@ function Workspace() {
             <TabsContent value="topic" className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <div className="col-span-2">
-                  <Label className="text-xs">Topic</Label>
+                  <Label className="text-xs">Тема</Label>
                   <Input
-                    placeholder="e.g. Клеточное строение растений"
+                    placeholder="например, Клеточное строение растений"
                     value={source.topic ?? ""}
                     onChange={(e) => setSource({ topic: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Subject</Label>
+                  <Label className="text-xs">Предмет</Label>
                   <Select value={source.subject || ""} onValueChange={(v) => setSource({ subject: v })}>
-                    <SelectTrigger><SelectValue placeholder="Subject" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Предмет" /></SelectTrigger>
                     <SelectContent>
                       {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Grade</Label>
+                  <Label className="text-xs">Класс</Label>
                   <Select value={source.grade || ""} onValueChange={(v) => setSource({ grade: v })}>
-                    <SelectTrigger><SelectValue placeholder="Grade" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Класс" /></SelectTrigger>
                     <SelectContent>
                       {GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                     </SelectContent>
@@ -215,17 +215,17 @@ function Workspace() {
           </Tabs>
 
           <div>
-            <Label className="text-xs">Additional instructions</Label>
+            <Label className="text-xs">Дополнительные инструкции</Label>
             <Textarea
               rows={3}
               value={source.userInstructions}
               onChange={(e) => setSource({ userInstructions: e.target.value })}
-              placeholder="What to emphasize, what to skip, audience notes..."
+              placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
             />
           </div>
 
           <PromptDisclosure
-            label="Show analysis prompt"
+            label="Показать промпт анализа"
             value={source.mode === "topic" ? prompts.analysisTopicOnly : prompts.analysisWithContent}
             onChange={(v) =>
               setPrompt(source.mode === "topic" ? "analysisTopicOnly" : "analysisWithContent", v)
@@ -236,7 +236,7 @@ function Workspace() {
           <div className="flex justify-start">
             <Button onClick={onAnalyze} disabled={loading !== null}>
               {loading === "analyze" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-              Analyze
+              Анализировать
             </Button>
           </div>
         </div>
@@ -244,10 +244,10 @@ function Workspace() {
         {/* STAGE 2 controls */}
         {activeContent && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <h2 className="text-sm font-semibold">2 · Style &amp; Design</h2>
+            <h2 className="text-sm font-semibold">2 · Стиль и дизайн</h2>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">Infographic style</Label>
+                <Label className="text-xs">Стиль инфографики</Label>
                 <Select
                   value={selectedStyleId ?? activeContent.value.recommendedStyle}
                   onValueChange={setSelectedStyleId}
@@ -259,7 +259,7 @@ function Workspace() {
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Design profile (colors &amp; fonts)</Label>
+                <Label className="text-xs">Профиль дизайна (цвета и шрифты)</Label>
                 <Select
                   value={selectedProfileName ?? activeProfile?.profileName ?? ""}
                   onValueChange={setSelectedProfileName}
@@ -272,7 +272,7 @@ function Workspace() {
               </div>
             </div>
             <PromptDisclosure
-              label="Show design-brief prompt"
+              label="Показать промпт дизайн-брифа"
               value={prompts.designBrief}
               onChange={(v) => setPrompt("designBrief", v)}
               rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
@@ -280,7 +280,7 @@ function Workspace() {
             <div>
               <Button onClick={onCreateBrief} disabled={loading !== null}>
                 {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Create design brief
+                Создать дизайн-бриф
               </Button>
             </div>
           </div>
@@ -289,18 +289,18 @@ function Workspace() {
         {/* STAGE 3 controls */}
         {activeBrief && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <h2 className="text-sm font-semibold">3 · Image generation</h2>
+            <h2 className="text-sm font-semibold">3 · Генерация изображения</h2>
             <div>
-              <Label className="text-xs">Additional wishes (priority on regeneration)</Label>
+              <Label className="text-xs">Дополнительные пожелания (приоритет при регенерации)</Label>
               <Textarea
                 rows={3}
                 value={userWishes}
                 onChange={(e) => setUserWishes(e.target.value)}
-                placeholder="Anything you'd like to bias the next generation toward..."
+                placeholder="Чем подкорректировать следующую генерацию…"
               />
             </div>
             <PromptDisclosure
-              label="View image prompt"
+              label="Показать промпт изображения"
               value={activeBrief.value.PromptForImageGeneration}
               onChange={(v) => updateActiveBriefPrompt(v)}
               rightSlot={<ModelPicker kind="image" value={models.image} onChange={(v) => setModel("image", v)} />}
@@ -308,7 +308,7 @@ function Workspace() {
             <div>
               <Button onClick={onGenerateImage} disabled={loading !== null}>
                 {loading === "image" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Generate image
+                Сгенерировать изображение
               </Button>
             </div>
           </div>
@@ -320,9 +320,9 @@ function Workspace() {
         <div className="rounded-lg border border-border bg-card p-2">
           <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as PaneMode)}>
             <TabsList>
-              <TabsTrigger value="content" disabled={!activeContent}>Content</TabsTrigger>
-              <TabsTrigger value="wireframe" disabled={!activeBrief}>Wireframe</TabsTrigger>
-              <TabsTrigger value="image" disabled={!activeImage}>Final image</TabsTrigger>
+              <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
+              <TabsTrigger value="wireframe" disabled={!activeBrief}>Каркас</TabsTrigger>
+              <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
 
             <TabsContent value="content" className="p-2 space-y-2">
@@ -330,7 +330,7 @@ function Workspace() {
                 <>
                   <div className="flex justify-end">
                     <Button size="sm" variant="outline" onClick={onAnalyze} disabled={loading !== null}>
-                      <RefreshCw className="size-3.5 mr-1" /> Regenerate
+                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
                   </div>
                   <Textarea
@@ -343,11 +343,11 @@ function Workspace() {
                     <Markdown>{activeContent.value.content}</Markdown>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Recommended style: <code>{activeContent.value.recommendedStyle}</code>
+                    Рекомендуемый стиль: <code>{activeContent.value.recommendedStyle}</code>
                   </p>
                 </>
               ) : (
-                <EmptyState text="Run analysis to see the content summary here." />
+                <EmptyState text="Запустите анализ, чтобы увидеть здесь сводку по контенту." />
               )}
             </TabsContent>
 
@@ -356,13 +356,13 @@ function Workspace() {
                 <>
                   <div className="flex justify-end">
                     <Button size="sm" variant="outline" onClick={onCreateBrief} disabled={loading !== null}>
-                      <RefreshCw className="size-3.5 mr-1" /> Regenerate
+                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
                   </div>
                   <WireframeView wf={activeBrief.value.WireframeDescription} />
                 </>
               ) : (
-                <EmptyState text="Create a design brief to see the wireframe." />
+                <EmptyState text="Создайте дизайн-бриф, чтобы увидеть каркас." />
               )}
             </TabsContent>
 
@@ -371,13 +371,13 @@ function Workspace() {
                 <>
                   <div className="flex justify-end">
                     <Button size="sm" variant="outline" onClick={onGenerateImage} disabled={loading !== null}>
-                      <RefreshCw className="size-3.5 mr-1" /> Regenerate
+                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
                   </div>
-                  <img src={activeImage.value} alt="Generated infographic" className="w-full rounded-md border border-border" />
+                  <img src={activeImage.value} alt="Сгенерированная инфографика" className="w-full rounded-md border border-border" />
                 </>
               ) : (
-                <EmptyState text="Generate the final image to see it here." />
+                <EmptyState text="Сгенерируйте итоговое изображение, чтобы увидеть его здесь." />
               )}
             </TabsContent>
           </Tabs>

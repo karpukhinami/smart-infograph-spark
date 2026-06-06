@@ -14,7 +14,7 @@ export function ModelPicker({
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="w-[260px]">
-        <SelectValue placeholder="Model" />
+        <SelectValue placeholder="Модель" />
       </SelectTrigger>
       <SelectContent>
         {list.map((m) => (

@@ -8,7 +8,7 @@ export function HelpFiles() {
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1">
           <HelpCircle className="size-4" />
-          Help
+          Памятка
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[440px] max-h-[70vh] overflow-auto text-sm">

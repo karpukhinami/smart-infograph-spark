@@ -34,8 +34,8 @@ export function PromptDisclosure({
             className="font-mono text-xs"
           />
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => { onChange(draft); }}>Save</Button>
-            <Button size="sm" variant="outline" onClick={() => setDraft(value)}>Revert</Button>
+            <Button size="sm" onClick={() => { onChange(draft); }}>Сохранить</Button>
+            <Button size="sm" variant="outline" onClick={() => setDraft(value)}>Отменить</Button>
           </div>
         </div>
       )}

@@ -10,8 +10,8 @@ function NotFoundComponent() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Page not found.</p>
-        <Link to="/" className="mt-4 inline-block text-primary underline">Home</Link>
+        <p className="mt-2 text-sm text-muted-foreground">Страница не найдена.</p>
+        <Link to="/" className="mt-4 inline-block text-primary underline">На главную</Link>
       </div>
     </div>
   );
@@ -23,12 +23,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold">Something went wrong</h1>
+        <h1 className="text-xl font-semibold">Что-то пошло не так</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
         <button
           onClick={() => { router.invalidate(); reset(); }}
           className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >Try again</button>
+        >Повторить</button>
       </div>
     </div>
   );
@@ -70,10 +70,10 @@ function RootComponent() {
               AI Infographic Generator
             </Link>
             <nav className="flex gap-4 text-sm text-muted-foreground">
-              <Link to="/" activeProps={{ className: "text-foreground font-medium" }}>Workspace</Link>
-              <Link to="/styles" activeProps={{ className: "text-foreground font-medium" }}>Styles</Link>
-              <Link to="/design-profiles" activeProps={{ className: "text-foreground font-medium" }}>Design profiles</Link>
-              <Link to="/prompts" activeProps={{ className: "text-foreground font-medium" }}>Prompts</Link>
+              <Link to="/" activeProps={{ className: "text-foreground font-medium" }}>Рабочее место</Link>
+              <Link to="/styles" activeProps={{ className: "text-foreground font-medium" }}>Стили</Link>
+              <Link to="/design-profiles" activeProps={{ className: "text-foreground font-medium" }}>Профили дизайна</Link>
+              <Link to="/prompts" activeProps={{ className: "text-foreground font-medium" }}>Промпты</Link>
             </nav>
           </div>
         </header>

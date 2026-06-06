@@ -23,7 +23,7 @@ import {
 } from "@/data/design-options";
 
 export const Route = createFileRoute("/design-profiles")({
-  head: () => ({ meta: [{ title: "Design Profiles — AI Infographic Generator" }] }),
+  head: () => ({ meta: [{ title: "Профили дизайна — AI Infographic Generator" }] }),
   component: ProfilesPage,
 });
 
@@ -35,17 +35,17 @@ function ProfilesPage() {
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Design Profiles</h1>
+        <h1 className="text-lg font-semibold">Профили дизайна</h1>
         <Button
           size="sm"
           onClick={() =>
             upsert({
               ...profiles[0],
-              profileName: `Profile ${profiles.length + 1}`,
+              profileName: `Профиль ${profiles.length + 1}`,
             })
           }
         >
-          Duplicate default
+          Дублировать стандартный
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -87,7 +87,7 @@ function ProfileEditor({
           onChange={(e) => setDraft({ ...draft, profileName: e.target.value })}
         />
         <div className="flex gap-2 shrink-0">
-          <Button size="sm" onClick={() => onChange(draft)}>Save</Button>
+          <Button size="sm" onClick={() => onChange(draft)}>Сохранить</Button>
           {canDelete && (
             <Button size="sm" variant="ghost" onClick={onDelete}>
               <Trash2 className="size-4" />
@@ -98,28 +98,28 @@ function ProfileEditor({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <ColorPicker
-          label="Background"
+          label="Фон"
           value={draft.background}
           onChange={(v) => setDraft({ ...draft, background: v })}
         />
         <ColorPicker
-          label="Primary accent"
+          label="Основной акцент"
           value={draft.accents.primary}
           onChange={(v) => setDraft({ ...draft, accents: { ...draft.accents, primary: v } })}
         />
         <ColorPicker
-          label="Secondary accent"
+          label="Дополнительный акцент"
           value={draft.accents.secondary}
           onChange={(v) => setDraft({ ...draft, accents: { ...draft.accents, secondary: v } })}
         />
         <MultiColorPicker
-          label="Additional accents"
+          label="Прочие акценты"
           values={draft.accents.additional}
           onChange={(v) => setDraft({ ...draft, accents: { ...draft.accents, additional: v } })}
         />
 
         <FontPicker
-          label="Primary font"
+          label="Основной шрифт"
           family={draft.fonts.primary.family}
           weights={draft.fonts.primary.weights}
           onChange={(family, weights) =>
@@ -127,7 +127,7 @@ function ProfileEditor({
           }
         />
         <FontPicker
-          label="Secondary font"
+          label="Дополнительный шрифт"
           family={draft.fonts.secondary.family}
           weights={draft.fonts.secondary.weights}
           onChange={(family, weights) =>
@@ -136,13 +136,13 @@ function ProfileEditor({
         />
 
         <SelectField
-          label="Border radius"
+          label="Скругление углов"
           value={draft.cardStyle.borderRadius}
           options={BORDER_RADIUS_OPTIONS}
           onChange={(v) => setDraft({ ...draft, cardStyle: { ...draft.cardStyle, borderRadius: v } })}
         />
         <SelectField
-          label="Border"
+          label="Обводка"
           value={draft.cardStyle.border}
           options={BORDER_OPTIONS}
           onChange={(v) => setDraft({ ...draft, cardStyle: { ...draft.cardStyle, border: v } })}
@@ -241,7 +241,7 @@ function MultiColorPicker({
       </div>
       <Select value="" onValueChange={add}>
         <SelectTrigger>
-          <SelectValue placeholder="Add color…" />
+          <SelectValue placeholder="Добавить цвет…" />
         </SelectTrigger>
         <SelectContent>
           {COLOR_PALETTE.map((c) => (
