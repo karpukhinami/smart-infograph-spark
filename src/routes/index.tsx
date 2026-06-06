@@ -15,6 +15,7 @@ import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { WireframeView } from "@/components/workspace/WireframeView";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
+import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { extractJson } from "@/lib/json-repair";
 import type { ContentSummary, DesignBriefResult, PaneMode } from "@/lib/types";
 
