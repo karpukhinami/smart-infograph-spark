@@ -1,0 +1,77 @@
+[
+  {
+    "id": "modern-bento",
+    "name": "Modern Bento",
+    "shortDescription": "Modular bento-grid layout with cards of varied sizes; suitable for grouping definitions, examples and facts together.",
+    "enabled": true,
+    "rules": {
+      "composition": "bento",
+      "symmetry": "moderate",
+      "primaryCarrier": "mixed",
+      "colorApproach": "color codes categories",
+      "typography": "contrast between headings and body",
+      "illustration": "many small schemes",
+      "character": "modern card"
+    }
+  },
+  {
+    "id": "school-reference-card",
+    "name": "School Reference Card",
+    "shortDescription": "Reference-style layout focused on rules, definitions and quick lookup; dense text-first organisation.",
+    "enabled": true,
+    "rules": {
+      "composition": "card",
+      "symmetry": "strict",
+      "primaryCarrier": "text",
+      "colorApproach": "minimal use of color",
+      "typography": "unified type family",
+      "illustration": "almost no illustrations",
+      "character": "reference"
+    }
+  },
+  {
+    "id": "timeline",
+    "name": "Timeline",
+    "shortDescription": "Sequential timeline composition; best when the material is a process, history or step-by-step procedure.",
+    "enabled": true,
+    "rules": {
+      "composition": "diagrammatic",
+      "symmetry": "free",
+      "primaryCarrier": "diagrams",
+      "colorApproach": "color codes processes",
+      "typography": "contrast between headings and body",
+      "illustration": "many small schemes",
+      "character": "scientific scheme"
+    }
+  },
+  {
+    "id": "exam-cheat-sheet",
+    "name": "Exam Cheat Sheet",
+    "shortDescription": "High-density cheat sheet with formulas, warnings and key facts compactly arranged for fast recall.",
+    "enabled": true,
+    "rules": {
+      "composition": "magazine",
+      "symmetry": "strict",
+      "primaryCarrier": "text",
+      "colorApproach": "color codes warnings",
+      "typography": "separate treatment for formulas",
+      "illustration": "almost no illustrations",
+      "character": "exam cheat sheet"
+    }
+  },
+  {
+    "id": "editorial-education-poster",
+    "name": "Editorial Education Poster",
+    "shortDescription": "Magazine-style educational poster with a large central visual and editorial typographic hierarchy.",
+    "enabled": true,
+    "rules": {
+      "composition": "poster",
+      "symmetry": "free",
+      "primaryCarrier": "images",
+      "colorApproach": "color codes categories",
+      "typography": "contrast between headings and body",
+      "illustration": "large central object",
+      "character": "educational poster"
+    }
+  }
+]

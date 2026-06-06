@@ -1,0 +1,4 @@
+[
+  { "id": "openai/gpt-4o-mini", "label": "OpenRouter: GPT-4o mini", "kind": "text" },
+  { "id": "anthropic/claude-3.5-sonnet", "label": "OpenRouter: Claude 3.5 Sonnet", "kind": "text" }
+]
