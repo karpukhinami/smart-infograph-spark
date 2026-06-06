@@ -1,0 +1,21 @@
+{
+  "profileName": "DefaultBentoStyle",
+  "background": "#FFFFFF",
+  "accents": {
+    "primary": "#F58220",
+    "secondary": "#6C5CE7",
+    "additional": ["#FCD9B0", "#DCD4F2"]
+  },
+  "fonts": {
+    "primary": { "family": "Roboto", "weights": ["Regular", "Bold", "Black"] },
+    "secondary": { "family": "Spectral", "weights": ["Italic", "BoldItalic", "Upright"] }
+  },
+  "usageRules": {
+    "primaryAccent": ["header", "keyText", "importantIcons"],
+    "secondaryAccent": ["cards", "labels", "minorIcons"],
+    "additionalAccents": ["illustrations", "arrows", "misc"]
+  },
+  "cardStyle": { "borderRadius": "16px", "border": "optional", "shadow": "none" },
+  "spacing": { "padding": "default", "interBlockGap": "default" },
+  "notesForAI": "If a block is not explicitly assigned a color or font, the AI can select a matching accent or weight from the palette."
+}
