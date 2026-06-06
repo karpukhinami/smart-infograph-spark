@@ -70,10 +70,10 @@ function RootComponent() {
               AI Infographic Generator
             </Link>
             <nav className="flex gap-4 text-sm text-muted-foreground">
-              <Link to="/" activeProps={{ className: "text-foreground font-medium" }}>Workspace</Link>
-              <Link to="/styles" activeProps={{ className: "text-foreground font-medium" }}>Styles</Link>
-              <Link to="/design-profiles" activeProps={{ className: "text-foreground font-medium" }}>Design profiles</Link>
-              <Link to="/prompts" activeProps={{ className: "text-foreground font-medium" }}>Prompts</Link>
+              <Link to="/" activeProps={{ className: "text-foreground font-medium" }}>Рабочее место</Link>
+              <Link to="/styles" activeProps={{ className: "text-foreground font-medium" }}>Стили</Link>
+              <Link to="/design-profiles" activeProps={{ className: "text-foreground font-medium" }}>Профили дизайна</Link>
+              <Link to="/prompts" activeProps={{ className: "text-foreground font-medium" }}>Промпты</Link>
             </nav>
           </div>
         </header>
