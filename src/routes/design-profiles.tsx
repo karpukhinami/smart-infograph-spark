@@ -241,7 +241,7 @@ function MultiColorPicker({
       </div>
       <Select value="" onValueChange={add}>
         <SelectTrigger>
-          <SelectValue placeholder="Add color…" />
+          <SelectValue placeholder="Добавить цвет…" />
         </SelectTrigger>
         <SelectContent>
           {COLOR_PALETTE.map((c) => (
