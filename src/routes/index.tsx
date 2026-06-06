@@ -15,6 +15,7 @@ import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { WireframeView } from "@/components/workspace/WireframeView";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
+import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { extractJson } from "@/lib/json-repair";
 import type { ContentSummary, DesignBriefResult, PaneMode } from "@/lib/types";
 
@@ -52,6 +53,7 @@ function Workspace() {
   const setPrompt = useSettingsStore((s) => s.setPrompt);
   const styles = useSettingsStore((s) => s.styles);
   const profiles = useSettingsStore((s) => s.profiles);
+  const styleGuidelines = useSettingsStore((s) => s.styleGuidelines);
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
   const [loading, setLoading] = useState<null | "analyze" | "brief" | "image">(null);
@@ -99,6 +101,7 @@ function Workspace() {
       setLoading("brief");
       const filled = prompts.designBrief
         .replace("{{CONTENT_SUMMARY}}", activeContent.value.content)
+        .replace("{{STYLE_GUIDELINES}}", styleGuidelines || "(none)")
         .replace("{{USER_WISHES}}", userWishes || "(none)")
         .replace("{{STYLE_SPEC}}", JSON.stringify(activeStyle, null, 2))
         .replace("{{DESIGN_PROFILE}}", JSON.stringify(activeProfile ?? {}, null, 2));
@@ -141,7 +144,11 @@ function Workspace() {
   }
 
   return (
-    <div className="mx-auto max-w-[1600px] grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
+    <div className="mx-auto max-w-[1600px] p-4 space-y-3">
+      <div className="flex justify-end">
+        <HelpFiles />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* LEFT */}
       <section className="space-y-4">
         <div className="rounded-lg border border-border bg-card p-4 space-y-3">
@@ -376,6 +383,7 @@ function Workspace() {
           </Tabs>
         </div>
       </section>
+      </div>
     </div>
   );
 }
