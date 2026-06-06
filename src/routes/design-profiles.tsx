@@ -87,7 +87,7 @@ function ProfileEditor({
           onChange={(e) => setDraft({ ...draft, profileName: e.target.value })}
         />
         <div className="flex gap-2 shrink-0">
-          <Button size="sm" onClick={() => onChange(draft)}>Save</Button>
+          <Button size="sm" onClick={() => onChange(draft)}>Сохранить</Button>
           {canDelete && (
             <Button size="sm" variant="ghost" onClick={onDelete}>
               <Trash2 className="size-4" />
