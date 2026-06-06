@@ -8,7 +8,7 @@ import { useSettingsStore } from "@/store/useSettingsStore";
 import type { InfographicStyle } from "@/lib/types";
 
 export const Route = createFileRoute("/styles")({
-  head: () => ({ meta: [{ title: "Styles — AI Infographic Generator" }] }),
+  head: () => ({ meta: [{ title: "Стили — AI Infographic Generator" }] }),
   component: StylesPage,
 });
 
