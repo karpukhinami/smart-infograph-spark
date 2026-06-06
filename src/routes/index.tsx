@@ -320,9 +320,9 @@ function Workspace() {
         <div className="rounded-lg border border-border bg-card p-2">
           <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as PaneMode)}>
             <TabsList>
-              <TabsTrigger value="content" disabled={!activeContent}>Content</TabsTrigger>
-              <TabsTrigger value="wireframe" disabled={!activeBrief}>Wireframe</TabsTrigger>
-              <TabsTrigger value="image" disabled={!activeImage}>Final image</TabsTrigger>
+              <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
+              <TabsTrigger value="wireframe" disabled={!activeBrief}>Каркас</TabsTrigger>
+              <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
 
             <TabsContent value="content" className="p-2 space-y-2">
@@ -330,7 +330,7 @@ function Workspace() {
                 <>
                   <div className="flex justify-end">
                     <Button size="sm" variant="outline" onClick={onAnalyze} disabled={loading !== null}>
-                      <RefreshCw className="size-3.5 mr-1" /> Regenerate
+                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
                   </div>
                   <Textarea
@@ -343,11 +343,11 @@ function Workspace() {
                     <Markdown>{activeContent.value.content}</Markdown>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Recommended style: <code>{activeContent.value.recommendedStyle}</code>
+                    Рекомендуемый стиль: <code>{activeContent.value.recommendedStyle}</code>
                   </p>
                 </>
               ) : (
-                <EmptyState text="Run analysis to see the content summary here." />
+                <EmptyState text="Запустите анализ, чтобы увидеть здесь сводку по контенту." />
               )}
             </TabsContent>
 
@@ -356,13 +356,13 @@ function Workspace() {
                 <>
                   <div className="flex justify-end">
                     <Button size="sm" variant="outline" onClick={onCreateBrief} disabled={loading !== null}>
-                      <RefreshCw className="size-3.5 mr-1" /> Regenerate
+                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
                   </div>
                   <WireframeView wf={activeBrief.value.WireframeDescription} />
                 </>
               ) : (
-                <EmptyState text="Create a design brief to see the wireframe." />
+                <EmptyState text="Создайте дизайн-бриф, чтобы увидеть каркас." />
               )}
             </TabsContent>
 
@@ -371,13 +371,13 @@ function Workspace() {
                 <>
                   <div className="flex justify-end">
                     <Button size="sm" variant="outline" onClick={onGenerateImage} disabled={loading !== null}>
-                      <RefreshCw className="size-3.5 mr-1" /> Regenerate
+                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
                   </div>
-                  <img src={activeImage.value} alt="Generated infographic" className="w-full rounded-md border border-border" />
+                  <img src={activeImage.value} alt="Сгенерированная инфографика" className="w-full rounded-md border border-border" />
                 </>
               ) : (
-                <EmptyState text="Generate the final image to see it here." />
+                <EmptyState text="Сгенерируйте итоговое изображение, чтобы увидеть его здесь." />
               )}
             </TabsContent>
           </Tabs>
