@@ -144,7 +144,11 @@ function Workspace() {
   }
 
   return (
-    <div className="mx-auto max-w-[1600px] grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
+    <div className="mx-auto max-w-[1600px] p-4 space-y-3">
+      <div className="flex justify-end">
+        <HelpFiles />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* LEFT */}
       <section className="space-y-4">
         <div className="rounded-lg border border-border bg-card p-4 space-y-3">
