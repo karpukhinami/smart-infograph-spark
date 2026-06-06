@@ -13,28 +13,15 @@ interface SettingsState {
     analysisTopicOnly: string;
     designBrief: string;
   };
-  styleGuidelines: string;
   styles: InfographicStyle[];
   profiles: DesignProfile[];
   setPrompt: (k: keyof SettingsState["prompts"], v: string) => void;
-  setStyleGuidelines: (v: string) => void;
   upsertStyle: (s: InfographicStyle) => void;
   toggleStyle: (id: string, enabled: boolean) => void;
   resetStyles: () => void;
   upsertProfile: (p: DesignProfile) => void;
   deleteProfile: (name: string) => void;
 }
-
-const DEFAULT_GUIDELINES = `Общие правила формирования инфографики:
-
-1. Каждый блок соответствует одной законченной мысли (определение, правило, пример, формула, предупреждение, вывод).
-2. Иерархия: заголовок → ключевые понятия → детали и примеры → второстепенная информация.
-3. Похожие по смыслу блоки имеют похожее визуальное оформление.
-4. Предупреждения и важные факты выделяются цветом-акцентом.
-5. Формулы и определения визуально отделяются от обычного текста.
-6. Если в материале есть процесс — используется явная визуальная связь (стрелки, нумерация).
-7. Если есть главный визуальный объект — он становится композиционным центром.
-8. Свободное пространство — часть композиции, не заполняй всё подряд.`;
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -44,11 +31,9 @@ export const useSettingsStore = create<SettingsState>()(
         analysisTopicOnly: promptAnalysisTopic,
         designBrief: promptDesignBrief,
       },
-      styleGuidelines: DEFAULT_GUIDELINES,
       styles: defaultStyles as InfographicStyle[],
       profiles: [defaultProfile as DesignProfile],
       setPrompt: (k, v) => set((s) => ({ prompts: { ...s.prompts, [k]: v } })),
-      setStyleGuidelines: (v) => set({ styleGuidelines: v }),
       upsertStyle: (s) =>
         set((state) => ({
           styles: state.styles.some((x) => x.id === s.id)
@@ -71,6 +56,21 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "infographic-settings",
+      version: 2,
+      migrate: (persisted: unknown) => {
+        const p = (persisted ?? {}) as Partial<SettingsState> & { styleGuidelines?: string };
+        if (Array.isArray(p.styles)) {
+          p.styles = p.styles.map((s) => ({
+            ...s,
+            guidelines:
+              (s as InfographicStyle).guidelines ??
+              defaultStyles.find((d) => d.id === s.id)?.guidelines ??
+              "",
+          })) as InfographicStyle[];
+        }
+        delete p.styleGuidelines;
+        return p as SettingsState;
+      },
       storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
     },
   ),
