@@ -131,7 +131,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "infographic-project",
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
     },
   ),
 );

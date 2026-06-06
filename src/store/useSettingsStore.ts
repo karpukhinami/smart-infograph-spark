@@ -56,7 +56,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "infographic-settings",
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
     },
   ),
 );
