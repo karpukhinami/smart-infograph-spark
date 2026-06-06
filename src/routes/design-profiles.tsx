@@ -35,17 +35,17 @@ function ProfilesPage() {
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Design Profiles</h1>
+        <h1 className="text-lg font-semibold">Профили дизайна</h1>
         <Button
           size="sm"
           onClick={() =>
             upsert({
               ...profiles[0],
-              profileName: `Profile ${profiles.length + 1}`,
+              profileName: `Профиль ${profiles.length + 1}`,
             })
           }
         >
-          Duplicate default
+          Дублировать стандартный
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
