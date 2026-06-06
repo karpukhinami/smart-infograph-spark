@@ -11,8 +11,26 @@ export function HelpFiles() {
           Памятка
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[440px] max-h-[70vh] overflow-auto text-sm">
-        <h3 className="font-semibold mb-2">Где что лежит в проекте</h3>
+      <PopoverContent align="end" className="w-[480px] max-h-[80vh] overflow-auto text-sm">
+        <h3 className="font-semibold mb-2">Как работает приложение</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Пайплайн из 4 этапов. На каждом можно открыть и подправить промпт и выбрать модель.
+        </p>
+        <ol className="list-decimal list-inside text-xs space-y-1 mb-4">
+          <li><b>Ввод</b> — вставить текст, загрузить файл (.txt / .md) или указать только тему (школьный предмет и класс).</li>
+          <li><b>Анализ</b> — LLM превращает вход в структурированное markdown-содержание и выбирает рекомендуемый стиль.</li>
+          <li><b>Дизайн-бриф</b> — на основе содержания, стиля и профиля дизайна модель создаёт описание макета (wireframe) и промпт для картинки.</li>
+          <li><b>Изображение</b> — генерация финальной инфографики по промпту из этапа 3. Все промпты видны и редактируются.</li>
+        </ol>
+
+        <h3 className="font-semibold mb-2 mt-4">Вспомогательные страницы</h3>
+        <ul className="list-disc list-inside text-xs space-y-1 mb-4">
+          <li><b>Стили (/styles)</b> — редактировать параметры инфографических стилей (композиция, типографика, цвет и т.д.) и общие правила формирования инфографики, которые подаются в дизайн-бриф.</li>
+          <li><b>Профили дизайна (/design-profiles)</b> — создавать и настраивать цветовые и шрифтовые профили через готовые палитры и выпадающие списки; добавлять свободные инструкции для модели.</li>
+          <li><b>Промпты (/prompts)</b> — централизованное редактирование всех базовых промптов анализа и дизайн-брифа (сохраняется на сессию).</li>
+        </ul>
+
+        <h3 className="font-semibold mb-2 mt-4">Где что лежит в проекте</h3>
 
         <Section title="Базовые промпты (текст)">
           <Row path="src/data/prompts/analysis-with-content.txt" desc="Промпт анализа, когда подан исходный текст" />
@@ -20,7 +38,7 @@ export function HelpFiles() {
           <Row path="src/data/prompts/design-brief.txt" desc="Промпт для создания дизайн-брифа и wireframe" />
           <p className="text-xs text-muted-foreground mt-1">
             Эти же промпты можно править в сессии на странице{" "}
-            <code>/prompts</code> и инлайн через «Show prompt» на главной.
+            <code>/prompts</code> и инлайн через «Показать промпт» на главной.
           </p>
         </Section>
 
