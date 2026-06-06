@@ -62,12 +62,12 @@ function StyleEditor({
           onChange={(e) => onChange({ ...value, name: e.target.value })}
         />
         <div className="flex items-center gap-2 shrink-0">
-          <Label className="text-xs">Enabled</Label>
+          <Label className="text-xs">Включён</Label>
           <Switch checked={value.enabled} onCheckedChange={(c) => onToggle(value.id, c)} />
         </div>
       </div>
       <div>
-        <Label className="text-xs">Short description</Label>
+        <Label className="text-xs">Краткое описание</Label>
         <Textarea
           rows={2}
           value={value.shortDescription}
@@ -77,7 +77,7 @@ function StyleEditor({
       <div className="grid grid-cols-2 gap-2">
         {(Object.keys(value.rules) as Array<keyof InfographicStyle["rules"]>).map((k) => (
           <div key={k}>
-            <Label className="text-xs capitalize">{k}</Label>
+            <Label className="text-xs">{RULE_LABELS[k]}</Label>
             <Input value={value.rules[k]} onChange={(e) => update(k, e.target.value)} />
           </div>
         ))}
@@ -85,3 +85,13 @@ function StyleEditor({
     </div>
   );
 }
+
+const RULE_LABELS: Record<keyof InfographicStyle["rules"], string> = {
+  composition: "Композиция",
+  symmetry: "Симметрия",
+  primaryCarrier: "Основной носитель",
+  colorApproach: "Подход к цвету",
+  typography: "Типографика",
+  illustration: "Иллюстрации",
+  character: "Характер",
+};
