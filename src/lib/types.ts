@@ -20,8 +20,8 @@ export interface DesignProfile {
     structural: string[];
   };
   typography: {
-    styleId: string;       // id from typography_styles
-    specificityId: string; // id from font_specificity_modes
+    styleId: string;
+    specificityId: string;
   };
   notesForAI: string;
 }
@@ -53,9 +53,35 @@ export interface WireframeDescription {
   connections?: Array<{ from: string; to: string; kind: string }>;
 }
 
+/** Structured analysis JSON produced by the strict-mode analysis prompt. */
+export interface AnalysisEntity {
+  sectionId: number;
+  entityType: string;
+  title: string | null;
+  content: string | string[];
+  formula?: string | string[] | null;
+  example?: string | string[] | null;
+  icon?: string | null;
+  visual?: { type: string; description: string } | null;
+  priority?: "high" | "medium" | "low";
+}
+export interface AnalysisJson {
+  sourceMode: "text" | "topic";
+  topic: string;
+  subject: string | null;
+  grade: string | null;
+  summary: string;
+  entities: AnalysisEntity[];
+  warnings: string[];
+}
+
 export interface ContentSummary {
+  /** Human-readable text shown to the user (rendered from analysis JSON in strict mode). */
   content: string;
+  /** Style id recommended by the model (or chosen by fallback). */
   recommendedStyle: string;
+  /** Structured analysis JSON (strict mode). */
+  analysis?: AnalysisJson | null;
 }
 
 export interface DesignBriefResult {

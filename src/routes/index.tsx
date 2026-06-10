@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, RefreshCw, RotateCcw } from "lucide-react";
+import { Loader2, RefreshCw, RotateCcw, Upload, ImagePlus } from "lucide-react";
 import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
 import { ModelPicker } from "@/components/workspace/ModelPicker";
@@ -18,6 +18,8 @@ import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { extractJson } from "@/lib/json-repair";
 import { buildDesignBriefPrompt } from "@/lib/prompt-injection";
+import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
+import recognizeImagePrompt from "@/data/prompts/recognize-image.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
@@ -25,8 +27,23 @@ export const Route = createFileRoute("/")({
   component: Workspace,
 });
 
-const SUBJECTS = ["Математика", "Русский язык", "Литература", "Физика", "Химия", "Биология", "География", "История", "Обществознание", "Информатика", "Английский язык", "Другое"];
-const GRADES = Array.from({ length: 11 }, (_, i) => String(i + 1));
+const SUBJECTS = [
+  "Математика", "Алгебра", "Геометрия", "Русский язык", "Литература",
+  "Физика", "Химия", "Биология", "География", "История",
+  "Обществознание", "Информатика", "Английский язык", "Окружающий мир",
+  "Технология", "ИЗО", "Музыка", "Физкультура", "ОБЖ", "Астрономия",
+  "Другое",
+];
+const GRADES = [...Array.from({ length: 11 }, (_, i) => String(i + 1)), "Другое"];
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
 
 function Workspace() {
   const source = useProjectStore((s) => s.source);
@@ -50,13 +67,16 @@ function Workspace() {
   const activeBrief = useActiveBrief();
   const activeImage = useActiveImage();
 
+  const mode = useSettingsStore((s) => s.mode);
   const prompts = useCurrentPrompts();
   const setPrompt = useSettingsStore((s) => s.setPrompt);
   const styles = useCurrentStyles();
   const profiles = useSettingsStore((s) => s.profiles);
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
-  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image">(null);
+  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize">(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const enabledStyles = useMemo<InfographicStyle[]>(() => styles.filter((s) => s.enabled), [styles]);
   const activeStyle = useMemo(
@@ -68,23 +88,85 @@ function Workspace() {
     [profiles, selectedProfileName],
   );
 
+  const hasSource = Boolean(source.text.trim());
+  const useTopicOnlyPrompt = !hasSource;
+
+  async function recognizeImages(files: File[]) {
+    if (!files.length) return;
+    try {
+      setLoading("recognize");
+      const dataUrls = await Promise.all(files.map(fileToDataUrl));
+      const recognized = await callTextLLM({
+        model: models.analysis,
+        prompt: recognizeImagePrompt,
+        images: dataUrls,
+      });
+      const cur = source.text.trim();
+      const next = cur ? `${cur}\n\n${recognized.trim()}` : recognized.trim();
+      setSource({ text: next });
+      toast.success(`Распознано картинок: ${files.length}`);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось распознать картинку");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function onPasteCapture(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = Array.from(e.clipboardData?.items ?? []);
+    const imageFiles = items
+      .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+      .map((it) => it.getAsFile())
+      .filter((f): f is File => !!f);
+    if (imageFiles.length) {
+      e.preventDefault();
+      await recognizeImages(imageFiles);
+    }
+  }
+
+  async function onFileChosen(files: FileList | null) {
+    if (!files?.length) return;
+    const arr = Array.from(files);
+    const images = arr.filter((f) => f.type.startsWith("image/"));
+    const texts = arr.filter((f) => !f.type.startsWith("image/"));
+    for (const t of texts) {
+      const text = await t.text();
+      const cur = source.text.trim();
+      setSource({ text: cur ? `${cur}\n\n${text}` : text });
+    }
+    if (images.length) await recognizeImages(images);
+  }
+
   async function onAnalyze() {
     try {
       setLoading("analyze");
       const stylesList = enabledStyles.map((s) => `- ${s.id}: ${s.name} — ${s.shortDescription}`).join("\n");
-      const isTopic = source.mode === "topic";
-      const template = isTopic ? prompts.analysisTopicOnly : prompts.analysisWithContent;
+      const template = useTopicOnlyPrompt ? prompts.analysisTopicOnly : prompts.analysisWithContent;
       const filled = template
-        .replace("{{USER_INSTRUCTIONS}}", source.userInstructions || "(none)")
-        .replace("{{STYLES_LIST}}", stylesList || "(no styles available)")
-        .replace("{{SOURCE_TEXT}}", source.text || "")
-        .replace("{{TOPIC}}", source.topic || "")
-        .replace("{{SUBJECT}}", source.subject || "")
-        .replace("{{GRADE}}", source.grade || "");
+        .replaceAll("{{USER_INSTRUCTIONS}}", source.userInstructions || "(нет)")
+        .replaceAll("{{STYLES_LIST}}", stylesList || "(стилей не задано)")
+        .replaceAll("{{SOURCE_TEXT}}", source.text || "")
+        .replaceAll("{{TOPIC}}", source.topic || "")
+        .replaceAll("{{SUBJECT}}", source.subject || "")
+        .replaceAll("{{GRADE}}", source.grade || "");
       const raw = await callTextLLM({ model: models.analysis, prompt: filled });
-      const parsed = extractJson<ContentSummary>(raw);
-      if (!parsed.content || !parsed.recommendedStyle) throw new Error("Model response missing fields");
-      pushContent(parsed);
+
+      let summary: ContentSummary;
+      if (mode === "strict") {
+        const parsed = extractJson<unknown>(raw);
+        const analysis = validateAnalysisJson(parsed);
+        const fallbackStyle = enabledStyles[0]?.id ?? "";
+        summary = {
+          content: renderAnalysisJson(analysis),
+          recommendedStyle: selectedStyleId ?? fallbackStyle,
+          analysis,
+        };
+      } else {
+        const parsed = extractJson<ContentSummary>(raw);
+        if (!parsed.content || !parsed.recommendedStyle) throw new Error("В ответе модели не хватает полей");
+        summary = parsed;
+      }
+      pushContent(summary);
       setPaneMode("content");
       toast.success("Контент проанализирован");
     } catch (e: unknown) {
@@ -139,11 +221,6 @@ function Workspace() {
     }
   }
 
-  async function onFileUpload(file: File) {
-    const text = await file.text();
-    setSource({ mode: "file", text });
-  }
-
   return (
     <div className="mx-auto max-w-[1600px] p-4 space-y-3">
       <div className="flex justify-end">
@@ -159,61 +236,95 @@ function Workspace() {
               <RotateCcw className="size-3.5 mr-1" /> Начать заново
             </Button>
           </div>
-          <Tabs value={source.mode} onValueChange={(v) => setSource({ mode: v as "text" | "file" | "topic" })}>
-            <TabsList>
-              <TabsTrigger value="text">Вставить текст</TabsTrigger>
-              <TabsTrigger value="file">Загрузить файл</TabsTrigger>
-              <TabsTrigger value="topic">Только тема</TabsTrigger>
-            </TabsList>
-            <TabsContent value="text" className="space-y-2">
-              <Textarea
-                placeholder="Вставьте исходный текст…"
-                rows={8}
-                value={source.text}
-                onChange={(e) => setSource({ text: e.target.value })}
-              />
-            </TabsContent>
-            <TabsContent value="file" className="space-y-2">
+
+          {/* Тема + предмет + класс */}
+          <div className="rounded-md border border-border bg-background/60 p-3 space-y-2">
+            <div>
+              <Label className="text-xs">Тема инфографики</Label>
               <Input
-                type="file"
-                accept=".txt,.md"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFileUpload(f); }}
+                placeholder="например, Перенос запятой в десятичных дробях"
+                value={source.topic ?? ""}
+                onChange={(e) => setSource({ topic: e.target.value })}
               />
-              {source.text && source.mode === "file" && (
-                <Textarea rows={6} value={source.text} onChange={(e) => setSource({ text: e.target.value })} />
-              )}
-            </TabsContent>
-            <TabsContent value="topic" className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="col-span-2">
-                  <Label className="text-xs">Тема</Label>
-                  <Input
-                    placeholder="например, Клеточное строение растений"
-                    value={source.topic ?? ""}
-                    onChange={(e) => setSource({ topic: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Предмет</Label>
-                  <Select value={source.subject || ""} onValueChange={(v) => setSource({ subject: v })}>
-                    <SelectTrigger><SelectValue placeholder="Предмет" /></SelectTrigger>
-                    <SelectContent>
-                      {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Класс</Label>
-                  <Select value={source.grade || ""} onValueChange={(v) => setSource({ grade: v })}>
-                    <SelectTrigger><SelectValue placeholder="Класс" /></SelectTrigger>
-                    <SelectContent>
-                      {GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Предмет</Label>
+                <Select value={source.subject || ""} onValueChange={(v) => setSource({ subject: v })}>
+                  <SelectTrigger><SelectValue placeholder="Выберите предмет" /></SelectTrigger>
+                  <SelectContent>
+                    {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-            </TabsContent>
-          </Tabs>
+              <div>
+                <Label className="text-xs">Класс</Label>
+                <Select value={source.grade || ""} onValueChange={(v) => setSource({ grade: v })}>
+                  <SelectTrigger><SelectValue placeholder="Выберите класс" /></SelectTrigger>
+                  <SelectContent>
+                    {GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Источник: текст + файл + картинки */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">
+                Исходный материал (необязательно — без него работа пойдёт только по теме)
+              </Label>
+              <div className="flex gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={loading !== null}
+                >
+                  <Upload className="size-3.5 mr-1" /> Файл
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={loading !== null}
+                >
+                  <ImagePlus className="size-3.5 mr-1" /> Картинка
+                </Button>
+              </div>
+            </div>
+            <Textarea
+              rows={8}
+              placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки автоматически распознаются в текст и описания иллюстраций."
+              value={source.text}
+              onChange={(e) => setSource({ text: e.target.value })}
+              onPaste={onPasteCapture}
+            />
+            {loading === "recognize" && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="size-3 animate-spin" /> Распознаю картинки…
+              </p>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.md,image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }}
+            />
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }}
+            />
+          </div>
 
           <div>
             <Label className="text-xs">Дополнительные инструкции</Label>
@@ -226,23 +337,23 @@ function Workspace() {
           </div>
 
           <PromptDisclosure
-            label="Показать промпт анализа"
-            value={source.mode === "topic" ? prompts.analysisTopicOnly : prompts.analysisWithContent}
+            label={`Показать промпт анализа (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
+            value={useTopicOnlyPrompt ? prompts.analysisTopicOnly : prompts.analysisWithContent}
             onChange={(v) =>
-              setPrompt(source.mode === "topic" ? "analysisTopicOnly" : "analysisWithContent", v)
+              setPrompt(useTopicOnlyPrompt ? "analysisTopicOnly" : "analysisWithContent", v)
             }
             rightSlot={<ModelPicker kind="text" value={models.analysis} onChange={(v) => setModel("analysis", v)} />}
           />
 
           <div className="flex justify-start">
-            <Button onClick={onAnalyze} disabled={loading !== null}>
+            <Button onClick={onAnalyze} disabled={loading !== null || !(source.topic?.trim() || source.text.trim())}>
               {loading === "analyze" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
               Анализировать
             </Button>
           </div>
         </div>
 
-        {/* STAGE 2 controls */}
+        {/* STAGE 2 */}
         {activeContent && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <h2 className="text-sm font-semibold">2 · Стиль и дизайн</h2>
@@ -287,7 +398,7 @@ function Workspace() {
           </div>
         )}
 
-        {/* STAGE 3 controls */}
+        {/* STAGE 3 */}
         {activeBrief && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <h2 className="text-sm font-semibold">3 · Генерация изображения</h2>
@@ -334,17 +445,27 @@ function Workspace() {
                       <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
                   </div>
+                  <div className="rounded-md border border-border p-3 bg-background">
+                    <Markdown>{activeContent.value.content}</Markdown>
+                  </div>
+                  {activeContent.value.analysis && (
+                    <details className="rounded-md border border-border bg-background/60 p-2">
+                      <summary className="cursor-pointer text-xs text-muted-foreground">
+                        Показать структурированный JSON анализа
+                      </summary>
+                      <pre className="mt-2 overflow-auto text-xs">
+                        {JSON.stringify(activeContent.value.analysis, null, 2)}
+                      </pre>
+                    </details>
+                  )}
                   <Textarea
-                    rows={12}
+                    rows={8}
                     value={activeContent.value.content}
                     onChange={(e) => updateActiveContent(e.target.value)}
                     className="font-mono text-xs"
                   />
-                  <div className="rounded-md border border-border p-3 bg-background">
-                    <Markdown>{activeContent.value.content}</Markdown>
-                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Рекомендуемый стиль: <code>{activeContent.value.recommendedStyle}</code>
+                    Рекомендуемый стиль: <code>{activeContent.value.recommendedStyle || "—"}</code>
                   </p>
                 </>
               ) : (

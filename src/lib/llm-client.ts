@@ -1,5 +1,10 @@
 // Client-side helpers calling the server routes.
-export async function callTextLLM(opts: { model: string; prompt: string; system?: string }): Promise<string> {
+export async function callTextLLM(opts: {
+  model: string;
+  prompt: string;
+  system?: string;
+  images?: string[]; // data URLs or https URLs
+}): Promise<string> {
   const res = await fetch("/api/llm", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
