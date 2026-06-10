@@ -269,6 +269,16 @@ function Workspace() {
             </div>
           </div>
 
+          <div>
+            <Label className="text-xs">Дополнительные инструкции</Label>
+            <Textarea
+              rows={3}
+              value={source.userInstructions}
+              onChange={(e) => setSource({ userInstructions: e.target.value })}
+              placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
+            />
+          </div>
+
           {/* Источник: текст + файл + картинки */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -326,15 +336,6 @@ function Workspace() {
             />
           </div>
 
-          <div>
-            <Label className="text-xs">Дополнительные инструкции</Label>
-            <Textarea
-              rows={3}
-              value={source.userInstructions}
-              onChange={(e) => setSource({ userInstructions: e.target.value })}
-              placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
-            />
-          </div>
 
           <PromptDisclosure
             label={`Показать промпт анализа (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
