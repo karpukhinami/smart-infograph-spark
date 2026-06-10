@@ -21,6 +21,7 @@ interface PromptSet {
   analysisWithContent: string;
   analysisTopicOnly: string;
   designBrief: string;
+  generalRules: string;
 }
 
 interface SettingsState {
