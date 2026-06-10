@@ -89,23 +89,202 @@ CONTENT SUMMARY:
 Формулируй правила конкретно, не общими словами.
 
 3) CONTENT LAYOUT
-Подробно опиши каждую карточку или смысловой блок инфографики. ContentSummary — единственный источник учебного содержания. Для каждой сущности из entities[] создай отдельное описание карточки либо явно укажи, что эта сущность встроена в карточку другой сущности того же sectionId. Ни одна сущность не должна быть потеряна.
 
-Для каждой карточки укажи:
-- порядковый номер карточки (card-1, card-2, ...);
-- sectionId;
-- entityType;
-- визуальную роль карточки (header / mainIdea / rule / detail / classification / warning / formula / example / visualCore / diagram / conclusion);
-- примерный размер: full / dominant / wide / half / third / compact / narrow;
-- положение относительно других блоков;
-- роль цвета фона (accent / pastel / structural-dark / card / warning);
-- стиль заголовка и точный текст заголовка из title;
-- точный основной текст из content (массив — как список/шаги/слоты);
-- точные формулы из formula, если есть;
-- точные примеры из example, если есть;
-- иконку из icon, если задана;
-- описание visual, если задано (только то, что в нём указано — без лишних обозначений);
-- что выделить и чего не добавлять.
+В этом слое подробно опиши, как именно содержание из ContentSummary должно быть размещено на финальной инфографике.
+
+ContentSummary является единственным источником учебного содержания. Не добавляй новые учебные факты, не сокращай текст, не переписывай формулы и не меняй связи между сущностями.
+
+КРИТИЧЕСКИ ВАЖНО: описывай карточки СТРОГО СВЕРХУ ВНИЗ, ряд за рядом, в том порядке, в котором они должны быть нарисованы на финальном изображении. Этот порядок одновременно задаёт порядок чтения инфографики и порядок рендеринга для модели, которая будет генерировать картинку. Модель, рисующая инфографику, обязана разместить карточки ровно в том порядке и в тех рядах, которые ты описал, а не раскладывать их случайно. Поэтому каждая карточка должна явно указывать: к какому горизонтальному ряду она относится (ROW 1, ROW 2, ROW 3 …, считая сверху), какую позицию занимает внутри ряда (left / center / right или first / second / third слева направо) и какую ширину занимает в ряду. Если ряд содержит несколько карточек, сумма их ширин должна давать визуально цельный ряд. Если карточка занимает весь ряд, явно укажи full-width row.
+
+Для каждой сущности из ContentSummary должно быть понятно, где она находится на изображении и как она визуально оформлена.
+
+Сущность может быть:
+- отдельной карточкой;
+- частью карточки другой сущности из того же sectionId;
+- частью общей группы карточек;
+- внутренним блоком внутри крупной смысловой зоны.
+
+Если несколько сущностей объединяются в одну карточку или группу, явно перечисли все эти сущности и весь их видимый текст.
+
+Ни одна сущность из ContentSummary не должна исчезнуть.
+
+Для каждой карточки, группы или внутреннего блока обязательно опиши:
+
+Идентификацию блока
+Укажи номер блока (card-1, card-2, …), номер ряда (ROW N, считая сверху вниз), позицию в ряду (left / center / right или first / second / … слева направо), sectionId и entityType сущностей, которые в него входят.
+
+Визуальную роль
+Опиши, является ли блок шапкой, главным акцентом, обычной объяснительной карточкой, группой равноправных карточек, предупреждением, примером, формульным блоком, визуальным ядром, итогом или вспомогательным блоком. Визуальная роль определяется по entityType и priority из ContentSummary, а также по правилам выбранного стиля.
+
+Размер и положение
+Укажи примерный размер блока: full-width, wide, dominant, half-width, compact, narrow, bottom card, central card, side card. Укажи положение относительно других блоков: top, below header, near visualCore, in the same section group, bottom, left/right row, central area. Дополнительно укажи, в каком ряду (ROW N) и на какой позиции в ряду расположен блок. Размер и положение должны следовать sectionId, priority и композиционной грамматике из LAYER 2.
+
+Цветовую роль
+Укажи не случайный цвет, а цветовую роль из BRAND DNA и DesignProfile: base card, calm fill, primary accent, secondary accent, structural dark, warning accent, formula badge, text on light, text on dark. Если в LAYER 2 уже назначена цветовая логика для entityType, используй её последовательно.
+
+Заголовок
+Если у сущности есть title, вставь точный видимый текст заголовка. Опиши, как он оформлен: title plate, pill, plain heading, small label, large heading. Не пиши «title from ContentSummary». Всегда подставляй точный текст.
+
+Основной текст
+Вставь точный content из ContentSummary. Если content — строка, запиши её как видимый body text. Если content — массив, перечисли каждый пункт как отдельную видимую строку или список внутри блока. Не пересказывай content своими словами.
+
+Формулы
+Если formula не null, вставь каждую формулу точно. Опиши, где она находится: отдельный бейдж, строка под правилом, формульный блок, крупный центральный элемент, часть примера. Формулы должны быть читаемыми, выровненными и не декоративно искажёнными.
+
+Примеры
+Если example не null, вставь каждый пример точно. Опиши, как он связан с правилом, формулой или определением. Пример должен находиться внутри той же карточки, рядом с карточкой или в той же visual group по sectionId.
+
+Иконки
+Если icon не null, опиши его как вспомогательный знак. На карточке иконка располагается рядом с заголовком. Укажи, где именно она расположена (например: слева от заголовка, сверху-слева, в углу плашки), в каком стиле она выполнена и какую роль выполняет. Иконка не должна быть главнее текста и не должна перегружать карточку.
+
+Содержательные изображения (visual)
+Если visual не null, опиши его подробно. Используй visual.type и visual.description из ContentSummary. Для схем, чертежей, графиков, множеств, координат и формул укажи только те элементы, которые описаны в ContentSummary. Не добавляй лишние подписи, стрелки, засечки, углы, области или декоративные элементы, которые могут изменить смысл. Если visual является visualCore — это смысловой центр инфографики, и его положение/размер должны отражать это.
+
+Внутреннюю структуру
+Опиши, как элементы располагаются внутри карточки: заголовок сверху, текст ниже, формула отдельной строкой, пример в нижней зоне, схема справа, иконка в углу, список в несколько строк и т.д.
+
+Запреты для конкретного блока
+Если для блока есть риск ошибки, явно напиши, чего нельзя добавлять или искажать: лишние обозначения, случайные стрелки, дополнительные примеры, дополнительные подписи, новые формулы, лишние визуальные маркеры.
+
+Пиши LAYER 3 как подробное техническое описание будущего изображения, а не как краткий список карточек.
+
+Не используй сжатый формат вида:
+[card-2, section-1] Half-width. Title: ...
+
+Используй развёрнутые блоки с читаемой структурой, перечисленные строго сверху вниз по рядам:
+
+ROW 1 — full-width row
+CARD 1 — HEADER
+Position: full-width, occupies the entire ROW 1 at the top of the poster.
+Background: ...
+Visible title text: "..."
+Meta text: "..."
+Internal layout: ...
+Do not add: ...
+
+ROW 2 — two equal sibling cards (left + right)
+CARD 2 — ...
+Position: ROW 2, left half.
+sectionId: ...
+entityType: ...
+Visual role: ...
+Size and placement: half-width, left side of ROW 2, immediately below the header.
+Background / color role: ...
+Visible title text: "..."
+Visible body text: "..."
+Formula text: "..."
+Example text: "..."
+Icon: ...
+Visual: ...
+Internal layout: ...
+Do not add: ...
+
+CARD 3 — ...
+Position: ROW 2, right half.
+...
+
+ROW 3 — ...
+
+Если несколько карточек образуют ряд или группу, сначала опиши общее правило группы (одинаковые размеры, одинаковые плашки заголовка, одинаковая визуальная плотность, общий sectionId), а затем каждую карточку внутри группы.
+
+Примеры ниже показывают только желаемый уровень детализации и способ записи. Они не являются обязательными шаблонами — адаптируй структуру под ContentSummary, правила выбранного стиля и DesignProfile.
+
+— Пример 1: full-width classification card —
+
+ROW N — full-width classification block
+CROWN SCHEMATIC CARD
+Position: full-width, occupies the entire ROW N, placed below the header and main idea block.
+sectionId: 2
+entityType: classification
+Visual role: central group of equal elements.
+Size and placement: full-width card.
+Background / color role: primary accent card from the selected palette.
+Title plate: dark structural title plate in the top-left corner.
+Visible title text: "ЧЕТЫРЕ КЛАССИЧЕСКИХ ФАКТОРА"
+
+Internal layout: horizontal row of four identical slots. Each slot has the same width, same internal padding and same visual weight. Each slot contains one outline icon above a small title plate. The slots must read as equal parts of one classification.
+
+Slot 1: outline mountain or field icon; title text: "ЗЕМЛЯ".
+Slot 2: outline worker with helmet icon; title text: "ТРУД".
+Slot 3: outline stacked coins icon; title text: "КАПИТАЛ".
+Slot 4: outline lightbulb icon; title text: "ПРЕДПРИНИМАТЕЛЬСТВО".
+
+Do not add arrows or connectors between the slots. Do not make one slot visually dominant.
+
+— Пример 2: pair of equal rule/detail cards —
+
+ROW N — two equal supporting cards (left + right)
+Both cards belong to the same sectionId and should be read as one row.
+Both cards have equal width, equal height, identical title plates, identical icon style and matching internal spacing.
+Use calm pastel card fills from the selected palette.
+
+CARD — ЗЕМЛЯ
+Position: ROW N, left half.
+sectionId: 3
+entityType: definition / detail
+Visual role: supporting explanation card.
+Size and placement: half-width card, left side of the row.
+Background / color role: calm warm card fill.
+Icon: outline mountain with sun or field, graphite stroke, placed near the top, next to the title plate.
+Title plate: structural dark plate with white uppercase text.
+Visible title text: "ЗЕМЛЯ"
+Visible body text: "Природные ресурсы: пахотные земли, полезные ископаемые, леса, вода, растительный и животный мир."
+Internal layout: icon at top next to title plate, body text in the lower part of the card.
+Do not add extra examples or labels.
+
+CARD — ТРУД
+Position: ROW N, right half.
+sectionId: 3
+entityType: definition / detail
+Visual role: supporting explanation card.
+Size and placement: half-width card, right side of the same row.
+Background / color role: related calm warm card fill, slightly different from the left card if the palette allows.
+Icon: outline worker with helmet, same stroke style as the first card, next to the title plate.
+Title plate: same as the first card.
+Visible title text: "ТРУД"
+Visible body text: "«Человеческий капитал» — физические и умственные усилия, способности, здоровье, квалификация."
+Internal layout: same as the first card.
+Do not change the phrase "человеческий капитал".
+
+— Пример 3: dominant formula card with example —
+
+ROW N — dominant formula block
+DOMINANT FORMULA CARD
+Position: ROW N, full-width or dominant central placement near the visual center of the poster.
+sectionId: 4
+entityType: rule / formula
+Visual role: main mathematical focus of the infographic.
+Size and placement: dominant wide card, larger than ordinary explanation cards.
+Background / color role: primary accent or high-contrast formula card from the selected DesignProfile.
+Title plate: compact structural title plate at the top-left.
+Visible title text: "КОЛИЧЕСТВО ПЕРЕСТАНОВОК"
+Visible body text: "Число всех возможных перестановок из n элементов обозначается Pn."
+Formula text: "P_n = n!"
+Example text: "P_3 = 3! = 3 · 2 · 1 = 6"
+
+Internal layout: title plate at the top, short explanation below, formula in the largest typographic size at the center, example in a smaller formula row underneath. The formula must be clean, aligned and high contrast.
+
+Do not distort the subscript in "P_n". Do not replace "n!" with another notation. Do not add extra formulas.
+
+— Пример 4: visual diagram card —
+
+ROW N — explanatory scheme
+VISUAL DIAGRAM CARD
+Position: ROW N, placed next to or directly below the rule card it explains.
+sectionId: 5
+entityType: diagram
+Visual role: content-bearing scheme connected to the nearby rule card.
+Size and placement: medium-wide card.
+Background / color role: calm light card fill.
+Visible title text: "ЛОГИКА ПОСТРОЕНИЯ"
+Visible body text: "Чтобы составить все перестановки для (k+1) элементов, нужно на первое место поочередно ставить каждый из элементов."
+Formula text: "P_{k+1} = (k+1) · P_k"
+
+Visual: draw a clean step diagram showing a branching choice structure. The first level shows (k+1) possible choices for the first position. The next level is represented as a compact continuation leading to P_k arrangements. Use simple lines and labels, not a dense tree.
+
+Internal layout: text and formula on the left, diagram on the right or below depending on available space. The diagram must support the formula, not dominate it.
+
+Do not add random branches, extra variables or decorative arrows that are not needed for the explanation.
 
 Текст из полей title, content, formula, example воспроизводи точно. Вставляй видимый текст явно, а не ссылкой «use the text from ContentSummary». Видимый текст инфографики оставь на языке ContentSummary, остальной промпт — на английском.
 
@@ -114,6 +293,9 @@ CONTENT SUMMARY:
 4) TECHNICAL AND NEGATIVE INSTRUCTIONS
 Коротко и прямо: final image only; no mockup; no UI; no watermark; no random text; no pseudo-text; no English text unless explicitly required; no extra labels; no misspelled words; no distorted formulas; no incorrect mathematical or scientific notation; no unnecessary arrows; no decorative marks that change meaning; no photorealism unless explicitly required; no 3D unless explicitly required; no messy shadows; no inconsistent icon styles; no inconsistent diagram styles.
 
+В конце слоя обязательно повтори жёсткое требование к порядку:
+Render the cards strictly in the order described in LAYER 3, row by row from top to bottom. Do not rearrange, do not shuffle, do not redistribute the cards between rows. The first described row is the topmost row of the image; the last described row is the bottom of the image. Within each row, render the cards left-to-right in the order described.
+
 И добавь проверку содержания:
 All visible text must come from ContentSummary. Preserve formulas, examples, labels and notation exactly. Keep entities with the same sectionId visually connected. Do not omit any entity from ContentSummary. Do not add educational content not present in ContentSummary.
 
@@ -121,9 +303,15 @@ All visible text must come from ContentSummary. Preserve formulas, examples, lab
 
 WIREFRAME
 
-Параллельно с PromptForImageGeneration построй WireframeDescription. Wireframe должен один-в-один соответствовать CONTENT LAYOUT: каждая карточка из CONTENT LAYOUT становится отдельным блоком в wireframe, в том же порядке чтения, с теми же sectionId, entityType, ролью, размером, приоритетом, цветовой ролью фона и точным заголовком. Не добавляй в wireframe блоки, которых нет в CONTENT LAYOUT, и не пропускай ни одной карточки.
+Параллельно с PromptForImageGeneration построй WireframeDescription. Wireframe ОБЯЗАН быть один-в-один с CONTENT LAYOUT:
+- порядок рядов в массиве rows должен совпадать с порядком ROW 1, ROW 2, ROW 3 … из LAYER 3 (сверху вниз);
+- порядок блоков внутри ряда должен совпадать с порядком слева направо из LAYER 3;
+- каждой карточке из CONTENT LAYOUT соответствует ровно один блок в wireframe с тем же id (card-1, card-2, …), тем же sectionId, entityType, role, size, priority, backgroundRole и точным title;
+- ни одной карточки из LAYER 3 не должно быть пропущено и ни одной лишней карточки не должно появиться;
+- contentPreview — одна короткая строка-превью основного текста этой же карточки;
+- hasIcon / hasFormula / hasExample / hasVisual выставляй в true только если у соответствующей сущности из ContentSummary это поле не null.
 
-Группируй блоки по строкам (rows) так, чтобы строки отражали реальные горизонтальные ряды макета. Полноширинные карточки занимают отдельную строку. Соседние карточки одной строки имеют согласованные размеры. Сумма size-токенов внутри строки должна давать визуально цельный ряд.
+Размеры карточек в wireframe должны согласовываться: полноширинная карточка занимает отдельный ряд, две half-width карточки образуют ряд из двух блоков, три third — ряд из трёх блоков и т.д. Сумма size-токенов внутри ряда должна давать визуально цельный ряд (full = 12, dominant ≈ 9–10, wide ≈ 8, half = 6, third = 4, quarter = 3, compact ≈ 3–4, narrow ≈ 2–3 единиц 12-колоночной сетки).
 
 ==================================================
 
