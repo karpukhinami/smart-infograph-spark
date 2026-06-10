@@ -64,8 +64,9 @@ export function buildDesignBriefPrompt(opts: {
   style: InfographicStyle | null | undefined;
   profile: DesignProfile | null | undefined;
   userWishes: string;
+  generalRules?: string;
 }): string {
-  const { template, contentSummary, style, profile, userWishes } = opts;
+  const { template, contentSummary, style, profile, userWishes, generalRules } = opts;
   return template
     .replaceAll("{{CONTENT_SUMMARY}}", contentSummary)
     .replaceAll("{{STYLE_NAME}}", style?.name ?? "")
@@ -73,5 +74,6 @@ export function buildDesignBriefPrompt(opts: {
     .replaceAll("{{STYLE_GENERAL_RULES_BLOCK}}", styleGeneralRulesBlock(style))
     .replaceAll("{{STYLE_SPECIFIC_RULES_BLOCK}}", styleSpecificRulesBlock(style))
     .replaceAll("{{DESIGN_PROFILE_PROSE}}", designProfileProse(profile))
-    .replaceAll("{{USER_WISHES}}", userWishes.trim() || "(нет)");
+    .replaceAll("{{USER_WISHES}}", userWishes.trim() || "(нет)")
+    .replaceAll("{{GENERAL_RULES_BLOCK}}", generalRules?.trim() ?? "");
 }
