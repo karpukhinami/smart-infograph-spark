@@ -8,10 +8,12 @@ import defaultProfile from "@/data/default-design-profile.json";
 import promptFreeAnalysisWith from "@/data/prompts/free/analysis-with-content.txt?raw";
 import promptFreeAnalysisTopic from "@/data/prompts/free/analysis-topic-only.txt?raw";
 import promptFreeDesignBrief from "@/data/prompts/free/design-brief.txt?raw";
+import promptFreeGeneralRules from "@/data/prompts/free/general-rules.txt?raw";
 
 import promptStrictAnalysisWith from "@/data/prompts/strict/analysis-with-content.txt?raw";
 import promptStrictAnalysisTopic from "@/data/prompts/strict/analysis-topic-only.txt?raw";
 import promptStrictDesignBrief from "@/data/prompts/strict/design-brief.txt?raw";
+import promptStrictGeneralRules from "@/data/prompts/strict/general-rules.txt?raw";
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
 
@@ -19,6 +21,7 @@ interface PromptSet {
   analysisWithContent: string;
   analysisTopicOnly: string;
   designBrief: string;
+  generalRules: string;
 }
 
 interface SettingsState {
@@ -44,11 +47,13 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     analysisWithContent: promptFreeAnalysisWith,
     analysisTopicOnly: promptFreeAnalysisTopic,
     designBrief: promptFreeDesignBrief,
+    generalRules: promptFreeGeneralRules,
   },
   strict: {
     analysisWithContent: promptStrictAnalysisWith,
     analysisTopicOnly: promptStrictAnalysisTopic,
     designBrief: promptStrictDesignBrief,
+    generalRules: promptStrictGeneralRules,
   },
 };
 
@@ -106,7 +111,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "infographic-settings",
-      version: 6,
+      version: 7,
       // Breaking shape change — drop persisted state from older versions.
       migrate: () => undefined as unknown as SettingsState,
       storage: createJSONStorage(() =>

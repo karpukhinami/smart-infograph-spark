@@ -187,6 +187,7 @@ function Workspace() {
         style: activeStyle,
         profile: activeProfile,
         userWishes,
+        generalRules: prompts.generalRules,
       });
       const raw = await callTextLLM({ model: models.brief, prompt: filled });
       const parsed = extractJson<DesignBriefResult>(raw);

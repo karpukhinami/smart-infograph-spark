@@ -41,6 +41,8 @@ CONTENT SUMMARY:
 {{CONTENT_SUMMARY}}
 
 ==================================================
+{{GENERAL_RULES_BLOCK}}
+==================================================
 SELECTED INFOGRAPHIC STYLE: {{STYLE_NAME}}
 {{STYLE_DESCRIPTION}}
 
