@@ -11,46 +11,52 @@ export function HelpFiles() {
           Памятка
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[480px] max-h-[80vh] overflow-auto text-sm">
-        <h3 className="font-semibold mb-2">Как работает приложение</h3>
+      <PopoverContent align="end" className="w-[520px] max-h-[80vh] overflow-auto text-sm">
+        <h3 className="font-semibold mb-2">Режимы «Строгий» и «Вольный»</h3>
         <p className="text-xs text-muted-foreground mb-3">
-          Пайплайн из 4 этапов. На каждом можно открыть и подправить промпт и выбрать модель.
+          Переключатель в левом верхнем углу. У каждого режима — свои промпты и свой
+          набор стилей. Профили дизайна общие для обоих режимов.
         </p>
+
+        <h3 className="font-semibold mb-2 mt-4">Как работает приложение</h3>
         <ol className="list-decimal list-inside text-xs space-y-1 mb-4">
-          <li><b>Ввод</b> — вставить текст, загрузить файл (.txt / .md) или указать только тему (школьный предмет и класс).</li>
-          <li><b>Анализ</b> — LLM превращает вход в структурированное markdown-содержание и выбирает рекомендуемый стиль.</li>
-          <li><b>Дизайн-бриф</b> — на основе содержания, стиля и профиля дизайна модель создаёт описание макета (wireframe) и промпт для картинки.</li>
-          <li><b>Изображение</b> — генерация финальной инфографики по промпту из этапа 3. Все промпты видны и редактируются.</li>
+          <li><b>Ввод</b> — вставить текст, загрузить файл (.txt / .md) или указать только тему.</li>
+          <li><b>Анализ</b> — LLM превращает вход в структурированное содержание и выбирает рекомендуемый стиль.</li>
+          <li><b>Дизайн-бриф</b> — на основе содержания, стиля и профиля дизайна модель создаёт wireframe и промпт для картинки.</li>
+          <li><b>Изображение</b> — генерация финальной инфографики. Все промпты редактируются.</li>
         </ol>
 
         <h3 className="font-semibold mb-2 mt-4">Вспомогательные страницы</h3>
         <ul className="list-disc list-inside text-xs space-y-1 mb-4">
-          <li><b>Стили (/styles)</b> — редактировать параметры инфографических стилей (композиция, типографика, цвет и т.д.) и общие правила формирования инфографики, которые подаются в дизайн-бриф.</li>
-          <li><b>Профили дизайна (/design-profiles)</b> — создавать и настраивать цветовые и шрифтовые профили через готовые палитры и выпадающие списки; добавлять свободные инструкции для модели.</li>
-          <li><b>Промпты (/prompts)</b> — централизованное редактирование всех базовых промптов анализа и дизайн-брифа (сохраняется на сессию).</li>
+          <li><b>Стили (/styles)</b> — название, краткое описание, общие правила и конкретные правила для каждого стиля. Отдельные списки для строгого и вольного режимов.</li>
+          <li><b>Профили дизайна (/design-profiles)</b> — фон страницы, яркие акценты, пастельные заливки, структурные цвета (выбор через палитру + HEX), типографический характер и режим выбора шрифта, свободные инструкции.</li>
+          <li><b>Промпты (/prompts)</b> — все базовые промпты текущего режима.</li>
         </ul>
 
         <h3 className="font-semibold mb-2 mt-4">Где что лежит в проекте</h3>
 
-        <Section title="Базовые промпты (текст)">
-          <Row path="src/data/prompts/analysis-with-content.txt" desc="Промпт анализа, когда подан исходный текст" />
-          <Row path="src/data/prompts/analysis-topic-only.txt" desc="Промпт анализа, когда указана только тема" />
-          <Row path="src/data/prompts/design-brief.txt" desc="Промпт для создания дизайн-брифа и wireframe" />
+        <Section title="Промпты текущего режима">
+          <Row path="src/data/prompts/free/" desc="Промпты вольного режима (3 файла)" />
+          <Row path="src/data/prompts/strict/" desc="Промпты строгого режима (3 файла)" />
           <p className="text-xs text-muted-foreground mt-1">
-            Эти же промпты можно править в сессии на странице{" "}
-            <code>/prompts</code> и инлайн через «Показать промпт» на главной.
+            Те же значения редактируются на странице <code>/prompts</code> и инлайн на главной.
           </p>
         </Section>
 
         <Section title="Стили инфографики">
-          <Row path="src/data/default-styles.json" desc="Список стилей по умолчанию (id, имя, описание, правила)" />
-          <Row path="страница /styles" desc="Редактирование стилей и общих правил формирования инфографики" />
+          <Row path="src/data/default-styles.free.json" desc="Стили по умолчанию для вольного режима" />
+          <Row path="src/data/default-styles.strict.json" desc="Стили по умолчанию для строгого режима" />
+          <Row path="страница /styles" desc="Редактирование стилей и их правил" />
         </Section>
 
-        <Section title="Профили дизайна (цвета и шрифты)">
-          <Row path="src/data/default-design-profile.json" desc="Профиль по умолчанию (DefaultBentoStyle)" />
-          <Row path="src/data/design-options.ts" desc="Палитра цветов и список шрифтов, доступных в выпадашках" />
+        <Section title="Профили дизайна">
+          <Row path="src/data/default-design-profile.json" desc="Профиль по умолчанию («Дефолт стайл»)" />
+          <Row path="src/data/typography-options.json" desc="Список типографических характеров и режимов выбора шрифта" />
           <Row path="страница /design-profiles" desc="Создание/редактирование профилей" />
+        </Section>
+
+        <Section title="Сборка промпта">
+          <Row path="src/lib/prompt-injection.ts" desc="Преобразует стиль и профиль в текст для дизайн-брифа" />
         </Section>
 
         <Section title="Модели и API">
@@ -62,7 +68,7 @@ export function HelpFiles() {
         </Section>
 
         <Section title="Состояние">
-          <Row path="src/store/useSettingsStore.ts" desc="Промпты, стили, профили, общие правила (sessionStorage)" />
+          <Row path="src/store/useSettingsStore.ts" desc="Режим, промпты по режимам, стили по режимам, профили" />
           <Row path="src/store/useProjectStore.ts" desc="Этапы пайплайна и версии результатов" />
         </Section>
       </PopoverContent>
