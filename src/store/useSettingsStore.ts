@@ -65,7 +65,7 @@ const initialStyles: Record<AppMode, InfographicStyle[]> = {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      mode: "free",
+      mode: "strict",
       setMode: (m) => set({ mode: m }),
 
       promptsByMode: initialPrompts,
