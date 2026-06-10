@@ -11,47 +11,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import type { DesignProfile } from "@/lib/types";
-import { Trash2, X } from "lucide-react";
-import {
-  COLOR_PALETTE,
-  FONT_OPTIONS,
-  FONT_WEIGHT_OPTIONS,
-  BORDER_RADIUS_OPTIONS,
-  BORDER_OPTIONS,
-} from "@/data/design-options";
+import { Plus, Trash2, X } from "lucide-react";
+import typographyOptions from "@/data/typography-options.json";
 
 export const Route = createFileRoute("/design-profiles")({
   head: () => ({ meta: [{ title: "Профили дизайна — AI Infographic Generator" }] }),
   component: ProfilesPage,
 });
 
+const TYPO_STYLES = typographyOptions.typography_styles as Array<{ id: string; label: string; prompt: string }>;
+const TYPO_SPECIFICITY = typographyOptions.font_specificity_modes as Array<{ id: string; label: string; prompt: string }>;
+
 function ProfilesPage() {
   const profiles = useSettingsStore((s) => s.profiles);
   const upsert = useSettingsStore((s) => s.upsertProfile);
   const del = useSettingsStore((s) => s.deleteProfile);
+  const reset = useSettingsStore((s) => s.resetProfiles);
 
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Профили дизайна</h1>
-        <Button
-          size="sm"
-          onClick={() =>
-            upsert({
-              ...profiles[0],
-              profileName: `Профиль ${profiles.length + 1}`,
-            })
-          }
-        >
-          Дублировать стандартный
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={reset}>
+            Сбросить к умолчаниям
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => upsert({ ...profiles[0], profileName: `Профиль ${profiles.length + 1}` })}
+          >
+            Дублировать профиль
+          </Button>
+        </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Цвета и шрифты выбираются из готовых палитр и списков. Списки можно расширить
-        в файле <code>src/data/design-options.ts</code>.
-      </p>
       {profiles.map((p) => (
         <ProfileEditor
           key={p.profileName}
@@ -76,7 +71,10 @@ function ProfileEditor({
   onDelete: () => void;
   canDelete: boolean;
 }) {
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState<DesignProfile>(value);
+
+  const setColors = (patch: Partial<DesignProfile["colors"]>) =>
+    setDraft({ ...draft, colors: { ...draft.colors, ...patch } });
 
   return (
     <div className="rounded-lg border border-border bg-card p-4 space-y-4">
@@ -96,124 +94,199 @@ function ProfileEditor({
         </div>
       </div>
 
+      <SingleColorRow
+        title="Фон страницы"
+        value={draft.colors.pageBackground}
+        onChange={(v) => setColors({ pageBackground: v })}
+      />
+      <ColorListRow
+        title="Яркие акценты"
+        values={draft.colors.brightAccents}
+        onChange={(v) => setColors({ brightAccents: v })}
+      />
+      <ColorListRow
+        title="Пастельные заливки"
+        values={draft.colors.pastelFills}
+        onChange={(v) => setColors({ pastelFills: v })}
+      />
+      <ColorListRow
+        title="Структурные / технические цвета"
+        values={draft.colors.structural}
+        onChange={(v) => setColors({ structural: v })}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <ColorPicker
-          label="Фон"
-          value={draft.background}
-          onChange={(v) => setDraft({ ...draft, background: v })}
-        />
-        <ColorPicker
-          label="Основной акцент"
-          value={draft.accents.primary}
-          onChange={(v) => setDraft({ ...draft, accents: { ...draft.accents, primary: v } })}
-        />
-        <ColorPicker
-          label="Дополнительный акцент"
-          value={draft.accents.secondary}
-          onChange={(v) => setDraft({ ...draft, accents: { ...draft.accents, secondary: v } })}
-        />
-        <MultiColorPicker
-          label="Прочие акценты"
-          values={draft.accents.additional}
-          onChange={(v) => setDraft({ ...draft, accents: { ...draft.accents, additional: v } })}
-        />
-
-        <FontPicker
-          label="Основной шрифт"
-          family={draft.fonts.primary.family}
-          weights={draft.fonts.primary.weights}
-          onChange={(family, weights) =>
-            setDraft({ ...draft, fonts: { ...draft.fonts, primary: { family, weights } } })
-          }
-        />
-        <FontPicker
-          label="Дополнительный шрифт"
-          family={draft.fonts.secondary.family}
-          weights={draft.fonts.secondary.weights}
-          onChange={(family, weights) =>
-            setDraft({ ...draft, fonts: { ...draft.fonts, secondary: { family, weights } } })
-          }
-        />
-
-        <SelectField
-          label="Скругление углов"
-          value={draft.cardStyle.borderRadius}
-          options={BORDER_RADIUS_OPTIONS}
-          onChange={(v) => setDraft({ ...draft, cardStyle: { ...draft.cardStyle, borderRadius: v } })}
-        />
-        <SelectField
-          label="Обводка"
-          value={draft.cardStyle.border}
-          options={BORDER_OPTIONS}
-          onChange={(v) => setDraft({ ...draft, cardStyle: { ...draft.cardStyle, border: v } })}
-        />
+        <div>
+          <Label className="text-xs">Типографический характер</Label>
+          <Select
+            value={draft.typography.styleId}
+            onValueChange={(v) => setDraft({ ...draft, typography: { ...draft.typography, styleId: v } })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {TYPO_STYLES.map((t) => (
+                <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">Строгость выбора шрифта</Label>
+          <Select
+            value={draft.typography.specificityId}
+            onValueChange={(v) => setDraft({ ...draft, typography: { ...draft.typography, specificityId: v } })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {TYPO_SPECIFICITY.map((t) => (
+                <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div>
-        <Label className="text-xs">Дополнительные инструкции (свободный текст для модели)</Label>
+        <Label className="text-xs">Дополнительные инструкции</Label>
         <Textarea
-          rows={4}
+          rows={10}
           value={draft.notesForAI}
           onChange={(e) => setDraft({ ...draft, notesForAI: e.target.value })}
-          placeholder="Любые свободные указания: фирменный стиль, ограничения, предпочтения…"
+          className="font-mono text-xs"
+          placeholder="Свободные правила использования цветов, типографики, иконок…"
         />
       </div>
     </div>
   );
 }
 
-function Swatch({ hex }: { hex: string }) {
+/* ---------- color UI ---------- */
+
+function Swatch({ hex, large }: { hex: string; large?: boolean }) {
   return (
     <span
-      className="inline-block size-4 rounded border border-border align-middle"
+      className={`inline-block rounded border border-border align-middle ${large ? "size-5" : "size-4"}`}
       style={{ backgroundColor: hex }}
     />
   );
 }
 
-function ColorPicker({
-  label,
+function ColorChip({ hex, onRemove }: { hex: string; onRemove?: () => void }) {
+  return (
+    <span className="flex items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5 text-xs">
+      <Swatch hex={hex} />
+      <span className="font-mono">{hex.toUpperCase()}</span>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="ml-0.5 text-muted-foreground hover:text-foreground"
+          aria-label="Удалить цвет"
+        >
+          <X className="size-3" />
+        </button>
+      )}
+    </span>
+  );
+}
+
+function ColorPickerPopover({
+  initial = "#000000",
+  onPick,
+  trigger,
+}: {
+  initial?: string;
+  onPick: (hex: string) => void;
+  trigger: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [hex, setHex] = useState(initial);
+
+  const normalize = (s: string) => {
+    let v = s.trim();
+    if (!v.startsWith("#")) v = `#${v}`;
+    return v;
+  };
+  const valid = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent className="w-64 space-y-3">
+        <div className="space-y-1">
+          <Label className="text-xs">Выберите цвет</Label>
+          <input
+            type="color"
+            value={valid ? hex : "#000000"}
+            onChange={(e) => setHex(e.target.value)}
+            className="h-10 w-full cursor-pointer rounded border border-border bg-transparent"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">HEX</Label>
+          <Input
+            value={hex}
+            onChange={(e) => setHex(normalize(e.target.value))}
+            placeholder="#RRGGBB"
+            className="font-mono"
+          />
+        </div>
+        <div className="flex items-center justify-between">
+          <Swatch hex={valid ? hex : "#000000"} large />
+          <Button
+            size="sm"
+            disabled={!valid}
+            onClick={() => {
+              onPick(hex.toUpperCase());
+              setOpen(false);
+            }}
+          >
+            Добавить
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function SingleColorRow({
+  title,
   value,
   onChange,
 }: {
-  label: string;
+  title: string;
   value: string;
   onChange: (v: string) => void;
 }) {
   return (
     <div>
-      <Label className="text-xs">{label}</Label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue>
-            <span className="flex items-center gap-2">
-              <Swatch hex={value} />
-              <span className="text-xs font-mono">{value}</span>
-            </span>
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {COLOR_PALETTE.map((c) => (
-            <SelectItem key={c.hex} value={c.hex}>
-              <span className="flex items-center gap-2">
-                <Swatch hex={c.hex} />
-                <span>{c.name}</span>
-                <span className="text-xs text-muted-foreground font-mono">{c.hex}</span>
-              </span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Label className="text-xs">{title}</Label>
+      <div className="flex flex-wrap items-center gap-1 mt-1">
+        <ColorChip hex={value} />
+        <ColorPickerPopover
+          initial={value}
+          onPick={onChange}
+          trigger={
+            <button
+              type="button"
+              title="Изменить цвет"
+              className="inline-flex size-6 items-center justify-center rounded border border-dashed border-border text-muted-foreground hover:bg-muted"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          }
+        />
+      </div>
     </div>
   );
 }
 
-function MultiColorPicker({
-  label,
+function ColorListRow({
+  title,
   values,
   onChange,
 }: {
-  label: string;
+  title: string;
   values: string[];
   onChange: (v: string[]) => void;
 }) {
@@ -221,122 +294,26 @@ function MultiColorPicker({
     if (!values.includes(hex)) onChange([...values, hex]);
   };
   const remove = (hex: string) => onChange(values.filter((v) => v !== hex));
-
   return (
     <div>
-      <Label className="text-xs">{label}</Label>
-      <div className="flex flex-wrap gap-1 mb-1 min-h-7">
+      <Label className="text-xs">{title}</Label>
+      <div className="flex flex-wrap items-center gap-1 mt-1">
         {values.map((hex) => (
-          <button
-            key={hex}
-            type="button"
-            onClick={() => remove(hex)}
-            className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs hover:bg-muted"
-          >
-            <Swatch hex={hex} />
-            <span className="font-mono">{hex}</span>
-            <X className="size-3" />
-          </button>
+          <ColorChip key={hex} hex={hex} onRemove={() => remove(hex)} />
         ))}
-      </div>
-      <Select value="" onValueChange={add}>
-        <SelectTrigger>
-          <SelectValue placeholder="Добавить цвет…" />
-        </SelectTrigger>
-        <SelectContent>
-          {COLOR_PALETTE.map((c) => (
-            <SelectItem key={c.hex} value={c.hex}>
-              <span className="flex items-center gap-2">
-                <Swatch hex={c.hex} />
-                <span>{c.name}</span>
-              </span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-function FontPicker({
-  label,
-  family,
-  weights,
-  onChange,
-}: {
-  label: string;
-  family: string;
-  weights: string[];
-  onChange: (family: string, weights: string[]) => void;
-}) {
-  const toggleWeight = (w: string) => {
-    const next = weights.includes(w) ? weights.filter((x) => x !== w) : [...weights, w];
-    onChange(family, next);
-  };
-  return (
-    <div>
-      <Label className="text-xs">{label}</Label>
-      <Select value={family} onValueChange={(v) => onChange(v, weights)}>
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {FONT_OPTIONS.map((f) => (
-            <SelectItem key={f} value={f}>
-              <span style={{ fontFamily: f }}>{f}</span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <div className="flex flex-wrap gap-1 mt-1">
-        {FONT_WEIGHT_OPTIONS.map((w) => {
-          const on = weights.includes(w);
-          return (
+        <ColorPickerPopover
+          onPick={add}
+          trigger={
             <button
-              key={w}
               type="button"
-              onClick={() => toggleWeight(w)}
-              className={`rounded border px-1.5 py-0.5 text-[10px] ${
-                on
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-border hover:bg-muted"
-              }`}
+              title="Добавить цвет"
+              className="inline-flex size-6 items-center justify-center rounded border border-dashed border-border text-muted-foreground hover:bg-muted"
             >
-              {w}
+              <Plus className="size-3.5" />
             </button>
-          );
-        })}
+          }
+        />
       </div>
-    </div>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <Label className="text-xs">{label}</Label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o} value={o}>
-              {o}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
     </div>
   );
 }

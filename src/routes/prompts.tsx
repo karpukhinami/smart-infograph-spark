@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useSettingsStore } from "@/store/useSettingsStore";
+import { useSettingsStore, useCurrentPrompts } from "@/store/useSettingsStore";
 
 export const Route = createFileRoute("/prompts")({
   head: () => ({ meta: [{ title: "Промпты — AI Infographic Generator" }] }),
@@ -9,13 +9,16 @@ export const Route = createFileRoute("/prompts")({
 });
 
 function PromptsPage() {
-  const prompts = useSettingsStore((s) => s.prompts);
+  const mode = useSettingsStore((s) => s.mode);
+  const prompts = useCurrentPrompts();
   const setPrompt = useSettingsStore((s) => s.setPrompt);
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-6">
-      <h1 className="text-lg font-semibold">Базовые промпты</h1>
+      <h1 className="text-lg font-semibold">
+        Базовые промпты — режим «{mode === "free" ? "вольный" : "строгий"}»
+      </h1>
       <p className="text-xs text-muted-foreground">
-        Изменения сохраняются на текущую сессию. Те же значения редактируются и через раскрывашки на главной странице.
+        Промпты хранятся отдельно для каждого режима. Изменения сохраняются на текущую сессию.
       </p>
       <Block
         label="Промпт анализа — с исходным текстом"
