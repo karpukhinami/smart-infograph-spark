@@ -8,6 +8,7 @@ import defaultProfile from "@/data/default-design-profile.json";
 import promptFreeAnalysisWith from "@/data/prompts/free/analysis-with-content.txt?raw";
 import promptFreeAnalysisTopic from "@/data/prompts/free/analysis-topic-only.txt?raw";
 import promptFreeDesignBrief from "@/data/prompts/free/design-brief.txt?raw";
+import promptFreeGeneralRules from "@/data/prompts/free/general-rules.txt?raw";
 
 import promptStrictAnalysisWith from "@/data/prompts/strict/analysis-with-content.txt?raw";
 import promptStrictAnalysisTopic from "@/data/prompts/strict/analysis-topic-only.txt?raw";
