@@ -5,6 +5,7 @@ interface ReqBody {
   model: string;
   prompt: string;
   system?: string;
+  images?: string[];
 }
 
 export const Route = createFileRoute("/api/llm")({
@@ -16,9 +17,6 @@ export const Route = createFileRoute("/api/llm")({
           return new Response("Missing model or prompt", { status: 400 });
         }
 
-        // Heuristic: Lovable Gateway accepts any model id in our catalog except those tagged as openrouter.
-        // We forward to OpenRouter when the openrouter key is set AND the id is not a known Lovable id pattern.
-        // Simpler: try OpenRouter if model contains "/" AND OPENROUTER_API_KEY is set AND model is not in the Lovable preset list.
         const lovablePresets = new Set([
           "google/gemini-3-flash-preview",
           "google/gemini-2.5-pro",
@@ -29,9 +27,17 @@ export const Route = createFileRoute("/api/llm")({
         ]);
 
         const useOpenRouter = !lovablePresets.has(body.model);
+
+        const userContent: unknown = body.images?.length
+          ? [
+              { type: "text", text: body.prompt },
+              ...body.images.map((url) => ({ type: "image_url", image_url: { url } })),
+            ]
+          : body.prompt;
+
         const messages = [
           ...(body.system ? [{ role: "system", content: body.system }] : []),
-          { role: "user", content: body.prompt },
+          { role: "user", content: userContent },
         ];
 
         let upstreamUrl: string;
