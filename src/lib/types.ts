@@ -37,11 +37,44 @@ export interface SourceText {
   userInstructions: string;
 }
 
+export type WireframeBlockSize =
+  | "full"
+  | "half"
+  | "third"
+  | "quarter"
+  | "compact"
+  | "dominant"
+  | "narrow"
+  | "wide";
+
 export interface WireframeBlock {
-  label: string;
-  type: string;
-  width: number;
+  /** Stable id, e.g. "card-1". */
+  id?: string;
+  /** Group id matching ContentSummary.entities[].sectionId. */
+  sectionId?: number;
+  /** entityType from ContentSummary (mainIdea, rule, definition, formula, warning, ...). */
+  entityType?: string;
+  /** Visual role of the card: header / mainIdea / rule / detail / warning / formula / visualCore / diagram / conclusion / classification. */
+  role?: string;
+  /** Semantic size token. */
+  size?: WireframeBlockSize;
+  /** Numeric width in grid units within the row (derived from size when absent). */
+  width?: number;
+  /** Exact title text from ContentSummary, if any. */
+  title?: string;
+  /** Short preview of the body text (one line). */
+  contentPreview?: string;
+  hasIcon?: boolean;
+  hasVisual?: boolean;
+  hasFormula?: boolean;
+  hasExample?: boolean;
+  priority?: "high" | "medium" | "low";
+  /** Background role token: accent / pastel / structural-dark / card / warning. */
+  backgroundRole?: string;
   note?: string;
+  /** Legacy fields, still accepted for backward compatibility. */
+  label?: string;
+  type?: string;
 }
 export interface WireframeRow {
   blocks: WireframeBlock[];
