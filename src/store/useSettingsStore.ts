@@ -47,11 +47,13 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     analysisWithContent: promptFreeAnalysisWith,
     analysisTopicOnly: promptFreeAnalysisTopic,
     designBrief: promptFreeDesignBrief,
+    generalRules: promptFreeGeneralRules,
   },
   strict: {
     analysisWithContent: promptStrictAnalysisWith,
     analysisTopicOnly: promptStrictAnalysisTopic,
     designBrief: promptStrictDesignBrief,
+    generalRules: promptStrictGeneralRules,
   },
 };
 
