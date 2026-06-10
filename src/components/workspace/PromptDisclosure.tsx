@@ -30,8 +30,10 @@ export function PromptDisclosure({
           <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            rows={14}
-            className="font-mono text-xs"
+            rows={24}
+            wrap="soft"
+            spellCheck={false}
+            className="font-mono text-xs leading-relaxed whitespace-pre-wrap break-words"
           />
           <div className="flex gap-2">
             <Button size="sm" onClick={() => { onChange(draft); }}>Сохранить</Button>
