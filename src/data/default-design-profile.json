@@ -1,21 +1,14 @@
 {
-  "profileName": "DefaultBentoStyle",
-  "background": "#FFFFFF",
-  "accents": {
-    "primary": "#F58220",
-    "secondary": "#6C5CE7",
-    "additional": ["#FCD9B0", "#DCD4F2"]
+  "profileName": "Дефолт стайл",
+  "colors": {
+    "pageBackground": "#F5F6FF",
+    "brightAccents": ["#FF8800", "#503AE0", "#F074FF"],
+    "pastelFills": ["#FFE3C2", "#FFD4A3", "#D9D4FF"],
+    "structural": ["#101828", "#1A2236", "#F5F6FF", "#9399BD"]
   },
-  "fonts": {
-    "primary": { "family": "Roboto", "weights": ["Regular", "Bold", "Black"] },
-    "secondary": { "family": "Spectral", "weights": ["Italic", "BoldItalic", "Upright"] }
+  "typography": {
+    "styleId": "geometric_grotesque",
+    "specificityId": "character_only"
   },
-  "usageRules": {
-    "primaryAccent": ["header", "keyText", "importantIcons"],
-    "secondaryAccent": ["cards", "labels", "minorIcons"],
-    "additionalAccents": ["illustrations", "arrows", "misc"]
-  },
-  "cardStyle": { "borderRadius": "16px", "border": "optional", "shadow": "none" },
-  "spacing": { "padding": "default", "interBlockGap": "default" },
-  "notesForAI": "If a block is not explicitly assigned a color or font, the AI can select a matching accent or weight from the palette."
+  "notesForAI": "PIGMENT vs FILL\n• Bright accents = pigments on keywords/icons OR fill of the single crown card\n• Pastels = card-background fills only; never text or icon color\n• All icons and body text = graphite\n\nPIGMENT SYNTAX RULE\n• Never embed color markup inside rendered text\n• Describe pigmentation as a separate instruction above the text block\n• Rendered text must be clean — no brackets, no hex codes, no markup characters\n• Applies to: title accents, etymology highlights, pull-quote keywords\n\nTYPOGRAPHY\n• Title: UPPERCASE extra-bold, 2 lines max\n• Subtitle: sentence case, text gray\n• Card title plates: UPPERCASE bold white on graphite, corner radius 10px, padding 8px×16px, identical font size across all detail cards\n• Body text: sentence case graphite\n• Sub-points: sentence case bold graphite\n• Etymology: italic\n• Meta pill: UPPERCASE light-gray on dark slate, letter-spacing +0.05em\n\nICONS\n• Outline, 2px stroke, graphite\n• Each icon alone on its own row, above its title plate — never beside it"
 }

@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { useSettingsStore } from "@/store/useSettingsStore";
 
 function NotFoundComponent() {
   return (
@@ -74,9 +75,12 @@ function RootComponent() {
       <div className="min-h-screen flex flex-col">
         <header className="border-b border-border bg-sidebar/60 backdrop-blur">
           <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-3">
-            <Link to="/" className="text-base font-semibold tracking-tight">
-              AI Infographic Generator
-            </Link>
+            <div className="flex items-center gap-4">
+              <ModeSwitch />
+              <Link to="/" className="text-base font-semibold tracking-tight">
+                AI Infographic Generator
+              </Link>
+            </div>
             <nav className="flex gap-4 text-sm text-muted-foreground">
               <Link to="/" activeProps={{ className: "text-foreground font-medium" }}>Рабочее место</Link>
               <Link to="/styles" activeProps={{ className: "text-foreground font-medium" }}>Стили</Link>
@@ -89,5 +93,29 @@ function RootComponent() {
         <Toaster />
       </div>
     </QueryClientProvider>
+  );
+}
+
+function ModeSwitch() {
+  const mode = useSettingsStore((s) => s.mode);
+  const setMode = useSettingsStore((s) => s.setMode);
+  return (
+    <div className="inline-flex rounded-md border border-border bg-background p-0.5 text-xs">
+      {(["strict", "free"] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => setMode(m)}
+          className={`px-2.5 py-1 rounded-sm transition-colors ${
+            mode === m
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+          title={m === "strict" ? "Строгий режим: свои промпты и стили" : "Вольный режим: свои промпты и стили"}
+        >
+          {m === "strict" ? "Строгий" : "Вольный"}
+        </button>
+      ))}
+    </div>
   );
 }

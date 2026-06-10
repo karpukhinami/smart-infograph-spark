@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Loader2, RefreshCw, RotateCcw } from "lucide-react";
 import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage } from "@/store/useProjectStore";
-import { useSettingsStore } from "@/store/useSettingsStore";
+import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
 import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
@@ -17,7 +17,8 @@ import { WireframeView } from "@/components/workspace/WireframeView";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { extractJson } from "@/lib/json-repair";
-import type { ContentSummary, DesignBriefResult, PaneMode } from "@/lib/types";
+import { buildDesignBriefPrompt } from "@/lib/prompt-injection";
+import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Workspace — AI Infographic Generator" }] }),
@@ -49,16 +50,15 @@ function Workspace() {
   const activeBrief = useActiveBrief();
   const activeImage = useActiveImage();
 
-  const prompts = useSettingsStore((s) => s.prompts);
+  const prompts = useCurrentPrompts();
   const setPrompt = useSettingsStore((s) => s.setPrompt);
-  const styles = useSettingsStore((s) => s.styles);
+  const styles = useCurrentStyles();
   const profiles = useSettingsStore((s) => s.profiles);
-  
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
   const [loading, setLoading] = useState<null | "analyze" | "brief" | "image">(null);
 
-  const enabledStyles = useMemo(() => styles.filter((s) => s.enabled), [styles]);
+  const enabledStyles = useMemo<InfographicStyle[]>(() => styles.filter((s) => s.enabled), [styles]);
   const activeStyle = useMemo(
     () => styles.find((s) => s.id === (selectedStyleId ?? activeContent?.value.recommendedStyle)),
     [styles, selectedStyleId, activeContent],
@@ -99,12 +99,13 @@ function Workspace() {
     if (!activeStyle) { toast.error("Сначала выберите стиль"); return; }
     try {
       setLoading("brief");
-      const filled = prompts.designBrief
-        .replace("{{CONTENT_SUMMARY}}", activeContent.value.content)
-        .replace("{{STYLE_GUIDELINES}}", activeStyle?.guidelines || "(none)")
-        .replace("{{USER_WISHES}}", userWishes || "(none)")
-        .replace("{{STYLE_SPEC}}", JSON.stringify(activeStyle, null, 2))
-        .replace("{{DESIGN_PROFILE}}", JSON.stringify(activeProfile ?? {}, null, 2));
+      const filled = buildDesignBriefPrompt({
+        template: prompts.designBrief,
+        contentSummary: activeContent.value.content,
+        style: activeStyle,
+        profile: activeProfile,
+        userWishes,
+      });
       const raw = await callTextLLM({ model: models.brief, prompt: filled });
       const parsed = extractJson<DesignBriefResult>(raw);
       if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {

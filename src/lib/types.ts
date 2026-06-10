@@ -1,39 +1,28 @@
+export type AppMode = "free" | "strict";
+
 export interface InfographicStyle {
   id: string;
   name: string;
   shortDescription: string;
   enabled: boolean;
-  guidelines: string;
-  rules: {
-    composition: string;
-    symmetry: string;
-    primaryCarrier: string;
-    colorApproach: string;
-    typography: string;
-    illustration: string;
-    character: string;
-  };
+  /** General composition / layout rules for this style. */
+  generalRules: string;
+  /** Specific element-level rules for this style. */
+  specificRules: string;
 }
 
 export interface DesignProfile {
   profileName: string;
-  background: string;
-  accents: {
-    primary: string;
-    secondary: string;
-    additional: string[];
+  colors: {
+    pageBackground: string;
+    brightAccents: string[];
+    pastelFills: string[];
+    structural: string[];
   };
-  fonts: {
-    primary: { family: string; weights: string[] };
-    secondary: { family: string; weights: string[] };
+  typography: {
+    styleId: string;       // id from typography_styles
+    specificityId: string; // id from font_specificity_modes
   };
-  usageRules: {
-    primaryAccent: string[];
-    secondaryAccent: string[];
-    additionalAccents: string[];
-  };
-  cardStyle: { borderRadius: string; border: string; shadow: string };
-  spacing: { padding: string; interBlockGap: string };
   notesForAI: string;
 }
 
@@ -41,7 +30,7 @@ export type InputMode = "text" | "file" | "topic";
 
 export interface SourceText {
   mode: InputMode;
-  text: string; // text or file contents
+  text: string;
   topic?: string;
   subject?: string;
   grade?: string;
