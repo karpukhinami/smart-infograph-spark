@@ -221,7 +221,7 @@ Use calm pastel card fills from the selected palette.
 CARD — ЗЕМЛЯ
 Position: ROW N, left half.
 sectionId: 3
-entityType: definition / detail
+entityType: definition
 Visual role: supporting explanation card.
 Size and placement: half-width card, left side of the row.
 Background / color role: calm warm card fill.
@@ -235,7 +235,7 @@ Do not add extra examples or labels.
 CARD — ТРУД
 Position: ROW N, right half.
 sectionId: 3
-entityType: definition / detail
+entityType: definition
 Visual role: supporting explanation card.
 Size and placement: half-width card, right side of the same row.
 Background / color role: related calm warm card fill, slightly different from the left card if the palette allows.
@@ -291,7 +291,11 @@ Do not add random branches, extra variables or decorative arrows that are not ne
 Сущности с одним sectionId оформляй как одну визуальную группу (крупная карточка с подсекциями, набор соседних карточек или общий блок с подкарточками). Несколько однотипных сущностей одного приоритета — как равноправные карточки.
 
 4) TECHNICAL AND NEGATIVE INSTRUCTIONS
-Коротко и прямо: final image only; no mockup; no UI; no watermark; no random text; no pseudo-text; no English text unless explicitly required; no extra labels; no misspelled words; no distorted formulas; no incorrect mathematical or scientific notation; no unnecessary arrows; no decorative marks that change meaning; no photorealism unless explicitly required; no 3D unless explicitly required; no messy shadows; no inconsistent icon styles; no inconsistent diagram styles.
+Здесь НЕ повторяй общие запреты из ОБЩИХ ПРАВИЛ (плоскость, фотореализм, 3D, мусорный текст, тени, согласованность иконок и т.п.) — они уже действуют. Добавь только то, что специфично для этой конкретной инфографики и не покрыто общими правилами:
+- final image only, без mockup, рамки браузера и UI;
+- запреты на конкретные искажения формул/обозначений из ContentSummary (например: «do not change subscript in P_n», «do not replace n! with another notation»);
+- запреты на лишние подписи, оси, стрелки и переменные в visual, которых нет в visual.description;
+- язык видимого текста (например: «all visible text must stay in Russian»).
 
 В конце слоя обязательно повтори жёсткое требование к порядку:
 Render the cards strictly in the order described in LAYER 3, row by row from top to bottom. Do not rearrange, do not shuffle, do not redistribute the cards between rows. The first described row is the topmost row of the image; the last described row is the bottom of the image. Within each row, render the cards left-to-right in the order described.
@@ -358,5 +362,26 @@ WIREFRAME
 - backgroundRole: "accent" | "pastel" | "structural-dark" | "card" | "warning"
 - priority: "high" | "medium" | "low"
 - connections можно опустить или вернуть пустой массив, если связей между карточками нет.
+
+Маппинг entityType (из ContentSummary) → role (в wireframe). entityType сохраняй в поле entityType как есть; role подбирай по смыслу так:
+- mainIdea → "mainIdea"
+- rule, principle, theorem, property, criterion, algorithm → "rule"
+- definition, etymology → "detail"
+- consequence, conclusion → "conclusion"
+- formula → "formula"
+- example, solutionStep, taskCondition, given, goal → "example"
+- classification, comparison → "classification"
+- warning, commonMistake → "warning"
+- checklist, mnemonic, quote → "detail"
+- visualCore → "visualCore"
+- diagram → "diagram"
+- заголовочная плашка темы (topic/subject/grade) → "header"
+
+ФОРМАТИРОВАНИЕ СТРОКИ PromptForImageGeneration (ОБЯЗАТЕЛЬНО):
+- Внутри JSON-строки используй реальные переводы строк, экранированные как \n. НЕ возвращай весь промпт одним абзацем без переводов строк — это считается ошибкой формата.
+- Между четырьмя слоями (BRAND DNA, COMPOSITION GRAMMAR, CONTENT LAYOUT, TECHNICAL AND NEGATIVE INSTRUCTIONS) вставляй пустую строку (\n\n) и заголовок слоя на отдельной строке (например "LAYER 1 — BRAND DNA").
+- Внутри LAYER 3 каждый ROW начинается с новой строки и отделён пустой строкой от предыдущего. Каждый CARD внутри ROW начинается с новой строки. Каждое поле карточки (Position, sectionId, entityType, Visual role, Background, Visible title text, Visible body text, Formula text, Example text, Icon, Visual, Internal layout, Do not add) — на отдельной строке.
+- Списки (маркированные перечисления, slots, шаги) — каждый пункт на отдельной строке.
+- Сплошной текст без \n запрещён.
 
 Никакого текста вне JSON. Никаких markdown-ограждений. Никаких комментариев.
