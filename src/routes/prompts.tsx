@@ -35,6 +35,11 @@ function PromptsPage() {
         value={prompts.designBrief}
         onChange={(v) => setPrompt("designBrief", v)}
       />
+      <Block
+        label="Общие правила финального изображения"
+        value={prompts.generalRules}
+        onChange={(v) => setPrompt("generalRules", v)}
+      />
     </div>
   );
 }
