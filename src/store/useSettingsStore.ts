@@ -13,6 +13,7 @@ import promptFreeGeneralRules from "@/data/prompts/free/general-rules.txt?raw";
 import promptStrictAnalysisWith from "@/data/prompts/strict/analysis-with-content.txt?raw";
 import promptStrictAnalysisTopic from "@/data/prompts/strict/analysis-topic-only.txt?raw";
 import promptStrictDesignBrief from "@/data/prompts/strict/design-brief.txt?raw";
+import promptStrictGeneralRules from "@/data/prompts/strict/general-rules.txt?raw";
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
 
