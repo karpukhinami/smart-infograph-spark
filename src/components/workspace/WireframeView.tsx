@@ -48,12 +48,13 @@ function chips(b: WireframeBlock): string[] {
 }
 
 export function WireframeView({ wf }: { wf: WireframeDescription }) {
-  const rowHeight = 120;
+  const rowHeight = 170;
   const padding = 16;
   const gap = 10;
   const width = 760;
   const rows = wf.rows ?? [];
   const innerWidth = width - padding * 2;
+
 
   return (
     <div className="rounded-md border border-border bg-card p-3">
