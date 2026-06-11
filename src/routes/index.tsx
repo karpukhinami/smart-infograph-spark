@@ -7,20 +7,27 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, RefreshCw, RotateCcw, Upload, ImagePlus } from "lucide-react";
+import { Loader2, RefreshCw, RotateCcw, Upload, ImagePlus, Sparkles } from "lucide-react";
 import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
 import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { WireframeView } from "@/components/workspace/WireframeView";
+import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { extractJson } from "@/lib/json-repair";
 import { buildDesignBriefPrompt } from "@/lib/prompt-injection";
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
+import {
+  buildRefineContentPrompt,
+  buildRefineBriefPrompt,
+  buildRefineImageDecisionPrompt,
+} from "@/lib/refine-prompts";
 import recognizeImagePrompt from "@/data/prompts/recognize-image.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Workspace — AI Infographic Generator" }] }),
