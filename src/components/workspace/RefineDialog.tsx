@@ -28,12 +28,11 @@ export function RefineDialog({ open, title, description, busy, onCancel, onSubmi
     drag.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
     function move(ev: MouseEvent) {
       if (!drag.current) return;
-      const w = 520;
       const x = Math.max(0, Math.min(window.innerWidth - 100, ev.clientX - drag.current.dx));
       const y = Math.max(0, Math.min(window.innerHeight - 60, ev.clientY - drag.current.dy));
       setPos({ x, y });
-      void w;
     }
+
     function up() {
       drag.current = null;
       window.removeEventListener("mousemove", move);
