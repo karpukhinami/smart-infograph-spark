@@ -7,20 +7,27 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, RefreshCw, RotateCcw, Upload, ImagePlus } from "lucide-react";
+import { Loader2, RefreshCw, RotateCcw, Upload, ImagePlus, Sparkles } from "lucide-react";
 import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
 import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { WireframeView } from "@/components/workspace/WireframeView";
+import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { extractJson } from "@/lib/json-repair";
 import { buildDesignBriefPrompt } from "@/lib/prompt-injection";
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
+import {
+  buildRefineContentPrompt,
+  buildRefineBriefPrompt,
+  buildRefineImageDecisionPrompt,
+} from "@/lib/refine-prompts";
 import recognizeImagePrompt from "@/data/prompts/recognize-image.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Workspace — AI Infographic Generator" }] }),
@@ -74,9 +81,11 @@ function Workspace() {
   const profiles = useSettingsStore((s) => s.profiles);
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
-  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize">(null);
+  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine">(null);
+  const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
 
   const enabledStyles = useMemo<InfographicStyle[]>(() => styles.filter((s) => s.enabled), [styles]);
   const activeStyle = useMemo(
@@ -221,6 +230,131 @@ function Workspace() {
       setLoading(null);
     }
   }
+
+  async function onRefineContent(userText: string) {
+    if (!activeContent) return;
+    try {
+      setLoading("refine");
+      const analysis = activeContent.value.analysis ?? null;
+      const prompt = buildRefineContentPrompt({
+        userInstructions: userText,
+        currentAnalysisJson: analysis ? JSON.stringify(analysis, null, 2) : "",
+        currentContentText: activeContent.value.content,
+        strict: mode === "strict",
+      });
+      const raw = await callTextLLM({ model: models.analysis, prompt });
+      let summary: ContentSummary;
+      if (mode === "strict") {
+        const parsed = extractJson<unknown>(raw);
+        const a = validateAnalysisJson(parsed);
+        summary = {
+          content: renderAnalysisJson(a),
+          recommendedStyle: activeContent.value.recommendedStyle,
+          analysis: a,
+        };
+      } else {
+        const parsed = extractJson<ContentSummary>(raw);
+        if (!parsed.content) throw new Error("В ответе модели не хватает поля content");
+        summary = { ...parsed, recommendedStyle: parsed.recommendedStyle || activeContent.value.recommendedStyle };
+      }
+      pushContent(summary);
+      setPaneMode("content");
+      setRefineStage(null);
+      toast.success("Контент обновлён");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать контент");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function onRefineBrief(userText: string) {
+    if (!activeBrief) return;
+    try {
+      setLoading("refine");
+      const prompt = buildRefineBriefPrompt({
+        userInstructions: userText,
+        currentBriefJson: JSON.stringify(activeBrief.value, null, 2),
+      });
+      const raw = await callTextLLM({ model: models.brief, prompt });
+      const parsed = extractJson<DesignBriefResult>(raw);
+      if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
+        throw new Error("В ответе модели не хватает полей");
+      }
+      pushBrief(parsed);
+      setPaneMode("wireframe");
+      setRefineStage(null);
+      toast.success("Расположение блоков обновлено");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать лэйаут");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function onRefineImage(userText: string) {
+    if (!activeBrief) return;
+    try {
+      setLoading("refine");
+      const decisionPrompt = buildRefineImageDecisionPrompt({
+        userInstructions: userText,
+        currentImagePrompt: activeBrief.value.PromptForImageGeneration,
+      });
+      const raw = await callTextLLM({ model: models.brief, prompt: decisionPrompt });
+      const decision = extractJson<{ action: "patch" | "rebuild"; newPrompt?: string; reason?: string }>(raw);
+
+      if (decision.action === "patch" && decision.newPrompt) {
+        // Save patched prompt as a new brief version with the same wireframe.
+        const next: DesignBriefResult = {
+          PromptForImageGeneration: decision.newPrompt,
+          WireframeDescription: activeBrief.value.WireframeDescription,
+        };
+        pushBrief(next);
+        // Now generate the image with the patched prompt.
+        const dataUrl = await callImageLLM({ model: models.image, prompt: decision.newPrompt });
+        pushImage(dataUrl);
+        setPaneMode("image");
+        setRefineStage(null);
+        toast.success("Изображение перегенерировано по вашему описанию");
+        return;
+      }
+
+      // Need to rebuild the brief — re-run design brief generation with user wishes prioritised.
+      if (!activeContent || !activeStyle) {
+        toast.error(decision.reason || "Нужно вернуться к шагу 2, но не хватает контента/стиля");
+        return;
+      }
+      toast.message("Изменение требует перестройки брифа", { description: decision.reason ?? "" });
+      const combinedWishes = userWishes.trim()
+        ? `${userText}\n\n(предыдущие пожелания: ${userWishes.trim()})`
+        : userText;
+      const filled = buildDesignBriefPrompt({
+        template: prompts.designBrief,
+        contentSummary: activeContent.value.content,
+        style: activeStyle,
+        profile: activeProfile,
+        userWishes: combinedWishes,
+        generalRules: prompts.generalRules,
+      });
+      const briefRaw = await callTextLLM({ model: models.brief, prompt: filled });
+      const parsed = extractJson<DesignBriefResult>(briefRaw);
+      if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
+        throw new Error("В ответе модели не хватает полей");
+      }
+      pushBrief(parsed);
+      const dataUrl = await callImageLLM({ model: models.image, prompt: parsed.PromptForImageGeneration });
+      pushImage(dataUrl);
+      setPaneMode("image");
+      setRefineStage(null);
+      toast.success("Бриф и изображение перегенерированы");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать изображение");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+
 
   return (
     <div className="mx-auto max-w-[1600px] p-4 space-y-3">
@@ -442,7 +576,10 @@ function Workspace() {
             <TabsContent value="content" className="p-2 space-y-2">
               {activeContent ? (
                 <>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setRefineStage("content")} disabled={loading !== null}>
+                      <Sparkles className="size-3.5 mr-1" /> Изменить с ИИ
+                    </Button>
                     <Button size="sm" variant="outline" onClick={onAnalyze} disabled={loading !== null}>
                       <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
@@ -478,7 +615,10 @@ function Workspace() {
             <TabsContent value="wireframe" className="p-2 space-y-2">
               {activeBrief ? (
                 <>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setRefineStage("brief")} disabled={loading !== null}>
+                      <Sparkles className="size-3.5 mr-1" /> Изменить с ИИ
+                    </Button>
                     <Button size="sm" variant="outline" onClick={onCreateBrief} disabled={loading !== null}>
                       <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
@@ -493,7 +633,10 @@ function Workspace() {
             <TabsContent value="image" className="p-2 space-y-2">
               {activeImage ? (
                 <>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setRefineStage("image")} disabled={loading !== null}>
+                      <Sparkles className="size-3.5 mr-1" /> Изменить с ИИ
+                    </Button>
                     <Button size="sm" variant="outline" onClick={onGenerateImage} disabled={loading !== null}>
                       <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
@@ -508,9 +651,35 @@ function Workspace() {
         </div>
       </section>
       </div>
+
+      <RefineDialog
+        open={refineStage === "content"}
+        title="Изменить содержание с ИИ"
+        description="Опишите, какие изменения в содержании или группировке необходимо произвести. Модели будут переданы: текущий JSON анализа, список допустимых типов сущностей и ваши пожелания."
+        busy={loading === "refine"}
+        onCancel={() => setRefineStage(null)}
+        onSubmit={onRefineContent}
+      />
+      <RefineDialog
+        open={refineStage === "brief"}
+        title="Изменить расположение блоков с ИИ"
+        description={'Опишите, какие изменения в размещении блоков необходимо произвести.\nОбратите внимание, что для редактирования текста предпочтительно вернуться на вкладку «Контент».'}
+        busy={loading === "refine"}
+        onCancel={() => setRefineStage(null)}
+        onSubmit={onRefineBrief}
+      />
+      <RefineDialog
+        open={refineStage === "image"}
+        title="Изменить изображение с ИИ"
+        description={'Опишите, что изменить на изображении.\nОбратите внимание, что содержание и размещение блоков лучше менять на предыдущих этапах.'}
+        busy={loading === "refine"}
+        onCancel={() => setRefineStage(null)}
+        onSubmit={onRefineImage}
+      />
     </div>
   );
 }
+
 
 function EmptyState({ text }: { text: string }) {
   return (

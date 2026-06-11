@@ -48,12 +48,13 @@ function chips(b: WireframeBlock): string[] {
 }
 
 export function WireframeView({ wf }: { wf: WireframeDescription }) {
-  const rowHeight = 120;
+  const rowHeight = 170;
   const padding = 16;
   const gap = 10;
   const width = 760;
   const rows = wf.rows ?? [];
   const innerWidth = width - padding * 2;
+
 
   return (
     <div className="rounded-md border border-border bg-card p-3">
@@ -99,61 +100,57 @@ export function WireframeView({ wf }: { wf: WireframeDescription }) {
                   strokeWidth={priorityStroke(b.priority)}
                   rx={8}
                 />
-                <text x={x + 10} y={y + 16} fontSize={10} fill="currentColor" opacity={0.6}>
-                  [{typeTag}] {meta}
-                </text>
-                <text x={x + 10} y={y + 38} fontSize={13} fill="currentColor" fontWeight="700">
-                  {label.length > 60 ? label.slice(0, 58) + "…" : label}
-                </text>
-                {b.contentPreview && (
-                  <text x={x + 10} y={y + 58} fontSize={11} fill="currentColor" opacity={0.75}>
-                    {b.contentPreview.length > 70
-                      ? b.contentPreview.slice(0, 68) + "…"
-                      : b.contentPreview}
-                  </text>
-                )}
-                {cs.length > 0 &&
-                  cs.map((tag, i) => (
-                    <g key={tag}>
-                      <rect
-                        x={x + 10 + i * 64}
-                        y={y + rowHeight - 24}
-                        width={58}
-                        height={16}
-                        rx={4}
-                        fill="none"
-                        stroke="currentColor"
-                        opacity={0.55}
-                      />
-                      <text
-                        x={x + 10 + i * 64 + 29}
-                        y={y + rowHeight - 12}
-                        fontSize={9}
-                        fill="currentColor"
-                        textAnchor="middle"
-                        opacity={0.75}
-                      >
-                        {tag}
-                      </text>
-                    </g>
-                  ))}
-                {b.note && (
-                  <text
-                    x={x + w - 10}
-                    y={y + rowHeight - 8}
-                    fontSize={9}
-                    fill="currentColor"
-                    opacity={0.55}
-                    textAnchor="end"
+                <foreignObject x={x + 10} y={y + 8} width={Math.max(20, w - 20)} height={rowHeight - 16}>
+                  <div
+                    style={{
+                      fontFamily: "inherit",
+                      color: "currentColor",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      height: "100%",
+                      overflow: "hidden",
+                    }}
                   >
-                    {b.note.length > 40 ? b.note.slice(0, 38) + "…" : b.note}
-                  </text>
-                )}
+
+                    <div style={{ fontSize: 10, opacity: 0.55, lineHeight: 1.1 }}>
+                      [{typeTag}] {meta}
+                    </div>
+                    <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.15, wordBreak: "break-word" }}>
+                      {label}
+                    </div>
+                    {b.contentPreview && (
+                      <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.25, wordBreak: "break-word" }}>
+                        {b.contentPreview}
+                      </div>
+                    )}
+                    <div style={{ marginTop: "auto", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {cs.map((tag) => (
+                        <span
+                          key={tag}
+                          style={{
+                            fontSize: 10,
+                            padding: "1px 6px",
+                            borderRadius: 4,
+                            border: "1px solid currentColor",
+                            opacity: 0.7,
+                          }}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {b.note && (
+                        <span style={{ marginLeft: "auto", fontSize: 10, opacity: 0.55 }}>{b.note}</span>
+                      )}
+                    </div>
+                  </div>
+                </foreignObject>
               </g>
             );
           });
         })}
       </svg>
+
       {wf.connections && wf.connections.length > 0 && (
         <div className="mt-2 text-xs text-muted-foreground">
           Connections: {wf.connections.map((c) => `${c.from} → ${c.to}`).join("; ")}
