@@ -576,7 +576,10 @@ function Workspace() {
             <TabsContent value="content" className="p-2 space-y-2">
               {activeContent ? (
                 <>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setRefineStage("content")} disabled={loading !== null}>
+                      <Sparkles className="size-3.5 mr-1" /> Изменить с ИИ
+                    </Button>
                     <Button size="sm" variant="outline" onClick={onAnalyze} disabled={loading !== null}>
                       <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
@@ -612,7 +615,10 @@ function Workspace() {
             <TabsContent value="wireframe" className="p-2 space-y-2">
               {activeBrief ? (
                 <>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setRefineStage("brief")} disabled={loading !== null}>
+                      <Sparkles className="size-3.5 mr-1" /> Изменить с ИИ
+                    </Button>
                     <Button size="sm" variant="outline" onClick={onCreateBrief} disabled={loading !== null}>
                       <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
@@ -627,7 +633,10 @@ function Workspace() {
             <TabsContent value="image" className="p-2 space-y-2">
               {activeImage ? (
                 <>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setRefineStage("image")} disabled={loading !== null}>
+                      <Sparkles className="size-3.5 mr-1" /> Изменить с ИИ
+                    </Button>
                     <Button size="sm" variant="outline" onClick={onGenerateImage} disabled={loading !== null}>
                       <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
@@ -642,9 +651,35 @@ function Workspace() {
         </div>
       </section>
       </div>
+
+      <RefineDialog
+        open={refineStage === "content"}
+        title="Изменить содержание с ИИ"
+        description="Опишите, какие изменения в содержании или группировке необходимо произвести. Модели будут переданы: текущий JSON анализа, список допустимых типов сущностей и ваши пожелания."
+        busy={loading === "refine"}
+        onCancel={() => setRefineStage(null)}
+        onSubmit={onRefineContent}
+      />
+      <RefineDialog
+        open={refineStage === "brief"}
+        title="Изменить расположение блоков с ИИ"
+        description={'Опишите, какие изменения в размещении блоков необходимо произвести.\nОбратите внимание, что для редактирования текста предпочтительно вернуться на вкладку «Контент».'}
+        busy={loading === "refine"}
+        onCancel={() => setRefineStage(null)}
+        onSubmit={onRefineBrief}
+      />
+      <RefineDialog
+        open={refineStage === "image"}
+        title="Изменить изображение с ИИ"
+        description={'Опишите, что изменить на изображении.\nОбратите внимание, что содержание и размещение блоков лучше менять на предыдущих этапах.'}
+        busy={loading === "refine"}
+        onCancel={() => setRefineStage(null)}
+        onSubmit={onRefineImage}
+      />
     </div>
   );
 }
+
 
 function EmptyState({ text }: { text: string }) {
   return (
