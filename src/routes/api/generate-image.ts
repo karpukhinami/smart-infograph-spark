@@ -46,10 +46,13 @@ export const Route = createFileRoute("/api/generate-image")({
             status: upstream.status,
           });
         }
-        const data = (await upstream.json()) as { data?: Array<{ b64_json?: string }> };
+        const data = (await upstream.json()) as {
+          data?: Array<{ b64_json?: string }>;
+          usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
+        };
         const b64 = data.data?.[0]?.b64_json;
         if (!b64) return new Response("No image returned", { status: 502 });
-        return Response.json({ b64 });
+        return Response.json({ b64, usage: data.usage ?? null, model: body.model });
       },
     },
   },

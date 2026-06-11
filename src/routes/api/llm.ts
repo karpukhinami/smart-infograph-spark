@@ -80,9 +80,10 @@ export const Route = createFileRoute("/api/llm")({
 
         const data = (await upstream.json()) as {
           choices?: Array<{ message?: { content?: string } }>;
+          usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
         };
         const text = data.choices?.[0]?.message?.content ?? "";
-        return Response.json({ text });
+        return Response.json({ text, usage: data.usage ?? null, model: body.model });
       },
     },
   },

@@ -50,7 +50,7 @@ CONTENT SUMMARY:
 Этот слой — короткая фиксация неизменной визуальной ДНК конкретной инфографики. Не переизобретай то, что уже задано в ЦВЕТО-ШРИФТОВОМ ПРОФИЛЕ и в ПРАВИЛАХ ВЫБРАННОГО СТИЛЯ — эти блоки уже действуют как обязательные. В BRAND DNA только конкретизируй применение этих правил к данной инфографике, не дублируя сами правила.
 
 Обязательно укажи (1–2 короткими фразами на пункт):
-- формат и ориентация изображения (например: vertical poster, square poster);
+- формат и ориентация изображения. По умолчанию формат соответствует листу A4 в вертикальной ориентации с соотношением сторон 3:4. Допустимо выбрать 4:3 (A4 горизонтально), если содержание ContentSummary раскладывается явно удачнее в горизонтальном формате; никакие другие соотношения (1:1, 9:16, 16:9 и т.п.) использовать НЕЛЬЗЯ. Явно зафиксируй выбранное соотношение фразой вида «format: A4 portrait, aspect ratio 3:4» или «format: A4 landscape, aspect ratio 4:3»;
 - какой именно цвет из палитры назначен фоном страницы;
 - какой цвет из палитры — главный акцент в этой инфографике, какие — поддерживающие;
 - какой цвет используется для основного текста и какой — для текста на тёмных/акцентных блоках;
@@ -87,6 +87,22 @@ CONTENT SUMMARY:
 В этом слое подробно опиши, как именно содержание из ContentSummary должно быть размещено на финальной инфографике.
 
 ContentSummary является единственным источником учебного содержания. Не добавляй новые учебные факты, не сокращай текст, не переписывай формулы и не меняй связи между сущностями.
+
+ПРАВИЛО ДОСЛОВНОГО ПЕРЕНОСА ТЕКСТА:
+- весь видимый учебный текст (title, content, formula, example, visual.description) должен попадать в LAYER 3 ДОСЛОВНО, без перефраза, без сокращения, без перестановки слов, без замены терминов и без перевода;
+- если поле content — массив, каждый пункт массива становится отдельной видимой строкой/буллетом на карточке (нельзя сливать пункты в одну фразу);
+- если в тексте есть абзацы (двойной перенос строки), они должны сохраниться как отдельные абзацы на карточке, а не склеиваться в один сплошной блок;
+- одиночные переносы строки внутри пункта тоже сохраняй;
+- формулы внутри текста переноси один в один — и LaTeX-обрамление $...$ / $$...$$, и юникод-обозначения (x², a₁, √) сохраняй как есть, ничего не «упрощая»;
+- эти правила сильнее любого желания «улучшить читабельность» — единственное допустимое изменение нуля.
+
+ПРАВИЛО ОФОРМЛЕНИЯ ЗАГОЛОВОЧНОЙ ПЛАШКИ ИНФОГРАФИКИ (HEADER):
+- единственная заголовочная плашка инфографики формируется из полей topic, subject, grade и summary из ContentSummary;
+- большой заголовок плашки — это ТОЛЬКО значение topic, дословно, без добавления слов, нумерации, рамок или служебных подписей;
+- вспомогательная мета-плашка показывает subject и grade в виде «<SUBJECT> · <GRADE>» (например «АЛГЕБРА · 8»); если одного из этих полей нет — показывай только присутствующее, второго не выдумывай;
+- ЗАПРЕЩЕНО выводить на изображении буквальный плейсхолдер «TOPIC/SUBJECT/GRADE», «TOPIC», «SUBJECT», «GRADE» или любые другие служебные имена полей; этих слов не должно быть в видимом тексте инфографики;
+- под заголовком может располагаться короткая аннотация — это значение summary, дословно (см. правило дословного переноса). Если summary пустой — не добавляй никакой аннотации;
+- на любых других карточках, не только в шапке, ЗАПРЕЩЕНО использовать в качестве заголовков технические/служебные подписи, которых нет в ContentSummary: «АЛГОРИТМ 4», «БЛОК 2», «CARD 3», «ROW 1», «SECTION 2» и т.п. Если у сущности title=null, оставь карточку без заголовка или используй короткую смысловую формулировку из её content; выдумывать технические ярлыки запрещено.
 
 КРИТИЧЕСКИ ВАЖНО: описывай карточки СТРОГО СВЕРХУ ВНИЗ, ряд за рядом, в том порядке, в котором они должны быть нарисованы на финальном изображении. Этот порядок одновременно задаёт порядок чтения инфографики и порядок рендеринга для модели, которая будет генерировать картинку. Модель, рисующая инфографику, обязана разместить карточки ровно в том порядке и в тех рядах, которые ты описал, а не раскладывать их случайно. Поэтому каждая карточка должна явно указывать: к какому горизонтальному ряду она относится (ROW 1, ROW 2, ROW 3 …, считая сверху), какую позицию занимает внутри ряда (left / center / right или first / second / third слева направо) и какую ширину занимает в ряду. Если ряд содержит несколько карточек, сумма их ширин должна давать визуально цельный ряд. Если карточка занимает весь ряд, явно укажи full-width row.
 
@@ -287,15 +303,19 @@ Do not add random branches, extra variables or decorative arrows that are not ne
 4) TECHNICAL AND NEGATIVE INSTRUCTIONS
 Здесь НЕ повторяй общие запреты из ОБЩИХ ПРАВИЛ (плоскость, фотореализм, 3D, мусорный текст, тени, согласованность иконок и т.п.) — они уже действуют. Добавь только то, что специфично для этой конкретной инфографики и не покрыто общими правилами:
 - final image only, без mockup, рамки браузера и UI;
+- canvas is A4-proportioned (aspect ratio strictly 3:4 portrait OR 4:3 landscape — повтори выбранный вариант из LAYER 1); no square, no 16:9, no 9:16;
 - запреты на конкретные искажения формул/обозначений из ContentSummary (например: «do not change subscript in P_n», «do not replace n! with another notation»);
 - запреты на лишние подписи, оси, стрелки и переменные в visual, которых нет в visual.description;
-- язык видимого текста (например: «all visible text must stay in Russian»).
+- язык видимого текста (например: «all visible text must stay in Russian»);
+- do not render the literal placeholder words "TOPIC", "SUBJECT", "GRADE" or "TOPIC/SUBJECT/GRADE" on the image — the header plate must show only the real topic + the real "<SUBJECT> · <GRADE>" meta;
+- do not invent technical or generic labels for cards (no "АЛГОРИТМ 1", "БЛОК 2", "CARD 3", "ROW 1", "SECTION 2"); every visible title must come from ContentSummary;
+- preserve paragraph breaks and list bullets from ContentSummary; do not merge multi-paragraph content into a single solid block of text.
 
 В конце слоя обязательно повтори жёсткое требование к порядку:
 Render the cards strictly in the order described in LAYER 3, row by row from top to bottom. Do not rearrange, do not shuffle, do not redistribute the cards between rows. The first described row is the topmost row of the image; the last described row is the bottom of the image. Within each row, render the cards left-to-right in the order described.
 
 И добавь проверку содержания:
-All visible text must come from ContentSummary. Preserve formulas, examples, labels and notation exactly. Keep entities with the same sectionId visually connected. Do not omit any entity from ContentSummary. Do not add educational content not present in ContentSummary.
+All visible text must come from ContentSummary verbatim. Preserve formulas, examples, labels, notation, paragraph breaks and list bullets exactly. Keep entities with the same sectionId visually connected. Do not omit any entity from ContentSummary. Do not add educational content not present in ContentSummary.
 
 ==================================================
 

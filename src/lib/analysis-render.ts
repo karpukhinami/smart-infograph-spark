@@ -34,6 +34,14 @@ function asLines(v: string | string[] | null | undefined): string[] {
   return Array.isArray(v) ? v.filter(Boolean) : [v];
 }
 
+/** Render a formula string: keep $...$ / $$...$$ as is; otherwise wrap in $...$. */
+function renderFormula(f: string): string {
+  const t = f.trim();
+  if (!t) return "";
+  if (t.startsWith("$") || t.includes("$$")) return t;
+  return `$${t}$`;
+}
+
 function renderEntity(e: AnalysisEntity): string {
   const label = ENTITY_LABELS[e.entityType] ?? e.entityType;
   const out: string[] = [];
@@ -41,15 +49,15 @@ function renderEntity(e: AnalysisEntity): string {
   out.push(`_${label}_${heading ? " · " + heading : ""}`);
   const content = asLines(e.content);
   if (content.length === 1) out.push(content[0]);
-  else if (content.length > 1) out.push(content.map((c) => `• ${c}`).join("\n"));
+  else if (content.length > 1) out.push(content.map((c) => `- ${c}`).join("\n"));
   const formulas = asLines(e.formula);
-  if (formulas.length) out.push(formulas.map((f) => "Формула: `" + f + "`").join("\n"));
+  if (formulas.length) out.push(formulas.map((f) => "**Формула:** " + renderFormula(f)).join("\n\n"));
   const examples = asLines(e.example);
-  if (examples.length) out.push(examples.map((x) => "Пример: _" + x + "_").join("\n"));
+  if (examples.length) out.push(examples.map((x) => "**Пример:** " + x).join("\n\n"));
   if (e.visual?.description) {
-    out.push(`🖼 Иллюстрация (${e.visual.type || "схема"}): ${e.visual.description}`);
+    out.push(`🖼 _Иллюстрация (${e.visual.type || "схема"}):_ ${e.visual.description}`);
   }
-  return out.join("\n");
+  return out.join("\n\n");
 }
 
 export function renderAnalysisJson(a: AnalysisJson): string {

@@ -5,6 +5,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { CostMeter } from "@/components/workspace/CostMeter";
 
 function NotFoundComponent() {
   return (
@@ -91,6 +92,7 @@ function RootComponent() {
         </header>
         <main className="flex-1"><Outlet /></main>
         <Toaster />
+        <CostMeter />
       </div>
     </QueryClientProvider>
   );
