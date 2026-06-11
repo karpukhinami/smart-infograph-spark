@@ -17,7 +17,7 @@ import { WireframeView } from "@/components/workspace/WireframeView";
 import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { HelpFiles } from "@/components/workspace/HelpFiles";
-import { extractJson } from "@/lib/json-repair";
+import { callTextLLMForJson } from "@/lib/llm-json";
 import { buildDesignBriefPrompt } from "@/lib/prompt-injection";
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
 import {
@@ -158,12 +158,16 @@ function Workspace() {
         .replaceAll("{{TOPIC}}", source.topic || "")
         .replaceAll("{{SUBJECT}}", source.subject || "")
         .replaceAll("{{GRADE}}", source.grade || "");
-      const raw = await callTextLLM({ model: models.analysis, prompt: filled });
 
       let summary: ContentSummary;
       if (mode === "strict") {
-        const parsed = extractJson<unknown>(raw);
-        const analysis = validateAnalysisJson(parsed);
+        const analysis = await callTextLLMForJson({
+          model: models.analysis,
+          prompt: filled,
+          label: "analysis",
+          schemaHint: 'Верни JSON-объект анализа со структурой { sourceMode, topic, subject, grade, summary, entities, warnings }.',
+          parse: validateAnalysisJson,
+        });
         const fallbackStyle = enabledStyles[0]?.id ?? "";
         summary = {
           content: renderAnalysisJson(analysis),
@@ -171,7 +175,13 @@ function Workspace() {
           analysis,
         };
       } else {
-        const parsed = extractJson<ContentSummary>(raw);
+        const parsed = await callTextLLMForJson({
+          model: models.analysis,
+          prompt: filled,
+          label: "analysis",
+          schemaHint: 'Верни JSON-объект со структурой { content, recommendedStyle }.',
+          parse: (value) => value as ContentSummary,
+        });
         if (!parsed.content || !parsed.recommendedStyle) throw new Error("В ответе модели не хватает полей");
         summary = parsed;
       }
@@ -198,8 +208,13 @@ function Workspace() {
         userWishes,
         generalRules: prompts.generalRules,
       });
-      const raw = await callTextLLM({ model: models.brief, prompt: filled });
-      const parsed = extractJson<DesignBriefResult>(raw);
+      const parsed = await callTextLLMForJson({
+        model: models.brief,
+        prompt: filled,
+        label: "design brief",
+        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeDescription": object }.',
+        parse: (value) => value as DesignBriefResult,
+      });
       if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
         throw new Error("В ответе модели не хватает полей");
       }
@@ -242,18 +257,28 @@ function Workspace() {
         currentContentText: activeContent.value.content,
         strict: mode === "strict",
       });
-      const raw = await callTextLLM({ model: models.analysis, prompt });
       let summary: ContentSummary;
       if (mode === "strict") {
-        const parsed = extractJson<unknown>(raw);
-        const a = validateAnalysisJson(parsed);
+        const a = await callTextLLMForJson({
+          model: models.analysis,
+          prompt,
+          label: "refine analysis",
+          schemaHint: 'Верни JSON-объект анализа со структурой { sourceMode, topic, subject, grade, summary, entities, warnings }.',
+          parse: validateAnalysisJson,
+        });
         summary = {
           content: renderAnalysisJson(a),
           recommendedStyle: activeContent.value.recommendedStyle,
           analysis: a,
         };
       } else {
-        const parsed = extractJson<ContentSummary>(raw);
+        const parsed = await callTextLLMForJson({
+          model: models.analysis,
+          prompt,
+          label: "refine analysis",
+          schemaHint: 'Верни JSON-объект со структурой { content, recommendedStyle }.',
+          parse: (value) => value as ContentSummary,
+        });
         if (!parsed.content) throw new Error("В ответе модели не хватает поля content");
         summary = { ...parsed, recommendedStyle: parsed.recommendedStyle || activeContent.value.recommendedStyle };
       }
@@ -276,8 +301,13 @@ function Workspace() {
         userInstructions: userText,
         currentBriefJson: JSON.stringify(activeBrief.value, null, 2),
       });
-      const raw = await callTextLLM({ model: models.brief, prompt });
-      const parsed = extractJson<DesignBriefResult>(raw);
+      const parsed = await callTextLLMForJson({
+        model: models.brief,
+        prompt,
+        label: "refine brief",
+        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeDescription": object }.',
+        parse: (value) => value as DesignBriefResult,
+      });
       if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
         throw new Error("В ответе модели не хватает полей");
       }
@@ -300,8 +330,13 @@ function Workspace() {
         userInstructions: userText,
         currentImagePrompt: activeBrief.value.PromptForImageGeneration,
       });
-      const raw = await callTextLLM({ model: models.brief, prompt: decisionPrompt });
-      const decision = extractJson<{ action: "patch" | "rebuild"; newPrompt?: string; reason?: string }>(raw);
+      const decision = await callTextLLMForJson({
+        model: models.brief,
+        prompt: decisionPrompt,
+        label: "refine image decision",
+        schemaHint: 'Верни JSON-объект формы { "action": "patch" | "rebuild", "newPrompt"?: string, "reason"?: string }.',
+        parse: (value) => value as { action: "patch" | "rebuild"; newPrompt?: string; reason?: string },
+      });
 
       if (decision.action === "patch" && decision.newPrompt) {
         // Save patched prompt as a new brief version with the same wireframe.
@@ -336,8 +371,13 @@ function Workspace() {
         userWishes: combinedWishes,
         generalRules: prompts.generalRules,
       });
-      const briefRaw = await callTextLLM({ model: models.brief, prompt: filled });
-      const parsed = extractJson<DesignBriefResult>(briefRaw);
+      const parsed = await callTextLLMForJson({
+        model: models.brief,
+        prompt: filled,
+        label: "design brief rebuild",
+        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeDescription": object }.',
+        parse: (value) => value as DesignBriefResult,
+      });
       if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
         throw new Error("В ответе модели не хватает полей");
       }
