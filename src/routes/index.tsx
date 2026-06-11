@@ -81,9 +81,11 @@ function Workspace() {
   const profiles = useSettingsStore((s) => s.profiles);
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
-  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize">(null);
+  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine">(null);
+  const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
 
   const enabledStyles = useMemo<InfographicStyle[]>(() => styles.filter((s) => s.enabled), [styles]);
   const activeStyle = useMemo(
