@@ -111,8 +111,8 @@ export function WireframeView({ wf }: { wf: WireframeDescription }) {
                       height: "100%",
                       overflow: "hidden",
                     }}
-                    xmlns="http://www.w3.org/1999/xhtml"
                   >
+
                     <div style={{ fontSize: 10, opacity: 0.55, lineHeight: 1.1 }}>
                       [{typeTag}] {meta}
                     </div>
