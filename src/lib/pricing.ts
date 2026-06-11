@@ -1,13 +1,24 @@
 // Approximate USD prices per 1M tokens. Update as needed.
-// Source: Lovable AI Gateway / OpenRouter public pricing snapshots.
+import openrouterModels from "@/data/openrouter-models.json";
+
 export interface ModelPrice {
-  inputPerM: number; // USD per 1M input tokens
-  outputPerM: number; // USD per 1M output tokens
-  imagePerM?: number; // USD per 1M output image tokens (image models)
+  inputPerM: number;
+  outputPerM: number;
+  imagePerM?: number;
 }
 
+const or = openrouterModels as {
+  text: Array<{ id: string; inputPerM: number; outputPerM: number }>;
+  image: Array<{ id: string; inputPerM: number; outputPerM: number }>;
+};
+
+const orPrices: Record<string, ModelPrice> = {};
+for (const m of or.text) orPrices[m.id] = { inputPerM: m.inputPerM, outputPerM: m.outputPerM };
+for (const m of or.image)
+  orPrices[m.id] = { inputPerM: m.inputPerM, outputPerM: m.outputPerM, imagePerM: m.outputPerM };
+
 export const MODEL_PRICES: Record<string, ModelPrice> = {
-  // Text
+  // Lovable text
   "google/gemini-3-flash-preview": { inputPerM: 0.3, outputPerM: 2.5 },
   "google/gemini-2.5-pro": { inputPerM: 1.25, outputPerM: 10 },
   "google/gemini-2.5-flash": { inputPerM: 0.3, outputPerM: 2.5 },
@@ -16,12 +27,14 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
   "openai/gpt-5-nano": { inputPerM: 0.05, outputPerM: 0.4 },
   "openai/gpt-4o-mini": { inputPerM: 0.15, outputPerM: 0.6 },
   "anthropic/claude-3.5-sonnet": { inputPerM: 3, outputPerM: 15 },
-  // Image
+  // Lovable image
   "openai/gpt-image-2": { inputPerM: 5, outputPerM: 40, imagePerM: 40 },
   "openai/gpt-image-1-mini": { inputPerM: 2, outputPerM: 8, imagePerM: 8 },
   "google/gemini-2.5-flash-image": { inputPerM: 0.3, outputPerM: 30, imagePerM: 30 },
   "google/gemini-3.1-flash-image-preview": { inputPerM: 0.3, outputPerM: 30, imagePerM: 30 },
   "google/gemini-3-pro-image-preview": { inputPerM: 2, outputPerM: 60, imagePerM: 60 },
+  // OpenRouter (overrides above for duplicate ids)
+  ...orPrices,
 };
 
 export interface UsageRecord {
@@ -42,6 +55,8 @@ export function computeCost(
 ): number {
   const p = MODEL_PRICES[model];
   if (!p) return 0;
+  // Negative prices (openrouter/auto sentinel) mean "unknown"
+  if (p.inputPerM < 0 || p.outputPerM < 0) return 0;
   const out = kind === "image" && p.imagePerM != null ? p.imagePerM : p.outputPerM;
   return (inputTokens * p.inputPerM + outputTokens * out) / 1_000_000;
 }
