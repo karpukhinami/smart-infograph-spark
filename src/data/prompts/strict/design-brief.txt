@@ -303,15 +303,19 @@ Do not add random branches, extra variables or decorative arrows that are not ne
 4) TECHNICAL AND NEGATIVE INSTRUCTIONS
 Здесь НЕ повторяй общие запреты из ОБЩИХ ПРАВИЛ (плоскость, фотореализм, 3D, мусорный текст, тени, согласованность иконок и т.п.) — они уже действуют. Добавь только то, что специфично для этой конкретной инфографики и не покрыто общими правилами:
 - final image only, без mockup, рамки браузера и UI;
+- canvas is A4-proportioned (aspect ratio strictly 3:4 portrait OR 4:3 landscape — повтори выбранный вариант из LAYER 1); no square, no 16:9, no 9:16;
 - запреты на конкретные искажения формул/обозначений из ContentSummary (например: «do not change subscript in P_n», «do not replace n! with another notation»);
 - запреты на лишние подписи, оси, стрелки и переменные в visual, которых нет в visual.description;
-- язык видимого текста (например: «all visible text must stay in Russian»).
+- язык видимого текста (например: «all visible text must stay in Russian»);
+- do not render the literal placeholder words "TOPIC", "SUBJECT", "GRADE" or "TOPIC/SUBJECT/GRADE" on the image — the header plate must show only the real topic + the real "<SUBJECT> · <GRADE>" meta;
+- do not invent technical or generic labels for cards (no "АЛГОРИТМ 1", "БЛОК 2", "CARD 3", "ROW 1", "SECTION 2"); every visible title must come from ContentSummary;
+- preserve paragraph breaks and list bullets from ContentSummary; do not merge multi-paragraph content into a single solid block of text.
 
 В конце слоя обязательно повтори жёсткое требование к порядку:
 Render the cards strictly in the order described in LAYER 3, row by row from top to bottom. Do not rearrange, do not shuffle, do not redistribute the cards between rows. The first described row is the topmost row of the image; the last described row is the bottom of the image. Within each row, render the cards left-to-right in the order described.
 
 И добавь проверку содержания:
-All visible text must come from ContentSummary. Preserve formulas, examples, labels and notation exactly. Keep entities with the same sectionId visually connected. Do not omit any entity from ContentSummary. Do not add educational content not present in ContentSummary.
+All visible text must come from ContentSummary verbatim. Preserve formulas, examples, labels, notation, paragraph breaks and list bullets exactly. Keep entities with the same sectionId visually connected. Do not omit any entity from ContentSummary. Do not add educational content not present in ContentSummary.
 
 ==================================================
 
