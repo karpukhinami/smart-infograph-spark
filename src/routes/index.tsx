@@ -26,6 +26,7 @@ import {
   buildRefineImageDecisionPrompt,
 } from "@/lib/refine-prompts";
 import recognizeImagePrompt from "@/data/prompts/recognize-image.txt?raw";
+import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
 
 
@@ -212,10 +213,10 @@ function Workspace() {
         model: models.brief,
         prompt: filled,
         label: "design brief",
-        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeDescription": object }.',
+        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
         parse: (value) => value as DesignBriefResult,
       });
-      if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
+      if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
         throw new Error("В ответе модели не хватает полей");
       }
       pushBrief(parsed);
@@ -228,13 +229,17 @@ function Workspace() {
     }
   }
 
+  function buildFinalImagePrompt(basePrompt: string): string {
+    const wishes = userWishes.trim();
+    const head = wishes ? `${wishes}\n\n${basePrompt}` : basePrompt;
+    return `${head}\n\n${executionRulesText.trim()}`;
+  }
+
   async function onGenerateImage() {
     if (!activeBrief) return;
     try {
       setLoading("image");
-      const prompt = userWishes.trim()
-        ? `${userWishes.trim()}\n\n${activeBrief.value.PromptForImageGeneration}`
-        : activeBrief.value.PromptForImageGeneration;
+      const prompt = buildFinalImagePrompt(activeBrief.value.PromptForImageGeneration);
       const dataUrl = await callImageLLM({ model: models.image, prompt });
       pushImage(dataUrl);
       setPaneMode("image");
@@ -305,10 +310,10 @@ function Workspace() {
         model: models.brief,
         prompt,
         label: "refine brief",
-        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeDescription": object }.',
+        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
         parse: (value) => value as DesignBriefResult,
       });
-      if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
+      if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
         throw new Error("В ответе модели не хватает полей");
       }
       pushBrief(parsed);
@@ -343,10 +348,11 @@ function Workspace() {
         const next: DesignBriefResult = {
           PromptForImageGeneration: decision.newPrompt,
           WireframeDescription: activeBrief.value.WireframeDescription,
+          WireframeSketch: activeBrief.value.WireframeSketch,
         };
         pushBrief(next);
         // Now generate the image with the patched prompt.
-        const dataUrl = await callImageLLM({ model: models.image, prompt: decision.newPrompt });
+        const dataUrl = await callImageLLM({ model: models.image, prompt: buildFinalImagePrompt(decision.newPrompt) });
         pushImage(dataUrl);
         setPaneMode("image");
         setRefineStage(null);
@@ -375,14 +381,14 @@ function Workspace() {
         model: models.brief,
         prompt: filled,
         label: "design brief rebuild",
-        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeDescription": object }.',
+        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
         parse: (value) => value as DesignBriefResult,
       });
-      if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
+      if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
         throw new Error("В ответе модели не хватает полей");
       }
       pushBrief(parsed);
-      const dataUrl = await callImageLLM({ model: models.image, prompt: parsed.PromptForImageGeneration });
+      const dataUrl = await callImageLLM({ model: models.image, prompt: buildFinalImagePrompt(parsed.PromptForImageGeneration) });
       pushImage(dataUrl);
       setPaneMode("image");
       setRefineStage(null);
@@ -663,7 +669,15 @@ function Workspace() {
                       <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
                     </Button>
                   </div>
-                  <WireframeView wf={activeBrief.value.WireframeDescription} />
+                  {activeBrief.value.WireframeSketch ? (
+                    <pre className="rounded-md border border-border bg-card p-3 text-xs leading-snug whitespace-pre overflow-auto font-mono">
+                      {activeBrief.value.WireframeSketch}
+                    </pre>
+                  ) : activeBrief.value.WireframeDescription ? (
+                    <WireframeView wf={activeBrief.value.WireframeDescription} />
+                  ) : (
+                    <EmptyState text="Каркас отсутствует в ответе модели." />
+                  )}
                 </>
               ) : (
                 <EmptyState text="Создайте дизайн-бриф, чтобы увидеть каркас." />

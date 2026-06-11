@@ -119,7 +119,10 @@ export interface ContentSummary {
 
 export interface DesignBriefResult {
   PromptForImageGeneration: string;
-  WireframeDescription: WireframeDescription;
+  /** Structured wireframe (legacy / alternative output). */
+  WireframeDescription?: WireframeDescription;
+  /** Plain-text box-drawing sketch (current preferred output). */
+  WireframeSketch?: string;
 }
 
 export type PaneMode = "content" | "wireframe" | "image";
