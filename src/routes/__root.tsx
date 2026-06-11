@@ -5,6 +5,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { CostMeter } from "@/components/workspace/CostMeter";
 
 function NotFoundComponent() {
   return (
