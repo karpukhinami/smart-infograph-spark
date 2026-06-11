@@ -25,6 +25,22 @@ function recordUsage(
     .add({ model, inputTokens, outputTokens, totalTokens, costUsd, kind, at: Date.now() });
 }
 
+function recordRaw(
+  model: string,
+  raw: string | undefined,
+  kind: "text" | "image",
+  note?: string,
+) {
+  if (!raw) return;
+  let pretty = raw;
+  try {
+    pretty = JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    /* keep as-is */
+  }
+  useUsageStore.getState().addRaw({ model, kind, at: Date.now(), raw: pretty, note });
+}
+
 export async function callTextLLM(opts: {
   model: string;
   prompt: string;
@@ -36,15 +52,24 @@ export async function callTextLLM(opts: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(opts),
   });
-  if (!res.ok) {
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
     const text = await res.text().catch(() => "");
-    throw new Error(`LLM request failed (${res.status}): ${text || res.statusText}`);
+    recordRaw(opts.model, text, "text", `http ${res.status}`);
+    throw new Error(`LLM request failed (${res.status}): ${text.slice(0, 400) || res.statusText}`);
   }
   const data = (await res.json()) as {
     text: string;
     usage?: UsagePayload | null;
     model?: string;
+    provider?: string;
+    raw?: string;
+    error?: string;
   };
+  recordRaw(data.model ?? opts.model, data.raw, "text", data.provider ?? (res.ok ? "ok" : `err ${res.status}`));
+  if (!res.ok || data.error) {
+    throw new Error(data.error || `LLM request failed (${res.status})`);
+  }
   recordUsage(data.model ?? opts.model, data.usage, "text");
   return data.text;
 }
@@ -55,15 +80,24 @@ export async function callImageLLM(opts: { model: string; prompt: string }): Pro
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(opts),
   });
-  if (!res.ok) {
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Image generation failed (${res.status}): ${text || res.statusText}`);
+    recordRaw(opts.model, text, "image", `http ${res.status}`);
+    throw new Error(`Image generation failed (${res.status}): ${text.slice(0, 400) || res.statusText}`);
   }
   const data = (await res.json()) as {
     b64: string;
     usage?: UsagePayload | null;
     model?: string;
+    provider?: string;
+    raw?: string;
+    error?: string;
   };
+  recordRaw(data.model ?? opts.model, data.raw, "image", data.provider ?? (res.ok ? "ok" : `err ${res.status}`));
+  if (!res.ok || data.error || !data.b64) {
+    throw new Error(data.error || `Image generation failed (${res.status})`);
+  }
   recordUsage(data.model ?? opts.model, data.usage, "image");
   return `data:image/png;base64,${data.b64}`;
 }

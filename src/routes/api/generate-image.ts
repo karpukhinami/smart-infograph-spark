@@ -1,20 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { OPENROUTER_API_KEY } from "@/lib/openrouter";
+import { isOpenRouterModel } from "@/lib/models";
 
 interface ReqBody {
   model: string;
   prompt: string;
 }
 
-const LOVABLE_IMAGE_MODELS = new Set([
-  "openai/gpt-image-2",
-  "openai/gpt-image-1-mini",
-  "google/gemini-2.5-flash-image",
-  "google/gemini-3.1-flash-image-preview",
-  "google/gemini-3-pro-image-preview",
-]);
-
-const OPENROUTER_TIMEOUT_MS = 120_000;
+const OPENROUTER_TIMEOUT_MS = 180_000;
 
 function isContextTooLongError(text: string): boolean {
   const t = text.toLowerCase();
@@ -40,7 +33,7 @@ export const Route = createFileRoute("/api/generate-image")({
           return new Response("Missing model or prompt", { status: 400 });
         }
 
-        const useOpenRouter = !LOVABLE_IMAGE_MODELS.has(body.model);
+        const useOpenRouter = isOpenRouterModel(body.model);
 
         if (useOpenRouter) {
           if (!OPENROUTER_API_KEY) {
@@ -80,19 +73,29 @@ export const Route = createFileRoute("/api/generate-image")({
           }
           clearTimeout(timer);
 
+          const rawText = await upstream.text().catch(() => "");
+
           if (!upstream.ok) {
-            const errText = await upstream.text().catch(() => "");
-            if (isContextTooLongError(errText) || upstream.status === 413) {
+            if (isContextTooLongError(rawText) || upstream.status === 413) {
               return new Response(
-                `Запрос слишком длинный для модели «${body.model}». Сократите промпт. (${errText.slice(0, 200)})`,
+                `Запрос слишком длинный для модели «${body.model}». Сократите промпт. (${rawText.slice(0, 200)})`,
                 { status: 413 },
               );
             }
-            return new Response(`Upstream error: ${errText || upstream.statusText}`, {
-              status: upstream.status,
-            });
+            return Response.json(
+              {
+                b64: "",
+                usage: null,
+                model: body.model,
+                provider: "openrouter",
+                raw: rawText,
+                error: `Upstream ${upstream.status}: ${rawText.slice(0, 400) || upstream.statusText}`,
+              },
+              { status: upstream.status },
+            );
           }
-          const data = (await upstream.json()) as {
+
+          let data: {
             choices?: Array<{
               message?: {
                 content?: string;
@@ -102,8 +105,20 @@ export const Route = createFileRoute("/api/generate-image")({
             usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
             error?: { message?: string };
           };
+          try {
+            data = JSON.parse(rawText);
+          } catch {
+            return Response.json(
+              { b64: "", usage: null, model: body.model, provider: "openrouter", raw: rawText, error: "Upstream вернул не-JSON ответ." },
+              { status: 502 },
+            );
+          }
+
           if (data.error?.message) {
-            return new Response(`Upstream error: ${data.error.message}`, { status: 502 });
+            return Response.json(
+              { b64: "", usage: null, model: body.model, provider: "openrouter", raw: rawText, error: data.error.message },
+              { status: 502 },
+            );
           }
           const imgs = data.choices?.[0]?.message?.images;
           const first = imgs?.[0];
@@ -111,11 +126,25 @@ export const Route = createFileRoute("/api/generate-image")({
             typeof first?.image_url === "string"
               ? first.image_url
               : first?.image_url?.url ?? "";
-          if (!url) return new Response("No image returned by OpenRouter", { status: 502 });
+          if (!url) {
+            return Response.json(
+              {
+                b64: "",
+                usage: data.usage ?? null,
+                model: body.model,
+                provider: "openrouter",
+                raw: rawText,
+                error: "Модель не вернула изображение. См. сырой ответ.",
+              },
+              { status: 502 },
+            );
+          }
           return Response.json({
             b64: extractB64FromDataUrl(url),
             usage: data.usage ?? null,
             model: body.model,
+            provider: "openrouter",
+            raw: rawText,
           });
         }
 
@@ -146,19 +175,41 @@ export const Route = createFileRoute("/api/generate-image")({
           },
           body: JSON.stringify(upstreamBody),
         });
+        const rawText = await upstream.text().catch(() => "");
         if (!upstream.ok) {
-          const errText = await upstream.text().catch(() => "");
-          return new Response(`Upstream error: ${errText || upstream.statusText}`, {
-            status: upstream.status,
-          });
+          return Response.json(
+            { b64: "", usage: null, model: body.model, provider: "lovable", raw: rawText, error: `Upstream ${upstream.status}: ${rawText.slice(0, 400) || upstream.statusText}` },
+            { status: upstream.status },
+          );
         }
-        const data = (await upstream.json()) as {
+        let data: {
           data?: Array<{ b64_json?: string }>;
-          usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
+          choices?: Array<{ message?: { images?: Array<{ image_url?: { url?: string } | string }> } }>;
+          usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number; prompt_tokens?: number; completion_tokens?: number };
         };
-        const b64 = data.data?.[0]?.b64_json;
-        if (!b64) return new Response("No image returned", { status: 502 });
-        return Response.json({ b64, usage: data.usage ?? null, model: body.model });
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          return Response.json(
+            { b64: "", usage: null, model: body.model, provider: "lovable", raw: rawText, error: "Lovable вернул не-JSON ответ." },
+            { status: 502 },
+          );
+        }
+        let b64 = data.data?.[0]?.b64_json;
+        if (!b64) {
+          // Gemini-style chat-completion shape
+          const first = data.choices?.[0]?.message?.images?.[0];
+          const url =
+            typeof first?.image_url === "string" ? first.image_url : first?.image_url?.url ?? "";
+          if (url) b64 = extractB64FromDataUrl(url);
+        }
+        if (!b64) {
+          return Response.json(
+            { b64: "", usage: data.usage ?? null, model: body.model, provider: "lovable", raw: rawText, error: "Lovable не вернул изображение." },
+            { status: 502 },
+          );
+        }
+        return Response.json({ b64, usage: data.usage ?? null, model: body.model, provider: "lovable", raw: rawText });
       },
     },
   },

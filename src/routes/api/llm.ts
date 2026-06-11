@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { OPENROUTER_API_KEY } from "@/lib/openrouter";
+import { isOpenRouterModel } from "@/lib/models";
 
 interface ReqBody {
   model: string;
@@ -8,16 +9,7 @@ interface ReqBody {
   images?: string[];
 }
 
-const LOVABLE_PRESETS = new Set([
-  "google/gemini-3-flash-preview",
-  "google/gemini-2.5-pro",
-  "google/gemini-2.5-flash",
-  "openai/gpt-5",
-  "openai/gpt-5-mini",
-  "openai/gpt-5-nano",
-]);
-
-const OPENROUTER_TIMEOUT_MS = 90_000;
+const OPENROUTER_TIMEOUT_MS = 180_000;
 
 function isContextTooLongError(text: string): boolean {
   const t = text.toLowerCase();
@@ -32,6 +24,38 @@ function isContextTooLongError(text: string): boolean {
   );
 }
 
+/** Extracts plain text from OpenAI-shaped chat completion message.content. */
+function extractContent(content: unknown): string {
+  if (content == null) return "";
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((p) => {
+        if (typeof p === "string") return p;
+        if (p && typeof p === "object") {
+          const obj = p as { type?: string; text?: string; content?: string };
+          return obj.text ?? obj.content ?? "";
+        }
+        return "";
+      })
+      .join("");
+  }
+  if (typeof content === "object") {
+    const obj = content as { text?: string };
+    return obj.text ?? "";
+  }
+  return "";
+}
+
+interface ChatCompletionResponse {
+  choices?: Array<{
+    message?: { content?: unknown; reasoning?: string };
+    finish_reason?: string;
+  }>;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  error?: { message?: string; code?: number | string };
+}
+
 export const Route = createFileRoute("/api/llm")({
   server: {
     handlers: {
@@ -41,7 +65,7 @@ export const Route = createFileRoute("/api/llm")({
           return new Response("Missing model or prompt", { status: 400 });
         }
 
-        const useOpenRouter = !LOVABLE_PRESETS.has(body.model);
+        const useOpenRouter = isOpenRouterModel(body.model);
 
         const userContent: unknown = body.images?.length
           ? [
@@ -57,6 +81,7 @@ export const Route = createFileRoute("/api/llm")({
 
         let upstreamUrl: string;
         let headers: Record<string, string>;
+        const provider = useOpenRouter ? "openrouter" : "lovable";
 
         if (useOpenRouter) {
           if (!OPENROUTER_API_KEY) {
@@ -108,24 +133,47 @@ export const Route = createFileRoute("/api/llm")({
         }
         if (timer) clearTimeout(timer);
 
+        // Read raw body once, then try to parse JSON. This lets us return the
+        // raw payload to the client so the developer can inspect it.
+        const rawText = await upstream.text().catch(() => "");
+
         if (!upstream.ok) {
-          const errText = await upstream.text().catch(() => "");
-          if (isContextTooLongError(errText) || upstream.status === 413) {
+          if (isContextTooLongError(rawText) || upstream.status === 413) {
             return new Response(
-              `Запрос слишком длинный для модели «${body.model}». Сократите исходный текст или выберите модель с большим контекстом. (${errText.slice(0, 200)})`,
+              `Запрос слишком длинный для модели «${body.model}». Сократите исходный текст или выберите модель с большим контекстом. (${rawText.slice(0, 200)})`,
               { status: 413 },
             );
           }
-          return new Response(`Upstream error: ${errText || upstream.statusText}`, {
-            status: upstream.status,
-          });
+          return Response.json(
+            {
+              text: "",
+              usage: null,
+              model: body.model,
+              provider,
+              raw: rawText,
+              error: `Upstream ${upstream.status}: ${rawText.slice(0, 400) || upstream.statusText}`,
+            },
+            { status: upstream.status },
+          );
         }
 
-        const data = (await upstream.json()) as {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-          error?: { message?: string; code?: number | string };
-        };
+        let data: ChatCompletionResponse;
+        try {
+          data = JSON.parse(rawText) as ChatCompletionResponse;
+        } catch {
+          return Response.json(
+            {
+              text: "",
+              usage: null,
+              model: body.model,
+              provider,
+              raw: rawText,
+              error: "Upstream вернул не-JSON ответ.",
+            },
+            { status: 502 },
+          );
+        }
+
         if (data.error?.message) {
           const msg = data.error.message;
           if (isContextTooLongError(msg)) {
@@ -134,10 +182,40 @@ export const Route = createFileRoute("/api/llm")({
               { status: 413 },
             );
           }
-          return new Response(`Upstream error: ${msg}`, { status: 502 });
+          return Response.json(
+            { text: "", usage: data.usage ?? null, model: body.model, provider, raw: rawText, error: msg },
+            { status: 502 },
+          );
         }
-        const text = data.choices?.[0]?.message?.content ?? "";
-        return Response.json({ text, usage: data.usage ?? null, model: body.model });
+
+        const choice = data.choices?.[0];
+        const text = extractContent(choice?.message?.content);
+
+        if (!text) {
+          // Return raw so client can show diagnostic, but signal error.
+          return Response.json(
+            {
+              text: "",
+              usage: data.usage ?? null,
+              model: body.model,
+              provider,
+              raw: rawText,
+              error:
+                choice?.finish_reason
+                  ? `Модель не вернула текст (finish_reason: ${choice.finish_reason}). Проверьте сырой ответ.`
+                  : "Ответ модели не содержит текста. Проверьте сырой ответ.",
+            },
+            { status: 502 },
+          );
+        }
+
+        return Response.json({
+          text,
+          usage: data.usage ?? null,
+          model: body.model,
+          provider,
+          raw: rawText,
+        });
       },
     },
   },
