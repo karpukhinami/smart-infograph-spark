@@ -92,6 +92,7 @@ function RootComponent() {
         </header>
         <main className="flex-1"><Outlet /></main>
         <Toaster />
+        <CostMeter />
       </div>
     </QueryClientProvider>
   );
