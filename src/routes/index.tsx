@@ -231,6 +231,131 @@ function Workspace() {
     }
   }
 
+  async function onRefineContent(userText: string) {
+    if (!activeContent) return;
+    try {
+      setLoading("refine");
+      const analysis = activeContent.value.analysis ?? null;
+      const prompt = buildRefineContentPrompt({
+        userInstructions: userText,
+        currentAnalysisJson: analysis ? JSON.stringify(analysis, null, 2) : "",
+        currentContentText: activeContent.value.content,
+        strict: mode === "strict",
+      });
+      const raw = await callTextLLM({ model: models.analysis, prompt });
+      let summary: ContentSummary;
+      if (mode === "strict") {
+        const parsed = extractJson<unknown>(raw);
+        const a = validateAnalysisJson(parsed);
+        summary = {
+          content: renderAnalysisJson(a),
+          recommendedStyle: activeContent.value.recommendedStyle,
+          analysis: a,
+        };
+      } else {
+        const parsed = extractJson<ContentSummary>(raw);
+        if (!parsed.content) throw new Error("В ответе модели не хватает поля content");
+        summary = { ...parsed, recommendedStyle: parsed.recommendedStyle || activeContent.value.recommendedStyle };
+      }
+      pushContent(summary);
+      setPaneMode("content");
+      setRefineStage(null);
+      toast.success("Контент обновлён");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать контент");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function onRefineBrief(userText: string) {
+    if (!activeBrief) return;
+    try {
+      setLoading("refine");
+      const prompt = buildRefineBriefPrompt({
+        userInstructions: userText,
+        currentBriefJson: JSON.stringify(activeBrief.value, null, 2),
+      });
+      const raw = await callTextLLM({ model: models.brief, prompt });
+      const parsed = extractJson<DesignBriefResult>(raw);
+      if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
+        throw new Error("В ответе модели не хватает полей");
+      }
+      pushBrief(parsed);
+      setPaneMode("wireframe");
+      setRefineStage(null);
+      toast.success("Расположение блоков обновлено");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать лэйаут");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function onRefineImage(userText: string) {
+    if (!activeBrief) return;
+    try {
+      setLoading("refine");
+      const decisionPrompt = buildRefineImageDecisionPrompt({
+        userInstructions: userText,
+        currentImagePrompt: activeBrief.value.PromptForImageGeneration,
+      });
+      const raw = await callTextLLM({ model: models.brief, prompt: decisionPrompt });
+      const decision = extractJson<{ action: "patch" | "rebuild"; newPrompt?: string; reason?: string }>(raw);
+
+      if (decision.action === "patch" && decision.newPrompt) {
+        // Save patched prompt as a new brief version with the same wireframe.
+        const next: DesignBriefResult = {
+          PromptForImageGeneration: decision.newPrompt,
+          WireframeDescription: activeBrief.value.WireframeDescription,
+        };
+        pushBrief(next);
+        // Now generate the image with the patched prompt.
+        const dataUrl = await callImageLLM({ model: models.image, prompt: decision.newPrompt });
+        pushImage(dataUrl);
+        setPaneMode("image");
+        setRefineStage(null);
+        toast.success("Изображение перегенерировано по вашему описанию");
+        return;
+      }
+
+      // Need to rebuild the brief — re-run design brief generation with user wishes prioritised.
+      if (!activeContent || !activeStyle) {
+        toast.error(decision.reason || "Нужно вернуться к шагу 2, но не хватает контента/стиля");
+        return;
+      }
+      toast.message("Изменение требует перестройки брифа", { description: decision.reason ?? "" });
+      const combinedWishes = userWishes.trim()
+        ? `${userText}\n\n(предыдущие пожелания: ${userWishes.trim()})`
+        : userText;
+      const filled = buildDesignBriefPrompt({
+        template: prompts.designBrief,
+        contentSummary: activeContent.value.content,
+        style: activeStyle,
+        profile: activeProfile,
+        userWishes: combinedWishes,
+        generalRules: prompts.generalRules,
+      });
+      const briefRaw = await callTextLLM({ model: models.brief, prompt: filled });
+      const parsed = extractJson<DesignBriefResult>(briefRaw);
+      if (!parsed.PromptForImageGeneration || !parsed.WireframeDescription) {
+        throw new Error("В ответе модели не хватает полей");
+      }
+      pushBrief(parsed);
+      const dataUrl = await callImageLLM({ model: models.image, prompt: parsed.PromptForImageGeneration });
+      pushImage(dataUrl);
+      setPaneMode("image");
+      setRefineStage(null);
+      toast.success("Бриф и изображение перегенерированы");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать изображение");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+
+
   return (
     <div className="mx-auto max-w-[1600px] p-4 space-y-3">
       <div className="flex justify-end">
