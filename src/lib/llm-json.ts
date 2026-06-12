@@ -9,6 +9,7 @@ const RECOVERABLE_JSON_ERROR_PATTERNS = [
   "expected property name",
   "property names must be double-quoted",
   "invalid escape",
+  "truncated json output",
   "json",
 ];
 
@@ -64,6 +65,12 @@ export async function callTextLLMForJson<T>(opts: {
   try {
     return parse(extractJson<unknown>(raw));
   } catch (error) {
+    if (error instanceof Error && error.message.toLowerCase().includes("truncated json output")) {
+      throw new Error(
+        "Модель вернула обрезанный JSON. Попробуйте сократить исходный текст, упростить запрос или повторить генерацию.",
+      );
+    }
+
     if (!isRecoverableJsonError(error)) throw error;
 
     const repairedRaw = await callTextLLM({
