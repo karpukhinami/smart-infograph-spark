@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { OPENROUTER_API_KEY } from "@/lib/openrouter";
-import { isOpenRouterModel } from "@/lib/models";
+import { isOpenRouterModel, resolveUpstreamModelId } from "@/lib/models";
 
 interface ReqBody {
   model: string;
