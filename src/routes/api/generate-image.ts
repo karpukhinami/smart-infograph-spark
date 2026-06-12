@@ -53,7 +53,7 @@ export const Route = createFileRoute("/api/generate-image")({
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                model: body.model,
+                model: resolveUpstreamModelId(body.model),
                 messages: [{ role: "user", content: body.prompt }],
                 modalities: ["image", "text"],
               }),
