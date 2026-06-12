@@ -152,15 +152,16 @@ export const Route = createFileRoute("/api/generate-image")({
         const key = process.env.LOVABLE_API_KEY;
         if (!key) return new Response("LOVABLE_API_KEY not configured", { status: 500 });
 
-        const isGemini = body.model.startsWith("google/");
+        const upstreamModel = resolveUpstreamModelId(body.model);
+        const isGemini = upstreamModel.startsWith("google/");
         const upstreamBody = isGemini
           ? {
-              model: body.model,
+              model: upstreamModel,
               messages: [{ role: "user", content: body.prompt }],
               modalities: ["image", "text"],
             }
           : {
-              model: body.model,
+              model: upstreamModel,
               prompt: body.prompt,
               quality: "low",
               size: "1024x1024",
