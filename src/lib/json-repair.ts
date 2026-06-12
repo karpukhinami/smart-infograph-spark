@@ -202,6 +202,12 @@ export function extractJson<T = unknown>(raw: string): T {
   if (!raw) throw new Error("Empty model response");
 
   const normalized = normalizeWrapper(raw);
+  try {
+    return parseCandidate<T>(normalized);
+  } catch {
+    // Continue with extraction/repair attempts below.
+  }
+
   const candidate = findJsonCandidate(normalized) ?? normalized;
 
   if (isTruncatedJson(candidate)) {
@@ -209,6 +215,7 @@ export function extractJson<T = unknown>(raw: string): T {
   }
 
   const attempts = [
+    normalized,
     candidate,
     removeTrailingCommas(candidate),
     repairJsonText(candidate),
