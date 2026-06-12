@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { OPENROUTER_API_KEY } from "@/lib/openrouter";
-import { isOpenRouterModel } from "@/lib/models";
+import { isOpenRouterModel, resolveUpstreamModelId } from "@/lib/models";
 
 interface ReqBody {
   model: string;
@@ -115,7 +115,7 @@ export const Route = createFileRoute("/api/llm")({
           upstream = await fetch(upstreamUrl, {
             method: "POST",
             headers,
-            body: JSON.stringify({ model: body.model, messages }),
+            body: JSON.stringify({ model: resolveUpstreamModelId(body.model), messages }),
             signal: controller.signal,
           });
         } catch (e) {

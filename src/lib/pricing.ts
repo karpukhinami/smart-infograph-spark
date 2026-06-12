@@ -53,7 +53,8 @@ export function computeCost(
   outputTokens: number,
   kind: "text" | "image",
 ): number {
-  const p = MODEL_PRICES[model];
+  const key = model.startsWith("openrouter:") ? model.slice("openrouter:".length) : model;
+  const p = MODEL_PRICES[key];
   if (!p) return 0;
   // Negative prices (openrouter/auto sentinel) mean "unknown"
   if (p.inputPerM < 0 || p.outputPerM < 0) return 0;
