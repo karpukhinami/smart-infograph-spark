@@ -176,15 +176,15 @@ function Workspace() {
           analysis,
         };
       } else {
-        const parsed = await callTextLLMForJson({
-          model: models.analysis,
-          prompt: filled,
-          label: "analysis",
-          schemaHint: 'Верни JSON-объект со структурой { content, recommendedStyle }.',
-          parse: (value) => value as ContentSummary,
-        });
-        if (!parsed.content || !parsed.recommendedStyle) throw new Error("В ответе модели не хватает полей");
-        summary = parsed;
+        // Free mode: model returns plain Markdown, not JSON.
+        const raw = await callTextLLM({ model: models.analysis, prompt: filled });
+        const content = (raw ?? "").trim();
+        if (!content) throw new Error("Модель вернула пустой ответ");
+        const fallbackStyle = enabledStyles[0]?.id ?? "";
+        summary = {
+          content,
+          recommendedStyle: selectedStyleId ?? fallbackStyle,
+        };
       }
       pushContent(summary);
       setPaneMode("content");
