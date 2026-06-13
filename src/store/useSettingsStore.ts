@@ -17,6 +17,8 @@ import promptStrictGeneralRules from "@/data/prompts/strict/general-rules.txt?ra
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
 
+export type UiMode = "debug" | "user";
+
 interface PromptSet {
   analysisWithContent: string;
   analysisTopicOnly: string;
@@ -27,6 +29,9 @@ interface PromptSet {
 interface SettingsState {
   mode: AppMode;
   setMode: (m: AppMode) => void;
+
+  uiMode: UiMode;
+  setUiMode: (m: UiMode) => void;
 
   promptsByMode: Record<AppMode, PromptSet>;
   setPrompt: (k: keyof PromptSet, v: string) => void;
