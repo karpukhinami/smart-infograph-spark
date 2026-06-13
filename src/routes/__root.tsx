@@ -71,30 +71,63 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const uiMode = useSettingsStore((s) => s.uiMode);
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen flex flex-col">
         <header className="border-b border-border bg-sidebar/60 backdrop-blur">
-          <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-4">
-              <ModeSwitch />
+          <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2">
+            <div className="flex items-center gap-3">
+              <UiModeSwitch />
+              {uiMode === "debug" && <ModeSwitch />}
               <Link to="/" className="text-base font-semibold tracking-tight">
                 AI Infographic Generator
               </Link>
             </div>
-            <nav className="flex gap-4 text-sm text-muted-foreground">
-              <Link to="/" activeProps={{ className: "text-foreground font-medium" }}>Рабочее место</Link>
-              <Link to="/styles" activeProps={{ className: "text-foreground font-medium" }}>Стили</Link>
-              <Link to="/design-profiles" activeProps={{ className: "text-foreground font-medium" }}>Профили дизайна</Link>
-              <Link to="/prompts" activeProps={{ className: "text-foreground font-medium" }}>Промпты</Link>
-            </nav>
+            <div className="flex items-center gap-4">
+              {uiMode === "debug" && (
+                <nav className="flex gap-4 text-sm text-muted-foreground">
+                  <Link to="/" activeProps={{ className: "text-foreground font-medium" }}>Рабочее место</Link>
+                  <Link to="/styles" activeProps={{ className: "text-foreground font-medium" }}>Стили</Link>
+                  <Link to="/design-profiles" activeProps={{ className: "text-foreground font-medium" }}>Профили дизайна</Link>
+                  <Link to="/prompts" activeProps={{ className: "text-foreground font-medium" }}>Промпты</Link>
+                </nav>
+              )}
+              <CostMeter />
+            </div>
           </div>
         </header>
         <main className="flex-1"><Outlet /></main>
         <Toaster />
-        <CostMeter />
       </div>
     </QueryClientProvider>
+  );
+}
+
+function UiModeSwitch() {
+  const uiMode = useSettingsStore((s) => s.uiMode);
+  const setUiMode = useSettingsStore((s) => s.setUiMode);
+  return (
+    <div className="inline-flex rounded-md border border-border bg-background p-0.5 text-xs">
+      {([
+        ["debug", "Отладка"],
+        ["user", "Для пользователя"],
+      ] as const).map(([m, label]) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => setUiMode(m)}
+          className={`px-2.5 py-1 rounded-sm transition-colors ${
+            uiMode === m
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+          title={m === "debug" ? "Отладочный режим: все настройки видны" : "Пользовательский режим: служебные элементы скрыты"}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 
