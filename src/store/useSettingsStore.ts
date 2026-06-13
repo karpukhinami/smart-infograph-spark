@@ -73,6 +73,9 @@ export const useSettingsStore = create<SettingsState>()(
       mode: "strict",
       setMode: (m) => set({ mode: m }),
 
+      uiMode: "debug",
+      setUiMode: (m) => set({ uiMode: m }),
+
       promptsByMode: initialPrompts,
       setPrompt: (k, v) =>
         set((s) => ({
