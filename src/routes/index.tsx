@@ -255,15 +255,15 @@ function Workspace() {
     if (!activeContent) return;
     try {
       setLoading("refine");
-      const analysis = activeContent.value.analysis ?? null;
-      const prompt = buildRefineContentPrompt({
-        userInstructions: userText,
-        currentAnalysisJson: analysis ? JSON.stringify(analysis, null, 2) : "",
-        currentContentText: activeContent.value.content,
-        strict: mode === "strict",
-      });
       let summary: ContentSummary;
       if (mode === "strict") {
+        const analysis = activeContent.value.analysis ?? null;
+        const prompt = buildRefineContentPrompt({
+          userInstructions: userText,
+          currentAnalysisJson: analysis ? JSON.stringify(analysis, null, 2) : "",
+          currentContentText: activeContent.value.content,
+          strict: true,
+        });
         const a = await callTextLLMForJson({
           model: models.analysis,
           prompt,
