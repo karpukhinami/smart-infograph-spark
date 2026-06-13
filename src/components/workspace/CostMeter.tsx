@@ -11,11 +11,11 @@ export function CostMeter() {
   const reset = useUsageStore((s) => s.reset);
   const uiMode = useSettingsStore((s) => s.uiMode);
   const allowExpand = uiMode === "debug";
-  const [open, setOpenRaw] = useState(false);
-  const open = allowExpand && open;
+  const [openState, setOpenState] = useState(false);
+  const open = allowExpand && openState;
   const setOpen = (v: boolean | ((o: boolean) => boolean)) => {
     if (!allowExpand) return;
-    setOpenRaw((prev) => (typeof v === "function" ? v(prev) : v));
+    setOpenState((prev) => (typeof v === "function" ? v(prev) : v));
   };
   const [tab, setTab] = useState<"cost" | "raw">("cost");
   const [rawIdx, setRawIdx] = useState<number | null>(null);
