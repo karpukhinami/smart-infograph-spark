@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { useSettingsStore } from "@/store/useSettingsStore";
 
 export function PromptDisclosure({
   label,
@@ -14,8 +15,10 @@ export function PromptDisclosure({
   onChange: (v: string) => void;
   rightSlot?: React.ReactNode;
 }) {
+  const uiMode = useSettingsStore((s) => s.uiMode);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
+  if (uiMode === "user") return null;
   return (
     <div className="rounded-md border border-border bg-card">
       <div className="flex items-center justify-between p-2">

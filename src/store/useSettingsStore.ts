@@ -17,6 +17,8 @@ import promptStrictGeneralRules from "@/data/prompts/strict/general-rules.txt?ra
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
 
+export type UiMode = "debug" | "user";
+
 interface PromptSet {
   analysisWithContent: string;
   analysisTopicOnly: string;
@@ -27,6 +29,9 @@ interface PromptSet {
 interface SettingsState {
   mode: AppMode;
   setMode: (m: AppMode) => void;
+
+  uiMode: UiMode;
+  setUiMode: (m: UiMode) => void;
 
   promptsByMode: Record<AppMode, PromptSet>;
   setPrompt: (k: keyof PromptSet, v: string) => void;
@@ -67,6 +72,9 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       mode: "strict",
       setMode: (m) => set({ mode: m }),
+
+      uiMode: "debug",
+      setUiMode: (m) => set({ uiMode: m }),
 
       promptsByMode: initialPrompts,
       setPrompt: (k, v) =>
@@ -111,7 +119,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "infographic-settings",
-      version: 14,
+      version: 15,
       // Breaking shape change — drop persisted state from older versions.
       migrate: () => undefined as unknown as SettingsState,
       storage: createJSONStorage(() =>

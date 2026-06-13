@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useUsageStore } from "@/store/useUsageStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
 import { fmtUsd } from "@/lib/pricing";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, X, FileText } from "lucide-react";
@@ -8,7 +9,14 @@ export function CostMeter() {
   const history = useUsageStore((s) => s.history);
   const rawHistory = useUsageStore((s) => s.rawHistory);
   const reset = useUsageStore((s) => s.reset);
-  const [open, setOpen] = useState(false);
+  const uiMode = useSettingsStore((s) => s.uiMode);
+  const allowExpand = uiMode === "debug";
+  const [openState, setOpenState] = useState(false);
+  const open = allowExpand && openState;
+  const setOpen = (v: boolean | ((o: boolean) => boolean)) => {
+    if (!allowExpand) return;
+    setOpenState((prev) => (typeof v === "function" ? v(prev) : v));
+  };
   const [tab, setTab] = useState<"cost" | "raw">("cost");
   const [rawIdx, setRawIdx] = useState<number | null>(null);
 
@@ -24,23 +32,23 @@ export function CostMeter() {
   const selectedRaw = rawIdx != null ? rawHistory[rawIdx] : rawHistory[rawHistory.length - 1];
 
   return (
-    <div className="fixed bottom-3 right-3 z-50 rounded-lg border border-border bg-card/95 shadow-lg backdrop-blur text-xs max-w-[min(96vw,640px)]">
+    <div className="relative rounded-lg border border-border bg-card/95 shadow-sm backdrop-blur text-xs max-w-[min(96vw,640px)]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 px-3 py-2 w-full"
+        className="flex items-center gap-2 px-3 py-1.5 w-full"
         title="Расход токенов и стоимость запросов"
       >
         <span className="font-mono font-semibold">{fmtUsd(total.cost)}</span>
         <span className="text-muted-foreground">
           {total.tokens.toLocaleString("ru")} ток · {history.length} зап
         </span>
-        {rawHistory.length > 0 && (
+        {allowExpand && rawHistory.length > 0 && (
           <span className="ml-1 text-muted-foreground inline-flex items-center gap-1">
             <FileText className="size-3" /> {rawHistory.length}
           </span>
         )}
-        {open ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
+        {allowExpand && (open ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />)}
       </button>
       {open && (
         <div className="border-t border-border">
