@@ -43,12 +43,12 @@ export function CostMeter() {
         <span className="text-muted-foreground">
           {total.tokens.toLocaleString("ru")} ток · {history.length} зап
         </span>
-        {rawHistory.length > 0 && (
+        {allowExpand && rawHistory.length > 0 && (
           <span className="ml-1 text-muted-foreground inline-flex items-center gap-1">
             <FileText className="size-3" /> {rawHistory.length}
           </span>
         )}
-        {open ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
+        {allowExpand && (open ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />)}
       </button>
       {open && (
         <div className="border-t border-border">
