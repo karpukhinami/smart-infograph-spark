@@ -35,8 +35,8 @@
 ЦВЕТО-ШРИФТОВОЙ ПРОФИЛЬ:
 {{DESIGN_PROFILE_PROSE}}
 
-MARKDOWN CONTENT:
-{{MARKDOWN_CONTENT}}
+CONTENT SUMMARY:
+{{CONTENT_SUMMARY}}
 
 ПОЖЕЛАНИЯ ПОЛЬЗОВАТЕЛЯ:
 {{USER_WISHES}}
