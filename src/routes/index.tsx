@@ -176,15 +176,15 @@ function Workspace() {
           analysis,
         };
       } else {
-        const parsed = await callTextLLMForJson({
-          model: models.analysis,
-          prompt: filled,
-          label: "analysis",
-          schemaHint: 'Верни JSON-объект со структурой { content, recommendedStyle }.',
-          parse: (value) => value as ContentSummary,
-        });
-        if (!parsed.content || !parsed.recommendedStyle) throw new Error("В ответе модели не хватает полей");
-        summary = parsed;
+        // Free mode: model returns plain Markdown, not JSON.
+        const raw = await callTextLLM({ model: models.analysis, prompt: filled });
+        const content = (raw ?? "").trim();
+        if (!content) throw new Error("Модель вернула пустой ответ");
+        const fallbackStyle = enabledStyles[0]?.id ?? "";
+        summary = {
+          content,
+          recommendedStyle: selectedStyleId ?? fallbackStyle,
+        };
       }
       pushContent(summary);
       setPaneMode("content");
@@ -255,15 +255,15 @@ function Workspace() {
     if (!activeContent) return;
     try {
       setLoading("refine");
-      const analysis = activeContent.value.analysis ?? null;
-      const prompt = buildRefineContentPrompt({
-        userInstructions: userText,
-        currentAnalysisJson: analysis ? JSON.stringify(analysis, null, 2) : "",
-        currentContentText: activeContent.value.content,
-        strict: mode === "strict",
-      });
       let summary: ContentSummary;
       if (mode === "strict") {
+        const analysis = activeContent.value.analysis ?? null;
+        const prompt = buildRefineContentPrompt({
+          userInstructions: userText,
+          currentAnalysisJson: analysis ? JSON.stringify(analysis, null, 2) : "",
+          currentContentText: activeContent.value.content,
+          strict: true,
+        });
         const a = await callTextLLMForJson({
           model: models.analysis,
           prompt,
@@ -277,15 +277,18 @@ function Workspace() {
           analysis: a,
         };
       } else {
-        const parsed = await callTextLLMForJson({
-          model: models.analysis,
-          prompt,
-          label: "refine analysis",
-          schemaHint: 'Верни JSON-объект со структурой { content, recommendedStyle }.',
-          parse: (value) => value as ContentSummary,
-        });
-        if (!parsed.content) throw new Error("В ответе модели не хватает поля content");
-        summary = { ...parsed, recommendedStyle: parsed.recommendedStyle || activeContent.value.recommendedStyle };
+        // Free mode: refine plain Markdown content.
+        const refinePrompt = `Ты — методист-редактор учебных инфографик. Внеси точечные изменения в существующий markdown-конспект по пожеланиям пользователя. Сохрани формат, структуру, заголовки и формулы в LaTeX ($...$ или $$...$$). Не возвращай JSON, не добавляй комментариев, верни только обновлённый markdown.
+
+ПОЖЕЛАНИЯ ПОЛЬЗОВАТЕЛЯ:
+${userText || "(не указано)"}
+
+ТЕКУЩИЙ MARKDOWN-КОНСПЕКТ:
+${activeContent.value.content}`;
+        const raw = await callTextLLM({ model: models.analysis, prompt: refinePrompt });
+        const content = (raw ?? "").trim();
+        if (!content) throw new Error("Модель вернула пустой ответ");
+        summary = { content, recommendedStyle: activeContent.value.recommendedStyle };
       }
       pushContent(summary);
       setPaneMode("content");
