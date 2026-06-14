@@ -73,10 +73,14 @@ function Workspace() {
   const userWishes = useProjectStore((s) => s.userWishes);
   const setUserWishes = useProjectStore((s) => s.setUserWishes);
   const pushImage = useProjectStore((s) => s.pushImage);
+  const briefMode = useProjectStore((s) => s.briefMode);
+  const setBriefMode = useProjectStore((s) => s.setBriefMode);
+  const pushSpec = useProjectStore((s) => s.pushSpec);
 
   const activeContent = useActiveContent();
   const activeBrief = useActiveBrief();
   const activeImage = useActiveImage();
+  const activeSpec = useActiveSpec();
 
   const mode = useSettingsStore((s) => s.mode);
   const prompts = useCurrentPrompts();
