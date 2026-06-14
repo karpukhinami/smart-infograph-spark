@@ -654,8 +654,8 @@ ${activeContent.value.content}`;
           </div>
         )}
 
-        {/* STAGE 3 */}
-        {activeBrief && (
+        {/* STAGE 3 — only in design-brief mode */}
+        {activeBrief && !(mode === "strict" && briefMode === "programmatic") && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <h2 className="text-sm font-semibold">3 · Генерация изображения</h2>
             <div>
