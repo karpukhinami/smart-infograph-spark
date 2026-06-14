@@ -1,158 +1,91 @@
-# AI Infographic Generator — MVP Plan
+## Цель
 
-A debugging-oriented prototype where the user controls every LLM call in a 4-stage pipeline: Input → Content Analysis → Design Brief + Wireframe → Final Image.
+Добавить в строгий режим переключатель «дизайн-бриф / технический макет» на шаге 2. В положении «технический макет» вместо генерации изображения ИИ создаётся ProgrammaticRenderSpec JSON, который детерминированно рисуется встроенным React-рендерером и показывается на вкладке «Каркас».
 
-## Architecture
+## UX-изменения
 
-**Layout:** Two-pane workspace. Left = user inputs / controls / prompts. Right = stage results with mode switcher (Content / Wireframe / Final Image) and version history.
+- Шаг 2: добавляется Tabs «Дизайн-бриф | Технический макет» сверху плашки.
+  - «Дизайн-бриф» — текущее поведение, всё как есть.
+  - «Технический макет» — та же плашка (выбор стиля, профиля, ModelPicker для `models.brief`, PromptDisclosure), но используется промпт из `src/data/prompts/strict/code-based-product.txt`. Кнопка: «Создать технический макет».
+- Шаг 3 в режиме «технический макет» скрывается (рендерер сам делает финал, генерация изображения ИИ не нужна).
+- Результат показывается на вкладке **«Каркас»** (т.к. это векторная DOM-структура, а не растровое изображение). Сверху вкладки — компактная панель «Экспорт PNG» (через `html-to-image`) и кнопка «Перегенерировать».
+- На вкладке «Каркас» включается соответствующий вид: либо текущий `WireframeSketch/WireframeView` (для дизайн-брифа), либо новый `ProgrammaticRenderer` (для технического макета).
+- Список layout-warnings показывается под рендером в свернутой секции.
 
-**Data entities (separate stores, per spec):**
-- `SourceText`, `ContentSummary`, `StyleSpecification`, `DesignProfile`, `PromptForImageGeneration`, `Wireframe`, `FinalImage`
-- Each result is versioned (kept in session). "Start over" button clears project versions but preserves edited base prompts and helper-page edits.
+## Хранение
 
-**State:** Zustand store with slices per entity + version arrays. Persisted to `sessionStorage` so prompt edits / style edits / profile edits survive within session.
+`useProjectStore`:
+- Новый тип режима шага 2: `briefMode: "design" | "programmatic"`, persisted, по умолчанию `"design"`.
+- Новый массив версий: `specVersions: Versioned<ProgrammaticRenderSpec>[]`, `activeSpecId`, `pushSpec`, `setActiveSpec`. Параллельно `briefVersions` (не смешиваем форматы).
+- `PaneMode` остаётся `content | wireframe | image`; в programmatic-ветке открывается `wireframe`.
 
-## Routes
+`useSettingsStore`:
+- Добавить в `prompts.strict` поле `codeBasedProduct`, заполняется содержимым `code-based-product.txt`. Версия persisted-стора инкрементируется.
 
-- `/` — main workspace (4-stage pipeline)
-- `/styles` — manage infographic styles (edit, toggle on/off, reset to default)
-- `/design-profiles` — manage color+font profiles (create, edit, set default)
-- `/prompts` — view/edit base prompts (analysis prompt, design-brief prompt) — also editable inline via "show prompt" buttons on main page
+## Промпт и LLM-вызов
 
-## Stage 1 — Input (left top)
+Новая функция `onCreateProgrammaticSpec()` в `src/routes/index.tsx`:
+- Заполняет плейсхолдеры в `prompts.codeBasedProduct` через расширенный `buildDesignBriefPrompt` (используем существующий, он уже подставляет `GENERAL_RULES_BLOCK`, `STYLE_*`, `DESIGN_PROFILE_PROSE`, `CONTENT_SUMMARY`, `USER_WISHES`).
+- Зовёт `callTextLLMForJson` с моделью `models.brief`, парсит и валидирует через `validateRenderSpec`.
+- При ошибке валидации — показывает первую проблему toast-ом + сохраняет сырой ответ для отладки.
 
-- Tabs: **Paste text** / **Upload file** (.txt, .md) / **Topic only**
-- Topic mode adds: subject dropdown (all school subjects + "Other"), grade dropdown (1–11)
-- "Additional instructions" textarea (user notes on emphasis)
-- Right side: collapsible "Show analysis prompt" (editable, persisted) + model dropdown
-- Left bottom: **Analyze** button → triggers Stage 2
+## Рендерер
 
-## Stage 2 — Content Analysis
+Новые файлы:
 
-- Prompt template has TWO variables: `withContentTemplate` and `topicOnlyTemplate`. App picks based on input mode.
-- Assembled prompt = base template + user additional instructions + list of enabled styles (name + short description from `/styles` page).
-- Model must return strict JSON: `{ "content": "<markdown+latex>", "recommendedStyle": "<styleId>" }`.
-- JSON validation + repair attempt; surface errors.
-- **Right pane (Content mode):** rendered markdown + KaTeX, editable textarea, **Regenerate** button.
-- **Left pane:** two dropdowns appear — Style (preselected to model's recommendation) and Design Profile (preselected to default). Below: "Show design-brief prompt" button + model dropdown + **Create design brief** button.
+- `src/lib/render-spec/types.ts` — TS-типы `ProgrammaticRenderSpec`, `RenderRow`, `RenderCard`, `ColorRef`, `AddOnPlacement`, `TitleStyle`, `GroupContainer`, `Theme`, `Header` строго по спецификации промпта.
+- `src/lib/render-spec/validate.ts` — `validateRenderSpec(value, designProfile): { spec, warnings }`. Проверяет:
+  - наличие корневого `ProgrammaticRenderSpec`, `format`, `theme`, `header`, `rows`;
+  - `format.orientation ∈ {portrait, landscape}`, `aspectRatio` соответствует;
+  - `rows` непустой; для каждого row: `id`, `role`, `heightWeight>0`, `cardCount`, `columnRatio` из белого списка `1|1:1|1:2|2:1|1:1:1|2:1:1|1:2:1|1:1:2`, `cards.length === cardCount`, `cardCount` соответствует количеству долей в `columnRatio`;
+  - все hex входят в палитру `designProfile` (pageBackground + brightAccents + pastelFills + structural; case-insensitive);
+  - запрет полей `icon`, `visual`;
+  - `groupContainer === null` если `cardCount === 1`;
+  - все строки `formula` обёрнуты в `$...$` или `$$...$$` (warning, не fatal, если нет).
+  - Возвращает либо валидный spec, либо бросает `Error` с понятным сообщением.
+- `src/lib/render-spec/tokens.ts` — таблицы margin/gap/density/radius/border/shadow/text-scale из ТЗ (точные числа из спецификации).
+- `src/lib/render-spec/layout.ts` — чистые функции:
+  - `computeCanvas(format)` → 1200×1600 / 1600×1200, `base`.
+  - `parseRatio(columnRatio)` → number[].
+  - `computeRowHeights(rows, canvasHeight, margin, gap)`.
+  - `computeCardWidths(row, canvasWidth, margin, gap)`.
+  - `resolveDensity`, `resolveRadius`, `cardPadding`, `blockGap` из density preset.
+- `src/lib/render-spec/fit-text.ts` — `useFitText({ baseFontSize, minFontSize, contentRef, containerRef })` — бинарный поиск размера, измеряет `scrollHeight/clientHeight` и `scrollWidth/clientWidth`. Хук вызывается после рендера через `useLayoutEffect`.
+- `src/components/render-spec/ProgrammaticRenderer.tsx` — корневой компонент:
+  - принимает `spec`, рендерит фиксированный canvas с CSS-переменными темы;
+  - использует `transform: scale(...)` через wrapper по ширине контейнера, не меняя внутренний layout;
+  - рисует header → rows → groupContainer? → cards.
+- `src/components/render-spec/Card.tsx` — карточка: background/border/shadow/radius/padding из card-level или theme; вертикальный flex с blockGap; зоны title/body/formula/example; применяет fillStrategy (`air | centerContent | scaleText | accentShape | largeFormula`); вызывает fit-text для body, formula считается отдельно.
+- `src/components/render-spec/AddOnContainer.tsx` — варианты inset/badge/plate, layout single/horizontalGroup.
+- `src/components/render-spec/CardContent.tsx` — `react-markdown` + `remark-math` + `rehype-katex` для body и formula/example. Поддержка строка | массив строк (массив → набор `<p>`/`<li>` сохраняя порядок).
+- `src/components/render-spec/RowTitle.tsx`.
+- `src/components/render-spec/LayoutWarnings.tsx` — собирает предупреждения через React context (`useLayoutWarnings`), отображает список под рендером.
 
-## Stage 3 — Design Brief + Wireframe
+### Поведение fit-text и warnings
 
-- Assembled prompt = base design-brief prompt (the spec's English placeholder) + ContentSummary + full StyleSpecification rules + DesignProfile JSON.
-- Model returns strict JSON: `{ "PromptForImageGeneration": "...", "WireframeDescription": {...} }`.
-- `WireframeDescription` is a structured layout schema (rows/columns of blocks with type, label, approx size, connections, illustration markers, main visual flag) so the UI can render an ASCII/SVG wireframe AND the same description goes into the image prompt — single source of truth.
-- **Right pane (Wireframe mode):** SVG wireframe (boxes only, no colors/fonts) + Regenerate.
-- **Left pane:** "Additional wishes" textarea (appended to prompt on regenerate, priority). Third button "View image prompt" (shows PromptForImageGeneration, editable) + model dropdown + **Generate image** button.
+- shared/independent/hierarchical textSizing реализуется через context на уровне Row: каждая карточка регистрирует свой подобранный fontSize, после первого прохода Row выставляет общий минимум и форсит re-render для shared/hierarchical.
+- При overflow-цепочке: уменьшить fontSize → blockGap → padding → пометить карточку failed (visual overlay в режиме отладки `uiMode === "debug"`, иначе только в LayoutWarnings).
 
-## Stage 4 — Image Generation
+### Экспорт
 
-- Calls image model with PromptForImageGeneration (+ user "additional wishes" if non-empty, with priority).
-- **Right pane (Final Image mode):** rendered image + Regenerate. Left pane unchanged.
+- `bun add html-to-image katex react-katex remark-math rehype-katex react-markdown` (react-markdown скорее всего уже есть, проверить; добавить только недостающее).
+- Кнопка «Экспорт PNG» зовёт `toPng(canvasRef.current, { pixelRatio: 2 })`, скачивает blob.
 
-## Models
+## Файлы, которые редактируем
 
-Dropdown next to each LLM step. Sources:
-1. **Built-in:** Lovable AI Gateway models (`google/gemini-3-flash-preview` default for text; `openai/gpt-image-2` for image stage).
-2. **OpenRouter:** loaded from `src/data/openrouter-models.json` (placeholder file with a few entries; user will provide full list). API key placeholder in `src/lib/openrouter.ts` as `const OPENROUTER_API_KEY = ""; // TODO: paste key`.
+- `src/store/useProjectStore.ts` — `briefMode`, `specVersions`, version bump.
+- `src/store/useSettingsStore.ts` — `prompts.strict.codeBasedProduct`, version bump.
+- `src/routes/index.tsx` — Tabs на шаге 2, `onCreateProgrammaticSpec`, скрытие шага 3 в programmatic-ветке, переключение содержимого вкладки «Каркас».
+- `src/components/workspace/WireframeView.tsx` — без изменений.
+- Новые файлы (см. выше).
 
-Text calls go through a TanStack server route at `/api/llm` that dispatches to either Lovable Gateway (using `LOVABLE_API_KEY`) or OpenRouter (using hard-coded key) based on selected model. Image generation uses streaming `/api/generate-image` route.
+## Технические детали
 
-## Styles (helper page + storage)
+- Все числовые константы margin/gap/density/radius/border/text-scale берутся ровно из таблиц в задаче.
+- Нет смешивания типов: `briefVersions` (старый формат) и `specVersions` (новый) живут параллельно. На вкладке «Каркас» отображаем тот, что соответствует текущему `briefMode`.
+- LaTeX-экранирование в JSON уже обрабатывается на стороне `llm-json` (json-repair). Дополнительно перед парсингом KaTeX-формула остаётся как есть.
+- Соответствие вкладок: технический макет — векторный DOM → вкладка «Каркас» (как и просил пользователь — «если векторная структура, то можно вписать в каркас»).
 
-`src/data/default-styles.json` with 5 stubs: Modern Bento, School Reference Card, Timeline, Exam Cheat Sheet, Editorial Education Poster. Each style:
-```json
-{
-  "id": "...",
-  "name": "...",
-  "shortDescription": "...",
-  "enabled": true,
-  "rules": {
-    "composition": "bento",
-    "symmetry": "moderate",
-    "primaryCarrier": "mixed",
-    "colorApproach": "...",
-    "typography": "...",
-    "illustration": "...",
-    "character": "..."
-  }
-}
-```
-Page: list, edit any field, toggle enabled, save (sessionStorage).
+## Открытые вопросы
 
-## Design Profiles (helper page + storage)
-
-`src/data/default-design-profile.json` with the spec's example `DefaultBentoStyle`. Page: form to edit palette (bg, primary, secondary, additional accents), fonts (primary/secondary family + weights), usage rules, card style (radius, border, shadow — shadow forced "none" for MVP), spacing, notesForAI. Save new profiles → appear in main-page dropdown for the session.
-
-## Base Prompts (files)
-
-- `src/data/prompts/analysis-with-content.txt`
-- `src/data/prompts/analysis-topic-only.txt`
-- `src/data/prompts/design-brief.txt` (the English placeholder from spec)
-
-Loaded into store on first run; edits persisted in sessionStorage.
-
-## Regeneration warnings
-
-When user changes SourceText / ContentSummary / StyleSpecification / DesignProfile, a confirm dialog lists downstream effects per spec rules. Old versions kept; new version created on confirm. FinalImage NEVER regenerates automatically. Wireframe NOT regenerated if only DesignProfile (visual-only) changes.
-
-## Version history
-
-Each entity holds `versions: T[]` + `activeVersionId`. Right-pane mode switcher includes a small version selector per mode.
-
-## File map (new)
-
-```
-src/
-  routes/
-    index.tsx                    # main workspace
-    styles.tsx                   # style manager
-    design-profiles.tsx          # profile manager
-    prompts.tsx                  # base prompt manager
-    api/
-      llm.ts                     # text LLM dispatcher (Lovable/OpenRouter)
-      generate-image.ts          # streaming image gen
-  components/
-    workspace/
-      LeftPanel.tsx
-      RightPanel.tsx
-      Stage1Input.tsx
-      Stage2Controls.tsx
-      Stage3Controls.tsx
-      Stage4Controls.tsx
-      PromptDisclosure.tsx
-      ModelPicker.tsx
-      ContentView.tsx            # markdown + katex render + edit
-      WireframeView.tsx          # SVG renderer from WireframeDescription
-      FinalImageView.tsx
-      VersionSwitcher.tsx
-      RegenerateWarningDialog.tsx
-  store/
-    useProjectStore.ts           # zustand: entities + versions
-    useSettingsStore.ts          # prompts, styles, profiles (session-persisted)
-  lib/
-    llm-client.ts                # client wrapper -> /api/llm
-    openrouter.ts                # OPENROUTER_API_KEY placeholder + model list loader
-    json-repair.ts               # strict JSON parse + cleanup
-    wireframe-schema.ts          # zod schema for WireframeDescription
-  data/
-    default-styles.json
-    default-design-profile.json
-    openrouter-models.json       # placeholder
-    prompts/
-      analysis-with-content.txt
-      analysis-topic-only.txt
-      design-brief.txt
-```
-
-Markdown rendered with `react-markdown` + `remark-math` + `rehype-katex`. Wireframe drawn as SVG from structured description.
-
-## Out of scope for MVP
-
-- PDF/DOCX upload
-- Cross-session persistence (sessionStorage only, per spec)
-- Auth / multi-user
-- Real OpenRouter model catalog (placeholder list; user will supply)
-
-## After approval
-
-Enable Lovable Cloud (needed only for `LOVABLE_API_KEY` server-side — no DB required for MVP since storage is session-only), then scaffold in the order: data files → store → API routes → workspace UI → helper pages.
+Реализую как описано, если возражений нет.
