@@ -219,9 +219,7 @@ function RowBlock({
   const gc = row.groupContainer;
   const gcPadding = gc ? gapPx(gc.padding, base) : 0;
 
-  let xCursor = margin + (gc ? gcPadding : 0);
   const innerGap = gc ? gap * 0.75 : gap;
-  const cardsWidthSum = widths.reduce((a, b) => a + b, 0) + innerGap * (widths.length - 1);
   // If group container is present, recompute widths to fill inner area:
   const adjusted = gc
     ? (() => {
