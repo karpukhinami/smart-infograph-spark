@@ -236,6 +236,41 @@ function Workspace() {
     }
   }
 
+  async function onCreateProgrammaticSpec() {
+    if (!activeContent) return;
+    if (!activeStyle) { toast.error("Сначала выберите стиль"); return; }
+    try {
+      setLoading("brief");
+      const filled = buildDesignBriefPrompt({
+        template: prompts.codeBasedProduct,
+        contentSummary: activeContent.value.content,
+        style: activeStyle,
+        profile: activeProfile,
+        userWishes,
+        generalRules: prompts.generalRules,
+      });
+      const raw = await callTextLLMForJson({
+        model: models.brief,
+        prompt: filled,
+        label: "render spec",
+        schemaHint: 'Верни JSON-объект формы { "ProgrammaticRenderSpec": { "format": {...}, "theme": {...}, "header": {...}, "rows": [...] } }.',
+        parse: (value) => value as unknown,
+      });
+      const { spec, warnings } = validateRenderSpec(raw, activeProfile ?? null);
+      pushSpec(spec);
+      setPaneMode("wireframe");
+      if (warnings.length) {
+        toast.message("Технический макет создан с предупреждениями", { description: warnings.slice(0, 3).join("\n") });
+      } else {
+        toast.success("Технический макет создан");
+      }
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось создать технический макет");
+    } finally {
+      setLoading(null);
+    }
+  }
+
   function buildFinalImagePrompt(basePrompt: string): string {
     const wishes = userWishes.trim();
     const head = wishes ? `${wishes}\n\n${basePrompt}` : basePrompt;
