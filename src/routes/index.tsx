@@ -689,7 +689,7 @@ ${activeContent.value.content}`;
           <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as PaneMode)}>
             <TabsList>
               <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
-              <TabsTrigger value="wireframe" disabled={!activeBrief}>Каркас</TabsTrigger>
+              <TabsTrigger value="wireframe" disabled={!activeBrief && !activeSpec}>Каркас</TabsTrigger>
               <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
 
@@ -733,7 +733,13 @@ ${activeContent.value.content}`;
             </TabsContent>
 
             <TabsContent value="wireframe" className="p-2 space-y-2">
-              {activeBrief ? (
+              {mode === "strict" && briefMode === "programmatic" && activeSpec ? (
+                <ProgrammaticPane
+                  spec={activeSpec.value}
+                  loading={loading !== null}
+                  onRegenerate={onCreateProgrammaticSpec}
+                />
+              ) : activeBrief ? (
                 <>
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="outline" onClick={() => setRefineStage("brief")} disabled={loading !== null}>
@@ -754,7 +760,7 @@ ${activeContent.value.content}`;
                   )}
                 </>
               ) : (
-                <EmptyState text="Создайте дизайн-бриф, чтобы увидеть каркас." />
+                <EmptyState text="Создайте дизайн-бриф или технический макет, чтобы увидеть каркас." />
               )}
             </TabsContent>
 
