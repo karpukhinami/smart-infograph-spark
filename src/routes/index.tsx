@@ -820,3 +820,51 @@ function EmptyState({ text }: { text: string }) {
     <div className="p-10 text-center text-sm text-muted-foreground">{text}</div>
   );
 }
+
+function ProgrammaticPane({
+  spec,
+  loading,
+  onRegenerate,
+}: {
+  spec: import("@/lib/render-spec/types").ProgrammaticRenderSpec;
+  loading: boolean;
+  onRegenerate: () => void;
+}) {
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
+  async function exportPng() {
+    const node = canvasWrapRef.current?.querySelector("[data-spec-canvas]") as HTMLElement | null;
+    if (!node) return;
+    try {
+      const dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `infographic-${Date.now()}.png`;
+      a.click();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось экспортировать PNG");
+    }
+  }
+  return (
+    <>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={exportPng} disabled={loading}>
+          Экспорт PNG
+        </Button>
+        <Button size="sm" variant="outline" onClick={onRegenerate} disabled={loading}>
+          <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
+        </Button>
+      </div>
+      <div ref={canvasWrapRef} className="rounded-md border border-border overflow-hidden">
+        <ProgrammaticRenderer spec={spec} />
+      </div>
+      <details className="rounded-md border border-border bg-background/60 p-2">
+        <summary className="cursor-pointer text-xs text-muted-foreground">
+          Показать JSON-спецификацию
+        </summary>
+        <pre className="mt-2 overflow-auto text-xs max-h-96">
+          {JSON.stringify(spec, null, 2)}
+        </pre>
+      </details>
+    </>
+  );
+}
