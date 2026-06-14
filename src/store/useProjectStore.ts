@@ -156,7 +156,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "infographic-project",
-      version: 2,
+      version: 3,
       migrate: () => undefined as unknown as ProjectState,
       storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
     },
@@ -171,4 +171,7 @@ export function useActiveBrief() {
 }
 export function useActiveImage() {
   return useProjectStore((s) => s.imageVersions.find((v) => v.id === s.activeImageId) ?? null);
+}
+export function useActiveSpec() {
+  return useProjectStore((s) => s.specVersions.find((v) => v.id === s.activeSpecId) ?? null);
 }
