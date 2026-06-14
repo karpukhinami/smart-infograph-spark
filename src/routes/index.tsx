@@ -583,7 +583,17 @@ ${activeContent.value.content}`;
         {/* STAGE 2 */}
         {activeContent && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <h2 className="text-sm font-semibold">2 · Стиль и дизайн</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">2 · Стиль и дизайн</h2>
+              {mode === "strict" && (
+                <Tabs value={briefMode} onValueChange={(v) => setBriefMode(v as "design" | "programmatic")}>
+                  <TabsList className="h-8">
+                    <TabsTrigger value="design" className="text-xs">Дизайн-бриф</TabsTrigger>
+                    <TabsTrigger value="programmatic" className="text-xs">Технический макет</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">Стиль инфографики</Label>
@@ -610,18 +620,37 @@ ${activeContent.value.content}`;
                 </Select>
               </div>
             </div>
-            <PromptDisclosure
-              label="Показать промпт дизайн-брифа"
-              value={prompts.designBrief}
-              onChange={(v) => setPrompt("designBrief", v)}
-              rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
-            />
-            <div>
-              <Button onClick={onCreateBrief} disabled={loading !== null}>
-                {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Создать дизайн-бриф
-              </Button>
-            </div>
+            {mode === "strict" && briefMode === "programmatic" ? (
+              <>
+                <PromptDisclosure
+                  label="Показать промпт технического макета"
+                  value={prompts.codeBasedProduct}
+                  onChange={(v) => setPrompt("codeBasedProduct", v)}
+                  rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
+                />
+                <div>
+                  <Button onClick={onCreateProgrammaticSpec} disabled={loading !== null}>
+                    {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                    Создать технический макет
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <PromptDisclosure
+                  label="Показать промпт дизайн-брифа"
+                  value={prompts.designBrief}
+                  onChange={(v) => setPrompt("designBrief", v)}
+                  rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
+                />
+                <div>
+                  <Button onClick={onCreateBrief} disabled={loading !== null}>
+                    {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                    Создать дизайн-бриф
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
