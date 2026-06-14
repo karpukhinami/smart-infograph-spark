@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Loader2, RefreshCw, RotateCcw, Upload, ImagePlus, Sparkles } from "lucide-react";
-import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage } from "@/store/useProjectStore";
+import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage, useActiveSpec } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
 import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
@@ -28,6 +28,9 @@ import {
 import recognizeImagePrompt from "@/data/prompts/recognize-image.txt?raw";
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
+import { validateRenderSpec } from "@/lib/render-spec/validate";
+import { ProgrammaticRenderer } from "@/components/render-spec/ProgrammaticRenderer";
+import { toPng } from "html-to-image";
 
 
 export const Route = createFileRoute("/")({
