@@ -109,13 +109,13 @@ export function validateRenderSpec(
       if ("visual" in (card as AnyRecord)) err(`${w}: поле visual запрещено`);
       checkColor(card.background, `${w}.background`);
       checkColor(card.textColor, `${w}.textColor`);
-      if (card.border) checkColor((card.border as AnyRecord).color, `${w}.border.color`);
+      if (card.border) checkColor((card.border as unknown as AnyRecord).color, `${w}.border.color`);
       if (card.titleStyle) {
-        checkColor((card.titleStyle as AnyRecord).background, `${w}.titleStyle.background`);
-        checkColor((card.titleStyle as AnyRecord).textColor, `${w}.titleStyle.textColor`);
+        checkColor((card.titleStyle as unknown as AnyRecord).background, `${w}.titleStyle.background`);
+        checkColor((card.titleStyle as unknown as AnyRecord).textColor, `${w}.titleStyle.textColor`);
       }
       // formulas dollar-wrap warning
-      const content = card.content as AnyRecord | undefined;
+      const content = card.content as unknown as AnyRecord | undefined;
       if (content && content.formula != null) {
         const formulas = Array.isArray(content.formula)
           ? (content.formula as string[])
