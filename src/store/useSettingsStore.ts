@@ -14,6 +14,7 @@ import promptStrictAnalysisWith from "@/data/prompts/strict/analysis-with-conten
 import promptStrictAnalysisTopic from "@/data/prompts/strict/analysis-topic-only.txt?raw";
 import promptStrictDesignBrief from "@/data/prompts/strict/design-brief.txt?raw";
 import promptStrictGeneralRules from "@/data/prompts/strict/general-rules.txt?raw";
+import promptStrictCodeBased from "@/data/prompts/strict/code-based-product.txt?raw";
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
 
@@ -24,6 +25,8 @@ interface PromptSet {
   analysisTopicOnly: string;
   designBrief: string;
   generalRules: string;
+  /** Strict-mode "code-based product" — programmatic render spec prompt. */
+  codeBasedProduct: string;
 }
 
 interface SettingsState {
@@ -53,12 +56,14 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     analysisTopicOnly: promptFreeAnalysisTopic,
     designBrief: promptFreeDesignBrief,
     generalRules: promptFreeGeneralRules,
+    codeBasedProduct: "",
   },
   strict: {
     analysisWithContent: promptStrictAnalysisWith,
     analysisTopicOnly: promptStrictAnalysisTopic,
     designBrief: promptStrictDesignBrief,
     generalRules: promptStrictGeneralRules,
+    codeBasedProduct: promptStrictCodeBased,
   },
 };
 
@@ -119,7 +124,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "infographic-settings",
-      version: 15,
+      version: 16,
       // Breaking shape change — drop persisted state from older versions.
       migrate: () => undefined as unknown as SettingsState,
       storage: createJSONStorage(() =>
