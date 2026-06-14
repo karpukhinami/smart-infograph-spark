@@ -128,6 +128,17 @@ export const useProjectStore = create<ProjectState>()(
       userWishes: "",
       setUserWishes: (s) => set({ userWishes: s }),
 
+      briefMode: "design",
+      setBriefMode: (m) => set({ briefMode: m }),
+
+      specVersions: [],
+      activeSpecId: null,
+      pushSpec: (spec) => {
+        const ver = v(spec);
+        set((s) => ({ specVersions: [...s.specVersions, ver], activeSpecId: ver.id }));
+      },
+      setActiveSpec: (id) => set({ activeSpecId: id }),
+
       imageVersions: [],
       activeImageId: null,
       pushImage: (dataUrl) => {
