@@ -6,7 +6,10 @@ import type {
   SourceText,
   Versioned,
 } from "@/lib/types";
+import type { ProgrammaticRenderSpec } from "@/lib/render-spec/types";
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from "@/lib/models";
+
+export type BriefMode = "design" | "programmatic";
 
 function v<T>(value: T): Versioned<T> {
   return { id: crypto.randomUUID(), createdAt: Date.now(), value };
@@ -28,6 +31,9 @@ interface ProjectState {
   selectedProfileName: string | null;
   setSelectedProfileName: (n: string) => void;
 
+  briefMode: BriefMode;
+  setBriefMode: (m: BriefMode) => void;
+
   briefVersions: Versioned<DesignBriefResult>[];
   activeBriefId: string | null;
   pushBrief: (b: DesignBriefResult) => void;
@@ -35,6 +41,11 @@ interface ProjectState {
   setActiveBrief: (id: string) => void;
   userWishes: string;
   setUserWishes: (s: string) => void;
+
+  specVersions: Versioned<ProgrammaticRenderSpec>[];
+  activeSpecId: string | null;
+  pushSpec: (s: ProgrammaticRenderSpec) => void;
+  setActiveSpec: (id: string) => void;
 
   imageVersions: Versioned<string>[]; // data URLs
   activeImageId: string | null;
@@ -68,6 +79,9 @@ export const useProjectStore = create<ProjectState>()(
           selectedProfileName: null,
           briefVersions: [],
           activeBriefId: null,
+          briefMode: "design",
+          specVersions: [],
+          activeSpecId: null,
           userWishes: "",
           imageVersions: [],
           activeImageId: null,
