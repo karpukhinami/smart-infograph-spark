@@ -6,7 +6,10 @@ import type {
   SourceText,
   Versioned,
 } from "@/lib/types";
+import type { ProgrammaticRenderSpec } from "@/lib/render-spec/types";
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from "@/lib/models";
+
+export type BriefMode = "design" | "programmatic";
 
 function v<T>(value: T): Versioned<T> {
   return { id: crypto.randomUUID(), createdAt: Date.now(), value };
@@ -28,6 +31,9 @@ interface ProjectState {
   selectedProfileName: string | null;
   setSelectedProfileName: (n: string) => void;
 
+  briefMode: BriefMode;
+  setBriefMode: (m: BriefMode) => void;
+
   briefVersions: Versioned<DesignBriefResult>[];
   activeBriefId: string | null;
   pushBrief: (b: DesignBriefResult) => void;
@@ -35,6 +41,11 @@ interface ProjectState {
   setActiveBrief: (id: string) => void;
   userWishes: string;
   setUserWishes: (s: string) => void;
+
+  specVersions: Versioned<ProgrammaticRenderSpec>[];
+  activeSpecId: string | null;
+  pushSpec: (s: ProgrammaticRenderSpec) => void;
+  setActiveSpec: (id: string) => void;
 
   imageVersions: Versioned<string>[]; // data URLs
   activeImageId: string | null;
@@ -68,6 +79,9 @@ export const useProjectStore = create<ProjectState>()(
           selectedProfileName: null,
           briefVersions: [],
           activeBriefId: null,
+          briefMode: "design",
+          specVersions: [],
+          activeSpecId: null,
           userWishes: "",
           imageVersions: [],
           activeImageId: null,
@@ -114,6 +128,17 @@ export const useProjectStore = create<ProjectState>()(
       userWishes: "",
       setUserWishes: (s) => set({ userWishes: s }),
 
+      briefMode: "design",
+      setBriefMode: (m) => set({ briefMode: m }),
+
+      specVersions: [],
+      activeSpecId: null,
+      pushSpec: (spec) => {
+        const ver = v(spec);
+        set((s) => ({ specVersions: [...s.specVersions, ver], activeSpecId: ver.id }));
+      },
+      setActiveSpec: (id) => set({ activeSpecId: id }),
+
       imageVersions: [],
       activeImageId: null,
       pushImage: (dataUrl) => {
@@ -131,7 +156,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "infographic-project",
-      version: 2,
+      version: 3,
       migrate: () => undefined as unknown as ProjectState,
       storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
     },
@@ -146,4 +171,7 @@ export function useActiveBrief() {
 }
 export function useActiveImage() {
   return useProjectStore((s) => s.imageVersions.find((v) => v.id === s.activeImageId) ?? null);
+}
+export function useActiveSpec() {
+  return useProjectStore((s) => s.specVersions.find((v) => v.id === s.activeSpecId) ?? null);
 }

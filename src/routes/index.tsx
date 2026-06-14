@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Loader2, RefreshCw, RotateCcw, Upload, ImagePlus, Sparkles } from "lucide-react";
-import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage } from "@/store/useProjectStore";
+import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage, useActiveSpec } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
 import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
@@ -28,6 +28,9 @@ import {
 import recognizeImagePrompt from "@/data/prompts/recognize-image.txt?raw";
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
+import { validateRenderSpec } from "@/lib/render-spec/validate";
+import { ProgrammaticRenderer } from "@/components/render-spec/ProgrammaticRenderer";
+import { toPng } from "html-to-image";
 
 
 export const Route = createFileRoute("/")({
@@ -70,10 +73,14 @@ function Workspace() {
   const userWishes = useProjectStore((s) => s.userWishes);
   const setUserWishes = useProjectStore((s) => s.setUserWishes);
   const pushImage = useProjectStore((s) => s.pushImage);
+  const briefMode = useProjectStore((s) => s.briefMode);
+  const setBriefMode = useProjectStore((s) => s.setBriefMode);
+  const pushSpec = useProjectStore((s) => s.pushSpec);
 
   const activeContent = useActiveContent();
   const activeBrief = useActiveBrief();
   const activeImage = useActiveImage();
+  const activeSpec = useActiveSpec();
 
   const mode = useSettingsStore((s) => s.mode);
   const prompts = useCurrentPrompts();
@@ -224,6 +231,41 @@ function Workspace() {
       toast.success("Дизайн-бриф создан");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось создать бриф");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function onCreateProgrammaticSpec() {
+    if (!activeContent) return;
+    if (!activeStyle) { toast.error("Сначала выберите стиль"); return; }
+    try {
+      setLoading("brief");
+      const filled = buildDesignBriefPrompt({
+        template: prompts.codeBasedProduct,
+        contentSummary: activeContent.value.content,
+        style: activeStyle,
+        profile: activeProfile,
+        userWishes,
+        generalRules: prompts.generalRules,
+      });
+      const raw = await callTextLLMForJson({
+        model: models.brief,
+        prompt: filled,
+        label: "render spec",
+        schemaHint: 'Верни JSON-объект формы { "ProgrammaticRenderSpec": { "format": {...}, "theme": {...}, "header": {...}, "rows": [...] } }.',
+        parse: (value) => value as unknown,
+      });
+      const { spec, warnings } = validateRenderSpec(raw, activeProfile ?? null);
+      pushSpec(spec);
+      setPaneMode("wireframe");
+      if (warnings.length) {
+        toast.message("Технический макет создан с предупреждениями", { description: warnings.slice(0, 3).join("\n") });
+      } else {
+        toast.success("Технический макет создан");
+      }
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось создать технический макет");
     } finally {
       setLoading(null);
     }
@@ -541,7 +583,17 @@ ${activeContent.value.content}`;
         {/* STAGE 2 */}
         {activeContent && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <h2 className="text-sm font-semibold">2 · Стиль и дизайн</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">2 · Стиль и дизайн</h2>
+              {mode === "strict" && (
+                <Tabs value={briefMode} onValueChange={(v) => setBriefMode(v as "design" | "programmatic")}>
+                  <TabsList className="h-8">
+                    <TabsTrigger value="design" className="text-xs">Дизайн-бриф</TabsTrigger>
+                    <TabsTrigger value="programmatic" className="text-xs">Технический макет</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">Стиль инфографики</Label>
@@ -568,23 +620,42 @@ ${activeContent.value.content}`;
                 </Select>
               </div>
             </div>
-            <PromptDisclosure
-              label="Показать промпт дизайн-брифа"
-              value={prompts.designBrief}
-              onChange={(v) => setPrompt("designBrief", v)}
-              rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
-            />
-            <div>
-              <Button onClick={onCreateBrief} disabled={loading !== null}>
-                {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Создать дизайн-бриф
-              </Button>
-            </div>
+            {mode === "strict" && briefMode === "programmatic" ? (
+              <>
+                <PromptDisclosure
+                  label="Показать промпт технического макета"
+                  value={prompts.codeBasedProduct}
+                  onChange={(v) => setPrompt("codeBasedProduct", v)}
+                  rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
+                />
+                <div>
+                  <Button onClick={onCreateProgrammaticSpec} disabled={loading !== null}>
+                    {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                    Создать технический макет
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <PromptDisclosure
+                  label="Показать промпт дизайн-брифа"
+                  value={prompts.designBrief}
+                  onChange={(v) => setPrompt("designBrief", v)}
+                  rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
+                />
+                <div>
+                  <Button onClick={onCreateBrief} disabled={loading !== null}>
+                    {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                    Создать дизайн-бриф
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
-        {/* STAGE 3 */}
-        {activeBrief && (
+        {/* STAGE 3 — only in design-brief mode */}
+        {activeBrief && !(mode === "strict" && briefMode === "programmatic") && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <h2 className="text-sm font-semibold">3 · Генерация изображения</h2>
             <div>
@@ -618,7 +689,7 @@ ${activeContent.value.content}`;
           <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as PaneMode)}>
             <TabsList>
               <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
-              <TabsTrigger value="wireframe" disabled={!activeBrief}>Каркас</TabsTrigger>
+              <TabsTrigger value="wireframe" disabled={!activeBrief && !activeSpec}>Каркас</TabsTrigger>
               <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
 
@@ -662,7 +733,13 @@ ${activeContent.value.content}`;
             </TabsContent>
 
             <TabsContent value="wireframe" className="p-2 space-y-2">
-              {activeBrief ? (
+              {mode === "strict" && briefMode === "programmatic" && activeSpec ? (
+                <ProgrammaticPane
+                  spec={activeSpec.value}
+                  loading={loading !== null}
+                  onRegenerate={onCreateProgrammaticSpec}
+                />
+              ) : activeBrief ? (
                 <>
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="outline" onClick={() => setRefineStage("brief")} disabled={loading !== null}>
@@ -683,7 +760,7 @@ ${activeContent.value.content}`;
                   )}
                 </>
               ) : (
-                <EmptyState text="Создайте дизайн-бриф, чтобы увидеть каркас." />
+                <EmptyState text="Создайте дизайн-бриф или технический макет, чтобы увидеть каркас." />
               )}
             </TabsContent>
 
@@ -741,5 +818,53 @@ ${activeContent.value.content}`;
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="p-10 text-center text-sm text-muted-foreground">{text}</div>
+  );
+}
+
+function ProgrammaticPane({
+  spec,
+  loading,
+  onRegenerate,
+}: {
+  spec: import("@/lib/render-spec/types").ProgrammaticRenderSpec;
+  loading: boolean;
+  onRegenerate: () => void;
+}) {
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
+  async function exportPng() {
+    const node = canvasWrapRef.current?.querySelector("[data-spec-canvas]") as HTMLElement | null;
+    if (!node) return;
+    try {
+      const dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `infographic-${Date.now()}.png`;
+      a.click();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось экспортировать PNG");
+    }
+  }
+  return (
+    <>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={exportPng} disabled={loading}>
+          Экспорт PNG
+        </Button>
+        <Button size="sm" variant="outline" onClick={onRegenerate} disabled={loading}>
+          <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
+        </Button>
+      </div>
+      <div ref={canvasWrapRef} className="rounded-md border border-border overflow-hidden">
+        <ProgrammaticRenderer spec={spec} />
+      </div>
+      <details className="rounded-md border border-border bg-background/60 p-2">
+        <summary className="cursor-pointer text-xs text-muted-foreground">
+          Показать JSON-спецификацию
+        </summary>
+        <pre className="mt-2 overflow-auto text-xs max-h-96">
+          {JSON.stringify(spec, null, 2)}
+        </pre>
+      </details>
+    </>
   );
 }
