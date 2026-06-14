@@ -48,7 +48,7 @@ export function validateRenderSpec(
   const envelope = raw as Partial<RenderSpecEnvelope> & AnyRecord;
   const spec =
     (envelope.ProgrammaticRenderSpec as ProgrammaticRenderSpec | undefined) ??
-    (raw as ProgrammaticRenderSpec);
+    (raw as unknown as ProgrammaticRenderSpec);
   if (!isObj(spec)) err("отсутствует ProgrammaticRenderSpec");
 
   // format
