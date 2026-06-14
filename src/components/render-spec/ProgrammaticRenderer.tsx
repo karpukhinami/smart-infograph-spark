@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 import type { ProgrammaticRenderSpec, RenderRow } from "@/lib/render-spec/types";
 import {
   BORDER_WIDTH,
@@ -9,7 +9,7 @@ import {
   marginPx,
   radiusPx,
 } from "@/lib/render-spec/tokens";
-import { computeCardWidths, computeRowGeometries } from "@/lib/render-spec/layout";
+import { computeCardWidths } from "@/lib/render-spec/layout";
 import { Card } from "./Card";
 
 interface Props {
@@ -25,14 +25,19 @@ export function ProgrammaticRenderer({ spec, containerWidth }: Props) {
 
   // Reserve space for the header at the top before computing row geometries.
   const headerH = headerHeightPx(spec, canvas.base);
-  const rowsAreaHeight = canvas.height - headerH - (headerH > 0 ? g : 0);
-  const rowsAreaY = m + headerH + (headerH > 0 ? g : 0);
-  const rowGeoms = computeRowGeometries(
-    spec.rows,
-    rowsAreaHeight + 2 * m, // computeRowGeometries already subtracts 2*m
-    m,
-    g,
-  ).map((r) => ({ ...r, y: r.y + headerH + (headerH > 0 ? g : 0) }));
+  const headerGap = headerH > 0 ? g : 0;
+  const rowsAreaY = m + headerH + headerGap;
+  const rowCount = spec.rows.length;
+  const availableRowsHeight =
+    canvas.height - m - rowsAreaY - g * Math.max(0, rowCount - 1);
+  const sumW = spec.rows.reduce((a, r) => a + r.heightWeight, 0) || 1;
+  let yCursor = rowsAreaY;
+  const rowGeoms = spec.rows.map((r) => {
+    const h = (availableRowsHeight * r.heightWeight) / sumW;
+    const geom = { y: yCursor, height: h };
+    yCursor += h + g;
+    return geom;
+  });
 
   // Outer wrapper measures CSS width and applies transform: scale().
   const wrapRef = useRef<HTMLDivElement>(null);
