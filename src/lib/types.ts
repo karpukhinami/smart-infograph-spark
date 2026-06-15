@@ -86,16 +86,35 @@ export interface WireframeDescription {
   connections?: Array<{ from: string; to: string; kind: string }>;
 }
 
+/** Section ids in the strict-mode analysis JSON. */
+export type AnalysisSectionId = "prerequisites" | "main" | "additions";
+export type AnalysisAttention = "main" | "normal" | "accent";
+
+/** Nested item inside a group entity (factGroup, algorithmGroup). */
+export interface AnalysisGroupItem {
+  title?: string | null;
+  content?: string | string[] | null;
+  formula?: string | string[] | null;
+  cardAddendum?: string | string[] | null;
+  icon?: string | null;
+  attention?: "normal" | "accent";
+}
+
 /** Structured analysis JSON produced by the strict-mode analysis prompt. */
 export interface AnalysisEntity {
-  sectionId: number;
+  sectionId: AnalysisSectionId;
   entityType: string;
+  attention?: AnalysisAttention;
   title: string | null;
-  content: string | string[];
+  content: string | string[] | null;
   formula?: string | string[] | null;
-  example?: string | string[] | null;
+  cardAddendum?: string | string[] | null;
+  items?: AnalysisGroupItem[] | null;
   icon?: string | null;
   visual?: { type: string; description: string } | null;
+  /** Legacy field, kept for backward compatibility. */
+  example?: string | string[] | null;
+  /** Legacy field, kept for backward compatibility. */
   priority?: "high" | "medium" | "low";
 }
 export interface AnalysisJson {
