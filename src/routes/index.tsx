@@ -173,7 +173,8 @@ function Workspace() {
           model: models.analysis,
           prompt: filled,
           label: "analysis",
-          schemaHint: 'Верни JSON-объект анализа со структурой { sourceMode, topic, subject, grade, summary, entities, warnings }.',
+          schemaHint:
+            'Верни JSON-объект анализа со структурой { sourceMode, topic, subject, grade, summary, entities: [{ sectionId: "prerequisites"|"main"|"additions", entityType, attention: "main"|"normal"|"accent", title, content, formula, cardAddendum, items, icon, visual }], warnings }. Все обратные слеши внутри строк должны быть удвоены (\\\\frac, \\\\sqrt и т.п.).',
           parse: validateAnalysisJson,
         });
         const fallbackStyle = enabledStyles[0]?.id ?? "";
