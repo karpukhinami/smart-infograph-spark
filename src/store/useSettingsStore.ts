@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 
 import defaultStylesFree from "@/data/default-styles.free.json";
 import defaultStylesStrict from "@/data/default-styles.strict.json";
-import defaultProfile from "@/data/default-design-profile.json";
+import defaultProfiles from "@/data/default-design-profile.json";
 
 import promptFreeAnalysisWith from "@/data/prompts/free/analysis-with-content.txt?raw";
 import promptFreeAnalysisTopic from "@/data/prompts/free/analysis-topic-only.txt?raw";
@@ -111,7 +111,7 @@ export const useSettingsStore = create<SettingsState>()(
           stylesByMode: { ...s.stylesByMode, [s.mode]: initialStyles[s.mode] },
         })),
 
-      profiles: [defaultProfile as DesignProfile],
+      profiles: defaultProfiles as DesignProfile[],
       upsertProfile: (p) =>
         set((s) => ({
           profiles: s.profiles.some((x) => x.profileName === p.profileName)
@@ -120,11 +120,12 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       deleteProfile: (name) =>
         set((s) => ({ profiles: s.profiles.filter((p) => p.profileName !== name) })),
-      resetProfiles: () => set({ profiles: [defaultProfile as DesignProfile] }),
+      resetProfiles: () => set({ profiles: defaultProfiles as DesignProfile[] }),
     }),
     {
       name: "infographic-settings",
-      version: 16,
+      version: 17,
+
       // Breaking shape change — drop persisted state from older versions.
       migrate: () => undefined as unknown as SettingsState,
       storage: createJSONStorage(() =>
