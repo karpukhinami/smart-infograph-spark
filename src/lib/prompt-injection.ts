@@ -17,11 +17,19 @@ export function styleSpecificRulesBlock(style: InfographicStyle | null | undefin
   return `При оформлении отдельных элементов руководствуйся следующими принципами:\n${text}`;
 }
 
-function listColors(label: string, colors: string[]): string {
-  const cleaned = colors.filter(Boolean);
-  if (!cleaned.length) return "";
-  return `${label}: ${cleaned.join(", ")}`;
-}
+const COLOR_ROLE_LABELS: Array<{ key: keyof import("./types").DesignProfileColors; label: string }> = [
+  { key: "backgroundColor", label: "Задний фон (backgroundColor)" },
+  { key: "surfaceColor", label: "Светлый фон плашки внутри карточки (surfaceColor)" },
+  { key: "primaryColor", label: "Акцентный цвет палитры (primaryColor)" },
+  { key: "detailSoftColor", label: "Более светлая пастель (detailSoftColor)" },
+  { key: "detailDeepColor", label: "Более тёмная пастель (detailDeepColor)" },
+  { key: "contrastSoftColor", label: "Контрастная пастель (contrastSoftColor)" },
+  { key: "inkColor", label: "Цвет тёмного текста и технических линий (inkColor)" },
+  { key: "headerColor", label: "Цвет шапки и фона заголовков (headerColor)" },
+  { key: "lightTextColor", label: "Цвет светлого текста (lightTextColor)" },
+  { key: "spotAccentColor", label: "Цвет акцентных деталей (spotAccentColor)" },
+  { key: "mutedheaderTextColor", label: "Вторичный светлый текст в шапке (mutedheaderTextColor)" },
+];
 
 export function designProfileProse(profile: DesignProfile | null | undefined): string {
   if (!profile) return "(дизайн-профиль не задан)";
@@ -31,15 +39,14 @@ export function designProfileProse(profile: DesignProfile | null | undefined): s
 
   const lines: string[] = [];
   lines.push(
-    "Используй только цвета из предложенных вариантов, опираясь на правила стиля и на содержание инфографики.",
+    "Используй только цвета из палитры дизайн-профиля, опираясь на роли каждого цвета.",
   );
-  if (c.pageBackground) lines.push(`Фон страницы (page background): ${c.pageBackground}.`);
-  if (c.brightAccents?.length)
-    lines.push(`Яркие акценты (для ключевых слов, иконок, выделений): ${c.brightAccents.join(", ")}.`);
-  if (c.pastelFills?.length)
-    lines.push(`Пастельные заливки (только для фонов карточек, никогда для текста): ${c.pastelFills.join(", ")}.`);
-  if (c.structural?.length)
-    lines.push(`Технические/структурные цвета (графит, тёмные плашки, фон, серый текст): ${c.structural.join(", ")}.`);
+  lines.push(`Профиль: ${profile.profileName}.`);
+  lines.push("Палитра по ролям:");
+  for (const { key, label } of COLOR_ROLE_LABELS) {
+    const hex = c?.[key];
+    if (hex) lines.push(`- ${label}: ${hex}.`);
+  }
 
   if (typoStyle) {
     lines.push("");
@@ -57,6 +64,7 @@ export function designProfileProse(profile: DesignProfile | null | undefined): s
 
   return lines.join("\n");
 }
+
 
 export function buildDesignBriefPrompt(opts: {
   template: string;

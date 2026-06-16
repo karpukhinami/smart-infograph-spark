@@ -11,20 +11,30 @@ export interface InfographicStyle {
   specificRules: string;
 }
 
+export interface DesignProfileColors {
+  backgroundColor: string;
+  surfaceColor: string;
+  primaryColor: string;
+  detailSoftColor: string;
+  detailDeepColor: string;
+  contrastSoftColor: string;
+  inkColor: string;
+  headerColor: string;
+  lightTextColor: string;
+  spotAccentColor: string;
+  mutedheaderTextColor: string;
+}
+
 export interface DesignProfile {
   profileName: string;
-  colors: {
-    pageBackground: string;
-    brightAccents: string[];
-    pastelFills: string[];
-    structural: string[];
-  };
+  colors: DesignProfileColors;
   typography: {
     styleId: string;
     specificityId: string;
   };
   notesForAI: string;
 }
+
 
 export type InputMode = "text" | "file" | "topic";
 

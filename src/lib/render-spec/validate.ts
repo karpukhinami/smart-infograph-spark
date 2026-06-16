@@ -15,12 +15,12 @@ function collectPaletteHex(profile: DesignProfile | null | undefined): Set<strin
       out.add(hex.toLowerCase().replace(/^#/, ""));
     }
   };
-  push(profile.colors.pageBackground);
-  profile.colors.brightAccents?.forEach(push);
-  profile.colors.pastelFills?.forEach(push);
-  profile.colors.structural?.forEach(push);
+  Object.values(profile.colors ?? {}).forEach((v) => {
+    if (typeof v === "string") push(v);
+  });
   return out;
 }
+
 
 function normHex(hex: string): string {
   return hex.toLowerCase().replace(/^#/, "");
