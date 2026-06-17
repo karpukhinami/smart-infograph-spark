@@ -403,7 +403,9 @@ function SimpleHome() {
 
               <Button onClick={onGenerateImage} disabled={loading !== null} className="w-full">
                 {loading === "image" ? <Loader2 className="size-4 mr-2 animate-spin" /> : simpleCurrent ? <RefreshCw className="size-4 mr-2" /> : <Sparkles className="size-4 mr-2" />}
-                {simpleCurrent ? "Перегенерировать" : "Сгенерировать изображение"}
+                {loading === "image"
+                  ? imageStage === "brief" ? "Шаг 1/2: дизайн-бриф…" : "Шаг 2/2: рисуем изображение…"
+                  : simpleCurrent ? "Перегенерировать" : "Сгенерировать изображение"}
               </Button>
 
               {simpleVersions.length > 0 && (
