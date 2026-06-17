@@ -463,7 +463,9 @@ sourceMode для этого промпта всегда "topic".
 "topic": "string ",
 "subject": "string | null",
 "grade": "string | null",
+"recommendedDesignProfile": "Оранжевый | Индиго",
 "summary": "string | null",
+
 "entities": [
 {
 "sectionId": "prerequisites",
