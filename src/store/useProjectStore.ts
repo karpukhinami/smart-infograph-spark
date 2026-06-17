@@ -101,6 +101,9 @@ export const useProjectStore = create<ProjectState>()(
           userWishes: "",
           imageVersions: [],
           activeImageId: null,
+          simpleCurrentImage: null,
+          simpleImageVersions: [],
+
         }),
 
       attachedImages: [],
