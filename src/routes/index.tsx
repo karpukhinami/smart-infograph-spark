@@ -1,41 +1,37 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, RefreshCw, RotateCcw, Upload, ImagePlus, Sparkles } from "lucide-react";
-import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage, useActiveSpec } from "@/store/useProjectStore";
-import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
-import { ModelPicker } from "@/components/workspace/ModelPicker";
-import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
-import { Markdown } from "@/components/workspace/Markdown";
-import { WireframeView } from "@/components/workspace/WireframeView";
-import { RefineDialog } from "@/components/workspace/RefineDialog";
-import { callTextLLM, callImageLLM } from "@/lib/llm-client";
-import { HelpFiles } from "@/components/workspace/HelpFiles";
-import { callTextLLMForJson } from "@/lib/llm-json";
-import { buildDesignBriefPrompt, designProfileColorsAndRules } from "@/lib/prompt-injection";
-import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  buildRefineContentPrompt,
-  buildRefineBriefPrompt,
-  buildRefineImageDecisionPrompt,
-} from "@/lib/refine-prompts";
-// recognize-image prompt no longer used: images are passed multimodally to the analysis model.
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, RotateCcw, RefreshCw, Upload, ImagePlus, Sparkles, ImageIcon } from "lucide-react";
+import { useProjectStore, useActiveContent } from "@/store/useProjectStore";
+import { useSettingsStore, useCurrentStyles } from "@/store/useSettingsStore";
+import { callTextLLM, callImageLLM } from "@/lib/llm-client";
+import { callTextLLMForJson } from "@/lib/llm-json";
+import { validateAnalysisJson } from "@/lib/analysis-render";
+import { renderSimpleSummary } from "@/lib/simple-content-render";
+import { buildDesignBriefPrompt, designProfileColorsAndRules } from "@/lib/prompt-injection";
+import simpleBriefPromptRaw from "@/data/prompts/simple/design-brief-short.txt?raw";
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
-import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
-import { validateRenderSpec } from "@/lib/render-spec/validate";
-import { ProgrammaticRenderer } from "@/components/render-spec/ProgrammaticRenderer";
-import { toPng } from "html-to-image";
-
+import type { ContentSummary, DesignBriefResult, InfographicStyle } from "@/lib/types";
+import { Markdown } from "@/components/workspace/Markdown";
 
 export const Route = createFileRoute("/")({
-  head: () => ({ meta: [{ title: "Workspace — AI Infographic Generator" }] }),
-  component: Workspace,
+  head: () => ({ meta: [{ title: "AI Infographic Generator" }] }),
+  component: SimpleHome,
 });
 
 const SUBJECTS = [
@@ -56,48 +52,38 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-function Workspace() {
+function SimpleHome() {
   const source = useProjectStore((s) => s.source);
   const setSource = useProjectStore((s) => s.setSource);
   const resetProject = useProjectStore((s) => s.resetProject);
   const models = useProjectStore((s) => s.models);
-  const setModel = useProjectStore((s) => s.setModel);
   const pushContent = useProjectStore((s) => s.pushContent);
-  const updateActiveContent = useProjectStore((s) => s.updateActiveContent);
   const selectedStyleId = useProjectStore((s) => s.selectedStyleId);
   const setSelectedStyleId = useProjectStore((s) => s.setSelectedStyleId);
   const selectedProfileName = useProjectStore((s) => s.selectedProfileName);
   const setSelectedProfileName = useProjectStore((s) => s.setSelectedProfileName);
-  const pushBrief = useProjectStore((s) => s.pushBrief);
-  const updateActiveBriefPrompt = useProjectStore((s) => s.updateActiveBriefPrompt);
   const userWishes = useProjectStore((s) => s.userWishes);
   const setUserWishes = useProjectStore((s) => s.setUserWishes);
-  const pushImage = useProjectStore((s) => s.pushImage);
-  const briefMode = useProjectStore((s) => s.briefMode);
-  const setBriefMode = useProjectStore((s) => s.setBriefMode);
-  const pushSpec = useProjectStore((s) => s.pushSpec);
   const attachedImages = useProjectStore((s) => s.attachedImages);
   const addAttachedImages = useProjectStore((s) => s.addAttachedImages);
   const removeAttachedImage = useProjectStore((s) => s.removeAttachedImage);
-
+  const simpleCurrent = useProjectStore((s) => s.simpleCurrentImage);
+  const simpleVersions = useProjectStore((s) => s.simpleImageVersions);
+  const setSimpleCurrent = useProjectStore((s) => s.setSimpleCurrentImage);
+  const archiveSimple = useProjectStore((s) => s.archiveSimpleCurrentImage);
+  const clearSimpleImages = useProjectStore((s) => s.clearSimpleImages);
 
   const activeContent = useActiveContent();
-  const activeBrief = useActiveBrief();
-  const activeImage = useActiveImage();
-  const activeSpec = useActiveSpec();
-
   const mode = useSettingsStore((s) => s.mode);
-  const prompts = useCurrentPrompts();
-  const setPrompt = useSettingsStore((s) => s.setPrompt);
+  const prompts = useSettingsStore((s) => s.promptsByMode[s.mode]);
   const styles = useCurrentStyles();
   const profiles = useSettingsStore((s) => s.profiles);
 
-  const [paneMode, setPaneMode] = useState<PaneMode>("content");
-  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine">(null);
-  const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
+  const [loading, setLoading] = useState<null | "analyze" | "image">(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-
 
   const enabledStyles = useMemo<InfographicStyle[]>(() => styles.filter((s) => s.enabled), [styles]);
   const activeStyle = useMemo(
@@ -112,15 +98,11 @@ function Workspace() {
   const hasSource = Boolean(source.text.trim());
   const useTopicOnlyPrompt = !hasSource;
 
-  // Legacy OCR-as-text fallback removed: images are now passed multimodally to the analysis model.
-
-
   async function attachImageFiles(files: File[]) {
     if (!files.length) return;
     try {
       const dataUrls = await Promise.all(files.map(fileToDataUrl));
       addAttachedImages(dataUrls);
-      toast.success(`Прикреплено картинок: ${files.length}`);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось прикрепить картинку");
     }
@@ -151,10 +133,12 @@ function Workspace() {
     if (images.length) await attachImageFiles(images);
   }
 
-
   async function onAnalyze() {
     try {
       setLoading("analyze");
+      // Перегенерация контента обнуляет все следующие шаги: текущее изображение архивируется,
+      // выбранный профиль/стиль сбрасываются, чтобы вновь подтянулись рекомендации модели.
+      archiveSimple();
       const stylesList = enabledStyles.map((s) => `- ${s.id}: ${s.name} — ${s.shortDescription}`).join("\n");
       const template = useTopicOnlyPrompt ? prompts.analysisTopicOnly : prompts.analysisWithContent;
       const filled = template
@@ -165,27 +149,24 @@ function Workspace() {
         .replaceAll("{{SUBJECT}}", source.subject || "")
         .replaceAll("{{GRADE}}", source.grade || "");
 
-      let summary: ContentSummary;
       const imgs = attachedImages.length ? attachedImages : undefined;
+      let summary: ContentSummary;
       if (mode === "strict") {
         const analysis = await callTextLLMForJson({
           model: models.analysis,
           prompt: filled,
           label: "analysis",
-          schemaHint:
-            'Верни JSON-объект анализа со структурой { sourceMode, topic, subject, grade, recommendedDesignProfile, summary, entities: [{ sectionId: "prerequisites"|"main"|"additions", entityType, attention: "main"|"normal"|"accent", title, content, formula, cardAddendum, items, icon, visual }], warnings }. Все обратные слеши внутри строк должны быть удвоены (\\\\frac, \\\\sqrt и т.п.).',
           parse: validateAnalysisJson,
           images: imgs,
         });
         const fallbackStyle = enabledStyles[0]?.id ?? "";
         summary = {
-          content: renderAnalysisJson(analysis),
+          content: "",
           recommendedStyle: selectedStyleId ?? fallbackStyle,
           recommendedDesignProfile: analysis.recommendedDesignProfile ?? null,
           analysis,
         };
       } else {
-        // Free mode: model returns plain Markdown, not JSON.
         const raw = await callTextLLM({ model: models.analysis, prompt: filled, images: imgs });
         const content = (raw ?? "").trim();
         if (!content) throw new Error("Модель вернула пустой ответ");
@@ -198,10 +179,8 @@ function Workspace() {
           recommendedDesignProfile: rdpMatch?.[1] ?? null,
         };
       }
-
       pushContent(summary);
-      setPaneMode("content");
-      toast.success("Контент проанализирован");
+      toast.success("Контент готов");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось выполнить анализ");
     } finally {
@@ -209,93 +188,45 @@ function Workspace() {
     }
   }
 
-  async function onCreateBrief() {
-    if (!activeContent) return;
-    if (!activeStyle) { toast.error("Сначала выберите стиль"); return; }
-    try {
-      setLoading("brief");
-      const filled = buildDesignBriefPrompt({
-        template: prompts.designBrief,
-        contentSummary: activeContent.value.content,
-        style: activeStyle,
-        profile: activeProfile,
-        userWishes,
-        generalRules: prompts.generalRules,
-      });
-      const parsed = await callTextLLMForJson({
-        model: models.brief,
-        prompt: filled,
-        label: "design brief",
-        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
-        parse: (value) => value as DesignBriefResult,
-      });
-      if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
-        throw new Error("В ответе модели не хватает полей");
-      }
-      if (mode === "strict") {
-        const layer1 = designProfileColorsAndRules(activeProfile);
-        parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
-      }
-      pushBrief(parsed);
-      setPaneMode("wireframe");
-      toast.success("Дизайн-бриф создан");
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Не удалось создать бриф");
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  async function onCreateProgrammaticSpec() {
-    if (!activeContent) return;
-    if (!activeStyle) { toast.error("Сначала выберите стиль"); return; }
-    try {
-      setLoading("brief");
-      const filled = buildDesignBriefPrompt({
-        template: prompts.codeBasedProduct,
-        contentSummary: activeContent.value.content,
-        style: activeStyle,
-        profile: activeProfile,
-        userWishes,
-        generalRules: prompts.generalRules,
-      });
-      const raw = await callTextLLMForJson({
-        model: models.brief,
-        prompt: filled,
-        label: "render spec",
-        schemaHint: 'Верни JSON-объект формы { "ProgrammaticRenderSpec": { "format": {...}, "theme": {...}, "header": {...}, "rows": [...] } }.',
-        parse: (value) => value as unknown,
-      });
-      const { spec, warnings } = validateRenderSpec(raw, activeProfile ?? null);
-      pushSpec(spec);
-      setPaneMode("wireframe");
-      if (warnings.length) {
-        toast.message("Технический макет создан с предупреждениями", { description: warnings.slice(0, 3).join("\n") });
-      } else {
-        toast.success("Технический макет создан");
-      }
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Не удалось создать технический макет");
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  function buildFinalImagePrompt(basePrompt: string): string {
-    const wishes = userWishes.trim();
-    const head = wishes ? `${wishes}\n\n${basePrompt}` : basePrompt;
-    return `${head}\n\n${executionRulesText.trim()}`;
-  }
-
   async function onGenerateImage() {
-    if (!activeBrief) return;
+    if (!activeContent) return;
+    if (!activeStyle) { toast.error("Выберите стиль"); return; }
     try {
       setLoading("image");
-      const prompt = buildFinalImagePrompt(activeBrief.value.PromptForImageGeneration);
-      const dataUrl = await callImageLLM({ model: models.image, prompt });
-      pushImage(dataUrl);
-      setPaneMode("image");
-      toast.success("Изображение сгенерировано");
+      archiveSimple();
+
+      // Шаг A: укороченный бриф → PromptForImageGeneration
+      const summaryText =
+        activeContent.value.analysis
+          ? JSON.stringify(activeContent.value.analysis, null, 2)
+          : activeContent.value.content;
+
+      const filled = buildDesignBriefPrompt({
+        template: simpleBriefPromptRaw,
+        contentSummary: summaryText,
+        style: activeStyle,
+        profile: activeProfile,
+        userWishes,
+        generalRules: prompts.generalRules,
+      });
+      const briefRes = await callTextLLMForJson({
+        model: models.brief,
+        prompt: filled,
+        label: "simple design brief",
+        parse: (v) => v as DesignBriefResult,
+      });
+      if (!briefRes?.PromptForImageGeneration) throw new Error("Модель не вернула PromptForImageGeneration");
+
+      // Шаг B: склейка с автоматическими кусками шага 3 рабочего места
+      const layer1 = mode === "strict" ? designProfileColorsAndRules(activeProfile) : "";
+      const finalPrompt = [layer1, briefRes.PromptForImageGeneration, executionRulesText]
+        .filter((s) => s && s.trim().length > 0)
+        .join("\n\n");
+
+      // Шаг C: генерация картинки
+      const dataUrl = await callImageLLM({ model: models.image, prompt: finalPrompt });
+      setSimpleCurrent({ dataUrl, prompt: finalPrompt });
+      toast.success("Готово");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось сгенерировать изображение");
     } finally {
@@ -303,598 +234,298 @@ function Workspace() {
     }
   }
 
-  async function onRefineContent(userText: string) {
-    if (!activeContent) return;
-    try {
-      setLoading("refine");
-      let summary: ContentSummary;
-      if (mode === "strict") {
-        const analysis = activeContent.value.analysis ?? null;
-        const prompt = buildRefineContentPrompt({
-          userInstructions: userText,
-          currentAnalysisJson: analysis ? JSON.stringify(analysis, null, 2) : "",
-          currentContentText: activeContent.value.content,
-          strict: true,
-        });
-        const a = await callTextLLMForJson({
-          model: models.analysis,
-          prompt,
-          label: "refine analysis",
-          schemaHint: 'Верни JSON-объект анализа со структурой { sourceMode, topic, subject, grade, summary, entities, warnings }.',
-          parse: validateAnalysisJson,
-        });
-        summary = {
-          content: renderAnalysisJson(a),
-          recommendedStyle: activeContent.value.recommendedStyle,
-          analysis: a,
-        };
-      } else {
-        // Free mode: refine plain Markdown content.
-        const refinePrompt = `Ты — методист-редактор учебных инфографик. Внеси точечные изменения в существующий markdown-конспект по пожеланиям пользователя. Сохрани формат, структуру, заголовки и формулы в LaTeX ($...$ или $$...$$). Не возвращай JSON, не добавляй комментариев, верни только обновлённый markdown.
-
-ПОЖЕЛАНИЯ ПОЛЬЗОВАТЕЛЯ:
-${userText || "(не указано)"}
-
-ТЕКУЩИЙ MARKDOWN-КОНСПЕКТ:
-${activeContent.value.content}`;
-        const raw = await callTextLLM({ model: models.analysis, prompt: refinePrompt });
-        const content = (raw ?? "").trim();
-        if (!content) throw new Error("Модель вернула пустой ответ");
-        summary = { content, recommendedStyle: activeContent.value.recommendedStyle };
-      }
-      pushContent(summary);
-      setPaneMode("content");
-      setRefineStage(null);
-      toast.success("Контент обновлён");
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать контент");
-    } finally {
-      setLoading(null);
-    }
+  function onConfirmReset() {
+    clearSimpleImages();
+    resetProject();
+    setResetOpen(false);
+    setPreviewVersion(null);
+    toast.success("Проект сброшен");
   }
 
-  async function onRefineBrief(userText: string) {
-    if (!activeBrief) return;
-    try {
-      setLoading("refine");
-      const prompt = buildRefineBriefPrompt({
-        userInstructions: userText,
-        currentBriefJson: JSON.stringify(activeBrief.value, null, 2),
-      });
-      const parsed = await callTextLLMForJson({
-        model: models.brief,
-        prompt,
-        label: "refine brief",
-        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
-        parse: (value) => value as DesignBriefResult,
-      });
-      if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
-        throw new Error("В ответе модели не хватает полей");
-      }
-      pushBrief(parsed);
-      setPaneMode("wireframe");
-      setRefineStage(null);
-      toast.success("Расположение блоков обновлено");
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать лэйаут");
-    } finally {
-      setLoading(null);
-    }
-  }
+  const previewedVersion = previewVersion
+    ? simpleVersions.find((v) => v.id === previewVersion) ?? null
+    : null;
 
-  async function onRefineImage(userText: string) {
-    if (!activeBrief) return;
-    try {
-      setLoading("refine");
-      const decisionPrompt = buildRefineImageDecisionPrompt({
-        userInstructions: userText,
-        currentImagePrompt: activeBrief.value.PromptForImageGeneration,
-      });
-      const decision = await callTextLLMForJson({
-        model: models.brief,
-        prompt: decisionPrompt,
-        label: "refine image decision",
-        schemaHint: 'Верни JSON-объект формы { "action": "patch" | "rebuild", "newPrompt"?: string, "reason"?: string }.',
-        parse: (value) => value as { action: "patch" | "rebuild"; newPrompt?: string; reason?: string },
-      });
-
-      if (decision.action === "patch" && decision.newPrompt) {
-        // Save patched prompt as a new brief version with the same wireframe.
-        const next: DesignBriefResult = {
-          PromptForImageGeneration: decision.newPrompt,
-          WireframeDescription: activeBrief.value.WireframeDescription,
-          WireframeSketch: activeBrief.value.WireframeSketch,
-        };
-        pushBrief(next);
-        // Now generate the image with the patched prompt.
-        const dataUrl = await callImageLLM({ model: models.image, prompt: buildFinalImagePrompt(decision.newPrompt) });
-        pushImage(dataUrl);
-        setPaneMode("image");
-        setRefineStage(null);
-        toast.success("Изображение перегенерировано по вашему описанию");
-        return;
-      }
-
-      // Need to rebuild the brief — re-run design brief generation with user wishes prioritised.
-      if (!activeContent || !activeStyle) {
-        toast.error(decision.reason || "Нужно вернуться к шагу 2, но не хватает контента/стиля");
-        return;
-      }
-      toast.message("Изменение требует перестройки брифа", { description: decision.reason ?? "" });
-      const combinedWishes = userWishes.trim()
-        ? `${userText}\n\n(предыдущие пожелания: ${userWishes.trim()})`
-        : userText;
-      const filled = buildDesignBriefPrompt({
-        template: prompts.designBrief,
-        contentSummary: activeContent.value.content,
-        style: activeStyle,
-        profile: activeProfile,
-        userWishes: combinedWishes,
-        generalRules: prompts.generalRules,
-      });
-      const parsed = await callTextLLMForJson({
-        model: models.brief,
-        prompt: filled,
-        label: "design brief rebuild",
-        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
-        parse: (value) => value as DesignBriefResult,
-      });
-      if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
-        throw new Error("В ответе модели не хватает полей");
-      }
-      if (mode === "strict") {
-        const layer1 = designProfileColorsAndRules(activeProfile);
-        parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
-      }
-      pushBrief(parsed);
-      const dataUrl = await callImageLLM({ model: models.image, prompt: buildFinalImagePrompt(parsed.PromptForImageGeneration) });
-      pushImage(dataUrl);
-      setPaneMode("image");
-      setRefineStage(null);
-      toast.success("Бриф и изображение перегенерированы");
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать изображение");
-    } finally {
-      setLoading(null);
-    }
-  }
-
-
+  const summarySections = useMemo(() => {
+    const a = activeContent?.value.analysis;
+    return a ? renderSimpleSummary(a) : null;
+  }, [activeContent]);
 
   return (
-    <div className="mx-auto max-w-[1600px] p-4 space-y-3">
-      <div className="flex justify-end">
-        <HelpFiles />
+    <div className="mx-auto max-w-[1400px] px-4 py-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">AI Infographic Generator</h1>
+          <p className="text-sm text-muted-foreground">Два шага — от темы до готовой инфографики.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
+          <RotateCcw className="size-3.5 mr-1" /> Начать заново
+        </Button>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* LEFT */}
-      <section className="space-y-4">
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">1 · Исходные данные</h2>
-            <Button size="sm" variant="ghost" onClick={resetProject}>
-              <RotateCcw className="size-3.5 mr-1" /> Начать заново
-            </Button>
-          </div>
 
-          {/* Тема + предмет + класс */}
-          <div className="rounded-md border border-border bg-background/60 p-3 space-y-2">
-            <div>
-              <Label className="text-xs">Тема инфографики</Label>
-              <Input
-                placeholder="например, Перенос запятой в десятичных дробях"
-                value={source.topic ?? ""}
-                onChange={(e) => setSource({ topic: e.target.value })}
-              />
+      {/* ============ STEP 1 ============ */}
+      <section className="rounded-lg border border-border bg-card p-5 space-y-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Шаг 1. Исходные данные</h2>
+          {activeContent && (
+            <Button size="sm" variant="outline" onClick={onAnalyze} disabled={loading !== null}>
+              {loading === "analyze" ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <RefreshCw className="size-3.5 mr-1" />}
+              Перегенерировать
+            </Button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-12 gap-3">
+          <div className="col-span-12 md:col-span-6">
+            <Label className="text-xs">Тема</Label>
+            <Input value={source.topic || ""} onChange={(e) => setSource({ topic: e.target.value })} placeholder="Что изучаем?" />
+          </div>
+          <div className="col-span-6 md:col-span-3">
+            <Label className="text-xs">Предмет</Label>
+            <Select value={source.subject || ""} onValueChange={(v) => setSource({ subject: v })}>
+              <SelectTrigger><SelectValue placeholder="Выберите предмет" /></SelectTrigger>
+              <SelectContent>
+                {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-6 md:col-span-3">
+            <Label className="text-xs">Класс</Label>
+            <Select value={source.grade || ""} onValueChange={(v) => setSource({ grade: v })}>
+              <SelectTrigger><SelectValue placeholder="Выберите класс" /></SelectTrigger>
+              <SelectContent>
+                {GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div>
+          <Label className="text-xs">Дополнительные инструкции</Label>
+          <Textarea
+            rows={2}
+            value={source.userInstructions}
+            onChange={(e) => setSource({ userInstructions: e.target.value })}
+            placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Исходный материал (необязательно)</Label>
+            <div className="flex gap-1">
+              <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={loading !== null}>
+                <Upload className="size-3.5 mr-1" /> Файл
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => imageInputRef.current?.click()} disabled={loading !== null}>
+                <ImagePlus className="size-3.5 mr-1" /> Картинка
+              </Button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Предмет</Label>
-                <Select value={source.subject || ""} onValueChange={(v) => setSource({ subject: v })}>
-                  <SelectTrigger><SelectValue placeholder="Выберите предмет" /></SelectTrigger>
-                  <SelectContent>
-                    {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+          </div>
+          <Textarea
+            rows={6}
+            placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки уйдут в модель как мультимодальный вход."
+            value={source.text}
+            onChange={(e) => setSource({ text: e.target.value })}
+            onPaste={onPasteCapture}
+          />
+          {attachedImages.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {attachedImages.map((url, i) => (
+                <div key={i} className="relative">
+                  <img src={url} alt="" className="size-16 object-cover rounded border" />
+                  <button
+                    type="button"
+                    onClick={() => removeAttachedImage(i)}
+                    className="absolute -top-1 -right-1 size-5 rounded-full bg-background border text-xs leading-none"
+                    title="Убрать"
+                  >×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <input ref={fileInputRef} type="file" accept=".txt,.md,image/*" multiple className="hidden"
+            onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }} />
+          <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden"
+            onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }} />
+        </div>
+
+        {!activeContent && (
+          <Button onClick={onAnalyze} disabled={loading !== null} className="w-full">
+            {loading === "analyze" ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
+            Сформировать контент
+          </Button>
+        )}
+
+        {activeContent && (
+          <div className="rounded-md border border-border bg-background p-4">
+            {summarySections ? (
+              <div className="space-y-6">
+                {summarySections.map((sec, si) => (
+                  <div key={si} className="space-y-4">
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground">{sec.sectionLabel}</div>
+                    {sec.blocks.map((b, bi) => (
+                      <div key={bi} className="space-y-2">
+                        {bi > 0 && <hr className="border-border" />}
+                        <SimpleBlock block={b} />
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </div>
-              <div>
-                <Label className="text-xs">Класс</Label>
-                <Select value={source.grade || ""} onValueChange={(v) => setSource({ grade: v })}>
-                  <SelectTrigger><SelectValue placeholder="Выберите класс" /></SelectTrigger>
-                  <SelectContent>
-                    {GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            ) : (
+              <Markdown>{activeContent.value.content}</Markdown>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* ============ STEP 2 ============ */}
+      {activeContent && (
+        <section className="rounded-lg border border-border bg-card p-5 space-y-5">
+          <h2 className="text-lg font-semibold">Шаг 2. Генерация изображения</h2>
+
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-12 md:col-span-6">
+              <Label className="text-xs">Стиль инфографики</Label>
+              <Select value={selectedStyleId ?? activeContent.value.recommendedStyle ?? ""} onValueChange={setSelectedStyleId}>
+                <SelectTrigger><SelectValue placeholder="Выберите стиль" /></SelectTrigger>
+                <SelectContent>
+                  {enabledStyles.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-12 md:col-span-6">
+              <Label className="text-xs">Профиль дизайна</Label>
+              <Select value={selectedProfileName ?? activeProfile?.profileName ?? ""} onValueChange={setSelectedProfileName}>
+                <SelectTrigger><SelectValue placeholder="Выберите профиль" /></SelectTrigger>
+                <SelectContent>
+                  {profiles.map((p) => <SelectItem key={p.profileName} value={p.profileName}>{p.profileName}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           <div>
-            <Label className="text-xs">Дополнительные инструкции</Label>
+            <Label className="text-xs">Дополнительные требования к изображению</Label>
             <Textarea
-              rows={3}
-              value={source.userInstructions}
-              onChange={(e) => setSource({ userInstructions: e.target.value })}
-              placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
+              rows={2}
+              value={userWishes}
+              onChange={(e) => setUserWishes(e.target.value)}
+              placeholder="Например: вынести формулу крупно, добавить иконку треугольника, цитата с автором…"
             />
           </div>
 
-          {/* Источник: текст + файл + картинки */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">
-                Исходный материал (необязательно — без него работа пойдёт только по теме)
-              </Label>
-              <div className="flex gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={loading !== null}
-                >
-                  <Upload className="size-3.5 mr-1" /> Файл
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={loading !== null}
-                >
-                  <ImagePlus className="size-3.5 mr-1" /> Картинка
-                </Button>
-              </div>
-            </div>
-            <Textarea
-              rows={8}
-              placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки прикрепляются как мультимодальный вход и передаются модели вместе с текстом."
-              value={source.text}
-              onChange={(e) => setSource({ text: e.target.value })}
-              onPaste={onPasteCapture}
-            />
-            {attachedImages.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {attachedImages.map((url, i) => (
-                  <div key={i} className="relative">
-                    <img src={url} alt="" className="size-16 object-cover rounded border" />
-                    <button
-                      type="button"
-                      onClick={() => removeAttachedImage(i)}
-                      className="absolute -top-1 -right-1 size-5 rounded-full bg-background border text-xs leading-none"
-                      title="Убрать"
-                    >×</button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {loading === "recognize" && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Loader2 className="size-3 animate-spin" /> Распознаю картинки…
-              </p>
-            )}
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".txt,.md,image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }}
-            />
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }}
-            />
-          </div>
-
-
-          <PromptDisclosure
-            label={`Показать промпт анализа (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
-            value={useTopicOnlyPrompt ? prompts.analysisTopicOnly : prompts.analysisWithContent}
-            onChange={(v) =>
-              setPrompt(useTopicOnlyPrompt ? "analysisTopicOnly" : "analysisWithContent", v)
-            }
-            rightSlot={<ModelPicker kind="text" value={models.analysis} onChange={(v) => setModel("analysis", v)} />}
-          />
-
-          <div className="flex justify-start">
-            <Button onClick={onAnalyze} disabled={loading !== null || !(source.topic?.trim() || source.text.trim())}>
-              {loading === "analyze" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-              Анализировать
-            </Button>
-          </div>
-        </div>
-
-        {/* STAGE 2 */}
-        {activeContent && (
-          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">2 · Стиль и дизайн</h2>
-              {mode === "strict" && (
-                <Tabs value={briefMode} onValueChange={(v) => setBriefMode(v as "design" | "programmatic")}>
-                  <TabsList className="h-8">
-                    <TabsTrigger value="design" className="text-xs">Дизайн-бриф</TabsTrigger>
-                    <TabsTrigger value="programmatic" className="text-xs">Технический макет</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Стиль инфографики</Label>
-                <Select
-                  value={selectedStyleId ?? activeContent.value.recommendedStyle}
-                  onValueChange={setSelectedStyleId}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {enabledStyles.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">Профиль дизайна (цвета и шрифты)</Label>
-                <Select
-                  value={selectedProfileName ?? activeProfile?.profileName ?? ""}
-                  onValueChange={setSelectedProfileName}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {profiles.map((p) => <SelectItem key={p.profileName} value={p.profileName}>{p.profileName}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {mode === "strict" && briefMode === "programmatic" ? (
-              <>
-                <PromptDisclosure
-                  label="Показать промпт технического макета"
-                  value={prompts.codeBasedProduct}
-                  onChange={(v) => setPrompt("codeBasedProduct", v)}
-                  rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
-                />
-                <div>
-                  <Button onClick={onCreateProgrammaticSpec} disabled={loading !== null}>
-                    {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                    Создать технический макет
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <PromptDisclosure
-                  label="Показать промпт дизайн-брифа"
-                  value={prompts.designBrief}
-                  onChange={(v) => setPrompt("designBrief", v)}
-                  rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
-                />
-                <div>
-                  <Button onClick={onCreateBrief} disabled={loading !== null}>
-                    {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                    Создать дизайн-бриф
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* STAGE 3 — only in design-brief mode */}
-        {activeBrief && !(mode === "strict" && briefMode === "programmatic") && (
-          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <h2 className="text-sm font-semibold">3 · Генерация изображения</h2>
-            <div>
-              <Label className="text-xs">Дополнительные пожелания (приоритет при регенерации)</Label>
-              <Textarea
-                rows={3}
-                value={userWishes}
-                onChange={(e) => setUserWishes(e.target.value)}
-                placeholder="Чем подкорректировать следующую генерацию…"
-              />
-            </div>
-            <PromptDisclosure
-              label="Показать промпт изображения"
-              value={activeBrief.value.PromptForImageGeneration}
-              onChange={(v) => updateActiveBriefPrompt(v)}
-              rightSlot={<ModelPicker kind="image" value={models.image} onChange={(v) => setModel("image", v)} />}
-            />
-            <div>
-              <Button onClick={onGenerateImage} disabled={loading !== null}>
-                {loading === "image" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Сгенерировать изображение
+          <div className="grid grid-cols-12 gap-4">
+            <div className="col-span-12 md:col-span-5 space-y-2">
+              <Button onClick={onGenerateImage} disabled={loading !== null} className="w-full">
+                {loading === "image" ? <Loader2 className="size-4 mr-2 animate-spin" /> : simpleCurrent ? <RefreshCw className="size-4 mr-2" /> : <Sparkles className="size-4 mr-2" />}
+                {simpleCurrent ? "Перегенерировать" : "Сгенерировать изображение"}
               </Button>
+              {simpleVersions.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Предыдущие версии</div>
+                  <div className="flex flex-wrap gap-2">
+                    {simpleVersions.map((v, i) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setPreviewVersion(v.id)}
+                        className="size-14 rounded border overflow-hidden relative group"
+                        title={`ver.${i + 1}`}
+                      >
+                        <img src={v.dataUrl} alt="" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[10px] text-white text-center py-0.5">ver.{i + 1}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="col-span-12 md:col-span-7">
+              <div className="rounded-md border border-border bg-background min-h-[320px] flex items-center justify-center overflow-hidden">
+                {loading === "image" ? (
+                  <Loader2 className="size-8 animate-spin text-muted-foreground" />
+                ) : simpleCurrent ? (
+                  <img src={simpleCurrent.dataUrl} alt="" className="max-w-full max-h-[80vh]" />
+                ) : (
+                  <div className="text-sm text-muted-foreground flex flex-col items-center gap-2 py-12">
+                    <ImageIcon className="size-8 opacity-50" />
+                    Итоговое изображение появится здесь
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* RIGHT */}
-      <section className="space-y-3">
-        <div className="rounded-lg border border-border bg-card p-2">
-          <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as PaneMode)}>
-            <TabsList>
-              <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
-              <TabsTrigger value="wireframe" disabled={!activeBrief && !activeSpec}>Каркас</TabsTrigger>
-              <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
-            </TabsList>
+      {/* Reset confirm */}
+      <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Все сгенерированные изображения будут уничтожены, проект полностью сбросится.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction onClick={onConfirmReset}>ОК</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-            <TabsContent value="content" className="p-2 space-y-2">
-              {activeContent ? (
-                <>
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setRefineStage("content")} disabled={loading !== null}>
-                      <Sparkles className="size-3.5 mr-1" /> Изменить с ИИ
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={onAnalyze} disabled={loading !== null}>
-                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
-                    </Button>
-                  </div>
-                  <div className="rounded-md border border-border p-3 bg-background">
-                    <Markdown>{activeContent.value.content}</Markdown>
-                  </div>
-                  {activeContent.value.analysis && (
-                    <details className="rounded-md border border-border bg-background/60 p-2">
-                      <summary className="cursor-pointer text-xs text-muted-foreground">
-                        Показать структурированный JSON анализа
-                      </summary>
-                      <pre className="mt-2 overflow-auto text-xs">
-                        {JSON.stringify(activeContent.value.analysis, null, 2)}
-                      </pre>
-                    </details>
-                  )}
-                  <Textarea
-                    rows={8}
-                    value={activeContent.value.content}
-                    onChange={(e) => updateActiveContent(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Рекомендуемый стиль: <code>{activeContent.value.recommendedStyle || "—"}</code>
-                  </p>
-                </>
-              ) : (
-                <EmptyState text="Запустите анализ, чтобы увидеть здесь сводку по контенту." />
-              )}
-            </TabsContent>
-
-            <TabsContent value="wireframe" className="p-2 space-y-2">
-              {mode === "strict" && briefMode === "programmatic" && activeSpec ? (
-                <ProgrammaticPane
-                  spec={activeSpec.value}
-                  loading={loading !== null}
-                  onRegenerate={onCreateProgrammaticSpec}
-                />
-              ) : activeBrief ? (
-                <>
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setRefineStage("brief")} disabled={loading !== null}>
-                      <Sparkles className="size-3.5 mr-1" /> Изменить с ИИ
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={onCreateBrief} disabled={loading !== null}>
-                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
-                    </Button>
-                  </div>
-                  {activeBrief.value.WireframeSketch ? (
-                    <pre className="rounded-md border border-border bg-card p-3 text-xs leading-snug whitespace-pre overflow-auto font-mono">
-                      {activeBrief.value.WireframeSketch}
-                    </pre>
-                  ) : activeBrief.value.WireframeDescription ? (
-                    <WireframeView wf={activeBrief.value.WireframeDescription} />
-                  ) : (
-                    <EmptyState text="Каркас отсутствует в ответе модели." />
-                  )}
-                </>
-              ) : (
-                <EmptyState text="Создайте дизайн-бриф или технический макет, чтобы увидеть каркас." />
-              )}
-            </TabsContent>
-
-            <TabsContent value="image" className="p-2 space-y-2">
-              {activeImage ? (
-                <>
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setRefineStage("image")} disabled={loading !== null}>
-                      <Sparkles className="size-3.5 mr-1" /> Изменить с ИИ
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={onGenerateImage} disabled={loading !== null}>
-                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
-                    </Button>
-                  </div>
-                  <img src={activeImage.value} alt="Сгенерированная инфографика" className="w-full rounded-md border border-border" />
-                </>
-              ) : (
-                <EmptyState text="Сгенерируйте итоговое изображение, чтобы увидеть его здесь." />
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
-      </section>
-      </div>
-
-      <RefineDialog
-        open={refineStage === "content"}
-        title="Изменить содержание с ИИ"
-        description="Опишите, какие изменения в содержании или группировке необходимо произвести. Модели будут переданы: текущий JSON анализа, список допустимых типов сущностей и ваши пожелания."
-        busy={loading === "refine"}
-        onCancel={() => setRefineStage(null)}
-        onSubmit={onRefineContent}
-      />
-      <RefineDialog
-        open={refineStage === "brief"}
-        title="Изменить расположение блоков с ИИ"
-        description={'Опишите, какие изменения в размещении блоков необходимо произвести.\nОбратите внимание, что для редактирования текста предпочтительно вернуться на вкладку «Контент».'}
-        busy={loading === "refine"}
-        onCancel={() => setRefineStage(null)}
-        onSubmit={onRefineBrief}
-      />
-      <RefineDialog
-        open={refineStage === "image"}
-        title="Изменить изображение с ИИ"
-        description={'Опишите, что изменить на изображении.\nОбратите внимание, что содержание и размещение блоков лучше менять на предыдущих этапах.'}
-        busy={loading === "refine"}
-        onCancel={() => setRefineStage(null)}
-        onSubmit={onRefineImage}
-      />
+      {/* Version preview modal */}
+      <AlertDialog open={!!previewedVersion} onOpenChange={(o) => { if (!o) setPreviewVersion(null); }}>
+        <AlertDialogContent className="max-w-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Предыдущая версия</AlertDialogTitle>
+            <AlertDialogDescription>
+              Изображение из предыдущей генерации. Текущее изображение в правой панели не меняется.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {previewedVersion && (
+            <img src={previewedVersion.dataUrl} alt="" className="max-w-full rounded border" />
+          )}
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setPreviewVersion(null)}>Закрыть</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-
-function EmptyState({ text }: { text: string }) {
+function SimpleBlock({ block }: { block: ReturnType<typeof renderSimpleSummary>[number]["blocks"][number] }) {
   return (
-    <div className="p-10 text-center text-sm text-muted-foreground">{text}</div>
-  );
-}
-
-function ProgrammaticPane({
-  spec,
-  loading,
-  onRegenerate,
-}: {
-  spec: import("@/lib/render-spec/types").ProgrammaticRenderSpec;
-  loading: boolean;
-  onRegenerate: () => void;
-}) {
-  const canvasWrapRef = useRef<HTMLDivElement>(null);
-  async function exportPng() {
-    const node = canvasWrapRef.current?.querySelector("[data-spec-canvas]") as HTMLElement | null;
-    if (!node) return;
-    try {
-      const dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true });
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `infographic-${Date.now()}.png`;
-      a.click();
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Не удалось экспортировать PNG");
-    }
-  }
-  return (
-    <>
-      <div className="flex justify-end gap-2">
-        <Button size="sm" variant="outline" onClick={exportPng} disabled={loading}>
-          Экспорт PNG
-        </Button>
-        <Button size="sm" variant="outline" onClick={onRegenerate} disabled={loading}>
-          <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
-        </Button>
-      </div>
-      <div ref={canvasWrapRef} className="rounded-md border border-border overflow-hidden">
-        <ProgrammaticRenderer spec={spec} />
-      </div>
-      <details className="rounded-md border border-border bg-background/60 p-2">
-        <summary className="cursor-pointer text-xs text-muted-foreground">
-          Показать JSON-спецификацию
-        </summary>
-        <pre className="mt-2 overflow-auto text-xs max-h-96">
-          {JSON.stringify(spec, null, 2)}
-        </pre>
-      </details>
-    </>
+    <div className="space-y-2">
+      {block.title && <div className="font-semibold text-base">{block.title}</div>}
+      {block.content.length > 0 && (
+        block.content.length === 1
+          ? <div className="text-sm whitespace-pre-wrap">{block.content[0]}</div>
+          : <ul className="list-disc pl-5 text-sm space-y-1">{block.content.map((c, i) => <li key={i}>{c}</li>)}</ul>
+      )}
+      {block.formula.length > 0 && (
+        <div className="space-y-1">
+          {block.formula.map((f, i) => (
+            <div key={i} className="font-mono text-sm bg-muted/40 rounded px-2 py-1">{f}</div>
+          ))}
+        </div>
+      )}
+      {block.addendum.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">Дополнение</div>
+          {block.addendum.map((a, i) => (
+            <div key={i} className="text-sm whitespace-pre-wrap">{a}</div>
+          ))}
+        </div>
+      )}
+      {block.items && block.items.length > 0 && (
+        <div className="pl-3 border-l border-border space-y-3 mt-2">
+          {block.items.map((it, i) => <SimpleBlock key={i} block={it} />)}
+        </div>
+      )}
+    </div>
   );
 }

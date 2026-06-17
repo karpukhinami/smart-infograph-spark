@@ -59,9 +59,17 @@ interface ProjectState {
   pushImage: (dataUrl: string) => void;
   setActiveImage: (id: string) => void;
 
+  // Simple-mode (home page) image versions: each carries its source prompt for traceability.
+  simpleCurrentImage: { dataUrl: string; prompt: string } | null;
+  simpleImageVersions: { id: string; dataUrl: string; prompt: string; createdAt: number }[];
+  setSimpleCurrentImage: (img: { dataUrl: string; prompt: string } | null) => void;
+  archiveSimpleCurrentImage: () => void;
+  clearSimpleImages: () => void;
+
   models: { analysis: string; brief: string; image: string };
   setModel: (k: "analysis" | "brief" | "image", id: string) => void;
 }
+
 
 const initialSource: SourceText = {
   mode: "text",
@@ -93,6 +101,9 @@ export const useProjectStore = create<ProjectState>()(
           userWishes: "",
           imageVersions: [],
           activeImageId: null,
+          simpleCurrentImage: null,
+          simpleImageVersions: [],
+
         }),
 
       attachedImages: [],
@@ -166,6 +177,23 @@ export const useProjectStore = create<ProjectState>()(
       },
       setActiveImage: (id) => set({ activeImageId: id }),
 
+      simpleCurrentImage: null,
+      simpleImageVersions: [],
+      setSimpleCurrentImage: (img) => set({ simpleCurrentImage: img }),
+      archiveSimpleCurrentImage: () =>
+        set((s) => {
+          if (!s.simpleCurrentImage) return {};
+          return {
+            simpleImageVersions: [
+              ...s.simpleImageVersions,
+              { id: crypto.randomUUID(), createdAt: Date.now(), ...s.simpleCurrentImage },
+            ],
+            simpleCurrentImage: null,
+          };
+        }),
+      clearSimpleImages: () => set({ simpleCurrentImage: null, simpleImageVersions: [] }),
+
+
       models: {
         analysis: DEFAULT_TEXT_MODEL,
         brief: DEFAULT_TEXT_MODEL,
@@ -175,7 +203,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "infographic-project",
-      version: 4,
+      version: 5,
       migrate: () => undefined as unknown as ProjectState,
       storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
     },

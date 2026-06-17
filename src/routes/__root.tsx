@@ -85,14 +85,18 @@ function RootComponent() {
               </Link>
             </div>
             <div className="flex items-center gap-4">
-              {uiMode === "debug" && (
-                <nav className="flex gap-4 text-sm text-muted-foreground">
-                  <Link to="/" activeProps={{ className: "text-foreground font-medium" }}>Рабочее место</Link>
-                  <Link to="/styles" activeProps={{ className: "text-foreground font-medium" }}>Стили</Link>
-                  <Link to="/design-profiles" activeProps={{ className: "text-foreground font-medium" }}>Профили дизайна</Link>
-                  <Link to="/prompts" activeProps={{ className: "text-foreground font-medium" }}>Промпты</Link>
-                </nav>
-              )}
+              <nav className="flex gap-4 text-sm text-muted-foreground">
+                <Link to="/" activeProps={{ className: "text-foreground font-medium" }} activeOptions={{ exact: true }}>Главная</Link>
+                {uiMode === "debug" && (
+                  <>
+                    <Link to="/workspace" activeProps={{ className: "text-foreground font-medium" }}>Рабочее место</Link>
+                    <Link to="/styles" activeProps={{ className: "text-foreground font-medium" }}>Стили</Link>
+                    <Link to="/design-profiles" activeProps={{ className: "text-foreground font-medium" }}>Профили дизайна</Link>
+                    <Link to="/prompts" activeProps={{ className: "text-foreground font-medium" }}>Промпты</Link>
+                  </>
+                )}
+              </nav>
+
               <CostMeter />
             </div>
           </div>
