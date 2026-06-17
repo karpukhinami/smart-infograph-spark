@@ -25,7 +25,7 @@ import {
   buildRefineBriefPrompt,
   buildRefineImageDecisionPrompt,
 } from "@/lib/refine-prompts";
-import recognizeImagePrompt from "@/data/prompts/recognize-image.txt?raw";
+// recognize-image prompt no longer used: images are passed multimodally to the analysis model.
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
 import { validateRenderSpec } from "@/lib/render-spec/validate";
