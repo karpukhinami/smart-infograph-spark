@@ -84,6 +84,7 @@ function SimpleHome() {
   const [imageStage, setImageStage] = useState<null | "brief" | "render">(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<string | null>(null);
+  const [paneMode, setPaneMode] = useState<"content" | "image">("content");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
