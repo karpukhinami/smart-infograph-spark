@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -83,6 +84,7 @@ function SimpleHome() {
   const [imageStage, setImageStage] = useState<null | "brief" | "render">(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<string | null>(null);
+  const [paneMode, setPaneMode] = useState<"content" | "image">("content");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -195,6 +197,7 @@ function SimpleHome() {
     try {
       setLoading("image");
       setImageStage("brief");
+      setPaneMode("image");
       archiveSimple();
 
       // Шаг A: укороченный бриф → PromptForImageGeneration
@@ -433,62 +436,68 @@ function SimpleHome() {
 
         {/* ============ RIGHT: RESULTS ============ */}
         <div className="space-y-4 lg:sticky lg:top-4">
-          {/* Content summary */}
-          <section className="rounded-lg border border-border bg-card p-5 space-y-3">
-            <h2 className="text-lg font-semibold">Контент</h2>
-            <div className="rounded-md border border-border bg-background p-4 min-h-[200px]">
-              {loading === "analyze" && !activeContent ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                  <Loader2 className="size-6 animate-spin" />
-                </div>
-              ) : activeContent ? (
-                summarySections ? (
-                  <div className="space-y-6">
-                    {summarySections.map((sec, si) => (
-                      <div key={si} className="space-y-4">
-                        <div className="text-xs uppercase tracking-wider text-muted-foreground">{sec.sectionLabel}</div>
-                        {sec.blocks.map((b, bi) => (
-                          <div key={bi} className="space-y-2">
-                            {bi > 0 && <hr className="border-border" />}
-                            <SimpleBlock block={b} />
+          <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as "content" | "image")}>
+            <TabsList>
+              <TabsTrigger value="content" disabled={!activeContent && loading !== "analyze"}>Контент</TabsTrigger>
+              <TabsTrigger value="image" disabled={!activeContent}>Итоговое изображение</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="content" className="mt-3">
+              <section className="rounded-lg border border-border bg-card p-5 space-y-3">
+                <div className="rounded-md border border-border bg-background p-4 min-h-[200px]">
+                  {loading === "analyze" && !activeContent ? (
+                    <div className="flex items-center justify-center py-12 text-muted-foreground">
+                      <Loader2 className="size-6 animate-spin" />
+                    </div>
+                  ) : activeContent ? (
+                    summarySections ? (
+                      <div className="space-y-6">
+                        {summarySections.map((sec, si) => (
+                          <div key={si} className="space-y-4">
+                            <div className="text-xs uppercase tracking-wider text-muted-foreground">{sec.sectionLabel}</div>
+                            {sec.blocks.map((b, bi) => (
+                              <div key={bi} className="space-y-2">
+                                {bi > 0 && <hr className="border-border" />}
+                                <SimpleBlock block={b} />
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <Markdown>{activeContent.value.content}</Markdown>
-                )
-              ) : (
-                <div className="text-sm text-muted-foreground text-center py-12">
-                  Заполните данные слева и нажмите «Сформировать контент»
+                    ) : (
+                      <Markdown>{activeContent.value.content}</Markdown>
+                    )
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-12">
+                      Заполните данные слева и нажмите «Сформировать контент»
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </section>
+              </section>
+            </TabsContent>
 
-          {/* Image result */}
-          {activeContent && (
-            <section className="rounded-lg border border-border bg-card p-5 space-y-3">
-              <h2 className="text-lg font-semibold">Изображение</h2>
-              <div className="rounded-md border border-border bg-background min-h-[320px] flex items-center justify-center overflow-hidden">
-                {loading === "image" ? (
-                  <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
-                    <Loader2 className="size-8 animate-spin" />
-                    <div>{imageStage === "brief" ? "Шаг 1 из 2 — составляем дизайн-бриф…" : "Шаг 2 из 2 — генерируем изображение…"}</div>
-                  </div>
-                ) : simpleCurrent ? (
-                  <img src={simpleCurrent.dataUrl} alt="" className="max-w-full max-h-[80vh]" />
-                ) : (
-                  <div className="text-sm text-muted-foreground flex flex-col items-center gap-2 py-12">
-                    <ImageIcon className="size-8 opacity-50" />
-                    Итоговое изображение появится здесь
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
+            <TabsContent value="image" className="mt-3">
+              <section className="rounded-lg border border-border bg-card p-5 space-y-3">
+                <div className="rounded-md border border-border bg-background min-h-[320px] flex items-center justify-center overflow-hidden">
+                  {loading === "image" ? (
+                    <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
+                      <Loader2 className="size-8 animate-spin" />
+                      <div>{imageStage === "brief" ? "Шаг 1 из 2 — составляем дизайн-бриф…" : "Шаг 2 из 2 — генерируем изображение…"}</div>
+                    </div>
+                  ) : simpleCurrent ? (
+                    <img src={simpleCurrent.dataUrl} alt="" className="max-w-full max-h-[80vh]" />
+                  ) : (
+                    <div className="text-sm text-muted-foreground flex flex-col items-center gap-2 py-12">
+                      <ImageIcon className="size-8 opacity-50" />
+                      Итоговое изображение появится здесь
+                    </div>
+                  )}
+                </div>
+              </section>
+            </TabsContent>
+          </Tabs>
         </div>
+
       </div>
 
       {/* Reset confirm */}
