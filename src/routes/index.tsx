@@ -437,6 +437,10 @@ ${activeContent.value.content}`;
       if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
         throw new Error("В ответе модели не хватает полей");
       }
+      if (mode === "strict") {
+        const layer1 = designProfileColorsAndRules(activeProfile);
+        parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
+      }
       pushBrief(parsed);
       const dataUrl = await callImageLLM({ model: models.image, prompt: buildFinalImagePrompt(parsed.PromptForImageGeneration) });
       pushImage(dataUrl);
