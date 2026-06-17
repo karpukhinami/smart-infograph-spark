@@ -174,6 +174,23 @@ export const useProjectStore = create<ProjectState>()(
       },
       setActiveImage: (id) => set({ activeImageId: id }),
 
+      simpleCurrentImage: null,
+      simpleImageVersions: [],
+      setSimpleCurrentImage: (img) => set({ simpleCurrentImage: img }),
+      archiveSimpleCurrentImage: () =>
+        set((s) => {
+          if (!s.simpleCurrentImage) return {};
+          return {
+            simpleImageVersions: [
+              ...s.simpleImageVersions,
+              { id: crypto.randomUUID(), createdAt: Date.now(), ...s.simpleCurrentImage },
+            ],
+            simpleCurrentImage: null,
+          };
+        }),
+      clearSimpleImages: () => set({ simpleCurrentImage: null, simpleImageVersions: [] }),
+
+
       models: {
         analysis: DEFAULT_TEXT_MODEL,
         brief: DEFAULT_TEXT_MODEL,
