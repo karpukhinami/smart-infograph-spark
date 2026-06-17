@@ -59,9 +59,17 @@ interface ProjectState {
   pushImage: (dataUrl: string) => void;
   setActiveImage: (id: string) => void;
 
+  // Simple-mode (home page) image versions: each carries its source prompt for traceability.
+  simpleCurrentImage: { dataUrl: string; prompt: string } | null;
+  simpleImageVersions: { id: string; dataUrl: string; prompt: string; createdAt: number }[];
+  setSimpleCurrentImage: (img: { dataUrl: string; prompt: string } | null) => void;
+  archiveSimpleCurrentImage: () => void;
+  clearSimpleImages: () => void;
+
   models: { analysis: string; brief: string; image: string };
   setModel: (k: "analysis" | "brief" | "image", id: string) => void;
 }
+
 
 const initialSource: SourceText = {
   mode: "text",
