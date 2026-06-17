@@ -115,7 +115,7 @@ export const Route = createFileRoute("/api/llm")({
           upstream = await fetch(upstreamUrl, {
             method: "POST",
             headers,
-            body: JSON.stringify({ model: resolveUpstreamModelId(body.model), messages }),
+            body: JSON.stringify({ model: resolveUpstreamModelId(body.model), messages, max_tokens: 16000 }),
             signal: controller.signal,
           });
         } catch (e) {
