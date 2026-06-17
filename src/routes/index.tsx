@@ -185,32 +185,39 @@ function Workspace() {
         .replaceAll("{{GRADE}}", source.grade || "");
 
       let summary: ContentSummary;
+      const imgs = attachedImages.length ? attachedImages : undefined;
       if (mode === "strict") {
         const analysis = await callTextLLMForJson({
           model: models.analysis,
           prompt: filled,
           label: "analysis",
           schemaHint:
-            'Верни JSON-объект анализа со структурой { sourceMode, topic, subject, grade, summary, entities: [{ sectionId: "prerequisites"|"main"|"additions", entityType, attention: "main"|"normal"|"accent", title, content, formula, cardAddendum, items, icon, visual }], warnings }. Все обратные слеши внутри строк должны быть удвоены (\\\\frac, \\\\sqrt и т.п.).',
+            'Верни JSON-объект анализа со структурой { sourceMode, topic, subject, grade, recommendedDesignProfile, summary, entities: [{ sectionId: "prerequisites"|"main"|"additions", entityType, attention: "main"|"normal"|"accent", title, content, formula, cardAddendum, items, icon, visual }], warnings }. Все обратные слеши внутри строк должны быть удвоены (\\\\frac, \\\\sqrt и т.п.).',
           parse: validateAnalysisJson,
+          images: imgs,
         });
         const fallbackStyle = enabledStyles[0]?.id ?? "";
         summary = {
           content: renderAnalysisJson(analysis),
           recommendedStyle: selectedStyleId ?? fallbackStyle,
+          recommendedDesignProfile: analysis.recommendedDesignProfile ?? null,
           analysis,
         };
       } else {
         // Free mode: model returns plain Markdown, not JSON.
-        const raw = await callTextLLM({ model: models.analysis, prompt: filled });
+        const raw = await callTextLLM({ model: models.analysis, prompt: filled, images: imgs });
         const content = (raw ?? "").trim();
         if (!content) throw new Error("Модель вернула пустой ответ");
         const fallbackStyle = enabledStyles[0]?.id ?? "";
+        const rdpMatch = content.match(/\[recommendedDesignProfile:\s*(Оранжевый|Индиго)\s*\]/i);
+        const cleaned = rdpMatch ? content.replace(rdpMatch[0], "").trim() : content;
         summary = {
-          content,
+          content: cleaned,
           recommendedStyle: selectedStyleId ?? fallbackStyle,
+          recommendedDesignProfile: rdpMatch?.[1] ?? null,
         };
       }
+
       pushContent(summary);
       setPaneMode("content");
       toast.success("Контент проанализирован");
