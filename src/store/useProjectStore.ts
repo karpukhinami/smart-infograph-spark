@@ -80,6 +80,7 @@ export const useProjectStore = create<ProjectState>()(
       resetProject: () =>
         set({
           source: initialSource,
+          attachedImages: [],
           contentVersions: [],
           activeContentId: null,
           selectedStyleId: null,
@@ -93,6 +94,15 @@ export const useProjectStore = create<ProjectState>()(
           imageVersions: [],
           activeImageId: null,
         }),
+
+      attachedImages: [],
+      addAttachedImages: (urls) =>
+        set((s) => ({ attachedImages: [...s.attachedImages, ...urls] })),
+      removeAttachedImage: (idx) =>
+        set((s) => ({ attachedImages: s.attachedImages.filter((_, i) => i !== idx) })),
+      clearAttachedImages: () => set({ attachedImages: [] }),
+
+
 
       contentVersions: [],
       activeContentId: null,
