@@ -260,7 +260,7 @@ sourceMode для этого промпта всегда "text".
 "entityType": "concept",
 "attention": "normal",
 "title": "string | null",
-"content": "string | string[] | null",
+"content": "string | string[] ",
 "formula": "string | string[] | null",
 "cardAddendum": "string | string[] | null",
 "icon": "string | null",
