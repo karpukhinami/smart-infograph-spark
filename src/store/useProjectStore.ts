@@ -203,7 +203,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "infographic-project",
-      version: 4,
+      version: 5,
       migrate: () => undefined as unknown as ProjectState,
       storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
     },
