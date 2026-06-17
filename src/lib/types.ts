@@ -135,6 +135,8 @@ export interface AnalysisJson {
   summary: string;
   entities: AnalysisEntity[];
   warnings: string[];
+  /** UI-only hint: which design profile to preselect on step 2. Not propagated further. */
+  recommendedDesignProfile?: string | null;
 }
 
 export interface ContentSummary {
@@ -142,9 +144,12 @@ export interface ContentSummary {
   content: string;
   /** Style id recommended by the model (or chosen by fallback). */
   recommendedStyle: string;
+  /** Design profile name recommended by the model (UI hint only). */
+  recommendedDesignProfile?: string | null;
   /** Structured analysis JSON (strict mode). */
   analysis?: AnalysisJson | null;
 }
+
 
 export interface DesignBriefResult {
   PromptForImageGeneration: string;
