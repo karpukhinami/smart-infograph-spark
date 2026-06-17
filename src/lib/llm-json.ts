@@ -61,30 +61,44 @@ export async function callTextLLMForJson<T>(opts: {
   images?: string[];
 }): Promise<T> {
   const { model, prompt, label, schemaHint, parse, images } = opts;
-  const raw = await callTextLLM({ model, prompt, images });
+
+  async function attempt(): Promise<T> {
+    const raw = await callTextLLM({ model, prompt, images });
+    try {
+      return parse(extractJson<unknown>(raw));
+    } catch (error) {
+      if (!isRecoverableJsonError(error)) throw error;
+      const repairedRaw = await callTextLLM({
+        model,
+        prompt: buildJsonRepairPrompt({
+          label,
+          originalPrompt: prompt,
+          invalidResponse: raw,
+          schemaHint,
+        }),
+        images,
+      });
+      return parse(extractJson<unknown>(repairedRaw));
+    }
+  }
 
   try {
-    return parse(extractJson<unknown>(raw));
+    return await attempt();
   } catch (error) {
-    if (error instanceof Error && error.message.toLowerCase().includes("truncated json output")) {
-      throw new Error(
-        "Модель вернула обрезанный JSON. Попробуйте сократить исходный текст, упростить запрос или повторить генерацию.",
-      );
+    // Truncated JSON ("length" finish_reason) is often transient — повторим один раз молча.
+    const msg = error instanceof Error ? error.message.toLowerCase() : "";
+    if (msg.includes("truncated json output") || msg.includes("обрезан")) {
+      try {
+        return await attempt();
+      } catch (e2) {
+        if (e2 instanceof Error && e2.message.toLowerCase().includes("truncated")) {
+          throw new Error(
+            "Модель дважды вернула обрезанный JSON. Попробуйте сократить исходный текст или повторить ещё раз.",
+          );
+        }
+        throw e2;
+      }
     }
-
-    if (!isRecoverableJsonError(error)) throw error;
-
-    const repairedRaw = await callTextLLM({
-      model,
-      prompt: buildJsonRepairPrompt({
-        label,
-        originalPrompt: prompt,
-        invalidResponse: raw,
-        schemaHint,
-      }),
-      images,
-    });
-
-    return parse(extractJson<unknown>(repairedRaw));
+    throw error;
   }
 }
