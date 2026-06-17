@@ -273,8 +273,10 @@ sourceMode для этого промпта всегда "text".
 "topic": "string ",
 "subject": "string | null",
 "grade": "string | null",
+"recommendedDesignProfile": "Оранжевый | Индиго",
 "summary": "string | null",
 "entities": [
+
 {
 "sectionId": "prerequisites",
 "entityType": "concept",
