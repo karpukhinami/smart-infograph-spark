@@ -109,6 +109,7 @@ function Workspace() {
   const useTopicOnlyPrompt = !hasSource;
 
   async function recognizeImages(files: File[]) {
+    // Legacy OCR fallback (kept available, but no longer auto-invoked on upload).
     if (!files.length) return;
     try {
       setLoading("recognize");
@@ -129,6 +130,17 @@ function Workspace() {
     }
   }
 
+  async function attachImageFiles(files: File[]) {
+    if (!files.length) return;
+    try {
+      const dataUrls = await Promise.all(files.map(fileToDataUrl));
+      addAttachedImages(dataUrls);
+      toast.success(`Прикреплено картинок: ${files.length}`);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось прикрепить картинку");
+    }
+  }
+
   async function onPasteCapture(e: React.ClipboardEvent<HTMLTextAreaElement>) {
     const items = Array.from(e.clipboardData?.items ?? []);
     const imageFiles = items
@@ -137,7 +149,7 @@ function Workspace() {
       .filter((f): f is File => !!f);
     if (imageFiles.length) {
       e.preventDefault();
-      await recognizeImages(imageFiles);
+      await attachImageFiles(imageFiles);
     }
   }
 
@@ -151,8 +163,9 @@ function Workspace() {
       const cur = source.text.trim();
       setSource({ text: cur ? `${cur}\n\n${text}` : text });
     }
-    if (images.length) await recognizeImages(images);
+    if (images.length) await attachImageFiles(images);
   }
+
 
   async function onAnalyze() {
     try {
