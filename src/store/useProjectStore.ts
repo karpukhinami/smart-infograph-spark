@@ -112,8 +112,10 @@ export const useProjectStore = create<ProjectState>()(
           contentVersions: [...s.contentVersions, ver],
           activeContentId: ver.id,
           selectedStyleId: s.selectedStyleId ?? c.recommendedStyle,
+          selectedProfileName: s.selectedProfileName ?? c.recommendedDesignProfile ?? null,
         }));
       },
+
       updateActiveContent: (text) =>
         set((s) => ({
           contentVersions: s.contentVersions.map((x) =>
