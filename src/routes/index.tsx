@@ -567,16 +567,32 @@ ${activeContent.value.content}`;
             </div>
             <Textarea
               rows={8}
-              placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки автоматически распознаются в текст и описания иллюстраций."
+              placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки прикрепляются как мультимодальный вход и передаются модели вместе с текстом."
               value={source.text}
               onChange={(e) => setSource({ text: e.target.value })}
               onPaste={onPasteCapture}
             />
+            {attachedImages.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {attachedImages.map((url, i) => (
+                  <div key={i} className="relative">
+                    <img src={url} alt="" className="size-16 object-cover rounded border" />
+                    <button
+                      type="button"
+                      onClick={() => removeAttachedImage(i)}
+                      className="absolute -top-1 -right-1 size-5 rounded-full bg-background border text-xs leading-none"
+                      title="Убрать"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            )}
             {loading === "recognize" && (
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Loader2 className="size-3 animate-spin" /> Распознаю картинки…
               </p>
             )}
+
             <input
               ref={fileInputRef}
               type="file"
