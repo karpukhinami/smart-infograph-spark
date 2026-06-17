@@ -112,27 +112,8 @@ function Workspace() {
   const hasSource = Boolean(source.text.trim());
   const useTopicOnlyPrompt = !hasSource;
 
-  async function recognizeImages(files: File[]) {
-    // Legacy OCR fallback (kept available, but no longer auto-invoked on upload).
-    if (!files.length) return;
-    try {
-      setLoading("recognize");
-      const dataUrls = await Promise.all(files.map(fileToDataUrl));
-      const recognized = await callTextLLM({
-        model: models.analysis,
-        prompt: recognizeImagePrompt,
-        images: dataUrls,
-      });
-      const cur = source.text.trim();
-      const next = cur ? `${cur}\n\n${recognized.trim()}` : recognized.trim();
-      setSource({ text: next });
-      toast.success(`Распознано картинок: ${files.length}`);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Не удалось распознать картинку");
-    } finally {
-      setLoading(null);
-    }
-  }
+  // Legacy OCR-as-text fallback removed: images are now passed multimodally to the analysis model.
+
 
   async function attachImageFiles(files: File[]) {
     if (!files.length) return;
