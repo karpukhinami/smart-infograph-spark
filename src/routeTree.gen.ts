@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as StylesRouteImport } from './routes/styles'
 import { Route as PromptsRouteImport } from './routes/prompts'
 import { Route as DesignProfilesRouteImport } from './routes/design-profiles'
@@ -16,6 +17,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiLlmRouteImport } from './routes/api/llm'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 
+const WorkspaceRoute = WorkspaceRouteImport.update({
+  id: '/workspace',
+  path: '/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StylesRoute = StylesRouteImport.update({
   id: '/styles',
   path: '/styles',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/design-profiles': typeof DesignProfilesRoute
   '/prompts': typeof PromptsRoute
   '/styles': typeof StylesRoute
+  '/workspace': typeof WorkspaceRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/design-profiles': typeof DesignProfilesRoute
   '/prompts': typeof PromptsRoute
   '/styles': typeof StylesRoute
+  '/workspace': typeof WorkspaceRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
 }
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/design-profiles': typeof DesignProfilesRoute
   '/prompts': typeof PromptsRoute
   '/styles': typeof StylesRoute
+  '/workspace': typeof WorkspaceRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
 }
@@ -79,6 +88,7 @@ export interface FileRouteTypes {
     | '/design-profiles'
     | '/prompts'
     | '/styles'
+    | '/workspace'
     | '/api/generate-image'
     | '/api/llm'
   fileRoutesByTo: FileRoutesByTo
@@ -87,6 +97,7 @@ export interface FileRouteTypes {
     | '/design-profiles'
     | '/prompts'
     | '/styles'
+    | '/workspace'
     | '/api/generate-image'
     | '/api/llm'
   id:
@@ -95,6 +106,7 @@ export interface FileRouteTypes {
     | '/design-profiles'
     | '/prompts'
     | '/styles'
+    | '/workspace'
     | '/api/generate-image'
     | '/api/llm'
   fileRoutesById: FileRoutesById
@@ -104,12 +116,20 @@ export interface RootRouteChildren {
   DesignProfilesRoute: typeof DesignProfilesRoute
   PromptsRoute: typeof PromptsRoute
   StylesRoute: typeof StylesRoute
+  WorkspaceRoute: typeof WorkspaceRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiLlmRoute: typeof ApiLlmRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/workspace': {
+      id: '/workspace'
+      path: '/workspace'
+      fullPath: '/workspace'
+      preLoaderRoute: typeof WorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/styles': {
       id: '/styles'
       path: '/styles'
@@ -160,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   DesignProfilesRoute: DesignProfilesRoute,
   PromptsRoute: PromptsRoute,
   StylesRoute: StylesRoute,
+  WorkspaceRoute: WorkspaceRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiLlmRoute: ApiLlmRoute,
 }
