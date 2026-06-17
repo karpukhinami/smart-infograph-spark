@@ -18,7 +18,7 @@ import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { callTextLLMForJson } from "@/lib/llm-json";
-import { buildDesignBriefPrompt } from "@/lib/prompt-injection";
+import { buildDesignBriefPrompt, designProfileColorsAndRules } from "@/lib/prompt-injection";
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
 import {
   buildRefineContentPrompt,
@@ -227,6 +227,10 @@ function Workspace() {
       if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
         throw new Error("В ответе модели не хватает полей");
       }
+      if (mode === "strict") {
+        const layer1 = designProfileColorsAndRules(activeProfile);
+        parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
+      }
       pushBrief(parsed);
       setPaneMode("wireframe");
       toast.success("Дизайн-бриф создан");
@@ -432,6 +436,10 @@ ${activeContent.value.content}`;
       });
       if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
         throw new Error("В ответе модели не хватает полей");
+      }
+      if (mode === "strict") {
+        const layer1 = designProfileColorsAndRules(activeProfile);
+        parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
       }
       pushBrief(parsed);
       const dataUrl = await callImageLLM({ model: models.image, prompt: buildFinalImagePrompt(parsed.PromptForImageGeneration) });
