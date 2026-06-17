@@ -194,6 +194,7 @@ function SimpleHome() {
     if (!activeStyle) { toast.error("Выберите стиль"); return; }
     try {
       setLoading("image");
+      setImageStage("brief");
       archiveSimple();
 
       // Шаг A: укороченный бриф → PromptForImageGeneration
@@ -225,6 +226,7 @@ function SimpleHome() {
         .join("\n\n");
 
       // Шаг C: генерация картинки
+      setImageStage("render");
       const dataUrl = await callImageLLM({ model: models.image, prompt: finalPrompt });
       setSimpleCurrent({ dataUrl, prompt: finalPrompt });
       toast.success("Готово");
@@ -232,6 +234,7 @@ function SimpleHome() {
       toast.error(e instanceof Error ? e.message : "Не удалось сгенерировать изображение");
     } finally {
       setLoading(null);
+      setImageStage(null);
     }
   }
 
