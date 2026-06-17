@@ -25,7 +25,7 @@ import {
   buildRefineBriefPrompt,
   buildRefineImageDecisionPrompt,
 } from "@/lib/refine-prompts";
-import recognizeImagePrompt from "@/data/prompts/recognize-image.txt?raw";
+// recognize-image prompt no longer used: images are passed multimodally to the analysis model.
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
 import { validateRenderSpec } from "@/lib/render-spec/validate";
@@ -76,6 +76,10 @@ function Workspace() {
   const briefMode = useProjectStore((s) => s.briefMode);
   const setBriefMode = useProjectStore((s) => s.setBriefMode);
   const pushSpec = useProjectStore((s) => s.pushSpec);
+  const attachedImages = useProjectStore((s) => s.attachedImages);
+  const addAttachedImages = useProjectStore((s) => s.addAttachedImages);
+  const removeAttachedImage = useProjectStore((s) => s.removeAttachedImage);
+
 
   const activeContent = useActiveContent();
   const activeBrief = useActiveBrief();
@@ -108,24 +112,17 @@ function Workspace() {
   const hasSource = Boolean(source.text.trim());
   const useTopicOnlyPrompt = !hasSource;
 
-  async function recognizeImages(files: File[]) {
+  // Legacy OCR-as-text fallback removed: images are now passed multimodally to the analysis model.
+
+
+  async function attachImageFiles(files: File[]) {
     if (!files.length) return;
     try {
-      setLoading("recognize");
       const dataUrls = await Promise.all(files.map(fileToDataUrl));
-      const recognized = await callTextLLM({
-        model: models.analysis,
-        prompt: recognizeImagePrompt,
-        images: dataUrls,
-      });
-      const cur = source.text.trim();
-      const next = cur ? `${cur}\n\n${recognized.trim()}` : recognized.trim();
-      setSource({ text: next });
-      toast.success(`Распознано картинок: ${files.length}`);
+      addAttachedImages(dataUrls);
+      toast.success(`Прикреплено картинок: ${files.length}`);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Не удалось распознать картинку");
-    } finally {
-      setLoading(null);
+      toast.error(e instanceof Error ? e.message : "Не удалось прикрепить картинку");
     }
   }
 
@@ -137,7 +134,7 @@ function Workspace() {
       .filter((f): f is File => !!f);
     if (imageFiles.length) {
       e.preventDefault();
-      await recognizeImages(imageFiles);
+      await attachImageFiles(imageFiles);
     }
   }
 
@@ -151,8 +148,9 @@ function Workspace() {
       const cur = source.text.trim();
       setSource({ text: cur ? `${cur}\n\n${text}` : text });
     }
-    if (images.length) await recognizeImages(images);
+    if (images.length) await attachImageFiles(images);
   }
+
 
   async function onAnalyze() {
     try {
@@ -168,32 +166,39 @@ function Workspace() {
         .replaceAll("{{GRADE}}", source.grade || "");
 
       let summary: ContentSummary;
+      const imgs = attachedImages.length ? attachedImages : undefined;
       if (mode === "strict") {
         const analysis = await callTextLLMForJson({
           model: models.analysis,
           prompt: filled,
           label: "analysis",
           schemaHint:
-            'Верни JSON-объект анализа со структурой { sourceMode, topic, subject, grade, summary, entities: [{ sectionId: "prerequisites"|"main"|"additions", entityType, attention: "main"|"normal"|"accent", title, content, formula, cardAddendum, items, icon, visual }], warnings }. Все обратные слеши внутри строк должны быть удвоены (\\\\frac, \\\\sqrt и т.п.).',
+            'Верни JSON-объект анализа со структурой { sourceMode, topic, subject, grade, recommendedDesignProfile, summary, entities: [{ sectionId: "prerequisites"|"main"|"additions", entityType, attention: "main"|"normal"|"accent", title, content, formula, cardAddendum, items, icon, visual }], warnings }. Все обратные слеши внутри строк должны быть удвоены (\\\\frac, \\\\sqrt и т.п.).',
           parse: validateAnalysisJson,
+          images: imgs,
         });
         const fallbackStyle = enabledStyles[0]?.id ?? "";
         summary = {
           content: renderAnalysisJson(analysis),
           recommendedStyle: selectedStyleId ?? fallbackStyle,
+          recommendedDesignProfile: analysis.recommendedDesignProfile ?? null,
           analysis,
         };
       } else {
         // Free mode: model returns plain Markdown, not JSON.
-        const raw = await callTextLLM({ model: models.analysis, prompt: filled });
+        const raw = await callTextLLM({ model: models.analysis, prompt: filled, images: imgs });
         const content = (raw ?? "").trim();
         if (!content) throw new Error("Модель вернула пустой ответ");
         const fallbackStyle = enabledStyles[0]?.id ?? "";
+        const rdpMatch = content.match(/\[recommendedDesignProfile:\s*(Оранжевый|Индиго)\s*\]/i);
+        const cleaned = rdpMatch ? content.replace(rdpMatch[0], "").trim() : content;
         summary = {
-          content,
+          content: cleaned,
           recommendedStyle: selectedStyleId ?? fallbackStyle,
+          recommendedDesignProfile: rdpMatch?.[1] ?? null,
         };
       }
+
       pushContent(summary);
       setPaneMode("content");
       toast.success("Контент проанализирован");
@@ -543,16 +548,32 @@ ${activeContent.value.content}`;
             </div>
             <Textarea
               rows={8}
-              placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки автоматически распознаются в текст и описания иллюстраций."
+              placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки прикрепляются как мультимодальный вход и передаются модели вместе с текстом."
               value={source.text}
               onChange={(e) => setSource({ text: e.target.value })}
               onPaste={onPasteCapture}
             />
+            {attachedImages.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {attachedImages.map((url, i) => (
+                  <div key={i} className="relative">
+                    <img src={url} alt="" className="size-16 object-cover rounded border" />
+                    <button
+                      type="button"
+                      onClick={() => removeAttachedImage(i)}
+                      className="absolute -top-1 -right-1 size-5 rounded-full bg-background border text-xs leading-none"
+                      title="Убрать"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            )}
             {loading === "recognize" && (
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Loader2 className="size-3 animate-spin" /> Распознаю картинки…
               </p>
             )}
+
             <input
               ref={fileInputRef}
               type="file"

@@ -265,6 +265,9 @@ export function validateAnalysisJson(raw: unknown): AnalysisJson {
     warnings.push(`Внимание: в ответе модели найдено несколько сущностей с attention="main" (${mainCount}).`);
   }
 
+  const rdpRaw = typeof o.recommendedDesignProfile === "string" ? o.recommendedDesignProfile.trim() : "";
+  const recommendedDesignProfile = rdpRaw || null;
+
   return {
     sourceMode,
     topic: (o.topic as string) ?? "",
@@ -273,5 +276,7 @@ export function validateAnalysisJson(raw: unknown): AnalysisJson {
     summary: typeof o.summary === "string" ? o.summary : "",
     entities,
     warnings,
+    recommendedDesignProfile,
   };
 }
+

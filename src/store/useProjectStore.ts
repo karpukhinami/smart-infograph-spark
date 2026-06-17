@@ -20,6 +20,13 @@ interface ProjectState {
   setSource: (patch: Partial<SourceText>) => void;
   resetProject: () => void;
 
+  attachedImages: string[]; // data URLs passed to multimodal analysis
+  addAttachedImages: (urls: string[]) => void;
+  removeAttachedImage: (idx: number) => void;
+  clearAttachedImages: () => void;
+
+
+
   contentVersions: Versioned<ContentSummary>[];
   activeContentId: string | null;
   pushContent: (c: ContentSummary) => void;
@@ -73,6 +80,7 @@ export const useProjectStore = create<ProjectState>()(
       resetProject: () =>
         set({
           source: initialSource,
+          attachedImages: [],
           contentVersions: [],
           activeContentId: null,
           selectedStyleId: null,
@@ -87,6 +95,15 @@ export const useProjectStore = create<ProjectState>()(
           activeImageId: null,
         }),
 
+      attachedImages: [],
+      addAttachedImages: (urls) =>
+        set((s) => ({ attachedImages: [...s.attachedImages, ...urls] })),
+      removeAttachedImage: (idx) =>
+        set((s) => ({ attachedImages: s.attachedImages.filter((_, i) => i !== idx) })),
+      clearAttachedImages: () => set({ attachedImages: [] }),
+
+
+
       contentVersions: [],
       activeContentId: null,
       pushContent: (c) => {
@@ -95,8 +112,10 @@ export const useProjectStore = create<ProjectState>()(
           contentVersions: [...s.contentVersions, ver],
           activeContentId: ver.id,
           selectedStyleId: s.selectedStyleId ?? c.recommendedStyle,
+          selectedProfileName: s.selectedProfileName ?? c.recommendedDesignProfile ?? null,
         }));
       },
+
       updateActiveContent: (text) =>
         set((s) => ({
           contentVersions: s.contentVersions.map((x) =>
@@ -156,7 +175,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "infographic-project",
-      version: 3,
+      version: 4,
       migrate: () => undefined as unknown as ProjectState,
       storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
     },
