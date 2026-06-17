@@ -289,7 +289,8 @@ export function designProfileColorsAndRules(profile: DesignProfile | null | unde
     const replacement = hex ?? `(${key})`;
     body = body.replaceAll(`{{${key}}}`, replacement);
   }
-  // Font family: keep placeholder text since concrete family isn't pinned by the profile.
+  const fontLabel = typoStyle?.label ?? FONT_FAMILY_PLACEHOLDER;
+  body = body.replaceAll(FONT_FAMILY_PLACEHOLDER, fontLabel);
   lines.push(body);
 
   return lines.join("\n");
