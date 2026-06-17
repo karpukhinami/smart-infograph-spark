@@ -76,6 +76,10 @@ function Workspace() {
   const briefMode = useProjectStore((s) => s.briefMode);
   const setBriefMode = useProjectStore((s) => s.setBriefMode);
   const pushSpec = useProjectStore((s) => s.pushSpec);
+  const attachedImages = useProjectStore((s) => s.attachedImages);
+  const addAttachedImages = useProjectStore((s) => s.addAttachedImages);
+  const removeAttachedImage = useProjectStore((s) => s.removeAttachedImage);
+
 
   const activeContent = useActiveContent();
   const activeBrief = useActiveBrief();
