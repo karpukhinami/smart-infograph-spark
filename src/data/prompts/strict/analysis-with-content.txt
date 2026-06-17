@@ -250,7 +250,7 @@ sourceMode для этого промпта всегда "text".
 Структура ответа:
 {
 "sourceMode": "text",
-"topic": "string | null",
+"topic": "string ",
 "subject": "string | null",
 "grade": "string | null",
 "summary": "string | null",
