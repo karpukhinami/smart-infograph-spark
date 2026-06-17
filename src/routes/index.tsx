@@ -80,6 +80,7 @@ function SimpleHome() {
   const profiles = useSettingsStore((s) => s.profiles);
 
   const [loading, setLoading] = useState<null | "analyze" | "image">(null);
+  const [imageStage, setImageStage] = useState<null | "brief" | "render">(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
