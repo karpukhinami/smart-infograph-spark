@@ -252,7 +252,7 @@ function SimpleHome() {
   }, [activeContent]);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6 space-y-6">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">AI Infographic Generator</h1>
@@ -263,165 +263,145 @@ function SimpleHome() {
         </Button>
       </div>
 
-      {/* ============ STEP 1 ============ */}
-      <section className="rounded-lg border border-border bg-card p-5 space-y-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Шаг 1. Исходные данные</h2>
-          {activeContent && (
-            <Button size="sm" variant="outline" onClick={onAnalyze} disabled={loading !== null}>
-              {loading === "analyze" ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <RefreshCw className="size-3.5 mr-1" />}
-              Перегенерировать
-            </Button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-12 gap-3">
-          <div className="col-span-12 md:col-span-6">
-            <Label className="text-xs">Тема</Label>
-            <Input value={source.topic || ""} onChange={(e) => setSource({ topic: e.target.value })} placeholder="Что изучаем?" />
-          </div>
-          <div className="col-span-6 md:col-span-3">
-            <Label className="text-xs">Предмет</Label>
-            <Select value={source.subject || ""} onValueChange={(v) => setSource({ subject: v })}>
-              <SelectTrigger><SelectValue placeholder="Выберите предмет" /></SelectTrigger>
-              <SelectContent>
-                {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-span-6 md:col-span-3">
-            <Label className="text-xs">Класс</Label>
-            <Select value={source.grade || ""} onValueChange={(v) => setSource({ grade: v })}>
-              <SelectTrigger><SelectValue placeholder="Выберите класс" /></SelectTrigger>
-              <SelectContent>
-                {GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div>
-          <Label className="text-xs">Дополнительные инструкции</Label>
-          <Textarea
-            rows={2}
-            value={source.userInstructions}
-            onChange={(e) => setSource({ userInstructions: e.target.value })}
-            placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-xs">Исходный материал (необязательно)</Label>
-            <div className="flex gap-1">
-              <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={loading !== null}>
-                <Upload className="size-3.5 mr-1" /> Файл
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => imageInputRef.current?.click()} disabled={loading !== null}>
-                <ImagePlus className="size-3.5 mr-1" /> Картинка
-              </Button>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        {/* ============ LEFT: CONTROLS ============ */}
+        <div className="space-y-4">
+          {/* STEP 1 */}
+          <section className="rounded-lg border border-border bg-card p-5 space-y-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Шаг 1. Исходные данные</h2>
+              {activeContent && (
+                <Button size="sm" variant="outline" onClick={onAnalyze} disabled={loading !== null}>
+                  {loading === "analyze" ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <RefreshCw className="size-3.5 mr-1" />}
+                  Перегенерировать
+                </Button>
+              )}
             </div>
-          </div>
-          <Textarea
-            rows={6}
-            placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки уйдут в модель как мультимодальный вход."
-            value={source.text}
-            onChange={(e) => setSource({ text: e.target.value })}
-            onPaste={onPasteCapture}
-          />
-          {attachedImages.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {attachedImages.map((url, i) => (
-                <div key={i} className="relative">
-                  <img src={url} alt="" className="size-16 object-cover rounded border" />
-                  <button
-                    type="button"
-                    onClick={() => removeAttachedImage(i)}
-                    className="absolute -top-1 -right-1 size-5 rounded-full bg-background border text-xs leading-none"
-                    title="Убрать"
-                  >×</button>
-                </div>
-              ))}
-            </div>
-          )}
-          <input ref={fileInputRef} type="file" accept=".txt,.md,image/*" multiple className="hidden"
-            onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }} />
-          <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden"
-            onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }} />
-        </div>
 
-        {!activeContent && (
-          <Button onClick={onAnalyze} disabled={loading !== null} className="w-full">
-            {loading === "analyze" ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
-            Сформировать контент
-          </Button>
-        )}
-
-        {activeContent && (
-          <div className="rounded-md border border-border bg-background p-4">
-            {summarySections ? (
-              <div className="space-y-6">
-                {summarySections.map((sec, si) => (
-                  <div key={si} className="space-y-4">
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">{sec.sectionLabel}</div>
-                    {sec.blocks.map((b, bi) => (
-                      <div key={bi} className="space-y-2">
-                        {bi > 0 && <hr className="border-border" />}
-                        <SimpleBlock block={b} />
-                      </div>
-                    ))}
-                  </div>
-                ))}
+            <div className="grid grid-cols-12 gap-3">
+              <div className="col-span-12">
+                <Label className="text-xs">Тема</Label>
+                <Input value={source.topic || ""} onChange={(e) => setSource({ topic: e.target.value })} placeholder="Что изучаем?" />
               </div>
-            ) : (
-              <Markdown>{activeContent.value.content}</Markdown>
+              <div className="col-span-6">
+                <Label className="text-xs">Предмет</Label>
+                <Select value={source.subject || ""} onValueChange={(v) => setSource({ subject: v })}>
+                  <SelectTrigger><SelectValue placeholder="Выберите предмет" /></SelectTrigger>
+                  <SelectContent>
+                    {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-6">
+                <Label className="text-xs">Класс</Label>
+                <Select value={source.grade || ""} onValueChange={(v) => setSource({ grade: v })}>
+                  <SelectTrigger><SelectValue placeholder="Выберите класс" /></SelectTrigger>
+                  <SelectContent>
+                    {GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs">Дополнительные инструкции</Label>
+              <Textarea
+                rows={2}
+                value={source.userInstructions}
+                onChange={(e) => setSource({ userInstructions: e.target.value })}
+                placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Исходный материал (необязательно)</Label>
+                <div className="flex gap-1">
+                  <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={loading !== null}>
+                    <Upload className="size-3.5 mr-1" /> Файл
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => imageInputRef.current?.click()} disabled={loading !== null}>
+                    <ImagePlus className="size-3.5 mr-1" /> Картинка
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                rows={6}
+                placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки уйдут в модель как мультимодальный вход."
+                value={source.text}
+                onChange={(e) => setSource({ text: e.target.value })}
+                onPaste={onPasteCapture}
+              />
+              {attachedImages.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {attachedImages.map((url, i) => (
+                    <div key={i} className="relative">
+                      <img src={url} alt="" className="size-16 object-cover rounded border" />
+                      <button
+                        type="button"
+                        onClick={() => removeAttachedImage(i)}
+                        className="absolute -top-1 -right-1 size-5 rounded-full bg-background border text-xs leading-none"
+                        title="Убрать"
+                      >×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <input ref={fileInputRef} type="file" accept=".txt,.md,image/*" multiple className="hidden"
+                onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }} />
+              <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden"
+                onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }} />
+            </div>
+
+            {!activeContent && (
+              <Button onClick={onAnalyze} disabled={loading !== null} className="w-full">
+                {loading === "analyze" ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
+                Сформировать контент
+              </Button>
             )}
-          </div>
-        )}
-      </section>
+          </section>
 
-      {/* ============ STEP 2 ============ */}
-      {activeContent && (
-        <section className="rounded-lg border border-border bg-card p-5 space-y-5">
-          <h2 className="text-lg font-semibold">Шаг 2. Генерация изображения</h2>
+          {/* STEP 2 */}
+          {activeContent && (
+            <section className="rounded-lg border border-border bg-card p-5 space-y-5">
+              <h2 className="text-lg font-semibold">Шаг 2. Генерация изображения</h2>
 
-          <div className="grid grid-cols-12 gap-3">
-            <div className="col-span-12 md:col-span-6">
-              <Label className="text-xs">Стиль инфографики</Label>
-              <Select value={selectedStyleId ?? activeContent.value.recommendedStyle ?? ""} onValueChange={setSelectedStyleId}>
-                <SelectTrigger><SelectValue placeholder="Выберите стиль" /></SelectTrigger>
-                <SelectContent>
-                  {enabledStyles.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-12 md:col-span-6">
-              <Label className="text-xs">Профиль дизайна</Label>
-              <Select value={selectedProfileName ?? activeProfile?.profileName ?? ""} onValueChange={setSelectedProfileName}>
-                <SelectTrigger><SelectValue placeholder="Выберите профиль" /></SelectTrigger>
-                <SelectContent>
-                  {profiles.map((p) => <SelectItem key={p.profileName} value={p.profileName}>{p.profileName}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              <div className="grid grid-cols-12 gap-3">
+                <div className="col-span-12">
+                  <Label className="text-xs">Стиль инфографики</Label>
+                  <Select value={selectedStyleId ?? activeContent.value.recommendedStyle ?? ""} onValueChange={setSelectedStyleId}>
+                    <SelectTrigger><SelectValue placeholder="Выберите стиль" /></SelectTrigger>
+                    <SelectContent>
+                      {enabledStyles.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-12">
+                  <Label className="text-xs">Профиль дизайна</Label>
+                  <Select value={selectedProfileName ?? activeProfile?.profileName ?? ""} onValueChange={setSelectedProfileName}>
+                    <SelectTrigger><SelectValue placeholder="Выберите профиль" /></SelectTrigger>
+                    <SelectContent>
+                      {profiles.map((p) => <SelectItem key={p.profileName} value={p.profileName}>{p.profileName}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <div>
-            <Label className="text-xs">Дополнительные требования к изображению</Label>
-            <Textarea
-              rows={2}
-              value={userWishes}
-              onChange={(e) => setUserWishes(e.target.value)}
-              placeholder="Например: вынести формулу крупно, добавить иконку треугольника, цитата с автором…"
-            />
-          </div>
+              <div>
+                <Label className="text-xs">Дополнительные требования к изображению</Label>
+                <Textarea
+                  rows={2}
+                  value={userWishes}
+                  onChange={(e) => setUserWishes(e.target.value)}
+                  placeholder="Например: вынести формулу крупно, добавить иконку треугольника, цитата с автором…"
+                />
+              </div>
 
-          <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-12 md:col-span-5 space-y-2">
               <Button onClick={onGenerateImage} disabled={loading !== null} className="w-full">
                 {loading === "image" ? <Loader2 className="size-4 mr-2 animate-spin" /> : simpleCurrent ? <RefreshCw className="size-4 mr-2" /> : <Sparkles className="size-4 mr-2" />}
                 {simpleCurrent ? "Перегенерировать" : "Сгенерировать изображение"}
               </Button>
+
               {simpleVersions.length > 0 && (
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Предыдущие версии</div>
@@ -441,8 +421,50 @@ function SimpleHome() {
                   </div>
                 </div>
               )}
+            </section>
+          )}
+        </div>
+
+        {/* ============ RIGHT: RESULTS ============ */}
+        <div className="space-y-4 lg:sticky lg:top-4">
+          {/* Content summary */}
+          <section className="rounded-lg border border-border bg-card p-5 space-y-3">
+            <h2 className="text-lg font-semibold">Контент</h2>
+            <div className="rounded-md border border-border bg-background p-4 min-h-[200px]">
+              {loading === "analyze" && !activeContent ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                  <Loader2 className="size-6 animate-spin" />
+                </div>
+              ) : activeContent ? (
+                summarySections ? (
+                  <div className="space-y-6">
+                    {summarySections.map((sec, si) => (
+                      <div key={si} className="space-y-4">
+                        <div className="text-xs uppercase tracking-wider text-muted-foreground">{sec.sectionLabel}</div>
+                        {sec.blocks.map((b, bi) => (
+                          <div key={bi} className="space-y-2">
+                            {bi > 0 && <hr className="border-border" />}
+                            <SimpleBlock block={b} />
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Markdown>{activeContent.value.content}</Markdown>
+                )
+              ) : (
+                <div className="text-sm text-muted-foreground text-center py-12">
+                  Заполните данные слева и нажмите «Сформировать контент»
+                </div>
+              )}
             </div>
-            <div className="col-span-12 md:col-span-7">
+          </section>
+
+          {/* Image result */}
+          {activeContent && (
+            <section className="rounded-lg border border-border bg-card p-5 space-y-3">
+              <h2 className="text-lg font-semibold">Изображение</h2>
               <div className="rounded-md border border-border bg-background min-h-[320px] flex items-center justify-center overflow-hidden">
                 {loading === "image" ? (
                   <Loader2 className="size-8 animate-spin text-muted-foreground" />
@@ -455,10 +477,10 @@ function SimpleHome() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </section>
-      )}
+            </section>
+          )}
+        </div>
+      </div>
 
       {/* Reset confirm */}
       <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
