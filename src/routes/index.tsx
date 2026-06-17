@@ -80,6 +80,7 @@ function SimpleHome() {
   const profiles = useSettingsStore((s) => s.profiles);
 
   const [loading, setLoading] = useState<null | "analyze" | "image">(null);
+  const [imageStage, setImageStage] = useState<null | "brief" | "render">(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -193,6 +194,7 @@ function SimpleHome() {
     if (!activeStyle) { toast.error("Выберите стиль"); return; }
     try {
       setLoading("image");
+      setImageStage("brief");
       archiveSimple();
 
       // Шаг A: укороченный бриф → PromptForImageGeneration
@@ -224,6 +226,7 @@ function SimpleHome() {
         .join("\n\n");
 
       // Шаг C: генерация картинки
+      setImageStage("render");
       const dataUrl = await callImageLLM({ model: models.image, prompt: finalPrompt });
       setSimpleCurrent({ dataUrl, prompt: finalPrompt });
       toast.success("Готово");
@@ -231,6 +234,7 @@ function SimpleHome() {
       toast.error(e instanceof Error ? e.message : "Не удалось сгенерировать изображение");
     } finally {
       setLoading(null);
+      setImageStage(null);
     }
   }
 
@@ -399,7 +403,9 @@ function SimpleHome() {
 
               <Button onClick={onGenerateImage} disabled={loading !== null} className="w-full">
                 {loading === "image" ? <Loader2 className="size-4 mr-2 animate-spin" /> : simpleCurrent ? <RefreshCw className="size-4 mr-2" /> : <Sparkles className="size-4 mr-2" />}
-                {simpleCurrent ? "Перегенерировать" : "Сгенерировать изображение"}
+                {loading === "image"
+                  ? imageStage === "brief" ? "Шаг 1/2: дизайн-бриф…" : "Шаг 2/2: рисуем изображение…"
+                  : simpleCurrent ? "Перегенерировать" : "Сгенерировать изображение"}
               </Button>
 
               {simpleVersions.length > 0 && (
@@ -467,7 +473,10 @@ function SimpleHome() {
               <h2 className="text-lg font-semibold">Изображение</h2>
               <div className="rounded-md border border-border bg-background min-h-[320px] flex items-center justify-center overflow-hidden">
                 {loading === "image" ? (
-                  <Loader2 className="size-8 animate-spin text-muted-foreground" />
+                  <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
+                    <Loader2 className="size-8 animate-spin" />
+                    <div>{imageStage === "brief" ? "Шаг 1 из 2 — составляем дизайн-бриф…" : "Шаг 2 из 2 — генерируем изображение…"}</div>
+                  </div>
                 ) : simpleCurrent ? (
                   <img src={simpleCurrent.dataUrl} alt="" className="max-w-full max-h-[80vh]" />
                 ) : (
