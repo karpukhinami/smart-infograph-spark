@@ -1,91 +1,84 @@
-## Цель
 
-Добавить в строгий режим переключатель «дизайн-бриф / технический макет» на шаге 2. В положении «технический макет» вместо генерации изображения ИИ создаётся ProgrammaticRenderSpec JSON, который детерминированно рисуется встроенным React-рендерером и показывается на вкладке «Каркас».
+Делаю в 3 этапа. Этапы 1–2 — правки промптов и пайплайна анализа. Этап 3 (новая главная) — только после ваших правок к этапам 1–2.
 
-## UX-изменения
+## Этап 1. Авто-выбор палитры (профиля дизайна)
 
-- Шаг 2: добавляется Tabs «Дизайн-бриф | Технический макет» сверху плашки.
-  - «Дизайн-бриф» — текущее поведение, всё как есть.
-  - «Технический макет» — та же плашка (выбор стиля, профиля, ModelPicker для `models.brief`, PromptDisclosure), но используется промпт из `src/data/prompts/strict/code-based-product.txt`. Кнопка: «Создать технический макет».
-- Шаг 3 в режиме «технический макет» скрывается (рендерер сам делает финал, генерация изображения ИИ не нужна).
-- Результат показывается на вкладке **«Каркас»** (т.к. это векторная DOM-структура, а не растровое изображение). Сверху вкладки — компактная панель «Экспорт PNG» (через `html-to-image`) и кнопка «Перегенерировать».
-- На вкладке «Каркас» включается соответствующий вид: либо текущий `WireframeSketch/WireframeView` (для дизайн-брифа), либо новый `ProgrammaticRenderer` (для технического макета).
-- Список layout-warnings показывается под рендером в свернутой секции.
+В оба файла `src/data/prompts/{strict,free}/analysis-with-content.txt` и `analysis-topic-only.txt` добавляю блок «Auto design profile»:
 
-## Хранение
+- `Оранжевый` — обществознание, экономика, право, история, география, прикладные темы, правила, процессы, гуманитарно-практические темы.
+- `Индиго` — математика, физика, информатика, химия, логика, алгоритмы, формулы, доказательства, научные классификации.
+- Правило: если subject указан явно и не «Другое» → выбор по subject. Если «Другое» → выбор по содержанию.
+- Модель возвращает значение в новом поле `recommendedDesignProfile: "Оранжевый" | "Индиго"` рядом с остальным content-summary.
 
-`useProjectStore`:
-- Новый тип режима шага 2: `briefMode: "design" | "programmatic"`, persisted, по умолчанию `"design"`.
-- Новый массив версий: `specVersions: Versioned<ProgrammaticRenderSpec>[]`, `activeSpecId`, `pushSpec`, `setActiveSpec`. Параллельно `briefVersions` (не смешиваем форматы).
-- `PaneMode` остаётся `content | wireframe | image`; в programmatic-ветке открывается `wireframe`.
+В `src/lib/types.ts` добавлю поле в `ContentSummary` (опциональное), но в `buildDesignBriefPrompt` оно НЕ подставляется и в layer 1/2/3 не уходит — используется только как hint для выпадашки «Профиль дизайна» на шаге 2.
 
-`useSettingsStore`:
-- Добавить в `prompts.strict` поле `codeBasedProduct`, заполняется содержимым `code-based-product.txt`. Версия persisted-стора инкрементируется.
+В `src/routes/index.tsx`: после успешного анализа, если `selectedProfileName` ещё не задан пользователем и `recommendedDesignProfile` пришёл — выставляю его в стор (тот же механизм, что уже есть для `recommendedStyle`).
 
-## Промпт и LLM-вызов
+## Этап 2. Картинки в анализ (мультимодальный вход)
 
-Новая функция `onCreateProgrammaticSpec()` в `src/routes/index.tsx`:
-- Заполняет плейсхолдеры в `prompts.codeBasedProduct` через расширенный `buildDesignBriefPrompt` (используем существующий, он уже подставляет `GENERAL_RULES_BLOCK`, `STYLE_*`, `DESIGN_PROFILE_PROSE`, `CONTENT_SUMMARY`, `USER_WISHES`).
-- Зовёт `callTextLLMForJson` с моделью `models.brief`, парсит и валидирует через `validateRenderSpec`.
-- При ошибке валидации — показывает первую проблему toast-ом + сохраняет сырой ответ для отладки.
+Сейчас при загрузке картинки она прогоняется отдельным OCR-промптом (`recognize-image.txt`) через Gemini и результат вливается в текст. Это удаляет цвет/диаграммы/формулы как «картинки» и теряет смысл.
 
-## Рендерер
+Меняю поведение:
 
-Новые файлы:
+- Картинки и приложенные файлы-изображения хранятся в проектном сторе как `attachedImages: string[]` (data URLs), не вливаются в `source`.
+- В `analyze()` (`src/routes/index.tsx`) передаю их в `callTextLLM({ ..., images: attachedImages })` — поддержка уже есть в `llm-client.ts` и `/api/llm`.
+- В промпт `analysis-with-content.txt` (strict + free) добавляю явный блок: «Если переданы изображения — разбери их сам (текст, формулы, диаграммы, таблицы) и используй наравне с текстом источника. Не игнорируй и не описывай их поверхностно».
+- OCR-кнопку «распознать картинкой» оставляю как fallback (полезно для PDF-сканов до отправки), но по умолчанию ничего не «OCR-ится» — картинки летят в анализатор напрямую.
 
-- `src/lib/render-spec/types.ts` — TS-типы `ProgrammaticRenderSpec`, `RenderRow`, `RenderCard`, `ColorRef`, `AddOnPlacement`, `TitleStyle`, `GroupContainer`, `Theme`, `Header` строго по спецификации промпта.
-- `src/lib/render-spec/validate.ts` — `validateRenderSpec(value, designProfile): { spec, warnings }`. Проверяет:
-  - наличие корневого `ProgrammaticRenderSpec`, `format`, `theme`, `header`, `rows`;
-  - `format.orientation ∈ {portrait, landscape}`, `aspectRatio` соответствует;
-  - `rows` непустой; для каждого row: `id`, `role`, `heightWeight>0`, `cardCount`, `columnRatio` из белого списка `1|1:1|1:2|2:1|1:1:1|2:1:1|1:2:1|1:1:2`, `cards.length === cardCount`, `cardCount` соответствует количеству долей в `columnRatio`;
-  - все hex входят в палитру `designProfile` (pageBackground + brightAccents + pastelFills + structural; case-insensitive);
-  - запрет полей `icon`, `visual`;
-  - `groupContainer === null` если `cardCount === 1`;
-  - все строки `formula` обёрнуты в `$...$` или `$$...$$` (warning, не fatal, если нет).
-  - Возвращает либо валидный spec, либо бросает `Error` с понятным сообщением.
-- `src/lib/render-spec/tokens.ts` — таблицы margin/gap/density/radius/border/shadow/text-scale из ТЗ (точные числа из спецификации).
-- `src/lib/render-spec/layout.ts` — чистые функции:
-  - `computeCanvas(format)` → 1200×1600 / 1600×1200, `base`.
-  - `parseRatio(columnRatio)` → number[].
-  - `computeRowHeights(rows, canvasHeight, margin, gap)`.
-  - `computeCardWidths(row, canvasWidth, margin, gap)`.
-  - `resolveDensity`, `resolveRadius`, `cardPadding`, `blockGap` из density preset.
-- `src/lib/render-spec/fit-text.ts` — `useFitText({ baseFontSize, minFontSize, contentRef, containerRef })` — бинарный поиск размера, измеряет `scrollHeight/clientHeight` и `scrollWidth/clientWidth`. Хук вызывается после рендера через `useLayoutEffect`.
-- `src/components/render-spec/ProgrammaticRenderer.tsx` — корневой компонент:
-  - принимает `spec`, рендерит фиксированный canvas с CSS-переменными темы;
-  - использует `transform: scale(...)` через wrapper по ширине контейнера, не меняя внутренний layout;
-  - рисует header → rows → groupContainer? → cards.
-- `src/components/render-spec/Card.tsx` — карточка: background/border/shadow/radius/padding из card-level или theme; вертикальный flex с blockGap; зоны title/body/formula/example; применяет fillStrategy (`air | centerContent | scaleText | accentShape | largeFormula`); вызывает fit-text для body, formula считается отдельно.
-- `src/components/render-spec/AddOnContainer.tsx` — варианты inset/badge/plate, layout single/horizontalGroup.
-- `src/components/render-spec/CardContent.tsx` — `react-markdown` + `remark-math` + `rehype-katex` для body и formula/example. Поддержка строка | массив строк (массив → набор `<p>`/`<li>` сохраняя порядок).
-- `src/components/render-spec/RowTitle.tsx`.
-- `src/components/render-spec/LayoutWarnings.tsx` — собирает предупреждения через React context (`useLayoutWarnings`), отображает список под рендером.
+### Проверка моделей на мультимодальность
+Все модели в `src/data/openrouter-models.json → text`:
+- `google/gemini-2.5-flash` ✅
+- `google/gemini-3.1-flash-lite` ✅
+- `anthropic/claude-haiku-4.5` ✅
+- `anthropic/claude-sonnet-4.6` ✅
+- `openai/o4-mini-high` ✅
+- `openai/gpt-5.4-mini` ✅
+- `x-ai/grok-4.20` ✅
 
-### Поведение fit-text и warnings
+Все семь принимают image input. Моделей без vision в текущем списке нет. Если когда-нибудь добавите text-only модель — придётся флагом в JSON отмечать и блокировать выбор при наличии картинок; сейчас этой проверки не делаю.
 
-- shared/independent/hierarchical textSizing реализуется через context на уровне Row: каждая карточка регистрирует свой подобранный fontSize, после первого прохода Row выставляет общий минимум и форсит re-render для shared/hierarchical.
-- При overflow-цепочке: уменьшить fontSize → blockGap → padding → пометить карточку failed (visual overlay в режиме отладки `uiMode === "debug"`, иначе только в LayoutWarnings).
+Поднимаю `version` стора (21 → 22), чтобы свежие промпты подтянулись в превью.
 
-### Экспорт
+---
 
-- `bun add html-to-image katex react-katex remark-math rehype-katex react-markdown` (react-markdown скорее всего уже есть, проверить; добавить только недостающее).
-- Кнопка «Экспорт PNG» зовёт `toPng(canvasRef.current, { pixelRatio: 2 })`, скачивает blob.
+## Этап 3 (только после approve правок 1–2). Новая главная + перенос рабочего места
 
-## Файлы, которые редактируем
+### Роутинг
+- Текущий `src/routes/index.tsx` (Workspace) переезжает в `src/routes/workspace.tsx` без изменений логики/промптов. В шапке (`__root.tsx`) добавляю ссылку «Рабочее место».
+- Новый `src/routes/index.tsx` — упрощённая MVP-главная.
 
-- `src/store/useProjectStore.ts` — `briefMode`, `specVersions`, version bump.
-- `src/store/useSettingsStore.ts` — `prompts.strict.codeBasedProduct`, version bump.
-- `src/routes/index.tsx` — Tabs на шаге 2, `onCreateProgrammaticSpec`, скрытие шага 3 в programmatic-ветке, переключение содержимого вкладки «Каркас».
-- `src/components/workspace/WireframeView.tsx` — без изменений.
-- Новые файлы (см. выше).
+### Главная: 2 шага вместо трёх
 
-## Технические детали
+**Шаг 1. Исходные данные → Контент**
+- Та же плашка ввода (subject/grade/тема/источник/файлы/картинки), но без `PromptDisclosure` и без `ModelPicker` — используется промпт из файла и дефолтная text-модель.
+- Картинки передаются мультимодально (этап 2).
+- Результат — визуальный рендер ContentSummary: для каждого раздела (заголовок раздела как разделитель), для каждой entity:
+  - Заголовок (title)
+  - Содержание (content, переносы строк + списки если есть)
+  - Формулы (formula, если есть)
+  - Дополнения — микрозаголовок «Дополнение», содержимое на новой строке
+  - `<hr/>` между entity
+- Никаких технических полей (sectionId, entityType, attention и т.п.), никакого JSON-редактора, никакой «правки ИИ». Остаётся только «Перегенерировать».
 
-- Все числовые константы margin/gap/density/radius/border/text-scale берутся ровно из таблиц в задаче.
-- Нет смешивания типов: `briefVersions` (старый формат) и `specVersions` (новый) живут параллельно. На вкладке «Каркас» отображаем тот, что соответствует текущему `briefMode`.
-- LaTeX-экранирование в JSON уже обрабатывается на стороне `llm-json` (json-repair). Дополнительно перед парсингом KaTeX-формула остаётся как есть.
-- Соответствие вкладок: технический макет — векторный DOM → вкладка «Каркас» (как и просил пользователь — «если векторная структура, то можно вписать в каркас»).
+**Шаг 2. Генерация изображения**
+- Заголовок «Генерация изображения».
+- Выпадашки: стиль инфографики, профиль дизайна (с предзаполнением по `recommendedDesignProfile`). Тумблер brief/wireframe убран.
+- Поле «Дополнительные требования» (текст).
+- Без `PromptDisclosure` и `ModelPicker`. Промпты — из новых файлов в новой папке: `src/data/prompts/simple/design-brief-short.txt` (только `PromptForImageGeneration`, без wireframe sketch) и при необходимости helper. Текст файлов рабочего места не трогаю.
+- По нажатию «Сгенерировать»:
+  1. Зовём text-модель с укороченным брифом → получаем `PromptForImageGeneration`.
+  2. Склеиваем его с двумя автоматическими кусками (как делает шаг 3 в `/workspace`: `designProfileColorsAndRules(profile)` + `executionRulesText`).
+  3. Сразу отправляем в image-модель (дефолтная с шага 3 рабочего места).
+  4. Результат — в правую часть. «Каркаса» (wireframe) на главной нет вообще.
 
-## Открытые вопросы
+### Версии изображения
+- Храним `imageVersions: { dataUrl: string; prompt: string }[]` на текущий проект главной (отдельный кусок стора, чтобы не мешать `/workspace`).
+- При перегенерации контента (шаг 1): текущий «итоговый» очищается, текущий `PromptForImageGeneration` очищается; уже сгенерированные картинки складываются в `versions` и показываются как маленькие иконки `ver.1`, `ver.2`… в панельке возле итогового. Клик по иконке — открыть превью версии.
+- Кнопка «Начать заново» → AlertDialog «Вы уверены? Все сгенерированные изображения будут уничтожены» с OK/Отмена. При OK — всё обнуляется, версии стираются.
 
-Реализую как описано, если возражений нет.
+### Что не меняю
+- Все промпты и логика `/workspace` (бывший `/`) остаются 1-в-1. Новые промпты — в `src/data/prompts/simple/`, со своими `?raw` импортами на новой главной.
+
+---
+
+Подтвердите, что план в порядке (особенно по этапу 3), и я приступаю. Если хотите — могу сначала выкатить только этап 1+2, проверим в превью, и потом этап 3.
