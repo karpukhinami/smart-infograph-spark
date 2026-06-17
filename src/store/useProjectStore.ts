@@ -20,6 +20,13 @@ interface ProjectState {
   setSource: (patch: Partial<SourceText>) => void;
   resetProject: () => void;
 
+  attachedImages: string[]; // data URLs passed to multimodal analysis
+  addAttachedImages: (urls: string[]) => void;
+  removeAttachedImage: (idx: number) => void;
+  clearAttachedImages: () => void;
+
+
+
   contentVersions: Versioned<ContentSummary>[];
   activeContentId: string | null;
   pushContent: (c: ContentSummary) => void;
