@@ -197,6 +197,7 @@ function SimpleHome() {
     try {
       setLoading("image");
       setImageStage("brief");
+      setPaneMode("image");
       archiveSimple();
 
       // Шаг A: укороченный бриф → PromptForImageGeneration
