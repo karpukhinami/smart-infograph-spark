@@ -32,10 +32,10 @@ export function SimpleContentPreview({ analysis, profile }: Props) {
   // Assign alternating pastel index to "normal" entities only.
   let normalRun = 0;
   const items = entities.map((e) => {
-    const att = e.attention ?? "normal";
+    const att = String(e.attention ?? "normal").toLowerCase();
     let bg = c.detailSoftColor;
     let onBg = c.inkColor;
-    if (att === "core") {
+    if (att === "core" || att === "main") {
       bg = c.primaryColor;
       onBg = c.inkColor;
     } else if (att === "accent") {
