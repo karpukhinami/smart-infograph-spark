@@ -523,36 +523,3 @@ function SimpleHome() {
     </div>
   );
 }
-
-function SimpleBlock({ block }: { block: ReturnType<typeof renderSimpleSummary>[number]["blocks"][number] }) {
-  return (
-    <div className="space-y-2">
-      {block.title && <div className="font-semibold text-base">{block.title}</div>}
-      {block.content.length > 0 && (
-        block.content.length === 1
-          ? <div className="text-sm whitespace-pre-wrap">{block.content[0]}</div>
-          : <ul className="list-disc pl-5 text-sm space-y-1">{block.content.map((c, i) => <li key={i}>{c}</li>)}</ul>
-      )}
-      {block.formula.length > 0 && (
-        <div className="space-y-1">
-          {block.formula.map((f, i) => (
-            <div key={i} className="font-mono text-sm bg-muted/40 rounded px-2 py-1">{f}</div>
-          ))}
-        </div>
-      )}
-      {block.addendum.length > 0 && (
-        <div className="space-y-1">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">Дополнение</div>
-          {block.addendum.map((a, i) => (
-            <div key={i} className="text-sm whitespace-pre-wrap">{a}</div>
-          ))}
-        </div>
-      )}
-      {block.items && block.items.length > 0 && (
-        <div className="pl-3 border-l border-border space-y-3 mt-2">
-          {block.items.map((it, i) => <SimpleBlock key={i} block={it} />)}
-        </div>
-      )}
-    </div>
-  );
-}
