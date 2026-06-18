@@ -8,9 +8,7 @@ interface Props {
 
 function asLines(v: string | string[] | null | undefined): string[] {
   if (v == null) return [];
-  return Array.isArray(v)
-    ? v.filter((s) => s != null && String(s).trim() !== "").map(String)
-    : [String(v)];
+  return Array.isArray(v) ? v.filter((s) => s != null && String(s).trim() !== "").map(String) : [String(v)];
 }
 
 const FALLBACK = {
@@ -37,7 +35,7 @@ export function SimpleContentPreview({ analysis, profile }: Props) {
     const att = e.attention ?? "normal";
     let bg = c.detailSoftColor;
     let onBg = c.inkColor;
-    if (att === "main" || att === "core") {
+    if (att === "core") {
       bg = c.primaryColor;
       onBg = c.inkColor;
     } else if (att === "accent") {
@@ -55,38 +53,23 @@ export function SimpleContentPreview({ analysis, profile }: Props) {
   return (
     <div className="space-y-3" style={{ color: c.inkColor }}>
       {/* Header card */}
-      <div
-        className="rounded-xl px-4 py-3"
-        style={{ background: c.headerColor, color: c.lightTextColor }}
-      >
+      <div className="rounded-xl px-4 py-3" style={{ background: c.headerColor, color: c.lightTextColor }}>
         {(analysis.subject || analysis.grade) && (
-          <div
-            className="flex items-center gap-2 text-xs"
-            style={{ color: c.mutedheaderTextColor }}
-          >
+          <div className="flex items-center gap-2 text-xs" style={{ color: c.mutedheaderTextColor }}>
             {analysis.subject && <span>{analysis.subject}</span>}
             {analysis.subject && analysis.grade && (
-              <span
-                className="inline-block size-1.5 rounded-full"
-                style={{ background: c.mutedheaderTextColor }}
-              />
+              <span className="inline-block size-1.5 rounded-full" style={{ background: c.mutedheaderTextColor }} />
             )}
             {analysis.grade && <span>{analysis.grade} класс</span>}
           </div>
         )}
         {analysis.topic && (
-          <div
-            className="mt-1 text-lg font-bold uppercase leading-tight"
-            style={{ color: c.lightTextColor }}
-          >
+          <div className="mt-1 text-lg font-bold uppercase leading-tight" style={{ color: c.lightTextColor }}>
             {analysis.topic}
           </div>
         )}
         {analysis.summary && (
-          <div
-            className="mt-1 text-xs uppercase leading-snug"
-            style={{ color: c.mutedheaderTextColor }}
-          >
+          <div className="mt-1 text-xs uppercase leading-snug" style={{ color: c.mutedheaderTextColor }}>
             {analysis.summary}
           </div>
         )}
@@ -119,10 +102,7 @@ function EntityCard({
   const surfaceStyle: CSSProperties = { background: surface, color: onBg };
 
   return (
-    <div
-      className="rounded-xl p-3 space-y-2"
-      style={{ background: bg, color: onBg }}
-    >
+    <div className="rounded-xl p-3 space-y-2" style={{ background: bg, color: onBg }}>
       {entity.title && <div className="font-bold text-sm">{entity.title}</div>}
       {content.length > 0 &&
         (content.length === 1 ? (
@@ -138,11 +118,7 @@ function EntityCard({
       {formula.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {formula.map((f, i) => (
-            <div
-              key={i}
-              className="rounded-md px-2 py-1 font-mono text-sm inline-block"
-              style={surfaceStyle}
-            >
+            <div key={i} className="rounded-md px-2 py-1 font-mono text-sm inline-block" style={surfaceStyle}>
               {f}
             </div>
           ))}
@@ -158,10 +134,7 @@ function EntityCard({
       )}
 
       {addendum.length > 0 && (
-        <div
-          className="rounded-md px-3 py-2 w-full text-sm space-y-1"
-          style={surfaceStyle}
-        >
+        <div className="rounded-md px-3 py-2 w-full text-sm space-y-1" style={surfaceStyle}>
           {addendum.map((a, i) => (
             <div key={i} className="whitespace-pre-wrap">
               {a}
@@ -173,23 +146,12 @@ function EntityCard({
   );
 }
 
-function GroupItemCard({
-  item,
-  surface,
-  onBg,
-}: {
-  item: AnalysisGroupItem;
-  surface: string;
-  onBg: string;
-}) {
+function GroupItemCard({ item, surface, onBg }: { item: AnalysisGroupItem; surface: string; onBg: string }) {
   const content = asLines(item.content);
   const formula = asLines(item.formula);
   const addendum = asLines(item.cardAddendum);
   return (
-    <div
-      className="rounded-md px-3 py-2 space-y-1 text-sm"
-      style={{ background: surface, color: onBg }}
-    >
+    <div className="rounded-md px-3 py-2 space-y-1 text-sm" style={{ background: surface, color: onBg }}>
       {item.title && <div className="font-bold">{item.title}</div>}
       {content.length > 0 &&
         (content.length === 1 ? (
@@ -204,10 +166,7 @@ function GroupItemCard({
       {formula.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {formula.map((f, i) => (
-            <div
-              key={i}
-              className="rounded px-2 py-0.5 font-mono text-xs inline-block border border-current/20"
-            >
+            <div key={i} className="rounded px-2 py-0.5 font-mono text-xs inline-block border border-current/20">
               {f}
             </div>
           ))}
