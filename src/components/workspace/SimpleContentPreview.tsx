@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { AnalysisEntity, AnalysisGroupItem, AnalysisJson, DesignProfile } from "@/lib/types";
+import { Markdown } from "@/components/workspace/Markdown";
 
 interface Props {
   analysis: AnalysisJson;
