@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
 import {
   WHEEL,
   wheelColorAt,
@@ -86,15 +85,9 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-[1080px] p-0 gap-0 overflow-hidden"
-        showCloseButton={false}
-      >
-        <div className="relative p-5 space-y-4">
-          <DialogClose className="absolute right-3 top-3 rounded-md p-1 hover:bg-muted z-10">
-            <X className="size-4" />
-          </DialogClose>
-
+      <DialogContent className="max-w-[1080px] p-0 gap-0 overflow-hidden">
+        <DialogTitle className="sr-only">Создание новой палитры</DialogTitle>
+        <div className="relative p-5 pt-10 space-y-4">
           {/* Top: hue slider full width */}
           <div className="pr-8">
             <div
