@@ -29,6 +29,7 @@ import simpleBriefPromptRaw from "@/data/prompts/simple/design-brief-short.txt?r
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle } from "@/lib/types";
 import { Markdown } from "@/components/workspace/Markdown";
+import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "AI Infographic Generator" }] }),
@@ -385,12 +386,10 @@ function SimpleHome() {
                 </div>
                 <div className="col-span-12">
                   <Label className="text-xs">Профиль дизайна</Label>
-                  <Select value={selectedProfileName ?? activeProfile?.profileName ?? ""} onValueChange={setSelectedProfileName}>
-                    <SelectTrigger><SelectValue placeholder="Выберите профиль" /></SelectTrigger>
-                    <SelectContent>
-                      {profiles.map((p) => <SelectItem key={p.profileName} value={p.profileName}>{p.profileName}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <ProfileSelect
+                    value={selectedProfileName ?? activeProfile?.profileName ?? ""}
+                    onChange={setSelectedProfileName}
+                  />
                 </div>
               </div>
 

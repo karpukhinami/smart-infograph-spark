@@ -31,6 +31,7 @@ import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } fr
 import { validateRenderSpec } from "@/lib/render-spec/validate";
 import { ProgrammaticRenderer } from "@/components/render-spec/ProgrammaticRenderer";
 import { toPng } from "html-to-image";
+import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
 
 
 export const Route = createFileRoute("/workspace")({
@@ -639,15 +640,10 @@ ${activeContent.value.content}`;
               </div>
               <div>
                 <Label className="text-xs">Профиль дизайна (цвета и шрифты)</Label>
-                <Select
+                <ProfileSelect
                   value={selectedProfileName ?? activeProfile?.profileName ?? ""}
-                  onValueChange={setSelectedProfileName}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {profiles.map((p) => <SelectItem key={p.profileName} value={p.profileName}>{p.profileName}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                  onChange={setSelectedProfileName}
+                />
               </div>
             </div>
             {mode === "strict" && briefMode === "programmatic" ? (
