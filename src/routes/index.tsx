@@ -448,23 +448,12 @@ function SimpleHome() {
                       <Loader2 className="size-6 animate-spin" />
                     </div>
                   ) : activeContent ? (
-                    summarySections ? (
-                      <div className="space-y-6">
-                        {summarySections.map((sec, si) => (
-                          <div key={si} className="space-y-4">
-                            <div className="text-xs uppercase tracking-wider text-muted-foreground">{sec.sectionLabel}</div>
-                            {sec.blocks.map((b, bi) => (
-                              <div key={bi} className="space-y-2">
-                                {bi > 0 && <hr className="border-border" />}
-                                <SimpleBlock block={b} />
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
+                    analysisJson ? (
+                      <SimpleContentPreview analysis={analysisJson} profile={activeProfile ?? null} />
                     ) : (
                       <Markdown>{activeContent.value.content}</Markdown>
                     )
+
                   ) : (
                     <div className="text-sm text-muted-foreground text-center py-12">
                       Заполните данные слева и нажмите «Сформировать контент»
