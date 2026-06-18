@@ -1,6 +1,8 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { AnalysisEntity, AnalysisGroupItem, AnalysisJson, DesignProfile } from "@/lib/types";
 import { Markdown } from "@/components/workspace/Markdown";
+import { EntityEditDialog } from "@/components/workspace/EntityEditDialog";
+import { useProjectStore } from "@/store/useProjectStore";
 
 interface Props {
   analysis: AnalysisJson;
@@ -29,6 +31,8 @@ const FALLBACK = {
 export function SimpleContentPreview({ analysis, profile }: Props) {
   const c = { ...FALLBACK, ...(profile?.colors ?? {}) };
   const entities = analysis.entities ?? [];
+  const updateEntity = useProjectStore((s) => s.updateActiveAnalysisEntity);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   // Assign alternating pastel index to "normal" entities only.
   let normalRun = 0;
@@ -48,8 +52,6 @@ export function SimpleContentPreview({ analysis, profile }: Props) {
     }
     return { e, bg, onBg };
   });
-
-  const titleParts = [analysis.subject, analysis.grade].filter(Boolean).join(" · ");
 
   return (
     <div className="space-y-3" style={{ color: c.inkColor }}>
@@ -78,8 +80,25 @@ export function SimpleContentPreview({ analysis, profile }: Props) {
 
       {/* Entity cards */}
       {items.map(({ e, bg, onBg }, i) => (
-        <EntityCard key={i} entity={e} bg={bg} onBg={onBg} surface={c.surfaceColor} />
+        <button
+          key={i}
+          type="button"
+          onClick={() => setEditIndex(i)}
+          className="block w-full text-left cursor-pointer rounded-xl transition-transform hover:scale-[1.005] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title="Нажмите, чтобы отредактировать"
+        >
+          <EntityCard entity={e} bg={bg} onBg={onBg} surface={c.surfaceColor} />
+        </button>
       ))}
+
+      <EntityEditDialog
+        open={editIndex !== null}
+        entity={editIndex !== null ? entities[editIndex] ?? null : null}
+        onClose={() => setEditIndex(null)}
+        onSave={(patch) => {
+          if (editIndex !== null) updateEntity(editIndex, patch);
+        }}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
+  AnalysisEntity,
   ContentSummary,
   DesignBriefResult,
   SourceText,
@@ -8,6 +9,8 @@ import type {
 } from "@/lib/types";
 import type { ProgrammaticRenderSpec } from "@/lib/render-spec/types";
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from "@/lib/models";
+import { renderAnalysisJson } from "@/lib/analysis-render";
+
 
 export type BriefMode = "design" | "programmatic";
 
@@ -31,7 +34,9 @@ interface ProjectState {
   activeContentId: string | null;
   pushContent: (c: ContentSummary) => void;
   updateActiveContent: (text: string) => void;
+  updateActiveAnalysisEntity: (index: number, patch: Partial<AnalysisEntity>) => void;
   setActiveContent: (id: string) => void;
+
 
   selectedStyleId: string | null;
   setSelectedStyleId: (id: string) => void;
@@ -133,7 +138,28 @@ export const useProjectStore = create<ProjectState>()(
             x.id === s.activeContentId ? { ...x, value: { ...x.value, content: text } } : x,
           ),
         })),
+      updateActiveAnalysisEntity: (index, patch) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const analysis = x.value.analysis;
+            if (!analysis) return x;
+            const entities = analysis.entities.map((e, i) =>
+              i === index ? { ...e, ...patch } : e,
+            );
+            const newAnalysis = { ...analysis, entities };
+            return {
+              ...x,
+              value: {
+                ...x.value,
+                analysis: newAnalysis,
+                content: renderAnalysisJson(newAnalysis),
+              },
+            };
+          }),
+        })),
       setActiveContent: (id) => set({ activeContentId: id }),
+
 
       selectedStyleId: null,
       setSelectedStyleId: (id) => set({ selectedStyleId: id }),
