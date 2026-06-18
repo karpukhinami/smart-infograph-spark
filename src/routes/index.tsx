@@ -23,7 +23,7 @@ import { useSettingsStore, useCurrentStyles } from "@/store/useSettingsStore";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { callTextLLMForJson } from "@/lib/llm-json";
 import { validateAnalysisJson } from "@/lib/analysis-render";
-import { renderSimpleSummary } from "@/lib/simple-content-render";
+import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
 import { buildDesignBriefPrompt, designProfileColorsAndRules } from "@/lib/prompt-injection";
 import simpleBriefPromptRaw from "@/data/prompts/simple/design-brief-short.txt?raw";
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
@@ -254,10 +254,9 @@ function SimpleHome() {
     ? simpleVersions.find((v) => v.id === previewVersion) ?? null
     : null;
 
-  const summarySections = useMemo(() => {
-    const a = activeContent?.value.analysis;
-    return a ? renderSimpleSummary(a) : null;
-  }, [activeContent]);
+  const analysisJson = activeContent?.value.analysis ?? null;
+
+
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6 space-y-4">
@@ -449,23 +448,12 @@ function SimpleHome() {
                       <Loader2 className="size-6 animate-spin" />
                     </div>
                   ) : activeContent ? (
-                    summarySections ? (
-                      <div className="space-y-6">
-                        {summarySections.map((sec, si) => (
-                          <div key={si} className="space-y-4">
-                            <div className="text-xs uppercase tracking-wider text-muted-foreground">{sec.sectionLabel}</div>
-                            {sec.blocks.map((b, bi) => (
-                              <div key={bi} className="space-y-2">
-                                {bi > 0 && <hr className="border-border" />}
-                                <SimpleBlock block={b} />
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
+                    analysisJson ? (
+                      <SimpleContentPreview analysis={analysisJson} profile={activeProfile ?? null} />
                     ) : (
                       <Markdown>{activeContent.value.content}</Markdown>
                     )
+
                   ) : (
                     <div className="text-sm text-muted-foreground text-center py-12">
                       Заполните данные слева и нажмите «Сформировать контент»
@@ -532,39 +520,6 @@ function SimpleHome() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
-}
-
-function SimpleBlock({ block }: { block: ReturnType<typeof renderSimpleSummary>[number]["blocks"][number] }) {
-  return (
-    <div className="space-y-2">
-      {block.title && <div className="font-semibold text-base">{block.title}</div>}
-      {block.content.length > 0 && (
-        block.content.length === 1
-          ? <div className="text-sm whitespace-pre-wrap">{block.content[0]}</div>
-          : <ul className="list-disc pl-5 text-sm space-y-1">{block.content.map((c, i) => <li key={i}>{c}</li>)}</ul>
-      )}
-      {block.formula.length > 0 && (
-        <div className="space-y-1">
-          {block.formula.map((f, i) => (
-            <div key={i} className="font-mono text-sm bg-muted/40 rounded px-2 py-1">{f}</div>
-          ))}
-        </div>
-      )}
-      {block.addendum.length > 0 && (
-        <div className="space-y-1">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">Дополнение</div>
-          {block.addendum.map((a, i) => (
-            <div key={i} className="text-sm whitespace-pre-wrap">{a}</div>
-          ))}
-        </div>
-      )}
-      {block.items && block.items.length > 0 && (
-        <div className="pl-3 border-l border-border space-y-3 mt-2">
-          {block.items.map((it, i) => <SimpleBlock key={i} block={it} />)}
-        </div>
-      )}
     </div>
   );
 }
