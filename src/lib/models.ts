@@ -53,8 +53,8 @@ export const IMAGE_MODELS: ModelOption[] = [
 
 /** Default text model — OpenRouter Gemini 2.5 Flash. */
 export const DEFAULT_TEXT_MODEL = OR_PREFIX + "google/gemini-2.5-flash";
-/** Default image model — OpenRouter auto (free routing). */
-export const DEFAULT_IMAGE_MODEL = OR_PREFIX + "openrouter/auto";
+/** Default image model — Gemini 3.1 Flash Image Preview (Nano Banana 2). */
+export const DEFAULT_IMAGE_MODEL = "google/gemini-3.1-flash-image-preview";
 
 /** True when the UI value resolves to OpenRouter. */
 export function isOpenRouterModel(id: string): boolean {
