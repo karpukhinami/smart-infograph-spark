@@ -240,7 +240,7 @@ function SwatchRow({
             onChange={() => onSelect(i)}
           />
           <span
-            className="block aspect-square rounded-[4px] shadow-sm transition-all peer-checked:ring-2 peer-checked:ring-foreground peer-checked:ring-offset-2 peer-checked:ring-offset-background"
+            className="block h-7 w-full rounded-[3px] shadow-sm transition-all peer-checked:ring-2 peer-checked:ring-foreground peer-checked:ring-offset-2 peer-checked:ring-offset-background"
             style={{ background: c.hex }}
           />
         </label>
