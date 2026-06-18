@@ -83,9 +83,9 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[640px] p-0 gap-0 overflow-hidden bg-background">
+      <DialogContent className="max-w-[540px] p-0 gap-0 overflow-hidden bg-card">
         <DialogTitle className="sr-only">Создание новой палитры</DialogTitle>
-        <div className="relative p-4 pt-9 space-y-3 bg-background">
+        <div className="relative p-4 pt-9 space-y-3 bg-card">
           {/* Hue slider — thin, with narrow ruler-style handle */}
           <div className="pr-7">
             <div
@@ -108,28 +108,24 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
             </div>
           </div>
 
-          <div className="grid gap-4 grid-cols-[160px_1fr] items-start">
+          <div className="grid gap-4 grid-cols-[140px_1fr] items-start">
             {/* LEFT: controls (narrow) */}
             <div className="space-y-3">
               <div
-                className="w-full h-20 rounded-lg shadow-sm"
+                className="w-full h-16 rounded-md shadow-sm"
                 style={{ background: base.hex }}
               />
 
-              <div>
-                <Slider
-                  value={[density]}
-                  onValueChange={(v) => setDensity(v[0] ?? 0)}
-                  min={0}
-                  max={100}
-                  step={1}
-                />
-              </div>
+              <Slider
+                value={[density]}
+                onValueChange={(v) => setDensity(v[0] ?? 0)}
+                min={0}
+                max={100}
+                step={1}
+              />
 
-              <div className="space-y-1">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Контрастная пастель
-                </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Контрастная пастель</Label>
                 <SwatchRow
                   colors={contrastPastels}
                   selected={pastelIdx}
@@ -138,10 +134,8 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
                 />
               </div>
 
-              <div className="space-y-1">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Акцентный цвет
-                </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Акцентный цвет</Label>
                 <SwatchRow
                   colors={accents}
                   selected={accentIdx}
@@ -156,15 +150,18 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
               className="w-full rounded-lg border border-border p-2"
               style={{
                 background: infographicBg.hex,
-                aspectRatio: "1 / 1.414",
+                aspectRatio: "1 / 1.35",
                 fontFamily: FONT_STACK,
               }}
             >
-              <div className="h-full grid gap-1.5" style={{ gridTemplateRows: "auto 1.5fr 1fr 1fr 1.5fr" }}>
+              <div
+                className="h-full grid gap-1.5"
+                style={{ gridTemplateRows: "auto 1.4fr 0.9fr 0.9fr 1.1fr 1.4fr" }}
+              >
                 <MockCard
                   bg={HEADER_COLOR}
                   text={LIGHT_TEXT}
-                  className="uppercase font-extrabold text-[20px] leading-[1.1] tracking-wide flex items-center"
+                  className="uppercase font-extrabold text-[22px] leading-[1.05] tracking-wide flex items-start"
                 >
                   <span>
                     <span style={{ color: base.hex }}>Тестовый</span><br />макет инфографики
@@ -172,11 +169,11 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
                 </MockCard>
 
                 <div
-                  className="rounded-md p-2 flex flex-col gap-1 justify-center min-h-0"
+                  className="rounded-md p-2.5 flex flex-col gap-1.5 justify-start min-h-0"
                   style={{ background: base.hex, color: titleOnBaseColor }}
                 >
                   <TitlePill text="Главная идея" />
-                  <div className="text-[18px] font-extrabold leading-tight">
+                  <div className="text-[20px] font-extrabold leading-tight">
                     словесный <span style={{ color: accent.hex }}>акцент</span>
                   </div>
                 </div>
@@ -193,14 +190,19 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
                 </div>
 
                 <div
-                  className="rounded-md p-2 flex flex-col gap-1 justify-center min-h-0"
+                  className="rounded-md p-2.5 flex flex-col gap-1.5 justify-start min-h-0"
                   style={{ background: contrastPastel.hex, color: INK_COLOR }}
                 >
                   <TitlePill text="Обрати внимание" />
-                  <div className="text-[18px] font-extrabold leading-tight">
+                  <div className="text-[20px] font-extrabold leading-tight">
                     Посмотри на эту красоту!
                   </div>
                 </div>
+
+                <div
+                  className="rounded-md min-h-0"
+                  style={{ background: detailSoftColor }}
+                />
               </div>
             </div>
           </div>
@@ -210,6 +212,7 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
             <Button size="sm" onClick={handleSave}>Сохранить</Button>
           </div>
         </div>
+
       </DialogContent>
     </Dialog>
   );
