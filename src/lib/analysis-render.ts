@@ -221,7 +221,7 @@ export function validateAnalysisJson(raw: unknown): AnalysisJson {
   };
   const normalizeAttention = (v: unknown): AnalysisAttention | undefined => {
     const s = String(v ?? "").toLowerCase();
-    if (s === "main" || s === "normal" || s === "accent") return s;
+    if (s === "main" || s === "core" || s === "normal" || s === "accent") return s;
     return undefined;
   };
 
