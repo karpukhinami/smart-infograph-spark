@@ -104,23 +104,24 @@ function EntityCard({
 
   return (
     <div className="rounded-xl p-3 space-y-2" style={{ background: bg, color: onBg }}>
-      {entity.title && <div className="font-bold text-sm">{entity.title}</div>}
-      {content.length > 0 &&
-        (content.length === 1 ? (
-          <div className="text-sm whitespace-pre-wrap">{content[0]}</div>
+      {entity.title && <div className="font-bold text-sm"><Markdown>{entity.title}</Markdown></div>}
+      {content.length > 0 && (
+        content.length === 1 ? (
+          <div className="text-sm"><Markdown>{content[0]}</Markdown></div>
         ) : (
           <ul className="list-disc pl-5 text-sm space-y-1">
             {content.map((l, i) => (
-              <li key={i}>{l}</li>
+              <li key={i}><Markdown>{l}</Markdown></li>
             ))}
           </ul>
-        ))}
+        )
+      )}
 
       {formula.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {formula.map((f, i) => (
-            <div key={i} className="rounded-md px-2 py-1 font-mono text-sm inline-block" style={surfaceStyle}>
-              {f}
+            <div key={i} className="rounded-md px-2 py-1 text-sm inline-block" style={surfaceStyle}>
+              <Markdown>{wrapMath(f)}</Markdown>
             </div>
           ))}
         </div>
@@ -137,14 +138,20 @@ function EntityCard({
       {addendum.length > 0 && (
         <div className="rounded-md px-3 py-2 w-full text-sm space-y-1" style={surfaceStyle}>
           {addendum.map((a, i) => (
-            <div key={i} className="whitespace-pre-wrap">
-              {a}
-            </div>
+            <div key={i}><Markdown>{a}</Markdown></div>
           ))}
         </div>
       )}
     </div>
   );
+}
+
+function wrapMath(s: string): string {
+  const t = s.trim();
+  if (!t) return s;
+  // Already contains $...$ or $$...$$ delimiters
+  if (/\$.+\$/.test(t)) return s;
+  return `$${t}$`;
 }
 
 function GroupItemCard({ item, surface, onBg }: { item: AnalysisGroupItem; surface: string; onBg: string }) {
