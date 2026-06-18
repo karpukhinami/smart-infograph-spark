@@ -255,11 +255,7 @@ function SimpleHome() {
     : null;
 
   const analysisJson = activeContent?.value.analysis ?? null;
-  const profiles = useSettingsStore((s) => s.profiles);
-  const activeProfile = useMemo(
-    () => profiles.find((p) => p.profileName === selectedProfileName) ?? profiles[0] ?? null,
-    [profiles, selectedProfileName],
-  );
+
 
 
   return (
