@@ -156,7 +156,7 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
             >
               <div
                 className="h-full grid gap-1.5"
-                style={{ gridTemplateRows: "auto 1.4fr 0.9fr 0.9fr 1.1fr 1.4fr" }}
+                style={{ gridTemplateRows: "auto 1.4fr 0.9fr 0.9fr 1.6fr 0.9fr" }}
               >
                 <MockCard
                   bg={HEADER_COLOR}
