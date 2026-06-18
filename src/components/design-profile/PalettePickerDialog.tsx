@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   WHEEL,
   wheelColorAt,
