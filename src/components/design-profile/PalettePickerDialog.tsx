@@ -21,8 +21,8 @@ const LIGHT_TEXT = "#FFFFFF";
 const MUTED_HEADER_TEXT = "#9399BD";
 const SPOT_ACCENT = "#F074FF";
 
-// Geometric grotesque stack (Inter is loaded globally; Manrope/Onest fall back gracefully).
-const FONT_STACK = `"Manrope", "Onest", "Inter", ui-sans-serif, system-ui, sans-serif`;
+// Inherit the app's main UI font so the dialog matches the rest of the interface.
+const FONT_STACK = `inherit`;
 
 const HUE_GRADIENT = `linear-gradient(90deg, ${WHEEL.filter((_, i) => i % 6 === 0).map((w) => w.hex).join(",")})`;
 
@@ -85,7 +85,7 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
       <DialogContent className="max-w-[640px] p-0 gap-0 overflow-hidden bg-background">
         <DialogTitle className="sr-only">Создание новой палитры</DialogTitle>
         <div className="relative p-4 pt-9 space-y-3 bg-background">
-          {/* Hue slider — thin */}
+          {/* Hue slider — thin, with narrow ruler-style handle */}
           <div className="pr-7">
             <div
               className="relative h-3 rounded-full shadow-inner overflow-hidden"
@@ -98,109 +98,106 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
                 step={1}
                 value={hue}
                 onChange={(e) => setHue(Number(e.target.value))}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
               <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-5 rounded-full border-[3px] border-foreground bg-background shadow-md pointer-events-none"
-                style={{ left: `${(hue / 359) * 100}%` }}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 pointer-events-none rounded-[3px] border-2 border-foreground bg-background shadow-md"
+                style={{ left: `${(hue / 359) * 100}%`, width: 8, height: 20 }}
               />
             </div>
           </div>
 
-          {/* Framed area: outer = app bg, inner = infographic bg */}
-          <div className="rounded-xl border border-border p-3" style={{ background: infographicBg.hex }}>
-            <div className="grid gap-3 grid-cols-2 items-start">
-              {/* LEFT: controls */}
-              <div className="space-y-3">
-                <div
-                  className="w-full h-24 rounded-lg shadow-sm"
-                  style={{ background: base.hex }}
+          <div className="grid gap-4 grid-cols-[160px_1fr] items-start">
+            {/* LEFT: controls (narrow) */}
+            <div className="space-y-3">
+              <div
+                className="w-full h-20 rounded-lg shadow-sm"
+                style={{ background: base.hex }}
+              />
+
+              <div>
+                <Slider
+                  value={[density]}
+                  onValueChange={(v) => setDensity(v[0] ?? 0)}
+                  min={0}
+                  max={100}
+                  step={1}
                 />
-
-                <div>
-                  <Slider
-                    value={[density]}
-                    onValueChange={(v) => setDensity(v[0] ?? 0)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Контрастная пастель
-                  </div>
-                  <SwatchRow
-                    colors={contrastPastels}
-                    selected={pastelIdx}
-                    onSelect={setPastelIdx}
-                    name="contrast-pastel"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Акцентный цвет
-                  </div>
-                  <SwatchRow
-                    colors={accents}
-                    selected={accentIdx}
-                    onSelect={setAccentIdx}
-                    name="accent-color"
-                  />
-                </div>
               </div>
 
-              {/* RIGHT: A4 portrait mock */}
-              <div
-                className="w-full rounded-lg p-2 mx-auto"
-                style={{
-                  background: infographicBg.hex,
-                  aspectRatio: "1 / 1.414",
-                  fontFamily: FONT_STACK,
-                }}
-              >
-                <div className="h-full flex flex-col gap-1.5">
-                  <MockCard
-                    bg={HEADER_COLOR}
-                    text={LIGHT_TEXT}
-                    className="uppercase font-extrabold text-[14px] tracking-wide flex items-center"
-                  >
-                    <span>
-                      <span style={{ color: base.hex }}>Тест</span> макета
-                    </span>
-                  </MockCard>
+              <div className="space-y-1">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Контрастная пастель
+                </div>
+                <SwatchRow
+                  colors={contrastPastels}
+                  selected={pastelIdx}
+                  onSelect={setPastelIdx}
+                  name="contrast-pastel"
+                />
+              </div>
 
-                  <div
-                    className="rounded-md p-2 flex flex-col gap-1 justify-center"
-                    style={{ background: base.hex, color: titleOnBaseColor, minHeight: 0 }}
-                  >
-                    <TitlePill text="Главная идея" />
-                    <div className="text-[13px] font-extrabold leading-tight">
-                      словесный <span style={{ color: accent.hex }}>акцент</span>
-                    </div>
+              <div className="space-y-1">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Акцентный цвет
+                </div>
+                <SwatchRow
+                  colors={accents}
+                  selected={accentIdx}
+                  onSelect={setAccentIdx}
+                  name="accent-color"
+                />
+              </div>
+            </div>
+
+            {/* RIGHT: A4 portrait mock — bordered, infographic bg inside only */}
+            <div
+              className="w-full rounded-lg border border-border p-2"
+              style={{
+                background: infographicBg.hex,
+                aspectRatio: "1 / 1.414",
+                fontFamily: FONT_STACK,
+              }}
+            >
+              <div className="h-full grid gap-1.5" style={{ gridTemplateRows: "auto 1.5fr 1fr 1fr 1.5fr" }}>
+                <MockCard
+                  bg={HEADER_COLOR}
+                  text={LIGHT_TEXT}
+                  className="uppercase font-extrabold text-[20px] leading-[1.1] tracking-wide flex items-center"
+                >
+                  <span>
+                    <span style={{ color: base.hex }}>Тестовый</span><br />макет инфографики
+                  </span>
+                </MockCard>
+
+                <div
+                  className="rounded-md p-2 flex flex-col gap-1 justify-center min-h-0"
+                  style={{ background: base.hex, color: titleOnBaseColor }}
+                >
+                  <TitlePill text="Главная идея" />
+                  <div className="text-[18px] font-extrabold leading-tight">
+                    словесный <span style={{ color: accent.hex }}>акцент</span>
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-3 gap-1.5 flex-1 min-h-0">
-                    <MockCard bg={detailDeepColor} text={INK_COLOR} />
-                    <MockCard bg={detailSoftColor} text={INK_COLOR} />
-                    <MockCard bg={detailDeepColor} text={INK_COLOR} />
-                  </div>
+                <div className="grid grid-cols-3 gap-1.5 min-h-0">
+                  <MockCard bg={detailDeepColor} text={INK_COLOR} />
+                  <MockCard bg={detailSoftColor} text={INK_COLOR} />
+                  <MockCard bg={detailDeepColor} text={INK_COLOR} />
+                </div>
 
-                  <div className="grid grid-cols-2 gap-1.5 flex-1 min-h-0">
-                    <MockCard bg={detailSoftColor} text={INK_COLOR} />
-                    <MockCard bg={detailDeepColor} text={INK_COLOR} />
-                  </div>
+                <div className="grid grid-cols-2 gap-1.5 min-h-0">
+                  <MockCard bg={detailSoftColor} text={INK_COLOR} />
+                  <MockCard bg={detailDeepColor} text={INK_COLOR} />
+                </div>
 
-                  <div
-                    className="rounded-md p-2 flex flex-col gap-1 justify-center"
-                    style={{ background: contrastPastel.hex, color: INK_COLOR }}
-                  >
-                    <TitlePill text="Обрати внимание" />
-                    <div className="text-[13px] font-extrabold leading-tight">
-                      Посмотри на эту красоту!
-                    </div>
+                <div
+                  className="rounded-md p-2 flex flex-col gap-1 justify-center min-h-0"
+                  style={{ background: contrastPastel.hex, color: INK_COLOR }}
+                >
+                  <TitlePill text="Обрати внимание" />
+                  <div className="text-[18px] font-extrabold leading-tight">
+                    Посмотри на эту красоту!
                   </div>
                 </div>
               </div>
@@ -229,7 +226,7 @@ function SwatchRow({
   name: string;
 }) {
   return (
-    <div className="grid grid-cols-5 gap-2">
+    <div className="grid grid-cols-5 gap-1.5">
       {colors.map((c, i) => (
         <label key={`${name}-${i}`} className="block cursor-pointer">
           <input
@@ -240,7 +237,7 @@ function SwatchRow({
             onChange={() => onSelect(i)}
           />
           <span
-            className="block h-7 w-full rounded-[3px] shadow-sm transition-all peer-checked:ring-2 peer-checked:ring-foreground peer-checked:ring-offset-2 peer-checked:ring-offset-background"
+            className="block aspect-square w-full shadow-sm transition-all peer-checked:ring-2 peer-checked:ring-foreground peer-checked:ring-offset-1 peer-checked:ring-offset-background"
             style={{ background: c.hex }}
           />
         </label>
