@@ -160,22 +160,23 @@ function GroupItemCard({ item, surface, onBg }: { item: AnalysisGroupItem; surfa
   const addendum = asLines(item.cardAddendum);
   return (
     <div className="rounded-md px-3 py-2 space-y-1 text-sm" style={{ background: surface, color: onBg }}>
-      {item.title && <div className="font-bold">{item.title}</div>}
-      {content.length > 0 &&
-        (content.length === 1 ? (
-          <div className="whitespace-pre-wrap">{content[0]}</div>
+      {item.title && <div className="font-bold"><Markdown>{item.title}</Markdown></div>}
+      {content.length > 0 && (
+        content.length === 1 ? (
+          <div><Markdown>{content[0]}</Markdown></div>
         ) : (
           <ul className="list-disc pl-5 space-y-0.5">
             {content.map((l, i) => (
-              <li key={i}>{l}</li>
+              <li key={i}><Markdown>{l}</Markdown></li>
             ))}
           </ul>
-        ))}
+        )
+      )}
       {formula.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {formula.map((f, i) => (
-            <div key={i} className="rounded px-2 py-0.5 font-mono text-xs inline-block border border-current/20">
-              {f}
+            <div key={i} className="rounded px-2 py-0.5 text-xs inline-block border border-current/20">
+              <Markdown>{wrapMath(f)}</Markdown>
             </div>
           ))}
         </div>
@@ -183,9 +184,7 @@ function GroupItemCard({ item, surface, onBg }: { item: AnalysisGroupItem; surfa
       {addendum.length > 0 && (
         <div className="text-xs opacity-80 space-y-0.5">
           {addendum.map((a, i) => (
-            <div key={i} className="whitespace-pre-wrap">
-              {a}
-            </div>
+            <div key={i}><Markdown>{a}</Markdown></div>
           ))}
         </div>
       )}
