@@ -138,7 +138,28 @@ export const useProjectStore = create<ProjectState>()(
             x.id === s.activeContentId ? { ...x, value: { ...x.value, content: text } } : x,
           ),
         })),
+      updateActiveAnalysisEntity: (index, patch) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const analysis = x.value.analysis;
+            if (!analysis) return x;
+            const entities = analysis.entities.map((e, i) =>
+              i === index ? { ...e, ...patch } : e,
+            );
+            const newAnalysis = { ...analysis, entities };
+            return {
+              ...x,
+              value: {
+                ...x.value,
+                analysis: newAnalysis,
+                content: renderAnalysisJson(newAnalysis),
+              },
+            };
+          }),
+        })),
       setActiveContent: (id) => set({ activeContentId: id }),
+
 
       selectedStyleId: null,
       setSelectedStyleId: (id) => set({ selectedStyleId: id }),
