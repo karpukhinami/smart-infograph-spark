@@ -21,8 +21,8 @@ const LIGHT_TEXT = "#FFFFFF";
 const MUTED_HEADER_TEXT = "#9399BD";
 const SPOT_ACCENT = "#F074FF";
 
-// Geometric grotesque stack (Inter is loaded globally; Manrope/Onest fall back gracefully).
-const FONT_STACK = `"Manrope", "Onest", "Inter", ui-sans-serif, system-ui, sans-serif`;
+// Inherit the app's main UI font so the dialog matches the rest of the interface.
+const FONT_STACK = `inherit`;
 
 const HUE_GRADIENT = `linear-gradient(90deg, ${WHEEL.filter((_, i) => i % 6 === 0).map((w) => w.hex).join(",")})`;
 
