@@ -226,7 +226,7 @@ function SwatchRow({
   name: string;
 }) {
   return (
-    <div className="grid grid-cols-5 gap-2">
+    <div className="grid grid-cols-5 gap-1.5">
       {colors.map((c, i) => (
         <label key={`${name}-${i}`} className="block cursor-pointer">
           <input
@@ -237,7 +237,7 @@ function SwatchRow({
             onChange={() => onSelect(i)}
           />
           <span
-            className="block h-7 w-full rounded-[3px] shadow-sm transition-all peer-checked:ring-2 peer-checked:ring-foreground peer-checked:ring-offset-2 peer-checked:ring-offset-background"
+            className="block aspect-square w-full shadow-sm transition-all peer-checked:ring-2 peer-checked:ring-foreground peer-checked:ring-offset-1 peer-checked:ring-offset-background"
             style={{ background: c.hex }}
           />
         </label>
