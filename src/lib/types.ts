@@ -98,7 +98,7 @@ export interface WireframeDescription {
 
 /** Section ids in the strict-mode analysis JSON. */
 export type AnalysisSectionId = "prerequisites" | "main" | "additions";
-export type AnalysisAttention = "main" | "normal" | "accent";
+export type AnalysisAttention = "main" | "core" | "normal" | "accent";
 
 /** Nested item inside a group entity (factGroup, algorithmGroup). */
 export interface AnalysisGroupItem {

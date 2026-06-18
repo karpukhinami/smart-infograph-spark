@@ -37,7 +37,7 @@ export function SimpleContentPreview({ analysis, profile }: Props) {
     const att = e.attention ?? "normal";
     let bg = c.detailSoftColor;
     let onBg = c.inkColor;
-    if (att === "main") {
+    if (att === "main" || att === "core") {
       bg = c.primaryColor;
       onBg = c.inkColor;
     } else if (att === "accent") {
