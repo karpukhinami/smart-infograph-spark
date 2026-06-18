@@ -258,11 +258,11 @@ export function validateAnalysisJson(raw: unknown): AnalysisJson {
     };
   });
 
-  // Sanity check: at most one entity with attention="main".
-  const mainCount = entities.filter((e) => e.attention === "main").length;
+  // Sanity check: at most one entity with attention="main" or "core".
+  const mainCount = entities.filter((e) => e.attention === "main" || e.attention === "core").length;
   const warnings = Array.isArray(o.warnings) ? (o.warnings as string[]) : [];
   if (mainCount > 1) {
-    warnings.push(`Внимание: в ответе модели найдено несколько сущностей с attention="main" (${mainCount}).`);
+    warnings.push(`Внимание: в ответе модели найдено несколько сущностей с attention="main"/"core" (${mainCount}).`);
   }
 
   const rdpRaw = typeof o.recommendedDesignProfile === "string" ? o.recommendedDesignProfile.trim() : "";
