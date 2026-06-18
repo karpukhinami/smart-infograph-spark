@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
+  AnalysisEntity,
   ContentSummary,
   DesignBriefResult,
   SourceText,
@@ -8,6 +9,8 @@ import type {
 } from "@/lib/types";
 import type { ProgrammaticRenderSpec } from "@/lib/render-spec/types";
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from "@/lib/models";
+import { renderAnalysisJson } from "@/lib/analysis-render";
+
 
 export type BriefMode = "design" | "programmatic";
 
