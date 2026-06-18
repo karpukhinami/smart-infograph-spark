@@ -23,7 +23,7 @@ import { useSettingsStore, useCurrentStyles } from "@/store/useSettingsStore";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { callTextLLMForJson } from "@/lib/llm-json";
 import { validateAnalysisJson } from "@/lib/analysis-render";
-import { renderSimpleSummary } from "@/lib/simple-content-render";
+import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
 import { buildDesignBriefPrompt, designProfileColorsAndRules } from "@/lib/prompt-injection";
 import simpleBriefPromptRaw from "@/data/prompts/simple/design-brief-short.txt?raw";
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
