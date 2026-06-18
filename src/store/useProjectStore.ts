@@ -34,7 +34,9 @@ interface ProjectState {
   activeContentId: string | null;
   pushContent: (c: ContentSummary) => void;
   updateActiveContent: (text: string) => void;
+  updateActiveAnalysisEntity: (index: number, patch: Partial<AnalysisEntity>) => void;
   setActiveContent: (id: string) => void;
+
 
   selectedStyleId: string | null;
   setSelectedStyleId: (id: string) => void;
