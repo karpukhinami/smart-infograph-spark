@@ -254,10 +254,13 @@ function SimpleHome() {
     ? simpleVersions.find((v) => v.id === previewVersion) ?? null
     : null;
 
-  const summarySections = useMemo(() => {
-    const a = activeContent?.value.analysis;
-    return a ? renderSimpleSummary(a) : null;
-  }, [activeContent]);
+  const analysisJson = activeContent?.value.analysis ?? null;
+  const profiles = useSettingsStore((s) => s.profiles);
+  const activeProfile = useMemo(
+    () => profiles.find((p) => p.profileName === selectedProfileName) ?? profiles[0] ?? null,
+    [profiles, selectedProfileName],
+  );
+
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6 space-y-4">
