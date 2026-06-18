@@ -63,7 +63,7 @@ function renderFormula(f: string): string {
 }
 
 function attentionBadge(a: AnalysisAttention | undefined): string {
-  if (a === "main") return " 🟢 **ЯДРО**";
+  if (a === "main" || a === "core") return " 🟢 **ЯДРО**";
   if (a === "accent") return " 🟠 _акцент_";
   return "";
 }
