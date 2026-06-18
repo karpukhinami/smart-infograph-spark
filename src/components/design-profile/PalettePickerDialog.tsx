@@ -35,19 +35,16 @@ interface Props {
 }
 
 export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, notesTemplate }: Props) {
-  const [hue, setHue] = useState(28); // pleasant orange-ish start
+  const [hue, setHue] = useState(28);
   const [density, setDensity] = useState(50);
+  const [pastelIdx, setPastelIdx] = useState(2);
   const [accentIdx, setAccentIdx] = useState(2);
 
   const base: Color = useMemo(() => wheelColorAt(hue, "base"), [hue]);
   const infographicBg = useMemo(() => getInfographicBackground(base), [base]);
   const pastels = useMemo(() => getPastels(base, infographicBg, density), [base, infographicBg, density]);
-  const denseBasePastel = pastels[0]; // detailSoftColor (lighter pastel? see below)
-  const lightBasePastel = pastels[2];
-  // Per user: detailSoft = lighter pastel, detailDeep = darker pastel.
-  // pastels[0] is densest (darker), pastels[2] is lightest.
-  const detailSoftColor = lightBasePastel.hex;
-  const detailDeepColor = denseBasePastel.hex;
+  const detailSoftColor = pastels[2].hex; // lightest
+  const detailDeepColor = pastels[0].hex; // densest
 
   const accents = useMemo(() => getAccentColors(base), [base]);
   const contrastPastels = useMemo(
@@ -56,7 +53,7 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
   );
 
   const accent = accents[accentIdx];
-  const contrastPastel = contrastPastels[accentIdx];
+  const contrastPastel = contrastPastels[pastelIdx];
 
   const handleSave = () => {
     const colors: DesignProfileColors = {
@@ -85,13 +82,13 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1080px] p-0 gap-0 overflow-hidden">
+      <DialogContent className="max-w-[640px] p-0 gap-0 overflow-hidden bg-background">
         <DialogTitle className="sr-only">Создание новой палитры</DialogTitle>
-        <div className="relative p-5 pt-10 space-y-4">
-          {/* Top: hue slider full width */}
-          <div className="pr-8">
+        <div className="relative p-4 pt-9 space-y-3 bg-background">
+          {/* Hue slider — thin */}
+          <div className="pr-7">
             <div
-              className="relative h-8 rounded-full shadow-inner overflow-hidden"
+              className="relative h-3 rounded-full shadow-inner overflow-hidden"
               style={{ background: HUE_GRADIENT }}
             >
               <input
@@ -104,107 +101,115 @@ export function PalettePickerDialog({ open, onOpenChange, defaultName, onSave, n
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
               <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-8 rounded-full border-[4px] border-foreground bg-background shadow-md pointer-events-none"
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-5 rounded-full border-[3px] border-foreground bg-background shadow-md pointer-events-none"
                 style={{ left: `${(hue / 359) * 100}%` }}
               />
             </div>
           </div>
 
-          <div className="grid gap-5 grid-cols-[minmax(360px,0.85fr)_minmax(340px,1fr)] items-start">
-            {/* LEFT: controls */}
-            <div className="space-y-4">
-              {/* Base color rectangle */}
-              <div
-                className="w-full h-40 rounded-xl shadow-md"
-                style={{ background: base.hex }}
-              />
-
-              {/* Density slider */}
-              <div>
-                <Slider
-                  value={[density]}
-                  onValueChange={(v) => setDensity(v[0] ?? 0)}
-                  min={0}
-                  max={100}
-                  step={1}
+          {/* Framed area: outer = app bg, inner = infographic bg */}
+          <div className="rounded-xl border border-border p-3" style={{ background: infographicBg.hex }}>
+            <div className="grid gap-3 grid-cols-2 items-start">
+              {/* LEFT: controls */}
+              <div className="space-y-3">
+                <div
+                  className="w-full h-24 rounded-lg shadow-sm"
+                  style={{ background: base.hex }}
                 />
+
+                <div>
+                  <Slider
+                    value={[density]}
+                    onValueChange={(v) => setDensity(v[0] ?? 0)}
+                    min={0}
+                    max={100}
+                    step={1}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Контрастная пастель
+                  </div>
+                  <SwatchRow
+                    colors={contrastPastels}
+                    selected={pastelIdx}
+                    onSelect={setPastelIdx}
+                    name="contrast-pastel"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Акцентный цвет
+                  </div>
+                  <SwatchRow
+                    colors={accents}
+                    selected={accentIdx}
+                    onSelect={setAccentIdx}
+                    name="accent-color"
+                  />
+                </div>
               </div>
 
-              {/* Row 1: contrast pastels */}
-              <SwatchRow
-                colors={contrastPastels}
-                selected={accentIdx}
-                onSelect={setAccentIdx}
-                name="contrast-pastel"
-              />
+              {/* RIGHT: A4 portrait mock */}
+              <div
+                className="w-full rounded-lg p-2 mx-auto"
+                style={{
+                  background: infographicBg.hex,
+                  aspectRatio: "1 / 1.414",
+                  fontFamily: FONT_STACK,
+                }}
+              >
+                <div className="h-full flex flex-col gap-1.5">
+                  <MockCard
+                    bg={HEADER_COLOR}
+                    text={LIGHT_TEXT}
+                    className="uppercase font-extrabold text-[14px] tracking-wide flex items-center"
+                  >
+                    <span>
+                      <span style={{ color: base.hex }}>Тест</span> макета
+                    </span>
+                  </MockCard>
 
-              {/* Row 2: accent colors */}
-              <SwatchRow
-                colors={accents}
-                selected={accentIdx}
-                onSelect={setAccentIdx}
-                name="accent-color"
-              />
-            </div>
-
-            {/* RIGHT: A4 portrait mock */}
-            <div
-              className="w-full rounded-xl p-4 mx-auto"
-              style={{
-                background: infographicBg.hex,
-                aspectRatio: "1 / 1.414",
-                fontFamily: FONT_STACK,
-                maxWidth: 460,
-              }}
-            >
-              <div className="h-full flex flex-col gap-2">
-                <MockCard
-                  bg={HEADER_COLOR}
-                  text={LIGHT_TEXT}
-                  className="uppercase font-extrabold text-[20px] tracking-wide flex items-center"
-                >
-                  <span>
-                    <span style={{ color: base.hex }}>Тест</span> макета
-                  </span>
-                </MockCard>
-
-                <div
-                  className="rounded-lg p-3 flex flex-col gap-2 justify-center"
-                  style={{ background: base.hex, color: titleOnBaseColor, minHeight: 0 }}
-                >
-                  <TitlePill text="Главная идея" />
-                  <div className="text-[18px] font-extrabold leading-tight">
-                    словесный <span style={{ color: accent.hex }}>акцент</span>
+                  <div
+                    className="rounded-md p-2 flex flex-col gap-1 justify-center"
+                    style={{ background: base.hex, color: titleOnBaseColor, minHeight: 0 }}
+                  >
+                    <TitlePill text="Главная идея" />
+                    <div className="text-[13px] font-extrabold leading-tight">
+                      словесный <span style={{ color: accent.hex }}>акцент</span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-3 gap-2 flex-1 min-h-0">
-                  <MockCard bg={detailDeepColor} text={INK_COLOR} />
-                  <MockCard bg={detailSoftColor} text={INK_COLOR} />
-                  <MockCard bg={detailDeepColor} text={INK_COLOR} />
-                </div>
+                  <div className="grid grid-cols-3 gap-1.5 flex-1 min-h-0">
+                    <MockCard bg={detailDeepColor} text={INK_COLOR} />
+                    <MockCard bg={detailSoftColor} text={INK_COLOR} />
+                    <MockCard bg={detailDeepColor} text={INK_COLOR} />
+                  </div>
 
-                <div className="grid grid-cols-2 gap-2 flex-1 min-h-0">
-                  <MockCard bg={detailSoftColor} text={INK_COLOR} />
-                  <MockCard bg={detailDeepColor} text={INK_COLOR} />
-                </div>
+                  <div className="grid grid-cols-2 gap-1.5 flex-1 min-h-0">
+                    <MockCard bg={detailSoftColor} text={INK_COLOR} />
+                    <MockCard bg={detailDeepColor} text={INK_COLOR} />
+                  </div>
 
-                <div
-                  className="rounded-lg p-3 flex flex-col gap-2 justify-center"
-                  style={{ background: contrastPastel.hex, color: INK_COLOR }}
-                >
-                  <TitlePill text="Обрати внимание" />
-                  <div className="text-[18px] font-extrabold leading-tight">
-                    Посмотри на эту красоту!
+                  <div
+                    className="rounded-md p-2 flex flex-col gap-1 justify-center"
+                    style={{ background: contrastPastel.hex, color: INK_COLOR }}
+                  >
+                    <TitlePill text="Обрати внимание" />
+                    <div className="text-[13px] font-extrabold leading-tight">
+                      Посмотри на эту красоту!
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
-            <Button onClick={handleSave}>Сохранить</Button>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Отмена</Button>
+            <Button size="sm" onClick={handleSave}>Сохранить</Button>
           </div>
         </div>
       </DialogContent>
@@ -235,7 +240,7 @@ function SwatchRow({
             onChange={() => onSelect(i)}
           />
           <span
-            className="block aspect-square rounded-[4px] shadow-sm transition-all peer-checked:ring-2 peer-checked:ring-foreground peer-checked:ring-offset-2 peer-checked:ring-offset-background"
+            className="block h-7 w-full rounded-[3px] shadow-sm transition-all peer-checked:ring-2 peer-checked:ring-foreground peer-checked:ring-offset-2 peer-checked:ring-offset-background"
             style={{ background: c.hex }}
           />
         </label>
