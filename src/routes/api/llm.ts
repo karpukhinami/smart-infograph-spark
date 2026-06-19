@@ -115,7 +115,13 @@ export const Route = createFileRoute("/api/llm")({
           upstream = await fetch(upstreamUrl, {
             method: "POST",
             headers,
-            body: JSON.stringify({ model: resolveUpstreamModelId(body.model), messages, max_tokens: 16000 }),
+            body: JSON.stringify({
+              model: resolveUpstreamModelId(body.model),
+              messages,
+              max_tokens: 16000,
+              // Просим OpenRouter вернуть фактическую стоимость в usage.cost
+              ...(useOpenRouter ? { usage: { include: true } } : {}),
+            }),
             signal: controller.signal,
           });
         } catch (e) {
