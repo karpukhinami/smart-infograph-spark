@@ -56,6 +56,7 @@ export const Route = createFileRoute("/api/generate-image")({
                 model: resolveUpstreamModelId(body.model),
                 messages: [{ role: "user", content: body.prompt }],
                 modalities: ["image", "text"],
+                usage: { include: true },
               }),
               signal: controller.signal,
             });
