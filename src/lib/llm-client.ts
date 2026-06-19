@@ -8,6 +8,8 @@ interface UsagePayload {
   input_tokens?: number;
   output_tokens?: number;
   total_tokens?: number;
+  /** OpenRouter возвращает фактическую стоимость запроса в USD. */
+  cost?: number;
 }
 
 function recordUsage(
@@ -19,7 +21,12 @@ function recordUsage(
   const inputTokens = usage.prompt_tokens ?? usage.input_tokens ?? 0;
   const outputTokens = usage.completion_tokens ?? usage.output_tokens ?? 0;
   const totalTokens = usage.total_tokens ?? inputTokens + outputTokens;
-  const costUsd = computeCost(model, inputTokens, outputTokens, kind);
+  // Если апстрим (OpenRouter) сообщил фактическую стоимость — используем её напрямую,
+  // иначе считаем по тарифной таблице.
+  const costUsd =
+    typeof usage.cost === "number" && Number.isFinite(usage.cost) && usage.cost >= 0
+      ? usage.cost
+      : computeCost(model, inputTokens, outputTokens, kind);
   useUsageStore
     .getState()
     .add({ model, inputTokens, outputTokens, totalTokens, costUsd, kind, at: Date.now() });
