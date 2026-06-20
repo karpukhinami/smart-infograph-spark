@@ -179,6 +179,51 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
             </RadioGroup>
           </div>
 
+          <div className="rounded-md border border-border">
+            <button
+              type="button"
+              onClick={() => setVisualOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-muted/50"
+              aria-expanded={visualOpen}
+            >
+              <span>Визуал</span>
+              <span className="text-muted-foreground text-xs">{visualOpen ? "▲" : "▼"}</span>
+            </button>
+            {visualOpen && (
+              <div className="px-3 pb-3 pt-1 space-y-3 border-t border-border">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ent-icon">Иконка</Label>
+                  <Input
+                    id="ent-icon"
+                    value={icon}
+                    onChange={(e) => setIcon(e.target.value)}
+                    placeholder="Например: lightbulb или эмодзи"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ent-visual-type">Тип картинки</Label>
+                  <Input
+                    id="ent-visual-type"
+                    value={visualType}
+                    onChange={(e) => setVisualType(e.target.value)}
+                    placeholder="Например: schema, photo, diagram"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ent-visual-desc">Описание картинки</Label>
+                  <Textarea
+                    id="ent-visual-desc"
+                    value={visualDescription}
+                    onChange={(e) => setVisualDescription(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+
+
           {validationError && (
             <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {validationError}
