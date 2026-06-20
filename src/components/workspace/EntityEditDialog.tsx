@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useSettingsStore } from "@/store/useSettingsStore";
 import type { AnalysisAttention, AnalysisEntity } from "@/lib/types";
 
 interface Props {
