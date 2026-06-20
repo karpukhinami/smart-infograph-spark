@@ -13,6 +13,7 @@ import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/u
 import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
+import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
 import { WireframeView } from "@/components/workspace/WireframeView";
 import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
@@ -731,7 +732,11 @@ ${activeContent.value.content}`;
                     </Button>
                   </div>
                   <div className="rounded-md border border-border p-3 bg-background">
-                    <Markdown>{activeContent.value.content}</Markdown>
+                    {activeContent.value.analysis ? (
+                      <SimpleContentPreview analysis={activeContent.value.analysis} profile={activeProfile ?? null} />
+                    ) : (
+                      <Markdown>{activeContent.value.content}</Markdown>
+                    )}
                   </div>
                   {activeContent.value.analysis && (
                     <details className="rounded-md border border-border bg-background/60 p-2">
