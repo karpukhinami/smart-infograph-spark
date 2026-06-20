@@ -51,6 +51,10 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
   const [formula, setFormula] = useState("");
   const [addendum, setAddendum] = useState("");
   const [attention, setAttention] = useState<AnalysisAttention>("normal");
+  const [icon, setIcon] = useState("");
+  const [visualType, setVisualType] = useState("");
+  const [visualDescription, setVisualDescription] = useState("");
+  const [visualOpen, setVisualOpen] = useState(false);
 
   useEffect(() => {
     if (!entity) return;
@@ -60,6 +64,10 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
     setAddendum(asText(entity.cardAddendum));
     const att = String(entity.attention ?? "normal").toLowerCase();
     setAttention(att === "main" ? "core" : (att as AnalysisAttention));
+    setIcon(entity.icon ?? "");
+    setVisualType(entity.visual?.type ?? "");
+    setVisualDescription(entity.visual?.description ?? "");
+    setVisualOpen(false);
   }, [entity]);
 
   const validationError = useMemo(() => {
@@ -68,24 +76,33 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
       ["Контент", content],
       ["Формула", formula],
       ["Дополнение", addendum],
+      ["Иконка", icon],
+      ["Картинка", visualDescription],
     ] as const) {
       const err = checkBalance(t);
       if (err) return `${label}: ${err}`;
     }
     return null;
-  }, [title, content, formula, addendum]);
+  }, [title, content, formula, addendum, icon, visualDescription]);
 
   const contentEmpty = content.trim() === "";
   const canSave = !contentEmpty && !validationError;
 
   const handleSave = () => {
     if (!canSave) return;
+    const visTypeT = visualType.trim();
+    const visDescT = visualDescription.trim();
+    const visual = visTypeT === "" && visDescT === ""
+      ? null
+      : { type: visTypeT, description: visDescT };
     onSave({
       title: title.trim() === "" ? null : title,
       content: fromText(content),
       formula: fromText(formula),
       cardAddendum: fromText(addendum),
       attention,
+      icon: icon.trim() === "" ? null : icon.trim(),
+      visual,
     });
     onClose();
   };
