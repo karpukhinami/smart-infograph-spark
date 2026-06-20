@@ -732,7 +732,11 @@ ${activeContent.value.content}`;
                     </Button>
                   </div>
                   <div className="rounded-md border border-border p-3 bg-background">
-                    <Markdown>{activeContent.value.content}</Markdown>
+                    {activeContent.value.analysis ? (
+                      <SimpleContentPreview analysis={activeContent.value.analysis} profile={activeProfile ?? null} />
+                    ) : (
+                      <Markdown>{activeContent.value.content}</Markdown>
+                    )}
                   </div>
                   {activeContent.value.analysis && (
                     <details className="rounded-md border border-border bg-background/60 p-2">
