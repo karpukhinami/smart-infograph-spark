@@ -13,6 +13,7 @@ import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/u
 import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
+import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
 import { WireframeView } from "@/components/workspace/WireframeView";
 import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
