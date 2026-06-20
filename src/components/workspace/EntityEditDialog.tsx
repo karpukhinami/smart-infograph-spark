@@ -47,6 +47,7 @@ function checkBalance(text: string): string | null {
 }
 
 export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
+  const uiMode = useSettingsStore((s) => s.uiMode);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [formula, setFormula] = useState("");
