@@ -381,7 +381,7 @@ function SimpleHome() {
               <h2 className="text-lg font-semibold">Шаг 2. Генерация изображения</h2>
 
               <div className="grid grid-cols-12 gap-3">
-                <div className="col-span-12">
+                <div className="col-span-12 hidden">
                   <Label className="text-xs">Стиль инфографики</Label>
                   <Select value={selectedStyleId ?? activeContent.value.recommendedStyle ?? ""} onValueChange={setSelectedStyleId}>
                     <SelectTrigger><SelectValue placeholder="Выберите стиль" /></SelectTrigger>
