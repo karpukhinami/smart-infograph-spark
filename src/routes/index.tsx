@@ -487,10 +487,32 @@ function SimpleHome() {
                     </div>
                   )}
                 </div>
+                {simpleCurrent && loading !== "image" && (
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const title =
+                          (analysisJson?.topic?.trim() || source.topic?.trim() || "без названия");
+                        const safe = title.replace(/[\\/:*?"<>|]+/g, "").slice(0, 120);
+                        const a = document.createElement("a");
+                        a.href = simpleCurrent.dataUrl;
+                        a.download = `инфографика: ${safe}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                      }}
+                    >
+                      <Download className="size-3.5 mr-1" /> Сохранить
+                    </Button>
+                  </div>
+                )}
               </section>
             </TabsContent>
           </Tabs>
         </div>
+
 
       </div>
 
