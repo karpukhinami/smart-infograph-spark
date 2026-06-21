@@ -159,6 +159,23 @@ export const useProjectStore = create<ProjectState>()(
             };
           }),
         })),
+      updateActiveAnalysisHeader: (patch) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const analysis = x.value.analysis;
+            if (!analysis) return x;
+            const newAnalysis = { ...analysis, ...patch };
+            return {
+              ...x,
+              value: {
+                ...x.value,
+                analysis: newAnalysis,
+                content: renderAnalysisJson(newAnalysis),
+              },
+            };
+          }),
+        })),
       setActiveContent: (id) => set({ activeContentId: id }),
 
 
