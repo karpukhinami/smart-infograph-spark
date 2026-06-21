@@ -41,7 +41,12 @@ export function SimpleContentPreview({ analysis, profile }: Props) {
   const c = { ...FALLBACK, ...(profile?.colors ?? {}) };
   const entities = analysis.entities ?? [];
   const updateEntity = useProjectStore((s) => s.updateActiveAnalysisEntity);
+  const updateHeader = useProjectStore((s) => s.updateActiveAnalysisHeader);
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [headerOpen, setHeaderOpen] = useState(false);
+
+  const subjectShown = displayMeta(analysis.subject);
+  const gradeShown = displayMeta(analysis.grade);
 
   // Assign alternating pastel index to "normal" entities only.
   let normalRun = 0;
@@ -65,27 +70,34 @@ export function SimpleContentPreview({ analysis, profile }: Props) {
   return (
     <div className="space-y-3" style={{ color: c.inkColor }}>
       {/* Header card */}
-      <div className="rounded-xl px-4 py-3" style={{ background: c.headerColor, color: c.lightTextColor }}>
-        {(analysis.subject || analysis.grade) && (
-          <div className="flex items-center gap-2 text-xs" style={{ color: c.mutedheaderTextColor }}>
-            {analysis.subject && <span>{analysis.subject}</span>}
-            {analysis.subject && analysis.grade && (
-              <span className="inline-block size-1.5 rounded-full" style={{ background: c.mutedheaderTextColor }} />
-            )}
-            {analysis.grade && <span>{analysis.grade} класс</span>}
-          </div>
-        )}
-        {analysis.topic && (
-          <div className="mt-1 text-lg font-bold uppercase leading-tight" style={{ color: c.lightTextColor }}>
-            {analysis.topic}
-          </div>
-        )}
-        {analysis.summary && (
-          <div className="mt-1 text-xs uppercase leading-snug" style={{ color: c.mutedheaderTextColor }}>
-            {analysis.summary}
-          </div>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={() => setHeaderOpen(true)}
+        className="block w-full text-left cursor-pointer rounded-xl transition-transform hover:scale-[1.005] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        title="Нажмите, чтобы отредактировать шапку"
+      >
+        <div className="rounded-xl px-4 py-3" style={{ background: c.headerColor, color: c.lightTextColor }}>
+          {(subjectShown || gradeShown) && (
+            <div className="flex items-center gap-2 text-xs" style={{ color: c.mutedheaderTextColor }}>
+              {subjectShown && <span>{subjectShown}</span>}
+              {subjectShown && gradeShown && (
+                <span className="inline-block size-1.5 rounded-full" style={{ background: c.mutedheaderTextColor }} />
+              )}
+              {gradeShown && <span>{gradeShown} класс</span>}
+            </div>
+          )}
+          {analysis.topic && (
+            <div className="mt-1 text-lg font-bold uppercase leading-tight" style={{ color: c.lightTextColor }}>
+              {analysis.topic}
+            </div>
+          )}
+          {analysis.summary && (
+            <div className="mt-1 text-xs uppercase leading-snug" style={{ color: c.mutedheaderTextColor }}>
+              {analysis.summary}
+            </div>
+          )}
+        </div>
+      </button>
 
       {/* Entity cards */}
       {items.map(({ e, bg, onBg }, i) => (
@@ -107,6 +119,18 @@ export function SimpleContentPreview({ analysis, profile }: Props) {
         onSave={(patch) => {
           if (editIndex !== null) updateEntity(editIndex, patch);
         }}
+      />
+
+      <HeaderEditDialog
+        open={headerOpen}
+        value={headerOpen ? {
+          topic: analysis.topic ?? "",
+          subject: analysis.subject ?? null,
+          grade: analysis.grade ?? null,
+          summary: analysis.summary ?? "",
+        } : null}
+        onClose={() => setHeaderOpen(false)}
+        onSave={(patch) => updateHeader(patch)}
       />
     </div>
   );
