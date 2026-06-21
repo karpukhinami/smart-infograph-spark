@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, RotateCcw, RefreshCw, Upload, ImagePlus, Sparkles, ImageIcon } from "lucide-react";
+import { Loader2, RotateCcw, RefreshCw, Upload, ImagePlus, Sparkles, ImageIcon, Download } from "lucide-react";
 import { useProjectStore, useActiveContent } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentStyles } from "@/store/useSettingsStore";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
