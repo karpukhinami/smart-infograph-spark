@@ -2,11 +2,20 @@ import { useState, type CSSProperties } from "react";
 import type { AnalysisEntity, AnalysisGroupItem, AnalysisJson, DesignProfile } from "@/lib/types";
 import { Markdown } from "@/components/workspace/Markdown";
 import { EntityEditDialog } from "@/components/workspace/EntityEditDialog";
+import { HeaderEditDialog } from "@/components/workspace/HeaderEditDialog";
 import { useProjectStore } from "@/store/useProjectStore";
 
 interface Props {
   analysis: AnalysisJson;
   profile: DesignProfile | null;
+}
+
+function isOther(v: string | null | undefined): boolean {
+  return !!v && v.trim().toLowerCase() === "другое";
+}
+function displayMeta(v: string | null | undefined): string | null {
+  if (!v) return null;
+  return isOther(v) ? null : v;
 }
 
 function asLines(v: string | string[] | null | undefined): string[] {
