@@ -35,6 +35,7 @@ interface ProjectState {
   pushContent: (c: ContentSummary) => void;
   updateActiveContent: (text: string) => void;
   updateActiveAnalysisEntity: (index: number, patch: Partial<AnalysisEntity>) => void;
+  updateActiveAnalysisHeader: (patch: { topic?: string; subject?: string | null; grade?: string | null; summary?: string }) => void;
   setActiveContent: (id: string) => void;
 
 
@@ -148,6 +149,23 @@ export const useProjectStore = create<ProjectState>()(
               i === index ? { ...e, ...patch } : e,
             );
             const newAnalysis = { ...analysis, entities };
+            return {
+              ...x,
+              value: {
+                ...x.value,
+                analysis: newAnalysis,
+                content: renderAnalysisJson(newAnalysis),
+              },
+            };
+          }),
+        })),
+      updateActiveAnalysisHeader: (patch) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const analysis = x.value.analysis;
+            if (!analysis) return x;
+            const newAnalysis = { ...analysis, ...patch };
             return {
               ...x,
               value: {

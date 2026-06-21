@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, RotateCcw, RefreshCw, Upload, ImagePlus, Sparkles, ImageIcon } from "lucide-react";
+import { Loader2, RotateCcw, RefreshCw, Upload, ImagePlus, Sparkles, ImageIcon, Download } from "lucide-react";
 import { useProjectStore, useActiveContent } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentStyles } from "@/store/useSettingsStore";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
@@ -138,8 +138,15 @@ function SimpleHome() {
   }
 
   async function onAnalyze() {
+    if (!source.subject || !source.grade) {
+      toast.error(
+        "Заполните предмет и класс. Если нет подходящей опции, выберите «Другое» и затем вручную отредактируйте шапку после появления предпросмотра контента.",
+      );
+      return;
+    }
     try {
       setLoading("analyze");
+      setPaneMode("content");
       // Перегенерация контента обнуляет все следующие шаги: текущее изображение архивируется,
       // выбранный профиль/стиль сбрасываются, чтобы вновь подтянулись рекомендации модели.
       archiveSimple();
@@ -374,7 +381,7 @@ function SimpleHome() {
               <h2 className="text-lg font-semibold">Шаг 2. Генерация изображения</h2>
 
               <div className="grid grid-cols-12 gap-3">
-                <div className="col-span-12">
+                <div className="col-span-12 hidden">
                   <Label className="text-xs">Стиль инфографики</Label>
                   <Select value={selectedStyleId ?? activeContent.value.recommendedStyle ?? ""} onValueChange={setSelectedStyleId}>
                     <SelectTrigger><SelectValue placeholder="Выберите стиль" /></SelectTrigger>
@@ -480,10 +487,32 @@ function SimpleHome() {
                     </div>
                   )}
                 </div>
+                {simpleCurrent && loading !== "image" && (
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const title =
+                          (analysisJson?.topic?.trim() || source.topic?.trim() || "без названия");
+                        const safe = title.replace(/[\\/:*?"<>|]+/g, "").slice(0, 120);
+                        const a = document.createElement("a");
+                        a.href = simpleCurrent.dataUrl;
+                        a.download = `инфографика: ${safe}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                      }}
+                    >
+                      <Download className="size-3.5 mr-1" /> Сохранить
+                    </Button>
+                  </div>
+                )}
               </section>
             </TabsContent>
           </Tabs>
         </div>
+
 
       </div>
 
