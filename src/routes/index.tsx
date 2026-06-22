@@ -83,6 +83,7 @@ function SimpleHome() {
 
   const [loading, setLoading] = useState<null | "analyze" | "image">(null);
   const [imageStage, setImageStage] = useState<null | "brief" | "render">(null);
+  const [oneStep, setOneStep] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<string | null>(null);
   const [paneMode, setPaneMode] = useState<"content" | "image">("content");
