@@ -489,7 +489,7 @@ function SimpleHome() {
           <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as "content" | "image")}>
             <TabsList>
               <TabsTrigger value="content" disabled={!activeContent && loading !== "analyze"}>Контент</TabsTrigger>
-              <TabsTrigger value="image" disabled={!activeContent}>Итоговое изображение</TabsTrigger>
+              <TabsTrigger value="image" disabled={!activeContent && !oneStep}>Итоговое изображение</TabsTrigger>
             </TabsList>
 
             <TabsContent value="content" className="mt-3">
