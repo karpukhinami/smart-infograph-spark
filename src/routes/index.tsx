@@ -83,6 +83,7 @@ function SimpleHome() {
 
   const [loading, setLoading] = useState<null | "analyze" | "image">(null);
   const [imageStage, setImageStage] = useState<null | "brief" | "render">(null);
+  const [oneStep, setOneStep] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<string | null>(null);
   const [paneMode, setPaneMode] = useState<"content" | "image">("content");
@@ -137,6 +138,85 @@ function SimpleHome() {
     if (images.length) await attachImageFiles(images);
   }
 
+  async function runAnalysis(): Promise<ContentSummary> {
+    const stylesList = enabledStyles.map((s) => `- ${s.id}: ${s.name} — ${s.shortDescription}`).join("\n");
+    const template = useTopicOnlyPrompt ? prompts.analysisTopicOnly : prompts.analysisWithContent;
+    const filled = template
+      .replaceAll("{{USER_INSTRUCTIONS}}", source.userInstructions || "(нет)")
+      .replaceAll("{{STYLES_LIST}}", stylesList || "(стилей не задано)")
+      .replaceAll("{{SOURCE_TEXT}}", source.text || "")
+      .replaceAll("{{TOPIC}}", source.topic || "")
+      .replaceAll("{{SUBJECT}}", source.subject || "")
+      .replaceAll("{{GRADE}}", source.grade || "");
+
+    const imgs = attachedImages.length ? attachedImages : undefined;
+    let summary: ContentSummary;
+    if (mode === "strict") {
+      const analysis = await callTextLLMForJson({
+        model: models.analysis,
+        prompt: filled,
+        label: "analysis",
+        parse: validateAnalysisJson,
+        images: imgs,
+      });
+      const fallbackStyle = enabledStyles[0]?.id ?? "";
+      summary = {
+        content: "",
+        recommendedStyle: selectedStyleId ?? fallbackStyle,
+        recommendedDesignProfile: analysis.recommendedDesignProfile ?? null,
+        analysis,
+      };
+    } else {
+      const raw = await callTextLLM({ model: models.analysis, prompt: filled, images: imgs });
+      const content = (raw ?? "").trim();
+      if (!content) throw new Error("Модель вернула пустой ответ");
+      const fallbackStyle = enabledStyles[0]?.id ?? "";
+      const rdpMatch = content.match(/\[recommendedDesignProfile:\s*(Оранжевый|Индиго)\s*\]/i);
+      const cleaned = rdpMatch ? content.replace(rdpMatch[0], "").trim() : content;
+      summary = {
+        content: cleaned,
+        recommendedStyle: selectedStyleId ?? fallbackStyle,
+        recommendedDesignProfile: rdpMatch?.[1] ?? null,
+      };
+    }
+    pushContent(summary);
+    return summary;
+  }
+
+  async function runImageGen(summary: ContentSummary, profileOverride?: typeof activeProfile) {
+    const style = styles.find((s) => s.id === (selectedStyleId ?? summary.recommendedStyle)) ?? enabledStyles[0];
+    if (!style) throw new Error("Выберите стиль");
+    const profile = profileOverride ?? activeProfile;
+    setImageStage("brief");
+    archiveSimple();
+
+    const summaryText = summary.analysis ? JSON.stringify(summary.analysis, null, 2) : summary.content;
+    const filled = buildDesignBriefPrompt({
+      template: simpleBriefPromptRaw,
+      contentSummary: summaryText,
+      style,
+      profile,
+      userWishes,
+      generalRules: prompts.generalRules,
+    });
+    const briefRes = await callTextLLMForJson({
+      model: models.brief,
+      prompt: filled,
+      label: "simple design brief",
+      parse: (v) => v as DesignBriefResult,
+    });
+    if (!briefRes?.PromptForImageGeneration) throw new Error("Модель не вернула PromptForImageGeneration");
+
+    const layer1 = mode === "strict" ? designProfileColorsAndRules(profile) : "";
+    const finalPrompt = [layer1, briefRes.PromptForImageGeneration, executionRulesText]
+      .filter((s) => s && s.trim().length > 0)
+      .join("\n\n");
+
+    setImageStage("render");
+    const dataUrl = await callImageLLM({ model: models.image, prompt: finalPrompt });
+    setSimpleCurrent({ dataUrl, prompt: finalPrompt });
+  }
+
   async function onAnalyze() {
     if (!source.subject || !source.grade) {
       toast.error(
@@ -147,50 +227,8 @@ function SimpleHome() {
     try {
       setLoading("analyze");
       setPaneMode("content");
-      // Перегенерация контента обнуляет все следующие шаги: текущее изображение архивируется,
-      // выбранный профиль/стиль сбрасываются, чтобы вновь подтянулись рекомендации модели.
       archiveSimple();
-      const stylesList = enabledStyles.map((s) => `- ${s.id}: ${s.name} — ${s.shortDescription}`).join("\n");
-      const template = useTopicOnlyPrompt ? prompts.analysisTopicOnly : prompts.analysisWithContent;
-      const filled = template
-        .replaceAll("{{USER_INSTRUCTIONS}}", source.userInstructions || "(нет)")
-        .replaceAll("{{STYLES_LIST}}", stylesList || "(стилей не задано)")
-        .replaceAll("{{SOURCE_TEXT}}", source.text || "")
-        .replaceAll("{{TOPIC}}", source.topic || "")
-        .replaceAll("{{SUBJECT}}", source.subject || "")
-        .replaceAll("{{GRADE}}", source.grade || "");
-
-      const imgs = attachedImages.length ? attachedImages : undefined;
-      let summary: ContentSummary;
-      if (mode === "strict") {
-        const analysis = await callTextLLMForJson({
-          model: models.analysis,
-          prompt: filled,
-          label: "analysis",
-          parse: validateAnalysisJson,
-          images: imgs,
-        });
-        const fallbackStyle = enabledStyles[0]?.id ?? "";
-        summary = {
-          content: "",
-          recommendedStyle: selectedStyleId ?? fallbackStyle,
-          recommendedDesignProfile: analysis.recommendedDesignProfile ?? null,
-          analysis,
-        };
-      } else {
-        const raw = await callTextLLM({ model: models.analysis, prompt: filled, images: imgs });
-        const content = (raw ?? "").trim();
-        if (!content) throw new Error("Модель вернула пустой ответ");
-        const fallbackStyle = enabledStyles[0]?.id ?? "";
-        const rdpMatch = content.match(/\[recommendedDesignProfile:\s*(Оранжевый|Индиго)\s*\]/i);
-        const cleaned = rdpMatch ? content.replace(rdpMatch[0], "").trim() : content;
-        summary = {
-          content: cleaned,
-          recommendedStyle: selectedStyleId ?? fallbackStyle,
-          recommendedDesignProfile: rdpMatch?.[1] ?? null,
-        };
-      }
-      pushContent(summary);
+      await runAnalysis();
       toast.success("Контент готов");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось выполнить анализ");
@@ -199,47 +237,43 @@ function SimpleHome() {
     }
   }
 
+  async function onOneStep() {
+    if (!source.subject || !source.grade) {
+      toast.error(
+        "Заполните предмет и класс. Если нет подходящей опции, выберите «Другое» и затем вручную отредактируйте шапку после появления предпросмотра контента.",
+      );
+      return;
+    }
+    try {
+      setOneStep(true);
+      setPaneMode("image");
+      setLoading("analyze");
+      archiveSimple();
+      const summary = await runAnalysis();
+      const profileName = summary.recommendedDesignProfile;
+      const chosenProfile = profileName
+        ? profiles.find((p) => p.profileName === profileName) ?? activeProfile
+        : activeProfile;
+      if (profileName) setSelectedProfileName(profileName);
+      setLoading("image");
+      await runImageGen(summary, chosenProfile);
+      toast.success("Готово");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось сгенерировать инфографику");
+    } finally {
+      setLoading(null);
+      setImageStage(null);
+      setOneStep(false);
+    }
+  }
+
   async function onGenerateImage() {
     if (!activeContent) return;
     if (!activeStyle) { toast.error("Выберите стиль"); return; }
     try {
       setLoading("image");
-      setImageStage("brief");
       setPaneMode("image");
-      archiveSimple();
-
-      // Шаг A: укороченный бриф → PromptForImageGeneration
-      const summaryText =
-        activeContent.value.analysis
-          ? JSON.stringify(activeContent.value.analysis, null, 2)
-          : activeContent.value.content;
-
-      const filled = buildDesignBriefPrompt({
-        template: simpleBriefPromptRaw,
-        contentSummary: summaryText,
-        style: activeStyle,
-        profile: activeProfile,
-        userWishes,
-        generalRules: prompts.generalRules,
-      });
-      const briefRes = await callTextLLMForJson({
-        model: models.brief,
-        prompt: filled,
-        label: "simple design brief",
-        parse: (v) => v as DesignBriefResult,
-      });
-      if (!briefRes?.PromptForImageGeneration) throw new Error("Модель не вернула PromptForImageGeneration");
-
-      // Шаг B: склейка с автоматическими кусками шага 3 рабочего места
-      const layer1 = mode === "strict" ? designProfileColorsAndRules(activeProfile) : "";
-      const finalPrompt = [layer1, briefRes.PromptForImageGeneration, executionRulesText]
-        .filter((s) => s && s.trim().length > 0)
-        .join("\n\n");
-
-      // Шаг C: генерация картинки
-      setImageStage("render");
-      const dataUrl = await callImageLLM({ model: models.image, prompt: finalPrompt });
-      setSimpleCurrent({ dataUrl, prompt: finalPrompt });
+      await runImageGen(activeContent.value);
       toast.success("Готово");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось сгенерировать изображение");
@@ -368,10 +402,21 @@ function SimpleHome() {
             </div>
 
             {!activeContent && (
-              <Button onClick={onAnalyze} disabled={loading !== null} className="w-full">
-                {loading === "analyze" ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
-                Сформировать контент
-              </Button>
+              <div className="space-y-2">
+                <Button onClick={onAnalyze} disabled={loading !== null} className="w-full">
+                  {loading === "analyze" && !oneStep ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
+                  Сформировать контент
+                </Button>
+                <Button
+                  onClick={onOneStep}
+                  disabled={loading !== null}
+                  className="w-full text-white hover:opacity-90"
+                  style={{ backgroundColor: "#FF8800" }}
+                >
+                  {loading !== null && oneStep ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
+                  Сгенерировать инфографику в один шаг
+                </Button>
+              </div>
             )}
           </section>
 
@@ -444,7 +489,7 @@ function SimpleHome() {
           <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as "content" | "image")}>
             <TabsList>
               <TabsTrigger value="content" disabled={!activeContent && loading !== "analyze"}>Контент</TabsTrigger>
-              <TabsTrigger value="image" disabled={!activeContent}>Итоговое изображение</TabsTrigger>
+              <TabsTrigger value="image" disabled={!activeContent && !oneStep}>Итоговое изображение</TabsTrigger>
             </TabsList>
 
             <TabsContent value="content" className="mt-3">
@@ -473,10 +518,10 @@ function SimpleHome() {
             <TabsContent value="image" className="mt-3">
               <section className="rounded-lg border border-border bg-card p-5 space-y-3">
                 <div className="rounded-md border border-border bg-background min-h-[320px] flex items-center justify-center overflow-hidden">
-                  {loading === "image" ? (
+                  {loading === "image" || (oneStep && loading === "analyze") ? (
                     <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
                       <Loader2 className="size-8 animate-spin" />
-                      <div>{imageStage === "brief" ? "Шаг 1 из 2 — составляем дизайн-бриф…" : "Шаг 2 из 2 — генерируем изображение…"}</div>
+                      <div>{loading === "analyze" ? "Шаг 1 из 2 — формируем контент…" : imageStage === "brief" ? "Шаг 1 из 2 — составляем дизайн-бриф…" : "Шаг 2 из 2 — генерируем изображение…"}</div>
                     </div>
                   ) : simpleCurrent ? (
                     <img src={simpleCurrent.dataUrl} alt="" className="max-w-full max-h-[80vh]" />
