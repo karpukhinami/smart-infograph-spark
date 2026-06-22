@@ -402,10 +402,21 @@ function SimpleHome() {
             </div>
 
             {!activeContent && (
-              <Button onClick={onAnalyze} disabled={loading !== null} className="w-full">
-                {loading === "analyze" ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
-                Сформировать контент
-              </Button>
+              <div className="space-y-2">
+                <Button onClick={onAnalyze} disabled={loading !== null} className="w-full">
+                  {loading === "analyze" && !oneStep ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
+                  Сформировать контент
+                </Button>
+                <Button
+                  onClick={onOneStep}
+                  disabled={loading !== null}
+                  className="w-full text-white hover:opacity-90"
+                  style={{ backgroundColor: "#FF8800" }}
+                >
+                  {loading !== null && oneStep ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
+                  Сгенерировать инфографику в один шаг
+                </Button>
+              </div>
             )}
           </section>
 
