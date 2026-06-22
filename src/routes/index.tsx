@@ -518,10 +518,10 @@ function SimpleHome() {
             <TabsContent value="image" className="mt-3">
               <section className="rounded-lg border border-border bg-card p-5 space-y-3">
                 <div className="rounded-md border border-border bg-background min-h-[320px] flex items-center justify-center overflow-hidden">
-                  {loading === "image" ? (
+                  {loading === "image" || (oneStep && loading === "analyze") ? (
                     <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
                       <Loader2 className="size-8 animate-spin" />
-                      <div>{imageStage === "brief" ? "Шаг 1 из 2 — составляем дизайн-бриф…" : "Шаг 2 из 2 — генерируем изображение…"}</div>
+                      <div>{loading === "analyze" ? "Шаг 1 из 2 — формируем контент…" : imageStage === "brief" ? "Шаг 1 из 2 — составляем дизайн-бриф…" : "Шаг 2 из 2 — генерируем изображение…"}</div>
                     </div>
                   ) : simpleCurrent ? (
                     <img src={simpleCurrent.dataUrl} alt="" className="max-w-full max-h-[80vh]" />
