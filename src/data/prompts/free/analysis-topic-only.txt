@@ -131,6 +131,10 @@ $$x^2 + bx + c = 0$$
 ДОПОЛНИТЕЛЬНЫЕ ПОЖЕЛАНИЯ ПОЛЬЗОВАТЕЛЯ:
 {{USER_INSTRUCTIONS}}
 
+ПЕРЕКЛЮЧАТЕЛИ ИЛЛЮСТРАЦИЙ:
+- Учебные иллюстрации: {{EDUCATIONAL_ILLUSTRATIONS}}
+- Сюжетные иллюстрации: {{NARRATIVE_ILLUSTRATIONS}}
+
 ТЕМА:
 {{TOPIC}}
 

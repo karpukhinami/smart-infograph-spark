@@ -28,7 +28,10 @@ import {
   ImageIcon,
   Download,
   Pencil,
+  Info,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectStore, useActiveContent } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentStyles } from "@/store/useSettingsStore";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
@@ -197,7 +200,9 @@ function SimpleHome() {
       .replaceAll("{{SOURCE_TEXT}}", source.text || "")
       .replaceAll("{{TOPIC}}", source.topic || "")
       .replaceAll("{{SUBJECT}}", source.subject || "")
-      .replaceAll("{{GRADE}}", source.grade || "");
+      .replaceAll("{{GRADE}}", source.grade || "")
+      .replaceAll("{{EDUCATIONAL_ILLUSTRATIONS}}", source.educationalIllustrations ? "вкл" : "выкл")
+      .replaceAll("{{NARRATIVE_ILLUSTRATIONS}}", source.narrativeIllustrations ? "вкл" : "выкл");
 
     const imgs = attachedImages.length ? attachedImages : undefined;
     let summary: ContentSummary;
@@ -379,14 +384,6 @@ function SimpleHome() {
           </div>
 
           <div className="grid grid-cols-12 gap-3">
-            <div className="col-span-12">
-              <Label className="text-xs">Тема</Label>
-              <Input
-                value={source.topic || ""}
-                onChange={(e) => setSource({ topic: e.target.value })}
-                placeholder="Что изучаем?"
-              />
-            </div>
             <div className="col-span-6">
               <Label className="text-xs">
                 Предмет
@@ -423,6 +420,14 @@ function SimpleHome() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="col-span-12">
+              <Label className="text-xs">Тема</Label>
+              <Input
+                value={source.topic || ""}
+                onChange={(e) => setSource({ topic: e.target.value })}
+                placeholder="Что изучаем?"
+              />
+            </div>
           </div>
 
           <div>
@@ -434,6 +439,51 @@ function SimpleHome() {
               placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
             />
           </div>
+
+          <TooltipProvider delayDuration={150}>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="sw-edu"
+                  checked={source.educationalIllustrations}
+                  onCheckedChange={(v) => setSource({ educationalIllustrations: v })}
+                />
+                <Label htmlFor="sw-edu" className="text-sm font-normal cursor-pointer">
+                  Учебные иллюстрации
+                </Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="size-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs">
+                    {source.educationalIllustrations
+                      ? 'Иллюстрации, отражающие предметное содержание — чертежи, схемы, диаграммы — добавляются только в случае необходимости. Если хотите увидеть больше предметных иллюстраций, отметьте это в поле «Дополнительные инструкции».'
+                      : 'Иллюстрации, отражающие предметное содержание — чертежи, схемы, диаграммы — запрещены.'}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="sw-narr"
+                  checked={source.narrativeIllustrations}
+                  onCheckedChange={(v) => setSource({ narrativeIllustrations: v })}
+                />
+                <Label htmlFor="sw-narr" className="text-sm font-normal cursor-pointer">
+                  Сюжетные иллюстрации
+                </Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="size-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs">
+                    {source.narrativeIllustrations
+                      ? 'Иллюстрации развлекательного характера, призванные привлечь внимание ученика, добавляются умеренно на основе темы и класса. Если хотите более точно задать их содержание, отметьте это в поле «Дополнительные инструкции».'
+                      : 'Иллюстрации развлекательного характера, призванные привлечь внимание ученика, отсутствуют.'}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+          </TooltipProvider>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">

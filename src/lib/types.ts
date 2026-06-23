@@ -45,6 +45,8 @@ export interface SourceText {
   subject?: string;
   grade?: string;
   userInstructions: string;
+  educationalIllustrations: boolean;
+  narrativeIllustrations: boolean;
 }
 
 export type WireframeBlockSize =
