@@ -8,6 +8,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 interface Props {
   analysis: AnalysisJson;
   profile: DesignProfile | null;
+  editable?: boolean;
 }
 
 function isOther(v: string | null | undefined): boolean {
