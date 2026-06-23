@@ -5,11 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import type { AnalysisAttention, AnalysisEntity } from "@/lib/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
+import type { AnalysisAttention, AnalysisEntity, AnalysisSectionId } from "@/lib/types";
 
 interface Props {
   open: boolean;
   entity: AnalysisEntity | null;
+  isNew?: boolean;
   onClose: () => void;
   onSave: (patch: Partial<AnalysisEntity>) => void;
 }
@@ -20,32 +24,48 @@ function asText(v: string | string[] | null | undefined): string {
 }
 
 function fromText(t: string): string | string[] | null {
-  const lines = t.split("\n").map((l) => l).filter((l, _, all) => true);
-  // Trim trailing empty lines
   const nonEmpty = t.split("\n").filter((l) => l.trim() !== "");
   if (nonEmpty.length === 0) return null;
   if (nonEmpty.length === 1) return nonEmpty[0];
   return nonEmpty;
 }
 
-// Validate that LaTeX `$...$` delimiters and common markdown markers are balanced.
 function checkBalance(text: string): string | null {
   if (!text) return null;
-  // Strip escaped \$ before counting
   const cleaned = text.replace(/\\\$/g, "");
-  // Count $$ pairs first, then single $
   const doubleDollarCount = (cleaned.match(/\$\$/g) ?? []).length;
   if (doubleDollarCount % 2 !== 0) return "Несбалансированные $$ (LaTeX-блок)";
   const withoutDouble = cleaned.replace(/\$\$/g, "");
   const singleDollar = (withoutDouble.match(/\$/g) ?? []).length;
   if (singleDollar % 2 !== 0) return "Несбалансированные $ (LaTeX-формула)";
-  // Backticks
   const backticks = (cleaned.match(/`/g) ?? []).length;
   if (backticks % 2 !== 0) return "Несбалансированные ` (код)";
   return null;
 }
 
-export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
+const SECTION_OPTIONS: { value: AnalysisSectionId; label: string }[] = [
+  { value: "prerequisites", label: "Предпосылки" },
+  { value: "main", label: "Основное содержание" },
+  { value: "additions", label: "Выводы и дополнения" },
+];
+
+function InfoIcon({ text }: { text: string }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button type="button" tabIndex={-1} className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground">
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">{text}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+export function EntityEditDialog({ open, entity, isNew = false, onClose, onSave }: Props) {
+  const [sectionId, setSectionId] = useState<AnalysisSectionId | "">("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [formula, setFormula] = useState("");
@@ -55,7 +75,19 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
   const [visualDescription, setVisualDescription] = useState("");
 
   useEffect(() => {
-    if (!entity) return;
+    if (!open) return;
+    if (!entity) {
+      setSectionId("");
+      setTitle("");
+      setContent("");
+      setFormula("");
+      setAddendum("");
+      setAttention("normal");
+      setIcon("");
+      setVisualDescription("");
+      return;
+    }
+    setSectionId(entity.sectionId ?? "");
     setTitle(entity.title ?? "");
     setContent(asText(entity.content));
     setFormula(asText(entity.formula));
@@ -64,7 +96,7 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
     setAttention(att === "main" ? "core" : (att as AnalysisAttention));
     setIcon(entity.icon ?? "");
     setVisualDescription(entity.visual?.description ?? "");
-  }, [entity]);
+  }, [entity, open]);
 
   const validationError = useMemo(() => {
     for (const [label, t] of [
@@ -82,20 +114,25 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
   }, [title, content, formula, addendum, icon, visualDescription]);
 
   const contentEmpty = content.trim() === "";
-  const canSave = !contentEmpty && !validationError;
+  const titleEmpty = title.trim() === "";
+  const sectionEmpty = sectionId === "";
+  const canSave = !contentEmpty && !validationError && !sectionEmpty && (!isNew || !titleEmpty);
 
   const handleSave = () => {
     if (!canSave) return;
     const visDescT = visualDescription.trim();
     const visual = visDescT === "" ? null : { type: null, description: visDescT };
     onSave({
-      title: title.trim() === "" ? null : title,
+      sectionId: sectionId as AnalysisSectionId,
+      title: titleEmpty ? null : title,
       content: fromText(content),
       formula: fromText(formula),
       cardAddendum: fromText(addendum),
       attention,
       icon: icon.trim() === "" ? null : icon.trim(),
       visual,
+      // for new entities, give a sensible default entityType
+      ...(isNew ? { entityType: "custom" } : {}),
     });
     onClose();
   };
@@ -104,13 +141,39 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Редактировать карточку</DialogTitle>
+          <DialogTitle>{isNew ? "Новая карточка" : "Редактировать карточку"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="ent-title">Заголовок</Label>
-            <Input id="ent-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="ent-section">
+                Раздел <span className="text-destructive">*</span>
+              </Label>
+              <InfoIcon text="Этот параметр повлияет на расположение карточки на инфографике: предпосылки размещаются в верхней части изображения, основное содержание — в центральной, а выводы и дополнения — внизу." />
+            </div>
+            <Select value={sectionId} onValueChange={(v) => setSectionId(v as AnalysisSectionId)}>
+              <SelectTrigger id="ent-section" className={sectionEmpty ? "border-destructive" : ""}>
+                <SelectValue placeholder="Выберите раздел" />
+              </SelectTrigger>
+              <SelectContent>
+                {SECTION_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="ent-title">
+              Заголовок{isNew && <span className="text-destructive"> *</span>}
+            </Label>
+            <Input
+              id="ent-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={isNew && titleEmpty ? "border-destructive" : ""}
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -173,7 +236,10 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="ent-icon">Иконка</Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="ent-icon">Иконка</Label>
+              <InfoIcon text="Используйте для описания короткую фразу" />
+            </div>
             <Input
               id="ent-icon"
               value={icon}
@@ -182,7 +248,10 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="ent-visual-desc">Описание картинки</Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="ent-visual-desc">Описание картинки</Label>
+              <InfoIcon text="Опишите пожелания к иллюстрации карточки: чем подробнее — тем лучше" />
+            </div>
             <Textarea
               id="ent-visual-desc"
               value={visualDescription}
@@ -190,8 +259,6 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
               rows={3}
             />
           </div>
-
-
 
           {validationError && (
             <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
