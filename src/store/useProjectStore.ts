@@ -72,6 +72,7 @@ interface ProjectState {
   simpleImageVersions: { id: string; dataUrl: string; prompt: string; createdAt: number }[];
   setSimpleCurrentImage: (img: { dataUrl: string; prompt: string } | null) => void;
   archiveSimpleCurrentImage: () => void;
+  swapSimpleVersion: (id: string) => void;
   clearSimpleImages: () => void;
 
   models: { analysis: string; brief: string; image: string };
