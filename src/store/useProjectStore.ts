@@ -87,6 +87,8 @@ const initialSource: SourceText = {
   subject: "",
   grade: "",
   userInstructions: "",
+  educationalIllustrations: true,
+  narrativeIllustrations: false,
 };
 
 export const useProjectStore = create<ProjectState>()(
