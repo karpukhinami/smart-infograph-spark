@@ -363,10 +363,12 @@ function SimpleHome() {
     toast.success("Изменения сохранены");
   }
   function onResetEdits() {
-    if (editSnapshot) replaceActiveAnalysis(editSnapshot);
+    const current = activeContent?.value.analysis ?? null;
+    const unchanged = editSnapshot && current && JSON.stringify(editSnapshot) === JSON.stringify(current);
+    if (editSnapshot && !unchanged) replaceActiveAnalysis(editSnapshot);
     setEditSnapshot(null);
     setEditMode(false);
-    toast.success("Изменения отменены");
+    if (!unchanged) toast.success("Изменения отменены");
   }
 
   const analysisJson = activeContent?.value.analysis ?? null;

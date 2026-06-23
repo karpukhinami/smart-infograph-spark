@@ -164,18 +164,24 @@ export const useProjectStore = create<ProjectState>()(
               const newIdx = SECTION_ORDER.indexOf(newSec);
               const moved = entities[index];
               entities = entities.filter((_, i) => i !== index);
-              if (newIdx > oldIdx) {
-                // place first in the new section
-                const firstNew = entities.findIndex((e) => e.sectionId === newSec);
-                const pos = firstNew === -1 ? entities.length : firstNew;
-                entities.splice(pos, 0, moved);
+              const hasAny = entities.some((e) => e.sectionId === newSec);
+              let pos: number;
+              if (hasAny) {
+                if (newIdx > oldIdx) {
+                  // moving to a later section: place ABOVE the topmost card of that section
+                  pos = entities.findIndex((e) => e.sectionId === newSec);
+                } else {
+                  // moving to an earlier section: place BELOW the bottommost card of that section
+                  let lastNew = -1;
+                  entities.forEach((e, i) => { if (e.sectionId === newSec) lastNew = i; });
+                  pos = lastNew + 1;
+                }
               } else {
-                // place last in the new section
-                let lastNew = -1;
-                entities.forEach((e, i) => { if (e.sectionId === newSec) lastNew = i; });
-                const pos = lastNew === -1 ? entities.length : lastNew + 1;
-                entities.splice(pos, 0, moved);
+                // no cards in target section
+                if (newSec === "prerequisites") pos = 0;
+                else pos = entities.length; // "additions" → end; "main" is unreachable per spec
               }
+              entities.splice(pos, 0, moved);
             }
             const newAnalysis = { ...analysis, entities };
             return {
