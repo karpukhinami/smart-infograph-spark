@@ -28,7 +28,10 @@ import {
   ImageIcon,
   Download,
   Pencil,
+  Info,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectStore, useActiveContent } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentStyles } from "@/store/useSettingsStore";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
