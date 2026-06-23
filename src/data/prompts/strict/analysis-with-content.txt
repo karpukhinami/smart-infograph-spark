@@ -8,6 +8,9 @@
 КЛАСС: {{GRADE}}
 ДОПОЛНИТЕЛЬНЫЕ ПОЖЕЛАНИЯ ПОЛЬЗОВАТЕЛЯ:
 {{USER_INSTRUCTIONS}}
+ПЕРЕКЛЮЧАТЕЛИ ИЛЛЮСТРАЦИЙ:
+- Учебные иллюстрации: {{EDUCATIONAL_ILLUSTRATIONS}}
+- Сюжетные иллюстрации: {{NARRATIVE_ILLUSTRATIONS}}
 ИСХОДНЫЙ ТЕКСТ:
 {{SOURCE_TEXT}}
 
