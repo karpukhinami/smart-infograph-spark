@@ -86,11 +86,8 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
 
   const handleSave = () => {
     if (!canSave) return;
-    const visTypeT = visualType.trim();
     const visDescT = visualDescription.trim();
-    const visual = visTypeT === "" && visDescT === ""
-      ? null
-      : { type: visTypeT, description: visDescT };
+    const visual = visDescT === "" ? null : { type: null, description: visDescT };
     onSave({
       title: title.trim() === "" ? null : title,
       content: fromText(content),
