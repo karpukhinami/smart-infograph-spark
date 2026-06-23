@@ -744,7 +744,7 @@ function RegenerateImageDialog({
   const [wishes, setWishes] = useState(initialWishes);
 
   // sync incoming initial values when reopened
-  useMemo(() => {
+  useEffect(() => {
     if (open) {
       setProfile(initialProfile);
       setWishes(initialWishes);
