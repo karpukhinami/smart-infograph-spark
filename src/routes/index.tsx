@@ -197,7 +197,9 @@ function SimpleHome() {
       .replaceAll("{{SOURCE_TEXT}}", source.text || "")
       .replaceAll("{{TOPIC}}", source.topic || "")
       .replaceAll("{{SUBJECT}}", source.subject || "")
-      .replaceAll("{{GRADE}}", source.grade || "");
+      .replaceAll("{{GRADE}}", source.grade || "")
+      .replaceAll("{{EDUCATIONAL_ILLUSTRATIONS}}", source.educationalIllustrations ? "вкл" : "выкл")
+      .replaceAll("{{NARRATIVE_ILLUSTRATIONS}}", source.narrativeIllustrations ? "вкл" : "выкл");
 
     const imgs = attachedImages.length ? attachedImages : undefined;
     let summary: ContentSummary;
