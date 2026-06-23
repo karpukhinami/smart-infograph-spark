@@ -37,6 +37,7 @@ interface ProjectState {
   updateActiveContent: (text: string) => void;
   updateActiveAnalysisEntity: (index: number, patch: Partial<AnalysisEntity>) => void;
   updateActiveAnalysisHeader: (patch: { topic?: string; subject?: string | null; grade?: string | null; summary?: string }) => void;
+  replaceActiveAnalysis: (analysis: AnalysisJson) => void;
   setActiveContent: (id: string) => void;
 
 
