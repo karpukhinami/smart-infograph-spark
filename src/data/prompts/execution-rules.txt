@@ -6,7 +6,13 @@ Use only the visible educational text explicitly specified in the prompt.
 
 Do not add, rewrite, shorten, expand, translate, paraphrase or invent any educational content.
 
+Do not place a period at the end of the main infographic title, the infographic summary, or any individual card title under any circumstances.
+
 Preserve all formulas, examples, labels, symbols, variables, numbers, punctuation, paragraph breaks and list structure exactly as specified.
+
+If a formula is written using LaTeX commands but is not enclosed in dollar signs, still render it as a proper readable mathematical formula. Do not leave raw LaTeX commands, backslashes, braces or other technical syntax visible unless they are explicitly intended as visible educational text.
+
+Render formulas using a dedicated mathematical formula typeface, visually similar to LaTeX / Computer Modern Math: elegant serif math glyphs, clear italic variables, readable operators, fractions, superscripts, subscripts and symbols.
 
 Do not render any internal or technical labels.
 
