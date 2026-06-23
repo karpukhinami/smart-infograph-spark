@@ -121,7 +121,7 @@ export interface AnalysisEntity {
   cardAddendum?: string | string[] | null;
   items?: AnalysisGroupItem[] | null;
   icon?: string | null;
-  visual?: { type: string; description: string } | null;
+  visual?: { type: string | null; description: string } | null;
   /** Legacy field, kept for backward compatibility. */
   example?: string | string[] | null;
   /** Legacy field, kept for backward compatibility. */
