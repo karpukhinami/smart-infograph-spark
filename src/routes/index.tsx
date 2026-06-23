@@ -799,7 +799,7 @@ function RegenerateContentDialog({
   onConfirm: (extraInstructions: string) => void;
 }) {
   const [extra, setExtra] = useState("");
-  useMemo(() => {
+  useEffect(() => {
     if (open) setExtra("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
