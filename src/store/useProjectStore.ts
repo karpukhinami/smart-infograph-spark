@@ -153,9 +153,30 @@ export const useProjectStore = create<ProjectState>()(
             if (x.id !== s.activeContentId) return x;
             const analysis = x.value.analysis;
             if (!analysis) return x;
-            const entities = analysis.entities.map((e, i) =>
+            const SECTION_ORDER: AnalysisEntity["sectionId"][] = ["prerequisites", "main", "additions"];
+            const oldSec = analysis.entities[index]?.sectionId;
+            const newSec = (patch.sectionId ?? oldSec) as AnalysisEntity["sectionId"];
+            let entities = analysis.entities.map((e, i) =>
               i === index ? { ...e, ...patch } : e,
             );
+            if (oldSec && newSec && newSec !== oldSec) {
+              const oldIdx = SECTION_ORDER.indexOf(oldSec);
+              const newIdx = SECTION_ORDER.indexOf(newSec);
+              const moved = entities[index];
+              entities = entities.filter((_, i) => i !== index);
+              if (newIdx > oldIdx) {
+                // place first in the new section
+                const firstNew = entities.findIndex((e) => e.sectionId === newSec);
+                const pos = firstNew === -1 ? entities.length : firstNew;
+                entities.splice(pos, 0, moved);
+              } else {
+                // place last in the new section
+                let lastNew = -1;
+                entities.forEach((e, i) => { if (e.sectionId === newSec) lastNew = i; });
+                const pos = lastNew === -1 ? entities.length : lastNew + 1;
+                entities.splice(pos, 0, moved);
+              }
+            }
             const newAnalysis = { ...analysis, entities };
             return {
               ...x,
@@ -164,6 +185,55 @@ export const useProjectStore = create<ProjectState>()(
                 analysis: newAnalysis,
                 content: renderAnalysisJson(newAnalysis),
               },
+            };
+          }),
+        })),
+      deleteActiveAnalysisEntity: (index) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const analysis = x.value.analysis;
+            if (!analysis) return x;
+            const entities = analysis.entities.filter((_, i) => i !== index);
+            const newAnalysis = { ...analysis, entities };
+            return {
+              ...x,
+              value: { ...x.value, analysis: newAnalysis, content: renderAnalysisJson(newAnalysis) },
+            };
+          }),
+        })),
+      swapActiveAnalysisEntities: (i, j) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const analysis = x.value.analysis;
+            if (!analysis) return x;
+            if (i < 0 || j < 0 || i >= analysis.entities.length || j >= analysis.entities.length) return x;
+            const entities = analysis.entities.slice();
+            [entities[i], entities[j]] = [entities[j], entities[i]];
+            const newAnalysis = { ...analysis, entities };
+            return {
+              ...x,
+              value: { ...x.value, analysis: newAnalysis, content: renderAnalysisJson(newAnalysis) },
+            };
+          }),
+        })),
+      addActiveAnalysisEntity: (entity) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const analysis = x.value.analysis;
+            if (!analysis) return x;
+            const entities = analysis.entities.slice();
+            // place at the end of its section
+            let lastSec = -1;
+            entities.forEach((e, i) => { if (e.sectionId === entity.sectionId) lastSec = i; });
+            const pos = lastSec === -1 ? entities.length : lastSec + 1;
+            entities.splice(pos, 0, entity);
+            const newAnalysis = { ...analysis, entities };
+            return {
+              ...x,
+              value: { ...x.value, analysis: newAnalysis, content: renderAnalysisJson(newAnalysis) },
             };
           }),
         })),
