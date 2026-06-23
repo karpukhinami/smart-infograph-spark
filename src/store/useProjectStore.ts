@@ -179,6 +179,14 @@ export const useProjectStore = create<ProjectState>()(
             };
           }),
         })),
+      replaceActiveAnalysis: (analysis) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) =>
+            x.id === s.activeContentId
+              ? { ...x, value: { ...x.value, analysis, content: renderAnalysisJson(analysis) } }
+              : x,
+          ),
+        })),
       setActiveContent: (id) => set({ activeContentId: id }),
 
 
