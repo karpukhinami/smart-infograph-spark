@@ -1,9 +1,14 @@
 import { useState, type CSSProperties } from "react";
-import type { AnalysisEntity, AnalysisGroupItem, AnalysisJson, DesignProfile } from "@/lib/types";
+import type { AnalysisEntity, AnalysisGroupItem, AnalysisJson, AnalysisSectionId, DesignProfile } from "@/lib/types";
 import { Markdown } from "@/components/workspace/Markdown";
 import { EntityEditDialog } from "@/components/workspace/EntityEditDialog";
 import { HeaderEditDialog } from "@/components/workspace/HeaderEditDialog";
 import { useProjectStore } from "@/store/useProjectStore";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronUp, ChevronDown, X, Plus } from "lucide-react";
 
 interface Props {
   analysis: AnalysisJson;
@@ -24,6 +29,12 @@ function asLines(v: string | string[] | null | undefined): string[] {
   return Array.isArray(v) ? v.filter((s) => s != null && String(s).trim() !== "").map(String) : [String(v)];
 }
 
+const SECTION_OPTIONS: { value: AnalysisSectionId; label: string }[] = [
+  { value: "prerequisites", label: "Предпосылки" },
+  { value: "main", label: "Основное содержание" },
+  { value: "additions", label: "Выводы и дополнения" },
+];
+
 const FALLBACK = {
   backgroundColor: "#F5F6FF",
   surfaceColor: "#FFFFFF",
@@ -42,9 +53,15 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
   const c = { ...FALLBACK, ...(profile?.colors ?? {}) };
   const entities = analysis.entities ?? [];
   const updateEntity = useProjectStore((s) => s.updateActiveAnalysisEntity);
+  const deleteEntity = useProjectStore((s) => s.deleteActiveAnalysisEntity);
+  const swapEntities = useProjectStore((s) => s.swapActiveAnalysisEntities);
+  const addEntity = useProjectStore((s) => s.addActiveAnalysisEntity);
   const updateHeader = useProjectStore((s) => s.updateActiveAnalysisHeader);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [headerOpen, setHeaderOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
+  const [changeSec, setChangeSec] = useState<{ index: number; section: AnalysisSectionId | "" } | null>(null);
 
   const subjectShown = displayMeta(analysis.subject);
   const gradeShown = displayMeta(analysis.grade);
@@ -92,9 +109,21 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
     </div>
   );
 
+  const handleMove = (index: number, direction: -1 | 1) => {
+    const neighborIdx = index + direction;
+    const cur = entities[index];
+    const neighbor = entities[neighborIdx];
+    if (neighbor && neighbor.sectionId === cur.sectionId) {
+      swapEntities(index, neighborIdx);
+    } else {
+      // Cannot swap across sections — prompt to change section instead.
+      setChangeSec({ index, section: cur.sectionId });
+    }
+  };
+
   return (
     <div className="space-y-3" style={{ color: c.inkColor }}>
-      {/* Header card */}
+      {/* Header card (no move/delete controls) */}
       {editable ? (
         <button
           type="button"
@@ -111,18 +140,66 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
       {/* Entity cards */}
       {items.map(({ e, bg, onBg }, i) =>
         editable ? (
-          <button
+          <div
             key={i}
-            type="button"
-            onClick={() => setEditIndex(i)}
-            className="block w-full text-left cursor-pointer rounded-xl transition-transform hover:scale-[1.005] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            title="Нажмите, чтобы отредактировать"
+            className="relative group rounded-xl"
           >
-            <EntityCard entity={e} bg={bg} onBg={onBg} surface={c.surfaceColor} />
-          </button>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setEditIndex(i)}
+              onKeyDown={(ev) => { if (ev.key === "Enter") setEditIndex(i); }}
+              className="block w-full text-left cursor-pointer rounded-xl transition-transform hover:scale-[1.005] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              title="Нажмите, чтобы отредактировать"
+            >
+              <EntityCard entity={e} bg={bg} onBg={onBg} surface={c.surfaceColor} />
+            </div>
+            {/* Move buttons (top-left) */}
+            <div className="absolute top-2 left-2 flex gap-1 z-10">
+              <button
+                type="button"
+                onClick={(ev) => { ev.stopPropagation(); handleMove(i, -1); }}
+                disabled={i === 0}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-foreground shadow hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Переместить вверх"
+              >
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={(ev) => { ev.stopPropagation(); handleMove(i, 1); }}
+                disabled={i === entities.length - 1}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-foreground shadow hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Переместить вниз"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {/* Delete button (top-right) */}
+            <button
+              type="button"
+              onClick={(ev) => { ev.stopPropagation(); setDeleteIndex(i); }}
+              className="absolute top-2 right-2 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-foreground shadow hover:bg-white"
+              title="Удалить карточку"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
         ) : (
           <EntityCard key={i} entity={e} bg={bg} onBg={onBg} surface={c.surfaceColor} />
         ),
+      )}
+
+      {/* Add card button */}
+      {editable && (
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/40 px-4 py-4 text-sm text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Добавить карточку</span>
+        </button>
       )}
 
       {editable && (
@@ -133,6 +210,28 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
             onClose={() => setEditIndex(null)}
             onSave={(patch) => {
               if (editIndex !== null) updateEntity(editIndex, patch);
+            }}
+          />
+
+          <EntityEditDialog
+            open={addOpen}
+            entity={null}
+            isNew
+            onClose={() => setAddOpen(false)}
+            onSave={(patch) => {
+              if (!patch.sectionId) return;
+              const newEntity: AnalysisEntity = {
+                sectionId: patch.sectionId as AnalysisSectionId,
+                entityType: patch.entityType ?? "custom",
+                attention: patch.attention ?? "normal",
+                title: patch.title ?? null,
+                content: patch.content ?? null,
+                formula: patch.formula ?? null,
+                cardAddendum: patch.cardAddendum ?? null,
+                icon: patch.icon ?? null,
+                visual: patch.visual ?? null,
+              };
+              addEntity(newEntity);
             }}
           />
 
@@ -147,6 +246,71 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
             onClose={() => setHeaderOpen(false)}
             onSave={(patch) => updateHeader(patch)}
           />
+
+          {/* Delete confirmation */}
+          <Dialog open={deleteIndex !== null} onOpenChange={(v) => { if (!v) setDeleteIndex(null); }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Удалить карточку?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                Карточка вместе со всем содержимым будет удалена.
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteIndex(null)}>Оставить</Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    if (deleteIndex !== null) deleteEntity(deleteIndex);
+                    setDeleteIndex(null);
+                  }}
+                >
+                  Удалить
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Change section dialog */}
+          <Dialog open={changeSec !== null} onOpenChange={(v) => { if (!v) setChangeSec(null); }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Смените раздел карточки</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-1.5">
+                <Label htmlFor="change-sec">Раздел</Label>
+                <Select
+                  value={changeSec?.section ?? ""}
+                  onValueChange={(v) =>
+                    setChangeSec((prev) => (prev ? { ...prev, section: v as AnalysisSectionId } : prev))
+                  }
+                >
+                  <SelectTrigger id="change-sec">
+                    <SelectValue placeholder="Выберите раздел" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SECTION_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setChangeSec(null)}>Отмена</Button>
+                <Button
+                  disabled={!changeSec?.section}
+                  onClick={() => {
+                    if (changeSec && changeSec.section) {
+                      updateEntity(changeSec.index, { sectionId: changeSec.section as AnalysisSectionId });
+                    }
+                    setChangeSec(null);
+                  }}
+                >
+                  Сохранить
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>
@@ -218,7 +382,6 @@ function EntityCard({
 function wrapMath(s: string): string {
   const t = s.trim();
   if (!t) return s;
-  // Already contains $...$ or $$...$$ delimiters
   if (/\$.+\$/.test(t)) return s;
   return `$${t}$`;
 }
