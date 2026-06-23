@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useSettingsStore } from "@/store/useSettingsStore";
 import type { AnalysisAttention, AnalysisEntity } from "@/lib/types";
 
 interface Props {
@@ -47,16 +46,13 @@ function checkBalance(text: string): string | null {
 }
 
 export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
-  const uiMode = useSettingsStore((s) => s.uiMode);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [formula, setFormula] = useState("");
   const [addendum, setAddendum] = useState("");
   const [attention, setAttention] = useState<AnalysisAttention>("normal");
   const [icon, setIcon] = useState("");
-  const [visualType, setVisualType] = useState("");
   const [visualDescription, setVisualDescription] = useState("");
-  const [visualOpen, setVisualOpen] = useState(false);
 
   useEffect(() => {
     if (!entity) return;
@@ -67,9 +63,7 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
     const att = String(entity.attention ?? "normal").toLowerCase();
     setAttention(att === "main" ? "core" : (att as AnalysisAttention));
     setIcon(entity.icon ?? "");
-    setVisualType(entity.visual?.type ?? "");
     setVisualDescription(entity.visual?.description ?? "");
-    setVisualOpen(false);
   }, [entity]);
 
   const validationError = useMemo(() => {
@@ -92,11 +86,8 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
 
   const handleSave = () => {
     if (!canSave) return;
-    const visTypeT = visualType.trim();
     const visDescT = visualDescription.trim();
-    const visual = visTypeT === "" && visDescT === ""
-      ? null
-      : { type: visTypeT, description: visDescT };
+    const visual = visDescT === "" ? null : { type: null, description: visDescT };
     onSave({
       title: title.trim() === "" ? null : title,
       content: fromText(content),
@@ -181,50 +172,24 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
             </RadioGroup>
           </div>
 
-          {uiMode === "debug" && (
-            <div className="rounded-md border border-border">
-              <button
-                type="button"
-                onClick={() => setVisualOpen((v) => !v)}
-                className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-muted/50"
-                aria-expanded={visualOpen}
-              >
-                <span>Визуал</span>
-                <span className="text-muted-foreground text-xs">{visualOpen ? "▲" : "▼"}</span>
-              </button>
-              {visualOpen && (
-                <div className="px-3 pb-3 pt-1 space-y-3 border-t border-border">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ent-icon">Иконка</Label>
-                    <Input
-                      id="ent-icon"
-                      value={icon}
-                      onChange={(e) => setIcon(e.target.value)}
-                      placeholder="Например: lightbulb или эмодзи"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ent-visual-type">Тип картинки</Label>
-                    <Input
-                      id="ent-visual-type"
-                      value={visualType}
-                      onChange={(e) => setVisualType(e.target.value)}
-                      placeholder="Например: schema, photo, diagram"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ent-visual-desc">Описание картинки</Label>
-                    <Textarea
-                      id="ent-visual-desc"
-                      value={visualDescription}
-                      onChange={(e) => setVisualDescription(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="ent-icon">Иконка</Label>
+            <Input
+              id="ent-icon"
+              value={icon}
+              onChange={(e) => setIcon(e.target.value)}
+              placeholder="Например: lightbulb или эмодзи"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ent-visual-desc">Описание картинки</Label>
+            <Textarea
+              id="ent-visual-desc"
+              value={visualDescription}
+              onChange={(e) => setVisualDescription(e.target.value)}
+              rows={3}
+            />
+          </div>
 
 
 

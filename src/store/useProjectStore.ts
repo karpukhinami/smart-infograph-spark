@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   AnalysisEntity,
+  AnalysisJson,
   ContentSummary,
   DesignBriefResult,
   SourceText,
@@ -36,6 +37,7 @@ interface ProjectState {
   updateActiveContent: (text: string) => void;
   updateActiveAnalysisEntity: (index: number, patch: Partial<AnalysisEntity>) => void;
   updateActiveAnalysisHeader: (patch: { topic?: string; subject?: string | null; grade?: string | null; summary?: string }) => void;
+  replaceActiveAnalysis: (analysis: AnalysisJson) => void;
   setActiveContent: (id: string) => void;
 
 
@@ -70,6 +72,7 @@ interface ProjectState {
   simpleImageVersions: { id: string; dataUrl: string; prompt: string; createdAt: number }[];
   setSimpleCurrentImage: (img: { dataUrl: string; prompt: string } | null) => void;
   archiveSimpleCurrentImage: () => void;
+  swapSimpleVersion: (id: string) => void;
   clearSimpleImages: () => void;
 
   models: { analysis: string; brief: string; image: string };
@@ -176,6 +179,14 @@ export const useProjectStore = create<ProjectState>()(
             };
           }),
         })),
+      replaceActiveAnalysis: (analysis) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) =>
+            x.id === s.activeContentId
+              ? { ...x, value: { ...x.value, analysis, content: renderAnalysisJson(analysis) } }
+              : x,
+          ),
+        })),
       setActiveContent: (id) => set({ activeContentId: id }),
 
 
@@ -236,6 +247,25 @@ export const useProjectStore = create<ProjectState>()(
           };
         }),
       clearSimpleImages: () => set({ simpleCurrentImage: null, simpleImageVersions: [] }),
+      swapSimpleVersion: (id) =>
+        set((s) => {
+          if (!s.simpleCurrentImage) return {};
+          const idx = s.simpleImageVersions.findIndex((v) => v.id === id);
+          if (idx < 0) return {};
+          const chosen = s.simpleImageVersions[idx];
+          const newVersions = s.simpleImageVersions.slice();
+          newVersions.splice(idx, 1);
+          newVersions.push({
+            id: crypto.randomUUID(),
+            createdAt: Date.now(),
+            dataUrl: s.simpleCurrentImage.dataUrl,
+            prompt: s.simpleCurrentImage.prompt,
+          });
+          return {
+            simpleImageVersions: newVersions,
+            simpleCurrentImage: { dataUrl: chosen.dataUrl, prompt: chosen.prompt },
+          };
+        }),
 
 
       models: {
