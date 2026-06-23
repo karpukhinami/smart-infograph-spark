@@ -46,16 +46,13 @@ function checkBalance(text: string): string | null {
 }
 
 export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
-  const uiMode = useSettingsStore((s) => s.uiMode);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [formula, setFormula] = useState("");
   const [addendum, setAddendum] = useState("");
   const [attention, setAttention] = useState<AnalysisAttention>("normal");
   const [icon, setIcon] = useState("");
-  const [visualType, setVisualType] = useState("");
   const [visualDescription, setVisualDescription] = useState("");
-  const [visualOpen, setVisualOpen] = useState(false);
 
   useEffect(() => {
     if (!entity) return;
@@ -66,9 +63,7 @@ export function EntityEditDialog({ open, entity, onClose, onSave }: Props) {
     const att = String(entity.attention ?? "normal").toLowerCase();
     setAttention(att === "main" ? "core" : (att as AnalysisAttention));
     setIcon(entity.icon ?? "");
-    setVisualType(entity.visual?.type ?? "");
     setVisualDescription(entity.visual?.description ?? "");
-    setVisualOpen(false);
   }, [entity]);
 
   const validationError = useMemo(() => {
