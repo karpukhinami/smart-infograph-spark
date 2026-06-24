@@ -130,6 +130,8 @@ function SimpleHome() {
   const [editSnapshot, setEditSnapshot] = useState<AnalysisJson | null>(null);
   const [regenImageOpen, setRegenImageOpen] = useState(false);
   const [regenContentOpen, setRegenContentOpen] = useState(false);
+  const [regenAfterEditOpen, setRegenAfterEditOpen] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
