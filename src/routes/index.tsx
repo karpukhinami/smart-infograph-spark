@@ -364,6 +364,32 @@ function SimpleHome() {
     setEditMode(false);
     toast.success("Изменения сохранены");
   }
+  function onSaveAndRegen() {
+    // Save (changes are already applied to the store); exit edit mode and open regen dialog
+    setEditSnapshot(null);
+    setEditMode(false);
+    setRegenAfterEditOpen(true);
+  }
+  function onCancelRegenAfterEdit() {
+    // Return to active editing without reverting saved changes
+    setRegenAfterEditOpen(false);
+    onEnterEditMode();
+  }
+  async function onConfirmRegenAfterEdit(wishes: string) {
+    try {
+      setRegenAfterEditOpen(false);
+      setUserWishes(wishes);
+      setLoading("image");
+      setPaneMode("image");
+      await runImage({ useProfileName: selectedProfileName ?? activeProfile?.profileName ?? null });
+      toast.success("Изображение готово");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать изображение");
+    } finally {
+      setLoading(null);
+      setImageStage(null);
+    }
+  }
   function onResetEdits() {
     const current = activeContent?.value.analysis ?? null;
     const unchanged = editSnapshot && current && JSON.stringify(editSnapshot) === JSON.stringify(current);
@@ -372,6 +398,7 @@ function SimpleHome() {
     setEditMode(false);
     if (!unchanged) toast.success("Изменения отменены");
   }
+
 
   const analysisJson = activeContent?.value.analysis ?? null;
 
