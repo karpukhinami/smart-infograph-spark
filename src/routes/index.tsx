@@ -130,6 +130,8 @@ function SimpleHome() {
   const [editSnapshot, setEditSnapshot] = useState<AnalysisJson | null>(null);
   const [regenImageOpen, setRegenImageOpen] = useState(false);
   const [regenContentOpen, setRegenContentOpen] = useState(false);
+  const [regenAfterEditOpen, setRegenAfterEditOpen] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -362,6 +364,32 @@ function SimpleHome() {
     setEditMode(false);
     toast.success("Изменения сохранены");
   }
+  function onSaveAndRegen() {
+    // Save (changes are already applied to the store); exit edit mode and open regen dialog
+    setEditSnapshot(null);
+    setEditMode(false);
+    setRegenAfterEditOpen(true);
+  }
+  function onCancelRegenAfterEdit() {
+    // Return to active editing without reverting saved changes
+    setRegenAfterEditOpen(false);
+    onEnterEditMode();
+  }
+  async function onConfirmRegenAfterEdit(wishes: string) {
+    try {
+      setRegenAfterEditOpen(false);
+      setUserWishes(wishes);
+      setLoading("image");
+      setPaneMode("image");
+      await runImage({ useProfileName: selectedProfileName ?? activeProfile?.profileName ?? null });
+      toast.success("Изображение готово");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать изображение");
+    } finally {
+      setLoading(null);
+      setImageStage(null);
+    }
+  }
   function onResetEdits() {
     const current = activeContent?.value.analysis ?? null;
     const unchanged = editSnapshot && current && JSON.stringify(editSnapshot) === JSON.stringify(current);
@@ -370,6 +398,7 @@ function SimpleHome() {
     setEditMode(false);
     if (!unchanged) toast.success("Изменения отменены");
   }
+
 
   const analysisJson = activeContent?.value.analysis ?? null;
 
@@ -694,8 +723,20 @@ function SimpleHome() {
                     <Button variant="outline" size="sm" onClick={onResetEdits}>
                       Сбросить изменения
                     </Button>
-                    <Button size="sm" onClick={onSaveEdits}>Сохранить изменения</Button>
+                    <Button variant="outline" size="sm" onClick={onSaveEdits}>
+                      Сохранить без перегенерации
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={onSaveAndRegen}
+                      style={{ background: LAVENDER, color: "#fff", borderColor: LAVENDER }}
+                      className="hover:opacity-90"
+                    >
+                      <Sparkles className="size-3.5 mr-1" />
+                      Сохранить и сгенерировать инфографику
+                    </Button>
                   </>
+
                 ) : (
                   <>
                     <Button variant="outline" size="sm" onClick={onEnterEditMode}>
@@ -784,10 +825,18 @@ function SimpleHome() {
         topic={source.topic || ""}
         basedOn={hasSource ? "materials" : "topic"}
       />
+
+      <RegenerateAfterEditDialog
+        open={regenAfterEditOpen}
+        onCancel={onCancelRegenAfterEdit}
+        onConfirm={onConfirmRegenAfterEdit}
+      />
     </div>
     </TooltipProvider>
   );
 }
+
+
 
 
 // ============== Regenerate Image Dialog ==============
@@ -927,6 +976,52 @@ function RegenerateContentDialog({
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Отмена</Button>
           <Button onClick={() => onConfirm(extra)}>
+            <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============== Regenerate Image After Edit Dialog ==============
+function RegenerateAfterEditDialog({
+  open,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  onCancel: () => void;
+  onConfirm: (wishes: string) => void;
+}) {
+  const [wishes, setWishes] = useState("");
+  useEffect(() => {
+    if (open) setWishes("");
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onCancel(); }}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Перегенерация изображения</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Перегенерация изображения на основе внесённых в содержание инфографики изменений.
+          </p>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Дополнительные требования к изображению</Label>
+            <Textarea
+              rows={3}
+              value={wishes}
+              onChange={(e) => setWishes(e.target.value)}
+              placeholder="Например: вынести формулу крупно, добавить иконку треугольника…"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>Отмена</Button>
+          <Button onClick={() => onConfirm(wishes)}>
             <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
           </Button>
         </DialogFooter>
