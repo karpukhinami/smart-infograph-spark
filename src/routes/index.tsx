@@ -723,8 +723,20 @@ function SimpleHome() {
                     <Button variant="outline" size="sm" onClick={onResetEdits}>
                       Сбросить изменения
                     </Button>
-                    <Button size="sm" onClick={onSaveEdits}>Сохранить изменения</Button>
+                    <Button variant="outline" size="sm" onClick={onSaveEdits}>
+                      Сохранить без перегенерации
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={onSaveAndRegen}
+                      style={{ background: LAVENDER, color: "#fff", borderColor: LAVENDER }}
+                      className="hover:opacity-90"
+                    >
+                      <Sparkles className="size-3.5 mr-1" />
+                      Сохранить и сгенерировать инфографику
+                    </Button>
                   </>
+
                 ) : (
                   <>
                     <Button variant="outline" size="sm" onClick={onEnterEditMode}>
