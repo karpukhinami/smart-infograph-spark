@@ -47,12 +47,12 @@ export function SimpleImageRating({ imageId }: Props) {
         <ThumbsDown className="size-3.5" />
       </button>
       {!rating && (
-        <div className="relative ml-1 max-w-[11rem] rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground shadow-sm">
+        <div className="relative ml-1 shrink-0 rounded-lg border border-border bg-card px-2 py-1 text-[11px] leading-none whitespace-nowrap text-muted-foreground shadow-sm">
           <span
             aria-hidden
             className="absolute left-0 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-l border-border bg-card"
           />
-          оцените качество генерации
+          Оцените генерацию
         </div>
       )}
     </div>

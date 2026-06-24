@@ -33,8 +33,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectStore, useActiveContent } from "@/store/useProjectStore";
-import { useSettingsStore, useCurrentStyles } from "@/store/useSettingsStore";
-import { callTextLLM, callImageLLM } from "@/lib/llm-client";
+import { useSettingsStore } from "@/store/useSettingsStore";
+import { callImageLLM } from "@/lib/llm-client";
 import { callTextLLMForJson } from "@/lib/llm-json";
 import { validateAnalysisJson } from "@/lib/analysis-render";
 import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
@@ -81,6 +81,11 @@ const SUBJECTS = [
   "Другое",
 ];
 const GRADES = [...Array.from({ length: 11 }, (_, i) => String(i + 1)), "Другое"];
+
+/** Home page always uses strict prompts/styles regardless of the global mode switch. */
+const HOME_APP_MODE = "strict" as const;
+/** Minimum panel height when the viewport is short. */
+const HOME_PANEL_MIN_HEIGHT_PX = 560;
 
 const LAVENDER = "#A78BFA";
 
@@ -132,9 +137,8 @@ export function SimpleHome() {
   const replaceActiveAnalysis = useProjectStore((s) => s.replaceActiveAnalysis);
 
   const activeContent = useActiveContent();
-  const mode = useSettingsStore((s) => s.mode);
-  const prompts = useSettingsStore((s) => s.promptsByMode[s.mode]);
-  const styles = useCurrentStyles();
+  const prompts = useSettingsStore((s) => s.promptsByMode[HOME_APP_MODE]);
+  const styles = useSettingsStore((s) => s.stylesByMode[HOME_APP_MODE]);
   const profiles = useSettingsStore((s) => s.profiles);
 
   const [loading, setLoading] = useState<null | "analyze" | "image">(null);
@@ -146,6 +150,7 @@ export function SimpleHome() {
   const [regenImageOpen, setRegenImageOpen] = useState(false);
   const [regenContentOpen, setRegenContentOpen] = useState(false);
   const [regenAfterEditOpen, setRegenAfterEditOpen] = useState(false);
+  const [imageFullscreen, setImageFullscreen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -174,6 +179,19 @@ export function SimpleHome() {
 
   const showResults = Boolean(activeContent) || loading !== null;
   const isBusy = loading !== null;
+
+  useEffect(() => {
+    if (!imageFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setImageFullscreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [imageFullscreen]);
+
+  useEffect(() => {
+    if (!simpleCurrent) setImageFullscreen(false);
+  }, [simpleCurrent?.id]);
 
   async function attachImageFiles(files: File[]) {
     if (!files.length) return;
@@ -227,35 +245,20 @@ export function SimpleHome() {
       .replaceAll("{{NARRATIVE_ILLUSTRATIONS}}", source.narrativeIllustrations ? "вкл" : "выкл");
 
     const imgs = attachedImages.length ? attachedImages : undefined;
-    let summary: ContentSummary;
-    if (mode === "strict") {
-      const analysis = await callTextLLMForJson({
-        model: models.analysis,
-        prompt: filled,
-        label: "analysis",
-        parse: validateAnalysisJson,
-        images: imgs,
-      });
-      const fallbackStyle = enabledStyles[0]?.id ?? "";
-      summary = {
-        content: "",
-        recommendedStyle: selectedStyleId ?? fallbackStyle,
-        recommendedDesignProfile: analysis.recommendedDesignProfile ?? null,
-        analysis,
-      };
-    } else {
-      const raw = await callTextLLM({ model: models.analysis, prompt: filled, images: imgs });
-      const content = (raw ?? "").trim();
-      if (!content) throw new Error("Модель вернула пустой ответ");
-      const fallbackStyle = enabledStyles[0]?.id ?? "";
-      const rdpMatch = content.match(/\[recommendedDesignProfile:\s*(Оранжевый|Индиго)\s*\]/i);
-      const cleaned = rdpMatch ? content.replace(rdpMatch[0], "").trim() : content;
-      summary = {
-        content: cleaned,
-        recommendedStyle: selectedStyleId ?? fallbackStyle,
-        recommendedDesignProfile: rdpMatch?.[1] ?? null,
-      };
-    }
+    const analysis = await callTextLLMForJson({
+      model: models.analysis,
+      prompt: filled,
+      label: "analysis",
+      parse: validateAnalysisJson,
+      images: imgs,
+    });
+    const fallbackStyle = enabledStyles[0]?.id ?? "";
+    const summary: ContentSummary = {
+      content: "",
+      recommendedStyle: selectedStyleId ?? fallbackStyle,
+      recommendedDesignProfile: analysis.recommendedDesignProfile ?? null,
+      analysis,
+    };
     pushContent(summary);
     return summary;
   }
@@ -265,7 +268,7 @@ export function SimpleHome() {
     const project = useProjectStore.getState();
     const settings = useSettingsStore.getState();
     const profiles = settings.profiles;
-    const prompts = settings.promptsByMode[settings.mode];
+    const prompts = settings.promptsByMode[HOME_APP_MODE];
     const profile = resolveDesignProfile(
       profiles,
       opts.useProfileName ?? project.selectedProfileName,
@@ -642,8 +645,11 @@ export function SimpleHome() {
 
   return (
     <TooltipProvider delayDuration={150}>
-    <div className="mx-auto max-w-[1600px] px-4 pt-8 pb-6 space-y-4">
-      <div className="flex items-center justify-between gap-4">
+    <div
+      className="mx-auto flex max-w-[1600px] min-h-0 flex-col px-4 py-4"
+      style={{ height: `max(${HOME_PANEL_MIN_HEIGHT_PX}px, calc(100vh - 7rem))` }}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-4 mb-4">
         <SimpleHomePageTitle />
         <Button
           variant="outline"
@@ -655,10 +661,10 @@ export function SimpleHome() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 max-lg:grid-rows-2 lg:grid-cols-2">
         {/* IMAGE PANEL */}
-        <section className="rounded-lg border border-border bg-card p-5 space-y-3">
-          <div className="flex flex-wrap gap-2 justify-between items-center min-h-9">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3 min-h-12">
             <h2 className="text-sm font-semibold text-muted-foreground">Итоговое изображение</h2>
             {simpleCurrent && !isBusy && (
               <div className="flex flex-wrap gap-2">
@@ -690,61 +696,78 @@ export function SimpleHome() {
             )}
           </div>
 
-          <div className="rounded-md border border-border bg-background min-h-[320px] flex items-center justify-center overflow-hidden">
-            {loading === "analyze" ? (
-              <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
-                <Loader2 className="size-8 animate-spin" />
-                <div>Шаг 1 из 2 — формируем контент…</div>
-              </div>
-            ) : loading === "image" ? (
-              <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
-                <Loader2 className="size-8 animate-spin" />
-                <div>
-                  {imageStage === "brief"
-                    ? "Шаг 2 из 2 — составляем дизайн-бриф…"
-                    : "Шаг 2 из 2 — генерируем изображение…"}
+          <div className="flex min-h-0 flex-1 flex-col gap-2 px-5 py-3">
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-md border border-border bg-background">
+              {loading === "analyze" ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
+                  <Loader2 className="size-8 animate-spin" />
+                  <div>Шаг 1 из 2 — формируем контент…</div>
                 </div>
+              ) : loading === "image" ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
+                  <Loader2 className="size-8 animate-spin" />
+                  <div>
+                    {imageStage === "brief"
+                      ? "Шаг 2 из 2 — составляем дизайн-бриф…"
+                      : "Шаг 2 из 2 — генерируем изображение…"}
+                  </div>
+                </div>
+              ) : simpleCurrent ? (
+                <button
+                  type="button"
+                  onClick={() => setImageFullscreen(true)}
+                  className="flex h-full w-full cursor-zoom-in items-center justify-center p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  title="Открыть на весь экран"
+                >
+                  <img
+                    src={simpleCurrent.dataUrl}
+                    alt=""
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </button>
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
+                  <ImageIcon className="size-8 opacity-50" />
+                  Итоговое изображение появится здесь
+                </div>
+              )}
+            </div>
+
+            {simpleCurrent && !isBusy && (
+              <div className="shrink-0">
+                <SimpleImageRating imageId={simpleCurrent.id} />
               </div>
-            ) : simpleCurrent ? (
-              <img src={simpleCurrent.dataUrl} alt="" className="max-w-full max-h-[80vh]" />
-            ) : (
-              <div className="text-sm text-muted-foreground flex flex-col items-center gap-2 py-12">
-                <ImageIcon className="size-8 opacity-50" />
-                Итоговое изображение появится здесь
+            )}
+
+            {simpleVersions.length > 0 && (
+              <div className="shrink-0 rounded-md border border-border bg-muted/40 p-2.5">
+                <div className="mb-1.5 text-xs text-muted-foreground">
+                  Предыдущие версии · текущая: {currentVerLabel}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {simpleVersions.map((v, i) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => swapSimpleVersion(v.id)}
+                      className="group relative size-14 overflow-hidden rounded border hover:ring-2 hover:ring-ring"
+                      title={`Открыть ver.${i + 1}`}
+                    >
+                      <img src={v.dataUrl} alt="" className="h-full w-full object-cover" />
+                      <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[10px] text-white">
+                        ver.{i + 1}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-
-          {simpleCurrent && !isBusy && <SimpleImageRating imageId={simpleCurrent.id} />}
-
-          {simpleVersions.length > 0 && (
-            <div className="rounded-md bg-muted/40 border border-border p-3 space-y-2">
-              <div className="text-xs text-muted-foreground">
-                Предыдущие версии · текущая: {currentVerLabel}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {simpleVersions.map((v, i) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => swapSimpleVersion(v.id)}
-                    className="size-16 rounded border overflow-hidden relative group hover:ring-2 hover:ring-ring"
-                    title={`Открыть ver.${i + 1}`}
-                  >
-                    <img src={v.dataUrl} alt="" className="w-full h-full object-cover" />
-                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[10px] text-white text-center py-0.5">
-                      ver.{i + 1}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </section>
 
         {/* CONTENT PANEL */}
-        <section className="rounded-lg border border-border bg-card p-5 space-y-3">
-          <div className="flex flex-wrap gap-2 justify-between items-center min-h-9">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3 min-h-12">
             <h2 className="text-sm font-semibold text-muted-foreground">Контент</h2>
             {activeContent && !isBusy && (
               <div className="flex flex-wrap gap-2">
@@ -765,7 +788,6 @@ export function SimpleHome() {
                       Сохранить и сгенерировать инфографику
                     </Button>
                   </>
-
                 ) : (
                   <>
                     <Button variant="outline" size="sm" onClick={onEnterEditMode}>
@@ -786,7 +808,7 @@ export function SimpleHome() {
           </div>
 
           {editMode && (
-            <div className="space-y-1.5">
+            <div className="shrink-0 space-y-1.5 border-b border-border px-5 py-3">
               <Label className="text-xs">Цветовая схема</Label>
               <ProfileSelect
                 value={selectedProfileName ?? activeProfile?.profileName ?? ""}
@@ -795,30 +817,49 @@ export function SimpleHome() {
             </div>
           )}
 
-          <div className="rounded-md border border-border bg-background p-4 min-h-[200px]">
-            {loading === "analyze" && !activeContent ? (
-              <div className="flex items-center justify-center py-12 text-muted-foreground">
-                <Loader2 className="size-6 animate-spin" />
-              </div>
-            ) : loading === "analyze" ? (
-              <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
-                <Loader2 className="size-6 animate-spin" />
-                Перегенерируем контент…
-              </div>
-            ) : activeContent ? (
-              analysisJson ? (
-                <SimpleContentPreview
-                  analysis={analysisJson}
-                  profile={activeProfile ?? null}
-                  editable={editMode}
-                />
-              ) : (
-                <Markdown>{activeContent.value.content}</Markdown>
-              )
-            ) : null}
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+            <div className="rounded-md border border-border bg-background p-4">
+              {loading === "analyze" && !activeContent ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                  <Loader2 className="size-6 animate-spin" />
+                </div>
+              ) : loading === "analyze" ? (
+                <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
+                  <Loader2 className="size-6 animate-spin" />
+                  Перегенерируем контент…
+                </div>
+              ) : activeContent ? (
+                analysisJson ? (
+                  <SimpleContentPreview
+                    analysis={analysisJson}
+                    profile={activeProfile ?? null}
+                    editable={editMode}
+                  />
+                ) : (
+                  <Markdown>{activeContent.value.content}</Markdown>
+                )
+              ) : null}
+            </div>
           </div>
         </section>
       </div>
+
+      {imageFullscreen && simpleCurrent && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Изображение на весь экран"
+          onClick={() => setImageFullscreen(false)}
+        >
+          <img
+            src={simpleCurrent.dataUrl}
+            alt=""
+            className="max-h-full max-w-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
 
 
       {/* Reset confirm */}
