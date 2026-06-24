@@ -63,9 +63,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="h-full">
       <head><HeadContent /></head>
-      <body className="min-h-dvh">{children}<Scripts /></body>
+      <body className="h-dvh overflow-hidden">{children}<Scripts /></body>
     </html>
   );
 }
@@ -79,9 +79,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex min-h-dvh flex-col">
+      <div className="flex h-full flex-col overflow-hidden">
         {showAdminHeader && (
-        <header className="border-b border-border bg-sidebar/60 backdrop-blur">
+        <header className="shrink-0 border-b border-border bg-sidebar/60 backdrop-blur">
           <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2">
             <div className="flex items-center gap-3">
               <UiModeSwitch />
@@ -108,7 +108,7 @@ function RootComponent() {
           </div>
         </header>
         )}
-        <main className="flex min-h-0 flex-1 flex-col"><Outlet /></main>
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden"><Outlet /></main>
         <Toaster />
       </div>
     </QueryClientProvider>

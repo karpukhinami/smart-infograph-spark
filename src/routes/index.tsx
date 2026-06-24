@@ -432,7 +432,7 @@ export function SimpleHome() {
   // ============ INPUT VIEW ============
   if (!showResults) {
     return (
-      <div className="mx-auto max-w-3xl px-4 pt-8 pb-6">
+      <div className="mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto px-4 pt-8 pb-6">
         <SimpleHomePageTitle className="mb-6" />
         <section className="rounded-lg border border-border bg-card p-5 space-y-5">
           <div className="flex items-center justify-between">
@@ -643,9 +643,9 @@ export function SimpleHome() {
 
   return (
     <TooltipProvider delayDuration={150}>
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-1 flex-col px-4 py-4">
-      <div className="flex shrink-0 items-center justify-between gap-4 mb-4">
-        <SimpleHomePageTitle />
+    <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 basis-0 flex-col overflow-hidden px-4 py-3">
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-4">
+        <SimpleHomePageTitle className="text-3xl" />
         <Button
           variant="outline"
           size="sm"
@@ -656,7 +656,7 @@ export function SimpleHome() {
         </Button>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 max-lg:grid-rows-2 lg:grid-cols-2">
+      <div className="grid min-h-0 flex-1 basis-0 grid-cols-1 gap-3 max-lg:grid-rows-2 lg:grid-cols-2">
         {/* IMAGE PANEL */}
         <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3 min-h-12">
