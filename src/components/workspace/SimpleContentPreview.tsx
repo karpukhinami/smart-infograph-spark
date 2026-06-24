@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import type { AnalysisEntity, AnalysisGroupItem, AnalysisJson, AnalysisSectionId, DesignProfile } from "@/lib/types";
+import type { AnalysisAttention, AnalysisEntity, AnalysisGroupItem, AnalysisJson, AnalysisSectionId, DesignProfile } from "@/lib/types";
 import { Markdown } from "@/components/workspace/Markdown";
 import { EntityEditDialog } from "@/components/workspace/EntityEditDialog";
 import { HeaderEditDialog } from "@/components/workspace/HeaderEditDialog";
@@ -35,6 +35,8 @@ const SECTION_OPTIONS: { value: AnalysisSectionId; label: string }[] = [
   { value: "additions", label: "Выводы и дополнения" },
 ];
 
+const COLOR_DOT_CLASS = "inline-block h-9 w-9 shrink-0 rounded-full";
+
 const FALLBACK = {
   backgroundColor: "#F5F6FF",
   surfaceColor: "#FFFFFF",
@@ -49,6 +51,27 @@ const FALLBACK = {
   mutedheaderTextColor: "#9399BD",
 };
 
+const ATTENTION_PICKER_OPTIONS: {
+  attention: AnalysisAttention;
+  colorKey: keyof typeof FALLBACK;
+  title: string;
+}[] = [
+  { attention: "normal", colorKey: "detailDeepColor", title: "Тёмная пастель (normal)" },
+  { attention: "accent", colorKey: "contrastSoftColor", title: "Контрастная пастель (accent)" },
+  { attention: "core", colorKey: "primaryColor", title: "Основной цвет (core)" },
+];
+
+function entityAccentColor(
+  attention: string | undefined,
+  colors: typeof FALLBACK,
+  normalRun: number,
+): string {
+  const att = String(attention ?? "normal").toLowerCase();
+  if (att === "core" || att === "main") return colors.primaryColor;
+  if (att === "accent") return colors.contrastSoftColor;
+  return normalRun % 2 === 0 ? colors.detailSoftColor : colors.detailDeepColor;
+}
+
 export function SimpleContentPreview({ analysis, profile, editable = true }: Props) {
   const c = { ...FALLBACK, ...(profile?.colors ?? {}) };
   const entities = analysis.entities ?? [];
@@ -62,6 +85,7 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
   const [addOpen, setAddOpen] = useState(false);
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
   const [changeSec, setChangeSec] = useState<{ index: number; section: AnalysisSectionId | "" } | null>(null);
+  const [attentionPickerIndex, setAttentionPickerIndex] = useState<number | null>(null);
 
   const subjectShown = displayMeta(analysis.subject);
   const gradeShown = displayMeta(analysis.grade);
@@ -70,19 +94,9 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
   let normalRun = 0;
   const items = entities.map((e) => {
     const att = String(e.attention ?? "normal").toLowerCase();
-    let bg = c.detailSoftColor;
-    let onBg = c.inkColor;
-    if (att === "core" || att === "main") {
-      bg = c.primaryColor;
-      onBg = c.inkColor;
-    } else if (att === "accent") {
-      bg = c.contrastSoftColor;
-      onBg = c.inkColor;
-    } else {
-      bg = normalRun % 2 === 0 ? c.detailSoftColor : c.detailDeepColor;
-      normalRun++;
-    }
-    return { e, bg, onBg };
+    const run = att === "normal" || att === "" ? normalRun++ : normalRun;
+    const bg = entityAccentColor(e.attention, c, run);
+    return { e, bg, onBg: c.inkColor };
   });
 
   const headerInner = (
@@ -147,8 +161,16 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
             <div
               role="button"
               tabIndex={0}
-              onClick={() => setEditIndex(i)}
-              onKeyDown={(ev) => { if (ev.key === "Enter") setEditIndex(i); }}
+              onClick={() => {
+                setAttentionPickerIndex(null);
+                setEditIndex(i);
+              }}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter") {
+                  setAttentionPickerIndex(null);
+                  setEditIndex(i);
+                }
+              }}
               className="block w-full text-left cursor-pointer rounded-xl transition-transform hover:scale-[1.005] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title="Нажмите, чтобы отредактировать"
             >
@@ -177,11 +199,39 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
             </div>
             {/* Color dot + delete (top-right) */}
             <div className="absolute top-2 right-2 flex items-start gap-1.5 z-10">
-              <span
-                aria-hidden
-                className="inline-block h-9 w-9 rounded-full ring-2 ring-white"
-                style={{ background: bg }}
-              />
+              {attentionPickerIndex === i ? (
+                <div
+                  className="flex items-center gap-1.5 rounded-full bg-white/95 px-1.5 py-1 shadow"
+                  onClick={(ev) => ev.stopPropagation()}
+                  onKeyDown={(ev) => ev.stopPropagation()}
+                >
+                  {ATTENTION_PICKER_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.attention}
+                      type="button"
+                      title={opt.title}
+                      className={`${COLOR_DOT_CLASS} transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+                      style={{ background: c[opt.colorKey] }}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        updateEntity(i, { attention: opt.attention });
+                        setAttentionPickerIndex(null);
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  title="Выбрать цвет карточки"
+                  className={`${COLOR_DOT_CLASS} transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+                  style={{ background: bg }}
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    setAttentionPickerIndex((prev) => (prev === i ? null : i));
+                  }}
+                />
+              )}
               <button
                 type="button"
                 onClick={(ev) => { ev.stopPropagation(); setDeleteIndex(i); }}
@@ -193,7 +243,7 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
             </div>
           </div>
         ) : (
-          <EntityCard key={i} entity={e} accent={bg} onBg={onBg} surface={c.surfaceColor} />
+          <EntityCard key={i} entity={e} accent={bg} onBg={onBg} surface={c.surfaceColor} showColorDot />
         ),
       )}
 
@@ -331,12 +381,14 @@ function EntityCard({
   onBg,
   surface,
   editable,
+  showColorDot,
 }: {
   entity: AnalysisEntity;
   accent: string;
   onBg: string;
   surface: string;
   editable?: boolean;
+  showColorDot?: boolean;
 }) {
   const content = asLines(entity.content);
   const formula = asLines(entity.formula);
@@ -348,14 +400,14 @@ function EntityCard({
 
   return (
     <div className="relative rounded-xl p-3 space-y-2" style={{ background: PALE, color: onBg }}>
-      {!editable && (
+      {showColorDot && (
         <span
           aria-hidden
-          className="absolute top-2 right-2 inline-block h-3 w-3 rounded-full ring-2 ring-white"
+          className={`absolute top-2 right-2 ${COLOR_DOT_CLASS}`}
           style={{ background: accent }}
         />
       )}
-      {entity.title && <div className="font-bold text-sm pr-6"><Markdown>{entity.title}</Markdown></div>}
+      {entity.title && <div className={`font-bold text-sm ${showColorDot ? "pr-12" : ""}`}><Markdown>{entity.title}</Markdown></div>}
       {content.length > 0 && (
         content.length === 1 ? (
           <div className="text-sm"><Markdown>{content[0]}</Markdown></div>

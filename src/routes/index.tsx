@@ -97,7 +97,7 @@ function fileToDataUrl(file: File): Promise<string> {
 
 function SimpleHomePageTitle({ className }: { className?: string }) {
   return (
-    <h1 className={cn("text-2xl font-semibold tracking-tight", className)}>
+    <h1 className={cn("text-4xl font-semibold tracking-tight", className)}>
       Генератор инфографики
     </h1>
   );
@@ -266,7 +266,6 @@ export function SimpleHome() {
     if (!content) throw new Error("Контент не готов");
 
     setImageStage("brief");
-    archiveSimple();
 
     const summaryText = content.value.analysis
       ? JSON.stringify(content.value.analysis, null, 2)
@@ -295,6 +294,7 @@ export function SimpleHome() {
 
     setImageStage("render");
     const dataUrl = await callImageLLM({ model: models.image, prompt: finalPrompt });
+    archiveSimple();
     setSimpleCurrent({ dataUrl, prompt: finalPrompt });
   }
 
