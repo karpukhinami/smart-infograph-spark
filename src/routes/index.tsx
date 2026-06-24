@@ -38,7 +38,11 @@ import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { callTextLLMForJson } from "@/lib/llm-json";
 import { validateAnalysisJson } from "@/lib/analysis-render";
 import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
-import { buildDesignBriefPrompt, designProfileColorsAndRules } from "@/lib/prompt-injection";
+import {
+  buildDesignBriefPrompt,
+  buildSimpleHomeImagePrompt,
+  resolveDesignProfile,
+} from "@/lib/prompt-injection";
 import simpleBriefPromptRaw from "@/data/prompts/simple/design-brief-short.txt?raw";
 import imagePromptHeaderText from "@/data/prompts/image-prompt-header.txt?raw";
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
@@ -259,8 +263,13 @@ export function SimpleHome() {
   // === Image ===
   async function runImage(opts: { useProfileName?: string | null } = {}): Promise<void> {
     const project = useProjectStore.getState();
-    const profileName = opts.useProfileName ?? project.selectedProfileName ?? activeProfile?.profileName ?? null;
-    const profile = profiles.find((p) => p.profileName === profileName) ?? activeProfile;
+    const settings = useSettingsStore.getState();
+    const profiles = settings.profiles;
+    const prompts = settings.promptsByMode[settings.mode];
+    const profile = resolveDesignProfile(
+      profiles,
+      opts.useProfileName ?? project.selectedProfileName,
+    );
     const fallbackStyle = enabledStyles[0];
     const style = activeStyle ?? fallbackStyle;
     if (!style) throw new Error("Не задан стиль инфографики");
@@ -282,25 +291,22 @@ export function SimpleHome() {
       generalRules: prompts.generalRules,
     });
     const briefRes = await callTextLLMForJson({
-      model: models.brief,
+      model: project.models.brief,
       prompt: filled,
       label: "simple design brief",
       parse: (v) => v as DesignBriefResult,
     });
     if (!briefRes?.PromptForImageGeneration) throw new Error("Модель не вернула PromptForImageGeneration");
 
-    const layer1 = mode === "strict" ? designProfileColorsAndRules(profile) : "";
-    const finalPrompt = [
-      imagePromptHeaderText.trim(),
-      layer1,
-      briefRes.PromptForImageGeneration,
-      executionRulesText,
-    ]
-      .filter((s) => s && s.trim().length > 0)
-      .join("\n\n");
+    const finalPrompt = buildSimpleHomeImagePrompt({
+      profile,
+      promptForImageGeneration: briefRes.PromptForImageGeneration,
+      headerText: imagePromptHeaderText,
+      executionRules: executionRulesText,
+    });
 
     setImageStage("render");
-    const dataUrl = await callImageLLM({ model: models.image, prompt: finalPrompt });
+    const dataUrl = await callImageLLM({ model: project.models.image, prompt: finalPrompt });
     archiveSimple();
     setSimpleCurrent({ dataUrl, prompt: finalPrompt });
   }

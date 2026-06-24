@@ -296,6 +296,32 @@ export function designProfileColorsAndRules(profile: DesignProfile | null | unde
   return lines.join("\n");
 }
 
+/** Resolve design profile by name, falling back to the first profile in the list. */
+export function resolveDesignProfile(
+  profiles: DesignProfile[],
+  profileName: string | null | undefined,
+): DesignProfile | null {
+  if (profileName) {
+    const found = profiles.find((p) => p.profileName === profileName);
+    if (found) return found;
+  }
+  return profiles[0] ?? null;
+}
+
+export const LAYER1_PROMPT_MARKER = "LAYER 1 -- COLOR AND TYPOGRAPHY GENERAL RULES";
+
+/** Final image prompt for the main (simple) page: header + LAYER 1 + brief + execution rules. */
+export function buildSimpleHomeImagePrompt(opts: {
+  profile: DesignProfile | null | undefined;
+  promptForImageGeneration: string;
+  headerText: string;
+  executionRules: string;
+}): string {
+  const layer1 = opts.profile ? designProfileColorsAndRules(opts.profile).trim() : "";
+  return [opts.headerText.trim(), layer1, opts.promptForImageGeneration.trim(), opts.executionRules.trim()]
+    .filter((s) => s.length > 0)
+    .join("\n\n");
+}
 
 export function buildDesignBriefPrompt(opts: {
   template: string;
