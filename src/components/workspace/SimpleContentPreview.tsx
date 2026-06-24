@@ -152,9 +152,9 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
               className="block w-full text-left cursor-pointer rounded-xl transition-transform hover:scale-[1.005] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title="Нажмите, чтобы отредактировать"
             >
-              <EntityCard entity={e} bg={bg} onBg={onBg} surface={c.surfaceColor} />
+              <EntityCard entity={e} accent={bg} onBg={onBg} surface={c.surfaceColor} />
             </div>
-            {/* Move buttons (top-left) */}
+            {/* Move + delete buttons (top-left) */}
             <div className="absolute top-2 left-2 flex gap-1 z-10">
               <button
                 type="button"
@@ -174,21 +174,21 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
               >
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
+              <button
+                type="button"
+                onClick={(ev) => { ev.stopPropagation(); setDeleteIndex(i); }}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-foreground shadow hover:bg-white"
+                title="Удалить карточку"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
-            {/* Delete button (top-right) */}
-            <button
-              type="button"
-              onClick={(ev) => { ev.stopPropagation(); setDeleteIndex(i); }}
-              className="absolute top-2 right-2 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-foreground shadow hover:bg-white"
-              title="Удалить карточку"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
           </div>
         ) : (
-          <EntityCard key={i} entity={e} bg={bg} onBg={onBg} surface={c.surfaceColor} />
+          <EntityCard key={i} entity={e} accent={bg} onBg={onBg} surface={c.surfaceColor} />
         ),
       )}
+
 
       {/* Add card button */}
       {editable && (
