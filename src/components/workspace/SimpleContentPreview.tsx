@@ -152,9 +152,9 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
               className="block w-full text-left cursor-pointer rounded-xl transition-transform hover:scale-[1.005] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title="Нажмите, чтобы отредактировать"
             >
-              <EntityCard entity={e} accent={bg} onBg={onBg} surface={c.surfaceColor} />
+              <EntityCard entity={e} accent={bg} onBg={onBg} surface={c.surfaceColor} editable />
             </div>
-            {/* Move + delete buttons (top-left) */}
+            {/* Move buttons (top-left) */}
             <div className="absolute top-2 left-2 flex gap-1 z-10">
               <button
                 type="button"
@@ -174,10 +174,18 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
               >
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
+            </div>
+            {/* Color dot + delete (top-right) */}
+            <div className="absolute top-2 right-2 flex items-start gap-1.5 z-10">
+              <span
+                aria-hidden
+                className="inline-block h-9 w-9 rounded-full ring-2 ring-white"
+                style={{ background: bg }}
+              />
               <button
                 type="button"
                 onClick={(ev) => { ev.stopPropagation(); setDeleteIndex(i); }}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-foreground shadow hover:bg-white"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/90 text-foreground shadow hover:bg-white"
                 title="Удалить карточку"
               >
                 <X className="h-3.5 w-3.5" />
@@ -322,11 +330,13 @@ function EntityCard({
   accent,
   onBg,
   surface,
+  editable,
 }: {
   entity: AnalysisEntity;
   accent: string;
   onBg: string;
   surface: string;
+  editable?: boolean;
 }) {
   const content = asLines(entity.content);
   const formula = asLines(entity.formula);
@@ -338,11 +348,13 @@ function EntityCard({
 
   return (
     <div className="relative rounded-xl p-3 space-y-2" style={{ background: PALE, color: onBg }}>
-      <span
-        aria-hidden
-        className="absolute top-2 right-2 inline-block h-3 w-3 rounded-full ring-2 ring-white"
-        style={{ background: accent }}
-      />
+      {!editable && (
+        <span
+          aria-hidden
+          className="absolute top-2 right-2 inline-block h-3 w-3 rounded-full ring-2 ring-white"
+          style={{ background: accent }}
+        />
+      )}
       {entity.title && <div className="font-bold text-sm pr-6"><Markdown>{entity.title}</Markdown></div>}
       {content.length > 0 && (
         content.length === 1 ? (
