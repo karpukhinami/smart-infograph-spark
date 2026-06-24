@@ -40,10 +40,12 @@ import { validateAnalysisJson } from "@/lib/analysis-render";
 import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
 import { buildDesignBriefPrompt, designProfileColorsAndRules } from "@/lib/prompt-injection";
 import simpleBriefPromptRaw from "@/data/prompts/simple/design-brief-short.txt?raw";
+import imagePromptHeaderText from "@/data/prompts/image-prompt-header.txt?raw";
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import type { AnalysisJson, ContentSummary, DesignBriefResult, InfographicStyle } from "@/lib/types";
 import { Markdown } from "@/components/workspace/Markdown";
 import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
+import { SimpleImageRating } from "@/components/workspace/SimpleImageRating";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -288,7 +290,12 @@ export function SimpleHome() {
     if (!briefRes?.PromptForImageGeneration) throw new Error("Модель не вернула PromptForImageGeneration");
 
     const layer1 = mode === "strict" ? designProfileColorsAndRules(profile) : "";
-    const finalPrompt = [layer1, briefRes.PromptForImageGeneration, executionRulesText]
+    const finalPrompt = [
+      imagePromptHeaderText.trim(),
+      layer1,
+      briefRes.PromptForImageGeneration,
+      executionRulesText,
+    ]
       .filter((s) => s && s.trim().length > 0)
       .join("\n\n");
 
@@ -701,6 +708,8 @@ export function SimpleHome() {
               </div>
             )}
           </div>
+
+          {simpleCurrent && !isBusy && <SimpleImageRating imageId={simpleCurrent.id} />}
 
           {simpleVersions.length > 0 && (
             <div className="rounded-md bg-muted/40 border border-border p-3 space-y-2">

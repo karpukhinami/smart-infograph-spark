@@ -142,11 +142,11 @@ CARD COLORING RULES
 - Use background color specified in the card description.
 
 
-3. Card title should use these styling rules:
+3. Card caption plate styling rules:
 
-- Title plate background: {{headerColor}}
+- caption plate background: {{headerColor}}
 
-- Title plate text: {{lightTextColor}}
+- caption plate text: {{lightTextColor}}
 
 - Typography: UPPERCASE, BOLD
 
@@ -154,9 +154,9 @@ CARD COLORING RULES
 
 - No decorative variation between same-level cards
 
-- Exception:
+- Exception (use only when absolutely necessary):
 
-- Core card may use plain large heading without title plate if readability is improved
+- Core card may use plain large heading without caption plate if readability is improved
 
 
 4. TEXT CONTENT RULES (INSIDE CARDS)

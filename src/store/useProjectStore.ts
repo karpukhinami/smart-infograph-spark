@@ -71,9 +71,11 @@ interface ProjectState {
   setActiveImage: (id: string) => void;
 
   // Simple-mode (home page) image versions: each carries its source prompt for traceability.
-  simpleCurrentImage: { dataUrl: string; prompt: string } | null;
+  simpleCurrentImage: { id: string; dataUrl: string; prompt: string } | null;
   simpleImageVersions: { id: string; dataUrl: string; prompt: string; createdAt: number }[];
-  setSimpleCurrentImage: (img: { dataUrl: string; prompt: string } | null) => void;
+  simpleImageRatings: Record<string, "like" | "dislike">;
+  setSimpleCurrentImage: (img: { id?: string; dataUrl: string; prompt: string } | null) => void;
+  setSimpleImageRating: (id: string, rating: "like" | "dislike") => void;
   archiveSimpleCurrentImage: () => void;
   swapSimpleVersion: (id: string) => void;
   clearSimpleImages: () => void;
@@ -117,6 +119,7 @@ export const useProjectStore = create<ProjectState>()(
           activeImageId: null,
           simpleCurrentImage: null,
           simpleImageVersions: [],
+          simpleImageRatings: {},
 
         }),
 
@@ -315,36 +318,58 @@ export const useProjectStore = create<ProjectState>()(
 
       simpleCurrentImage: null,
       simpleImageVersions: [],
-      setSimpleCurrentImage: (img) => set({ simpleCurrentImage: img }),
+      simpleImageRatings: {},
+      setSimpleCurrentImage: (img) =>
+        set({
+          simpleCurrentImage: img
+            ? { id: img.id ?? crypto.randomUUID(), dataUrl: img.dataUrl, prompt: img.prompt }
+            : null,
+        }),
+      setSimpleImageRating: (id, rating) =>
+        set((s) => ({
+          simpleImageRatings: { ...s.simpleImageRatings, [id]: rating },
+        })),
       archiveSimpleCurrentImage: () =>
         set((s) => {
           if (!s.simpleCurrentImage) return {};
+          const id = s.simpleCurrentImage.id ?? crypto.randomUUID();
           return {
             simpleImageVersions: [
               ...s.simpleImageVersions,
-              { id: crypto.randomUUID(), createdAt: Date.now(), ...s.simpleCurrentImage },
+              {
+                id,
+                createdAt: Date.now(),
+                dataUrl: s.simpleCurrentImage.dataUrl,
+                prompt: s.simpleCurrentImage.prompt,
+              },
             ],
             simpleCurrentImage: null,
           };
         }),
-      clearSimpleImages: () => set({ simpleCurrentImage: null, simpleImageVersions: [] }),
+      clearSimpleImages: () =>
+        set({ simpleCurrentImage: null, simpleImageVersions: [], simpleImageRatings: {} }),
       swapSimpleVersion: (id) =>
         set((s) => {
           if (!s.simpleCurrentImage) return {};
           const idx = s.simpleImageVersions.findIndex((v) => v.id === id);
           if (idx < 0) return {};
           const chosen = s.simpleImageVersions[idx];
+          const currentId = s.simpleCurrentImage.id ?? crypto.randomUUID();
           const newVersions = s.simpleImageVersions.slice();
           newVersions.splice(idx, 1);
           newVersions.push({
-            id: crypto.randomUUID(),
+            id: currentId,
             createdAt: Date.now(),
             dataUrl: s.simpleCurrentImage.dataUrl,
             prompt: s.simpleCurrentImage.prompt,
           });
           return {
             simpleImageVersions: newVersions,
-            simpleCurrentImage: { dataUrl: chosen.dataUrl, prompt: chosen.prompt },
+            simpleCurrentImage: {
+              id: chosen.id,
+              dataUrl: chosen.dataUrl,
+              prompt: chosen.prompt,
+            },
           };
         }),
 
@@ -358,7 +383,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "infographic-project",
-      version: 5,
+      version: 6,
       migrate: () => undefined as unknown as ProjectState,
       storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
     },
