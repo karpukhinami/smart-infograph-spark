@@ -319,12 +319,12 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
 
 function EntityCard({
   entity,
-  bg,
+  accent,
   onBg,
   surface,
 }: {
   entity: AnalysisEntity;
-  bg: string;
+  accent: string;
   onBg: string;
   surface: string;
 }) {
@@ -333,11 +333,17 @@ function EntityCard({
   const addendum = asLines(entity.cardAddendum);
   const items = entity.items ?? [];
 
+  const PALE = "#EEF0F3";
   const surfaceStyle: CSSProperties = { background: surface, color: onBg };
 
   return (
-    <div className="rounded-xl p-3 space-y-2" style={{ background: bg, color: onBg }}>
-      {entity.title && <div className="font-bold text-sm"><Markdown>{entity.title}</Markdown></div>}
+    <div className="relative rounded-xl p-3 space-y-2" style={{ background: PALE, color: onBg }}>
+      <span
+        aria-hidden
+        className="absolute top-2 right-2 inline-block h-3 w-3 rounded-full ring-2 ring-white"
+        style={{ background: accent }}
+      />
+      {entity.title && <div className="font-bold text-sm pr-6"><Markdown>{entity.title}</Markdown></div>}
       {content.length > 0 && (
         content.length === 1 ? (
           <div className="text-sm"><Markdown>{content[0]}</Markdown></div>
@@ -378,6 +384,7 @@ function EntityCard({
     </div>
   );
 }
+
 
 function wrapMath(s: string): string {
   const t = s.trim();
