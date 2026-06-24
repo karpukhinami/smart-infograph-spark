@@ -145,6 +145,11 @@ function SimpleHome() {
     [profiles, selectedProfileName],
   );
 
+  const isDirty = useMemo(() => {
+    if (!editMode || !editSnapshot || !activeContent?.value.analysis) return false;
+    return JSON.stringify(activeContent.value.analysis) !== JSON.stringify(editSnapshot);
+  }, [editMode, editSnapshot, activeContent?.value.analysis]);
+
   const hasSource = Boolean(source.text.trim());
   const useTopicOnlyPrompt = !hasSource;
 
@@ -729,8 +734,7 @@ function SimpleHome() {
                     <Button
                       size="sm"
                       onClick={onSaveAndRegen}
-                      style={{ background: LAVENDER, color: "#fff", borderColor: LAVENDER }}
-                      className="hover:opacity-90"
+                      disabled={!isDirty}
                     >
                       <Sparkles className="size-3.5 mr-1" />
                       Сохранить и сгенерировать инфографику
