@@ -983,3 +983,49 @@ function RegenerateContentDialog({
     </Dialog>
   );
 }
+
+// ============== Regenerate Image After Edit Dialog ==============
+function RegenerateAfterEditDialog({
+  open,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  onCancel: () => void;
+  onConfirm: (wishes: string) => void;
+}) {
+  const [wishes, setWishes] = useState("");
+  useEffect(() => {
+    if (open) setWishes("");
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onCancel(); }}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Перегенерация изображения</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Перегенерация изображения на основе внесённых в содержание инфографики изменений.
+          </p>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Дополнительные требования к изображению</Label>
+            <Textarea
+              rows={3}
+              value={wishes}
+              onChange={(e) => setWishes(e.target.value)}
+              placeholder="Например: вынести формулу крупно, добавить иконку треугольника…"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>Отмена</Button>
+          <Button onClick={() => onConfirm(wishes)}>
+            <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
