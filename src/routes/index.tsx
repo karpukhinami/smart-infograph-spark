@@ -84,8 +84,6 @@ const GRADES = [...Array.from({ length: 11 }, (_, i) => String(i + 1)), "Дру�
 
 /** Home page always uses strict prompts/styles regardless of the global mode switch. */
 const HOME_APP_MODE = "strict" as const;
-/** Minimum panel height when the viewport is short. */
-const HOME_PANEL_MIN_HEIGHT_PX = 560;
 
 const LAVENDER = "#A78BFA";
 
@@ -645,10 +643,7 @@ export function SimpleHome() {
 
   return (
     <TooltipProvider delayDuration={150}>
-    <div
-      className="mx-auto flex max-w-[1600px] min-h-0 flex-col px-4 py-4"
-      style={{ height: `max(${HOME_PANEL_MIN_HEIGHT_PX}px, calc(100vh - 7rem))` }}
-    >
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-1 flex-col px-4 py-4">
       <div className="flex shrink-0 items-center justify-between gap-4 mb-4">
         <SimpleHomePageTitle />
         <Button

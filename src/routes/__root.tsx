@@ -65,7 +65,7 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head><HeadContent /></head>
-      <body>{children}<Scripts /></body>
+      <body className="min-h-dvh">{children}<Scripts /></body>
     </html>
   );
 }
@@ -79,7 +79,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen flex flex-col">
+      <div className="flex min-h-dvh flex-col">
         {showAdminHeader && (
         <header className="border-b border-border bg-sidebar/60 backdrop-blur">
           <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2">
@@ -108,7 +108,7 @@ function RootComponent() {
           </div>
         </header>
         )}
-        <main className="flex-1"><Outlet /></main>
+        <main className="flex min-h-0 flex-1 flex-col"><Outlet /></main>
         <Toaster />
       </div>
     </QueryClientProvider>
