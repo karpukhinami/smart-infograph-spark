@@ -14,6 +14,7 @@ import { Route as StylesRouteImport } from './routes/styles'
 import { Route as PromptsRouteImport } from './routes/prompts'
 import { Route as DesignProfilesRouteImport } from './routes/design-profiles'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as View_allRouteImport } from './routes/view_all'
 import { Route as ApiLlmRouteImport } from './routes/api/llm'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 
@@ -42,6 +43,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const View_allRoute = View_allRouteImport.update({
+  id: '/view_all',
+  path: '/view_all',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLlmRoute = ApiLlmRouteImport.update({
   id: '/api/llm',
   path: '/api/llm',
@@ -55,6 +61,7 @@ const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/view_all': typeof View_allRoute
   '/design-profiles': typeof DesignProfilesRoute
   '/prompts': typeof PromptsRoute
   '/styles': typeof StylesRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/view_all': typeof View_allRoute
   '/design-profiles': typeof DesignProfilesRoute
   '/prompts': typeof PromptsRoute
   '/styles': typeof StylesRoute
@@ -74,6 +82,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/view_all': typeof View_allRoute
   '/design-profiles': typeof DesignProfilesRoute
   '/prompts': typeof PromptsRoute
   '/styles': typeof StylesRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/view_all'
     | '/design-profiles'
     | '/prompts'
     | '/styles'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/view_all'
     | '/design-profiles'
     | '/prompts'
     | '/styles'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/view_all'
     | '/design-profiles'
     | '/prompts'
     | '/styles'
@@ -113,6 +125,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  View_allRoute: typeof View_allRoute
   DesignProfilesRoute: typeof DesignProfilesRoute
   PromptsRoute: typeof PromptsRoute
   StylesRoute: typeof StylesRoute
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/view_all': {
+      id: '/view_all'
+      path: '/view_all'
+      fullPath: '/view_all'
+      preLoaderRoute: typeof View_allRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/llm': {
       id: '/api/llm'
       path: '/api/llm'
@@ -177,6 +197,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  View_allRoute: View_allRoute,
   DesignProfilesRoute: DesignProfilesRoute,
   PromptsRoute: PromptsRoute,
   StylesRoute: StylesRoute,

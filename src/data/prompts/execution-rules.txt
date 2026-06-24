@@ -16,6 +16,8 @@ Render formulas using a dedicated mathematical formula typeface, visually simila
 
 Do not render any internal or technical labels.
 
+DO NOT RENDER THE SAME CARD TWICE!
+
 Do not render field names such as ContentSummary, topic, subject, grade, summary, entities, sectionId, entityType, priority, title, content, formula, example, icon, visual or backgroundRole.
 
 Do not render layout labels such as LAYER 1, LAYER 2, LAYER 3, BRAND DNA, COMPOSITION DECISIONS, CONTENT, HEADER, MAIN CARD, DOMINANT CARD, DETAIL ROW, CARD, VISUAL CARD, WARNING CARD, FORMULA CARD, EXAMPLE CARD, CONCLUSION CARD or ACCENT CARD, unless the exact words are explicitly part of the visible educational text.

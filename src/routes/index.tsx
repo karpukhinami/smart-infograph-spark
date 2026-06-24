@@ -44,6 +44,7 @@ import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import type { AnalysisJson, ContentSummary, DesignBriefResult, InfographicStyle } from "@/lib/types";
 import { Markdown } from "@/components/workspace/Markdown";
 import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "AI Infographic Generator" }] }),
@@ -94,7 +95,15 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-function SimpleHome() {
+function SimpleHomePageTitle({ className }: { className?: string }) {
+  return (
+    <h1 className={cn("text-2xl font-semibold tracking-tight", className)}>
+      Генератор инфографики
+    </h1>
+  );
+}
+
+export function SimpleHome() {
   const source = useProjectStore((s) => s.source);
   const setSource = useProjectStore((s) => s.setSource);
   const resetProject = useProjectStore((s) => s.resetProject);
@@ -247,14 +256,13 @@ function SimpleHome() {
 
   // === Image ===
   async function runImage(opts: { useProfileName?: string | null } = {}): Promise<void> {
-    const profileName = opts.useProfileName ?? selectedProfileName ?? activeProfile?.profileName ?? null;
+    const project = useProjectStore.getState();
+    const profileName = opts.useProfileName ?? project.selectedProfileName ?? activeProfile?.profileName ?? null;
     const profile = profiles.find((p) => p.profileName === profileName) ?? activeProfile;
     const fallbackStyle = enabledStyles[0];
     const style = activeStyle ?? fallbackStyle;
     if (!style) throw new Error("Не задан стиль инфографики");
-    const content = useProjectStore.getState().contentVersions.find(
-      (v) => v.id === useProjectStore.getState().activeContentId,
-    );
+    const content = project.contentVersions.find((v) => v.id === project.activeContentId);
     if (!content) throw new Error("Контент не готов");
 
     setImageStage("brief");
@@ -269,7 +277,7 @@ function SimpleHome() {
       contentSummary: summaryText,
       style,
       profile,
-      userWishes,
+      userWishes: project.userWishes,
       generalRules: prompts.generalRules,
     });
     const briefRes = await callTextLLMForJson({
@@ -410,7 +418,8 @@ function SimpleHome() {
   // ============ INPUT VIEW ============
   if (!showResults) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-6">
+      <div className="mx-auto max-w-3xl px-4 pt-8 pb-6">
+        <SimpleHomePageTitle className="mb-6" />
         <section className="rounded-lg border border-border bg-card p-5 space-y-5">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-semibold">Данные инфографики</h1>
@@ -620,8 +629,9 @@ function SimpleHome() {
 
   return (
     <TooltipProvider delayDuration={150}>
-    <div className="mx-auto max-w-[1600px] px-4 py-6 space-y-4">
-      <div className="flex items-center justify-end">
+    <div className="mx-auto max-w-[1600px] px-4 pt-8 pb-6 space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <SimpleHomePageTitle />
         <Button
           variant="outline"
           size="sm"

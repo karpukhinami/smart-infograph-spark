@@ -1,4 +1,4 @@
-import { Link, Outlet, createRootRouteWithContext, useRouter, HeadContent, Scripts } from "@tanstack/react-router";
+import { Link, Outlet, createRootRouteWithContext, useRouter, useRouterState, HeadContent, Scripts } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
@@ -6,6 +6,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { CostMeter } from "@/components/workspace/CostMeter";
+import { isAdminShellPath } from "@/lib/admin-shell";
 
 function NotFoundComponent() {
   return (
@@ -72,21 +73,26 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const uiMode = useSettingsStore((s) => s.uiMode);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const showAdminHeader = isAdminShellPath(pathname);
+  const homeTo = showAdminHeader ? "/view_all" : "/";
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen flex flex-col">
+        {showAdminHeader && (
         <header className="border-b border-border bg-sidebar/60 backdrop-blur">
           <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2">
             <div className="flex items-center gap-3">
               <UiModeSwitch />
               {uiMode === "debug" && <ModeSwitch />}
-              <Link to="/" className="text-base font-semibold tracking-tight">
+              <Link to={homeTo} className="text-base font-semibold tracking-tight">
                 AI Infographic Generator
               </Link>
             </div>
             <div className="flex items-center gap-4">
               <nav className="flex gap-4 text-sm text-muted-foreground">
-                <Link to="/" activeProps={{ className: "text-foreground font-medium" }} activeOptions={{ exact: true }}>Главная</Link>
+                <Link to={homeTo} activeProps={{ className: "text-foreground font-medium" }} activeOptions={{ exact: true }}>Главная</Link>
                 {uiMode === "debug" && (
                   <>
                     <Link to="/workspace" activeProps={{ className: "text-foreground font-medium" }}>Рабочее место</Link>
@@ -101,6 +107,7 @@ function RootComponent() {
             </div>
           </div>
         </header>
+        )}
         <main className="flex-1"><Outlet /></main>
         <Toaster />
       </div>
