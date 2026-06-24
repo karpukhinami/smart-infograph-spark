@@ -857,14 +857,26 @@ function RegenerateContentDialog({
   open,
   onClose,
   onConfirm,
+  subject,
+  grade,
+  topic,
+  basedOn,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: (extraInstructions: string) => void;
+  subject: string;
+  grade: string;
+  topic: string;
+  basedOn: "topic" | "materials";
 }) {
   const [extra, setExtra] = useState("");
+  const [paramsOpen, setParamsOpen] = useState(false);
   useEffect(() => {
-    if (open) setExtra("");
+    if (open) {
+      setExtra("");
+      setParamsOpen(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -879,6 +891,28 @@ function RegenerateContentDialog({
             Перегенерация контента производится на основе введённых ранее параметров и прикреплённых материалов;
             если вы хотите изменить их, нажмите «Начать заново».
           </p>
+          <div className="rounded-md border border-border">
+            <button
+              type="button"
+              onClick={() => setParamsOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs text-muted-foreground hover:bg-muted/40"
+            >
+              <span>Параметры исходной генерации</span>
+              <span>{paramsOpen ? "▲" : "▼"}</span>
+            </button>
+            {paramsOpen && (
+              <div className="px-3 pb-3 pt-1 text-xs space-y-1 text-muted-foreground">
+                <div><span className="font-medium text-foreground">Предмет:</span> {subject || "—"}</div>
+                <div><span className="font-medium text-foreground">Класс:</span> {grade || "—"}</div>
+                <div><span className="font-medium text-foreground">Тема:</span> {topic || "—"}</div>
+                <div className="italic">
+                  {basedOn === "materials"
+                    ? "генерация на основе прикреплённых материалов"
+                    : "генерация по теме"}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Дополнительные инструкции</Label>
             <Textarea
@@ -889,6 +923,7 @@ function RegenerateContentDialog({
             />
           </div>
         </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Отмена</Button>
           <Button onClick={() => onConfirm(extra)}>
