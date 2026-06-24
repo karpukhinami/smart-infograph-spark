@@ -18,9 +18,11 @@ interface Props {
   value: string;
   onChange: (name: string) => void;
   className?: string;
+  /** When false, hides the "+ Добавить новый" menu item. Default: true. */
+  allowCreate?: boolean;
 }
 
-export function ProfileSelect({ value, onChange, className }: Props) {
+export function ProfileSelect({ value, onChange, className, allowCreate = true }: Props) {
   const profiles = useSettingsStore((s) => s.profiles);
   const upsertProfile = useSettingsStore((s) => s.upsertProfile);
   const [open, setOpen] = useState(false);
@@ -62,9 +64,11 @@ export function ProfileSelect({ value, onChange, className }: Props) {
               {p.profileName}
             </SelectItem>
           ))}
-          <SelectItem value={NEW_PROFILE_VALUE} className="font-medium">
-            + Добавить новый
-          </SelectItem>
+          {allowCreate && (
+            <SelectItem value={NEW_PROFILE_VALUE} className="font-medium">
+              + Добавить новый
+            </SelectItem>
+          )}
         </SelectContent>
       </Select>
 

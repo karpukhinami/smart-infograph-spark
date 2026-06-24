@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ import { Markdown } from "@/components/workspace/Markdown";
 import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
 import { SimpleImageRating } from "@/components/workspace/SimpleImageRating";
 import { cn } from "@/lib/utils";
+import { isAdminShellPath } from "@/lib/admin-shell";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "AI Infographic Generator" }] }),
@@ -138,6 +139,8 @@ export function SimpleHome() {
   const prompts = useSettingsStore((s) => s.promptsByMode[HOME_APP_MODE]);
   const styles = useSettingsStore((s) => s.stylesByMode[HOME_APP_MODE]);
   const profiles = useSettingsStore((s) => s.profiles);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const allowNewDesignProfile = isAdminShellPath(pathname);
 
   const [loading, setLoading] = useState<null | "analyze" | "image">(null);
   const [imageStage, setImageStage] = useState<null | "brief" | "render">(null);
@@ -639,7 +642,18 @@ export function SimpleHome() {
   }
 
   // ============ RESULTS VIEW ============
-  const currentVerLabel = `ver.${simpleVersions.length + 1}`;
+  const sidebarVersions = useMemo(
+    () =>
+      [...simpleVersions].sort(
+        (a, b) =>
+          (a.versionNumber ?? Number.MAX_SAFE_INTEGER) - (b.versionNumber ?? Number.MAX_SAFE_INTEGER) ||
+          a.createdAt - b.createdAt,
+      ),
+    [simpleVersions],
+  );
+  const currentVerLabel = simpleCurrent
+    ? `ver.${simpleCurrent.versionNumber ?? sidebarVersions.length + 1}`
+    : "ver.1";
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -700,17 +714,17 @@ export function SimpleHome() {
                     <div>сейчас {currentVerLabel}</div>
                   </div>
                   <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
-                    {simpleVersions.map((v, i) => (
+                    {sidebarVersions.map((v) => (
                       <button
                         key={v.id}
                         type="button"
                         onClick={() => swapSimpleVersion(v.id)}
                         className="group relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded border hover:ring-2 hover:ring-ring"
-                        title={`Открыть ver.${i + 1}`}
+                        title={`Открыть ver.${v.versionNumber ?? "?"}`}
                       >
                         <img src={v.dataUrl} alt="" className="h-full w-full object-cover" />
                         <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[10px] text-white">
-                          ver.{i + 1}
+                          ver.{v.versionNumber ?? "?"}
                         </span>
                       </button>
                     ))}
@@ -813,6 +827,7 @@ export function SimpleHome() {
               <ProfileSelect
                 value={selectedProfileName ?? activeProfile?.profileName ?? ""}
                 onChange={setSelectedProfileName}
+                allowCreate={allowNewDesignProfile}
               />
             </div>
           )}
@@ -882,6 +897,7 @@ export function SimpleHome() {
         open={regenImageOpen}
         initialProfile={selectedProfileName ?? activeProfile?.profileName ?? ""}
         initialWishes={userWishes}
+        allowCreate={allowNewDesignProfile}
         onClose={() => setRegenImageOpen(false)}
         onConfirm={onRegenImage}
       />
@@ -914,12 +930,14 @@ function RegenerateImageDialog({
   open,
   initialProfile,
   initialWishes,
+  allowCreate,
   onClose,
   onConfirm,
 }: {
   open: boolean;
   initialProfile: string;
   initialWishes: string;
+  allowCreate: boolean;
   onClose: () => void;
   onConfirm: (profileName: string | null, wishes: string) => void;
 }) {
@@ -948,7 +966,7 @@ function RegenerateImageDialog({
           </p>
           <div className="space-y-1.5">
             <Label className="text-xs">Цветовая схема</Label>
-            <ProfileSelect value={profile} onChange={setProfile} />
+            <ProfileSelect value={profile} onChange={setProfile} allowCreate={allowCreate} />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Дополнительные требования к изображению</Label>

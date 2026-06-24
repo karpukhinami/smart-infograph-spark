@@ -15,8 +15,37 @@ import { renderAnalysisJson } from "@/lib/analysis-render";
 
 export type BriefMode = "design" | "programmatic";
 
+export interface SimpleImageEntry {
+  id: string;
+  dataUrl: string;
+  prompt: string;
+  versionNumber: number;
+  createdAt?: number;
+}
+
 function v<T>(value: T): Versioned<T> {
   return { id: crypto.randomUUID(), createdAt: Date.now(), value };
+}
+
+function nextSimpleVersionNumber(
+  versions: { versionNumber?: number }[],
+  current: { versionNumber?: number } | null,
+): number {
+  const nums = [
+    ...versions.map((item) => item.versionNumber ?? 0),
+    current?.versionNumber ?? 0,
+  ].filter((n) => n > 0);
+  return nums.length ? Math.max(...nums) + 1 : 1;
+}
+
+function resolveSimpleVersionNumber(
+  entry: { versionNumber?: number; createdAt: number },
+  pool: { versionNumber?: number; createdAt: number }[],
+): number {
+  if (entry.versionNumber != null) return entry.versionNumber;
+  const sorted = [...pool].sort((a, b) => a.createdAt - b.createdAt);
+  const idx = sorted.findIndex((x) => x.createdAt === entry.createdAt);
+  return idx >= 0 ? idx + 1 : sorted.length + 1;
 }
 
 interface ProjectState {
@@ -71,10 +100,10 @@ interface ProjectState {
   setActiveImage: (id: string) => void;
 
   // Simple-mode (home page) image versions: each carries its source prompt for traceability.
-  simpleCurrentImage: { id: string; dataUrl: string; prompt: string } | null;
-  simpleImageVersions: { id: string; dataUrl: string; prompt: string; createdAt: number }[];
+  simpleCurrentImage: SimpleImageEntry | null;
+  simpleImageVersions: (SimpleImageEntry & { createdAt: number })[];
   simpleImageRatings: Record<string, "like" | "dislike">;
-  setSimpleCurrentImage: (img: { id?: string; dataUrl: string; prompt: string } | null) => void;
+  setSimpleCurrentImage: (img: { id?: string; dataUrl: string; prompt: string; versionNumber?: number } | null) => void;
   setSimpleImageRating: (id: string, rating: "like" | "dislike") => void;
   archiveSimpleCurrentImage: () => void;
   swapSimpleVersion: (id: string) => void;
@@ -320,10 +349,18 @@ export const useProjectStore = create<ProjectState>()(
       simpleImageVersions: [],
       simpleImageRatings: {},
       setSimpleCurrentImage: (img) =>
-        set({
-          simpleCurrentImage: img
-            ? { id: img.id ?? crypto.randomUUID(), dataUrl: img.dataUrl, prompt: img.prompt }
-            : null,
+        set((s) => {
+          if (!img) return { simpleCurrentImage: null };
+          const versionNumber =
+            img.versionNumber ?? nextSimpleVersionNumber(s.simpleImageVersions, s.simpleCurrentImage);
+          return {
+            simpleCurrentImage: {
+              id: img.id ?? crypto.randomUUID(),
+              dataUrl: img.dataUrl,
+              prompt: img.prompt,
+              versionNumber,
+            },
+          };
         }),
       setSimpleImageRating: (id, rating) =>
         set((s) => ({
@@ -332,6 +369,9 @@ export const useProjectStore = create<ProjectState>()(
       archiveSimpleCurrentImage: () =>
         set((s) => {
           if (!s.simpleCurrentImage) return {};
+          const versionNumber =
+            s.simpleCurrentImage.versionNumber ??
+            nextSimpleVersionNumber(s.simpleImageVersions, s.simpleCurrentImage);
           const id = s.simpleCurrentImage.id ?? crypto.randomUUID();
           return {
             simpleImageVersions: [
@@ -341,6 +381,7 @@ export const useProjectStore = create<ProjectState>()(
                 createdAt: Date.now(),
                 dataUrl: s.simpleCurrentImage.dataUrl,
                 prompt: s.simpleCurrentImage.prompt,
+                versionNumber,
               },
             ],
             simpleCurrentImage: null,
@@ -354,6 +395,9 @@ export const useProjectStore = create<ProjectState>()(
           const idx = s.simpleImageVersions.findIndex((v) => v.id === id);
           if (idx < 0) return {};
           const chosen = s.simpleImageVersions[idx];
+          const currentVersionNumber =
+            s.simpleCurrentImage.versionNumber ??
+            nextSimpleVersionNumber(s.simpleImageVersions, s.simpleCurrentImage);
           const currentId = s.simpleCurrentImage.id ?? crypto.randomUUID();
           const newVersions = s.simpleImageVersions.slice();
           newVersions.splice(idx, 1);
@@ -362,6 +406,7 @@ export const useProjectStore = create<ProjectState>()(
             createdAt: Date.now(),
             dataUrl: s.simpleCurrentImage.dataUrl,
             prompt: s.simpleCurrentImage.prompt,
+            versionNumber: currentVersionNumber,
           });
           return {
             simpleImageVersions: newVersions,
@@ -369,6 +414,7 @@ export const useProjectStore = create<ProjectState>()(
               id: chosen.id,
               dataUrl: chosen.dataUrl,
               prompt: chosen.prompt,
+              versionNumber: resolveSimpleVersionNumber(chosen, s.simpleImageVersions),
             },
           };
         }),
