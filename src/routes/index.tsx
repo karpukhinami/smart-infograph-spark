@@ -691,72 +691,77 @@ export function SimpleHome() {
             )}
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-2 px-5 py-3">
-            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-md border border-border bg-background">
-              {loading === "analyze" ? (
-                <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
-                  <Loader2 className="size-8 animate-spin" />
-                  <div>Шаг 1 из 2 — формируем контент…</div>
-                </div>
-              ) : loading === "image" ? (
-                <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
-                  <Loader2 className="size-8 animate-spin" />
-                  <div>
-                    {imageStage === "brief"
-                      ? "Шаг 2 из 2 — составляем дизайн-бриф…"
-                      : "Шаг 2 из 2 — генерируем изображение…"}
+          <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2">
+            <div className="flex min-h-0 flex-1 gap-2">
+              {simpleVersions.length > 0 && !isBusy && (
+                <aside className="flex w-[4.5rem] shrink-0 flex-col overflow-hidden rounded-md border border-border bg-muted/40">
+                  <div className="shrink-0 border-b border-border px-1 py-1.5 text-center text-[10px] leading-tight text-muted-foreground">
+                    <div className="font-medium">Версии</div>
+                    <div>сейчас {currentVerLabel}</div>
                   </div>
-                </div>
-              ) : simpleCurrent ? (
-                <button
-                  type="button"
-                  onClick={() => setImageFullscreen(true)}
-                  className="flex h-full w-full cursor-zoom-in items-center justify-center p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Открыть на весь экран"
-                >
-                  <img
-                    src={simpleCurrent.dataUrl}
-                    alt=""
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </button>
-              ) : (
-                <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
-                  <ImageIcon className="size-8 opacity-50" />
-                  Итоговое изображение появится здесь
-                </div>
+                  <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
+                    {simpleVersions.map((v, i) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => swapSimpleVersion(v.id)}
+                        className="group relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded border hover:ring-2 hover:ring-ring"
+                        title={`Открыть ver.${i + 1}`}
+                      >
+                        <img src={v.dataUrl} alt="" className="h-full w-full object-cover" />
+                        <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[10px] text-white">
+                          ver.{i + 1}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </aside>
               )}
-            </div>
 
-            {simpleCurrent && !isBusy && (
-              <div className="shrink-0">
-                <SimpleImageRating imageId={simpleCurrent.id} />
-              </div>
-            )}
-
-            {simpleVersions.length > 0 && (
-              <div className="shrink-0 rounded-md border border-border bg-muted/40 p-2.5">
-                <div className="mb-1.5 text-xs text-muted-foreground">
-                  Предыдущие версии · текущая: {currentVerLabel}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {simpleVersions.map((v, i) => (
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
+                <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-md border border-border bg-background">
+                  {loading === "analyze" ? (
+                    <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
+                      <Loader2 className="size-8 animate-spin" />
+                      <div>Шаг 1 из 2 — формируем контент…</div>
+                    </div>
+                  ) : loading === "image" ? (
+                    <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
+                      <Loader2 className="size-8 animate-spin" />
+                      <div>
+                        {imageStage === "brief"
+                          ? "Шаг 2 из 2 — составляем дизайн-бриф…"
+                          : "Шаг 2 из 2 — генерируем изображение…"}
+                      </div>
+                    </div>
+                  ) : simpleCurrent ? (
                     <button
-                      key={v.id}
                       type="button"
-                      onClick={() => swapSimpleVersion(v.id)}
-                      className="group relative size-14 overflow-hidden rounded border hover:ring-2 hover:ring-ring"
-                      title={`Открыть ver.${i + 1}`}
+                      onClick={() => setImageFullscreen(true)}
+                      className="flex h-full w-full cursor-zoom-in items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      title="Открыть на весь экран"
                     >
-                      <img src={v.dataUrl} alt="" className="h-full w-full object-cover" />
-                      <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[10px] text-white">
-                        ver.{i + 1}
-                      </span>
+                      <img
+                        src={simpleCurrent.dataUrl}
+                        alt=""
+                        className="max-h-full max-w-full object-contain"
+                      />
                     </button>
-                  ))}
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
+                      <ImageIcon className="size-8 opacity-50" />
+                      Итоговое изображение появится здесь
+                    </div>
+                  )}
                 </div>
+
+                {simpleCurrent && !isBusy && (
+                  <div className="shrink-0">
+                    <SimpleImageRating imageId={simpleCurrent.id} />
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </section>
 
