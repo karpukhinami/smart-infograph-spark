@@ -585,117 +585,26 @@ function SimpleHome() {
   const currentVerLabel = `ver.${simpleVersions.length + 1}`;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 space-y-4">
-      <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as "content" | "image")}>
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="content" disabled={!activeContent && loading !== "analyze"}>
-              Контент
-            </TabsTrigger>
-            <TabsTrigger value="image" disabled={editMode}>
-              Итоговое изображение
-            </TabsTrigger>
-          </TabsList>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setResetOpen(true)}
-            disabled={editMode || isBusy}
-          >
-            <RotateCcw className="size-3.5 mr-1" /> Начать заново
-          </Button>
-        </div>
+    <TooltipProvider delayDuration={150}>
+    <div className="mx-auto max-w-[1600px] px-4 py-6 space-y-4">
+      <div className="flex items-center justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setResetOpen(true)}
+          disabled={editMode || isBusy}
+        >
+          <RotateCcw className="size-3.5 mr-1" /> Начать заново
+        </Button>
+      </div>
 
-        {/* CONTENT TAB */}
-        <TabsContent value="content" className="mt-3">
-          <section className="rounded-lg border border-border bg-card p-5 space-y-3">
-            {editMode && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">Цветовая схема</Label>
-                <ProfileSelect
-                  value={selectedProfileName ?? activeProfile?.profileName ?? ""}
-                  onChange={setSelectedProfileName}
-                />
-              </div>
-            )}
-
-            <div className="rounded-md border border-border bg-background p-4 min-h-[200px]">
-              {loading === "analyze" && !activeContent ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                  <Loader2 className="size-6 animate-spin" />
-                </div>
-              ) : loading === "analyze" ? (
-                <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
-                  <Loader2 className="size-6 animate-spin" />
-                  Перегенерируем контент…
-                </div>
-              ) : activeContent ? (
-                analysisJson ? (
-                  <SimpleContentPreview
-                    analysis={analysisJson}
-                    profile={activeProfile ?? null}
-                    editable={editMode}
-                  />
-                ) : (
-                  <Markdown>{activeContent.value.content}</Markdown>
-                )
-              ) : null}
-            </div>
-
-            {activeContent && !isBusy && (
-              <div className="flex flex-wrap gap-2 justify-end pt-1">
-                {editMode ? (
-                  <>
-                    <Button variant="outline" onClick={onResetEdits}>
-                      Сбросить изменения
-                    </Button>
-                    <Button onClick={onSaveEdits}>Сохранить изменения</Button>
-                  </>
-                ) : (
-                  <>
-                    <Button variant="outline" onClick={onEnterEditMode}>
-                      <Pencil className="size-3.5 mr-1" /> Редактировать вручную
-                    </Button>
-                    <Button variant="outline" onClick={() => setRegenContentOpen(true)}>
-                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
-          </section>
-        </TabsContent>
-
-        {/* IMAGE TAB */}
-        <TabsContent value="image" className="mt-3">
-          <section className="rounded-lg border border-border bg-card p-5 space-y-3">
-            <div className="rounded-md border border-border bg-background min-h-[320px] flex items-center justify-center overflow-hidden">
-              {loading === "analyze" ? (
-                <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
-                  <Loader2 className="size-8 animate-spin" />
-                  <div>Шаг 1 из 2 — формируем контент…</div>
-                </div>
-              ) : loading === "image" ? (
-                <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
-                  <Loader2 className="size-8 animate-spin" />
-                  <div>
-                    {imageStage === "brief"
-                      ? "Шаг 2 из 2 — составляем дизайн-бриф…"
-                      : "Шаг 2 из 2 — генерируем изображение…"}
-                  </div>
-                </div>
-              ) : simpleCurrent ? (
-                <img src={simpleCurrent.dataUrl} alt="" className="max-w-full max-h-[80vh]" />
-              ) : (
-                <div className="text-sm text-muted-foreground flex flex-col items-center gap-2 py-12">
-                  <ImageIcon className="size-8 opacity-50" />
-                  Итоговое изображение появится здесь
-                </div>
-              )}
-            </div>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* IMAGE PANEL */}
+        <section className="rounded-lg border border-border bg-card p-5 space-y-3">
+          <div className="flex flex-wrap gap-2 justify-between items-center min-h-9">
+            <h2 className="text-sm font-semibold text-muted-foreground">Итоговое изображение</h2>
             {simpleCurrent && !isBusy && (
-              <div className="flex flex-wrap gap-2 justify-end">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="outline"
@@ -712,38 +621,135 @@ function SimpleHome() {
                 >
                   <Download className="size-3.5 mr-1" /> Сохранить
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setRegenImageOpen(true)}>
-                  <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="sm" variant="outline" onClick={() => setRegenImageOpen(true)}>
+                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать изображение
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">Текстовое содержание не изменится</TooltipContent>
+                </Tooltip>
               </div>
             )}
+          </div>
 
-            {simpleVersions.length > 0 && (
-              <div className="rounded-md bg-muted/40 border border-border p-3 space-y-2">
-                <div className="text-xs text-muted-foreground">
-                  Предыдущие версии · текущая: {currentVerLabel}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {simpleVersions.map((v, i) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => swapSimpleVersion(v.id)}
-                      className="size-16 rounded border overflow-hidden relative group hover:ring-2 hover:ring-ring"
-                      title={`Открыть ver.${i + 1}`}
-                    >
-                      <img src={v.dataUrl} alt="" className="w-full h-full object-cover" />
-                      <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[10px] text-white text-center py-0.5">
-                        ver.{i + 1}
-                      </span>
-                    </button>
-                  ))}
+          <div className="rounded-md border border-border bg-background min-h-[320px] flex items-center justify-center overflow-hidden">
+            {loading === "analyze" ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
+                <Loader2 className="size-8 animate-spin" />
+                <div>Шаг 1 из 2 — формируем контент…</div>
+              </div>
+            ) : loading === "image" ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
+                <Loader2 className="size-8 animate-spin" />
+                <div>
+                  {imageStage === "brief"
+                    ? "Шаг 2 из 2 — составляем дизайн-бриф…"
+                    : "Шаг 2 из 2 — генерируем изображение…"}
                 </div>
               </div>
+            ) : simpleCurrent ? (
+              <img src={simpleCurrent.dataUrl} alt="" className="max-w-full max-h-[80vh]" />
+            ) : (
+              <div className="text-sm text-muted-foreground flex flex-col items-center gap-2 py-12">
+                <ImageIcon className="size-8 opacity-50" />
+                Итоговое изображение появится здесь
+              </div>
             )}
-          </section>
-        </TabsContent>
-      </Tabs>
+          </div>
+
+          {simpleVersions.length > 0 && (
+            <div className="rounded-md bg-muted/40 border border-border p-3 space-y-2">
+              <div className="text-xs text-muted-foreground">
+                Предыдущие версии · текущая: {currentVerLabel}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {simpleVersions.map((v, i) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => swapSimpleVersion(v.id)}
+                    className="size-16 rounded border overflow-hidden relative group hover:ring-2 hover:ring-ring"
+                    title={`Открыть ver.${i + 1}`}
+                  >
+                    <img src={v.dataUrl} alt="" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[10px] text-white text-center py-0.5">
+                      ver.{i + 1}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* CONTENT PANEL */}
+        <section className="rounded-lg border border-border bg-card p-5 space-y-3">
+          <div className="flex flex-wrap gap-2 justify-between items-center min-h-9">
+            <h2 className="text-sm font-semibold text-muted-foreground">Контент</h2>
+            {activeContent && !isBusy && (
+              <div className="flex flex-wrap gap-2">
+                {editMode ? (
+                  <>
+                    <Button variant="outline" size="sm" onClick={onResetEdits}>
+                      Сбросить изменения
+                    </Button>
+                    <Button size="sm" onClick={onSaveEdits}>Сохранить изменения</Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" size="sm" onClick={onEnterEditMode}>
+                      <Pencil className="size-3.5 mr-1" /> Редактировать вручную
+                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={() => setRegenContentOpen(true)}>
+                          <RefreshCw className="size-3.5 mr-1" /> Перегенерировать контент
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="text-xs">Без генерации изображения</TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {editMode && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Цветовая схема</Label>
+              <ProfileSelect
+                value={selectedProfileName ?? activeProfile?.profileName ?? ""}
+                onChange={setSelectedProfileName}
+              />
+            </div>
+          )}
+
+          <div className="rounded-md border border-border bg-background p-4 min-h-[200px]">
+            {loading === "analyze" && !activeContent ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="size-6 animate-spin" />
+              </div>
+            ) : loading === "analyze" ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-sm text-muted-foreground">
+                <Loader2 className="size-6 animate-spin" />
+                Перегенерируем контент…
+              </div>
+            ) : activeContent ? (
+              analysisJson ? (
+                <SimpleContentPreview
+                  analysis={analysisJson}
+                  profile={activeProfile ?? null}
+                  editable={editMode}
+                />
+              ) : (
+                <Markdown>{activeContent.value.content}</Markdown>
+              )
+            ) : null}
+          </div>
+        </section>
+      </div>
+
 
       {/* Reset confirm */}
       <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
