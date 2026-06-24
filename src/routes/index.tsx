@@ -825,6 +825,21 @@ function SimpleHome() {
         topic={source.topic || ""}
         basedOn={hasSource ? "materials" : "topic"}
       />
+
+      <RegenerateAfterEditDialog
+        open={regenAfterEditOpen}
+        onCancel={onCancelRegenAfterEdit}
+        onConfirm={onConfirmRegenAfterEdit}
+      />
+    </div>
+    </TooltipProvider>
+  );
+}
+
+        grade={source.grade || ""}
+        topic={source.topic || ""}
+        basedOn={hasSource ? "materials" : "topic"}
+      />
     </div>
     </TooltipProvider>
   );
