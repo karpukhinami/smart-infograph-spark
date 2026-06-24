@@ -66,7 +66,7 @@ export function designProfileProse(profile: DesignProfile | null | undefined): s
   return lines.join("\n");
 }
 
-// English-only "use for" descriptions for the strict-mode LAYER 1 block.
+// English-only "use for" descriptions for the LAYER 1 palette block (hex codes injected at assembly time).
 const COLOR_USE_FOR: Record<keyof DesignProfileColors, string> = {
   backgroundColor: "use for the overall page / canvas background",
   surfaceColor: "use for small inner surfaces and insets inside cards (formulas, examples, notes, mini explanations)",
@@ -80,6 +80,12 @@ const COLOR_USE_FOR: Record<keyof DesignProfileColors, string> = {
   spotAccentColor: "use only for rare micro-accents (one word, small icon, marker, warning sign); max ~2 uses per infographic",
   mutedheaderTextColor: "use for subtitles, meta labels and secondary text inside the dark header",
 };
+
+/** One palette row: role name, hex from the active profile, then usage description. */
+function colorPaletteLine(key: keyof DesignProfileColors, hex: string): string {
+  const roleLabel = COLOR_ROLE_LABELS.find((r) => r.key === key)?.label ?? key;
+  return `- ${roleLabel} ${hex} — ${COLOR_USE_FOR[key]}`;
+}
 
 const FONT_FAMILY_PLACEHOLDER = "[FONT_FAMILY_PLACEHOLDER]";
 
@@ -272,8 +278,7 @@ export function designProfileColorsAndRules(profile: DesignProfile | null | unde
   for (const { key } of COLOR_ROLE_LABELS) {
     const hex = c?.[key];
     if (!hex) continue;
-    const useFor = COLOR_USE_FOR[key];
-    lines.push(`- ${useFor}: ${hex} (${key}).`);
+    lines.push(colorPaletteLine(key, hex));
   }
   if (typoStyle) {
     lines.push("");
