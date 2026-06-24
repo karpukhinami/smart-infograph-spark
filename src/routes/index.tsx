@@ -779,10 +779,16 @@ function SimpleHome() {
         open={regenContentOpen}
         onClose={() => setRegenContentOpen(false)}
         onConfirm={onRegenContent}
+        subject={source.subject || ""}
+        grade={source.grade || ""}
+        topic={source.topic || ""}
+        basedOn={hasSource ? "materials" : "topic"}
       />
     </div>
+    </TooltipProvider>
   );
 }
+
 
 // ============== Regenerate Image Dialog ==============
 function RegenerateImageDialog({
