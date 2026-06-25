@@ -58,6 +58,11 @@ interface ProjectState {
   removeAttachedImage: (idx: number) => void;
   clearAttachedImages: () => void;
 
+  /** Text extracted from uploaded files — not shown in the textarea. */
+  uploadedSourceText: string;
+  setUploadedSourceText: (text: string) => void;
+  appendUploadedSourceText: (chunk: string) => void;
+
 
 
   contentVersions: Versioned<ContentSummary>[];
@@ -134,6 +139,7 @@ export const useProjectStore = create<ProjectState>()(
         set({
           source: initialSource,
           attachedImages: [],
+          uploadedSourceText: "",
           contentVersions: [],
           activeContentId: null,
           selectedStyleId: null,
@@ -158,6 +164,16 @@ export const useProjectStore = create<ProjectState>()(
       removeAttachedImage: (idx) =>
         set((s) => ({ attachedImages: s.attachedImages.filter((_, i) => i !== idx) })),
       clearAttachedImages: () => set({ attachedImages: [] }),
+
+      uploadedSourceText: "",
+      setUploadedSourceText: (text) => set({ uploadedSourceText: text }),
+      appendUploadedSourceText: (chunk) =>
+        set((s) => {
+          const next = chunk.trim();
+          if (!next) return {};
+          const cur = s.uploadedSourceText.trim();
+          return { uploadedSourceText: cur ? `${cur}\n\n${next}` : next };
+        }),
 
 
 
@@ -429,7 +445,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "infographic-project",
-      version: 6,
+      version: 7,
       migrate: () => undefined as unknown as ProjectState,
       storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
     },

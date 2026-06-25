@@ -17,6 +17,7 @@ import { Route as DesignProfilesRouteImport } from './routes/design-profiles'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiLlmRouteImport } from './routes/api/llm'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
+import { Route as ApiExtractDocumentTextRouteImport } from './routes/api/extract-document-text'
 
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
@@ -58,6 +59,11 @@ const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
   path: '/api/generate-image',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiExtractDocumentTextRoute = ApiExtractDocumentTextRouteImport.update({
+  id: '/api/extract-document-text',
+  path: '/api/extract-document-text',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
   '/workspace': typeof WorkspaceRoute
+  '/api/extract-document-text': typeof ApiExtractDocumentTextRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
   '/workspace': typeof WorkspaceRoute
+  '/api/extract-document-text': typeof ApiExtractDocumentTextRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
   '/workspace': typeof WorkspaceRoute
+  '/api/extract-document-text': typeof ApiExtractDocumentTextRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/styles'
     | '/view_all'
     | '/workspace'
+    | '/api/extract-document-text'
     | '/api/generate-image'
     | '/api/llm'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/styles'
     | '/view_all'
     | '/workspace'
+    | '/api/extract-document-text'
     | '/api/generate-image'
     | '/api/llm'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/styles'
     | '/view_all'
     | '/workspace'
+    | '/api/extract-document-text'
     | '/api/generate-image'
     | '/api/llm'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   StylesRoute: typeof StylesRoute
   View_allRoute: typeof View_allRoute
   WorkspaceRoute: typeof WorkspaceRoute
+  ApiExtractDocumentTextRoute: typeof ApiExtractDocumentTextRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiLlmRoute: typeof ApiLlmRoute
 }
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGenerateImageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/extract-document-text': {
+      id: '/api/extract-document-text'
+      path: '/api/extract-document-text'
+      fullPath: '/api/extract-document-text'
+      preLoaderRoute: typeof ApiExtractDocumentTextRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   StylesRoute: StylesRoute,
   View_allRoute: View_allRoute,
   WorkspaceRoute: WorkspaceRoute,
+  ApiExtractDocumentTextRoute: ApiExtractDocumentTextRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiLlmRoute: ApiLlmRoute,
 }

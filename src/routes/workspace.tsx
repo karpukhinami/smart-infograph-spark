@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, RefreshCw, RotateCcw, Upload, ImagePlus, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, RotateCcw, Upload, Sparkles } from "lucide-react";
 import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage, useActiveSpec } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
 import { ModelPicker } from "@/components/workspace/ModelPicker";
@@ -33,6 +33,8 @@ import { validateRenderSpec } from "@/lib/render-spec/validate";
 import { ProgrammaticRenderer } from "@/components/render-spec/ProgrammaticRenderer";
 import { toPng } from "html-to-image";
 import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
+import { importSourceFiles, SOURCE_FILE_ACCEPT } from "@/lib/source-file-import";
+import { buildSourceTextForPrompt, hasSourceMaterials } from "@/lib/source-material";
 
 
 export const Route = createFileRoute("/workspace")({
@@ -80,7 +82,8 @@ function Workspace() {
   const pushSpec = useProjectStore((s) => s.pushSpec);
   const attachedImages = useProjectStore((s) => s.attachedImages);
   const addAttachedImages = useProjectStore((s) => s.addAttachedImages);
-  const removeAttachedImage = useProjectStore((s) => s.removeAttachedImage);
+  const uploadedSourceText = useProjectStore((s) => s.uploadedSourceText);
+  const setUploadedSourceText = useProjectStore((s) => s.setUploadedSourceText);
 
 
   const activeContent = useActiveContent();
@@ -98,7 +101,6 @@ function Workspace() {
   const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine">(null);
   const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
 
 
   const enabledStyles = useMemo<InfographicStyle[]>(() => styles.filter((s) => s.enabled), [styles]);
@@ -111,7 +113,7 @@ function Workspace() {
     [profiles, selectedProfileName],
   );
 
-  const hasSource = Boolean(source.text.trim());
+  const hasSource = hasSourceMaterials(source.text, uploadedSourceText, attachedImages);
   const useTopicOnlyPrompt = !hasSource;
 
   // Legacy OCR-as-text fallback removed: images are now passed multimodally to the analysis model.
@@ -142,15 +144,13 @@ function Workspace() {
 
   async function onFileChosen(files: FileList | null) {
     if (!files?.length) return;
-    const arr = Array.from(files);
-    const images = arr.filter((f) => f.type.startsWith("image/"));
-    const texts = arr.filter((f) => !f.type.startsWith("image/"));
-    for (const t of texts) {
-      const text = await t.text();
-      const cur = source.text.trim();
-      setSource({ text: cur ? `${cur}\n\n${text}` : text });
-    }
-    if (images.length) await attachImageFiles(images);
+    await importSourceFiles(Array.from(files), {
+      getUploadedText: () => uploadedSourceText,
+      setUploadedText: setUploadedSourceText,
+      addImages: addAttachedImages,
+      onSuccess: (message) => toast.success(message),
+      onError: (message) => toast.error(message),
+    });
   }
 
 
@@ -162,7 +162,7 @@ function Workspace() {
       const filled = template
         .replaceAll("{{USER_INSTRUCTIONS}}", source.userInstructions || "(нет)")
         .replaceAll("{{STYLES_LIST}}", stylesList || "(стилей не задано)")
-        .replaceAll("{{SOURCE_TEXT}}", source.text || "")
+        .replaceAll("{{SOURCE_TEXT}}", buildSourceTextForPrompt(source.text, uploadedSourceText) || "")
         .replaceAll("{{TOPIC}}", source.topic || "")
         .replaceAll("{{SUBJECT}}", source.subject || "")
         .replaceAll("{{GRADE}}", source.grade || "");
@@ -537,57 +537,19 @@ ${activeContent.value.content}`;
                 >
                   <Upload className="size-3.5 mr-1" /> Файл
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={loading !== null}
-                >
-                  <ImagePlus className="size-3.5 mr-1" /> Картинка
-                </Button>
               </div>
             </div>
             <Textarea
               rows={8}
-              placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки прикрепляются как мультимодальный вход и передаются модели вместе с текстом."
+              placeholder="Введите или вставьте текст вручную. Файлы (.txt, .md, .docx, .pdf, изображения) — кнопкой «Файл»."
               value={source.text}
               onChange={(e) => setSource({ text: e.target.value })}
               onPaste={onPasteCapture}
             />
-            {attachedImages.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {attachedImages.map((url, i) => (
-                  <div key={i} className="relative">
-                    <img src={url} alt="" className="size-16 object-cover rounded border" />
-                    <button
-                      type="button"
-                      onClick={() => removeAttachedImage(i)}
-                      className="absolute -top-1 -right-1 size-5 rounded-full bg-background border text-xs leading-none"
-                      title="Убрать"
-                    >×</button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {loading === "recognize" && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Loader2 className="size-3 animate-spin" /> Распознаю картинки…
-              </p>
-            )}
-
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.md,image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }}
-            />
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/*"
+              accept={SOURCE_FILE_ACCEPT}
               multiple
               className="hidden"
               onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }}
@@ -605,7 +567,7 @@ ${activeContent.value.content}`;
           />
 
           <div className="flex justify-start">
-            <Button onClick={onAnalyze} disabled={loading !== null || !(source.topic?.trim() || source.text.trim())}>
+            <Button onClick={onAnalyze} disabled={loading !== null || !(source.topic?.trim() || hasSource)}>
               {loading === "analyze" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
               Анализировать
             </Button>

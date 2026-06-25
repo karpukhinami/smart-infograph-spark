@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import type { AnalysisAttention, AnalysisEntity, AnalysisGroupItem, AnalysisJson, AnalysisSectionId, DesignProfile } from "@/lib/types";
+import type { AnalysisEntity, AnalysisGroupItem, AnalysisJson, AnalysisSectionId, DesignProfile } from "@/lib/types";
 import { Markdown } from "@/components/workspace/Markdown";
 import { EntityEditDialog } from "@/components/workspace/EntityEditDialog";
 import { HeaderEditDialog } from "@/components/workspace/HeaderEditDialog";
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AttentionColorPicker, normalizeAttention } from "@/components/workspace/AttentionColorPicker";
 import { ChevronUp, ChevronDown, X, Plus } from "lucide-react";
 
 interface Props {
@@ -30,8 +31,8 @@ function asLines(v: string | string[] | null | undefined): string[] {
 }
 
 const SECTION_OPTIONS: { value: AnalysisSectionId; label: string }[] = [
-  { value: "prerequisites", label: "Предпосылки" },
-  { value: "main", label: "Основное содержание" },
+  { value: "prerequisites", label: "Введение" },
+  { value: "main", label: "Основная часть" },
   { value: "additions", label: "Выводы и дополнения" },
 ];
 
@@ -51,23 +52,13 @@ const FALLBACK = {
   mutedheaderTextColor: "#9399BD",
 };
 
-const ATTENTION_PICKER_OPTIONS: {
-  attention: AnalysisAttention;
-  colorKey: keyof typeof FALLBACK;
-  title: string;
-}[] = [
-  { attention: "normal", colorKey: "detailDeepColor", title: "Тёмная пастель (normal)" },
-  { attention: "accent", colorKey: "contrastSoftColor", title: "Контрастная пастель (accent)" },
-  { attention: "core", colorKey: "primaryColor", title: "Основной цвет (core)" },
-];
-
 function entityAccentColor(
   attention: string | undefined,
   colors: typeof FALLBACK,
   normalRun: number,
 ): string {
-  const att = String(attention ?? "normal").toLowerCase();
-  if (att === "core" || att === "main") return colors.primaryColor;
+  const att = normalizeAttention(attention);
+  if (att === "core") return colors.primaryColor;
   if (att === "accent") return colors.contrastSoftColor;
   return normalRun % 2 === 0 ? colors.detailSoftColor : colors.detailDeepColor;
 }
@@ -93,10 +84,10 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
   // Assign alternating pastel index to "normal" entities only.
   let normalRun = 0;
   const items = entities.map((e) => {
-    const att = String(e.attention ?? "normal").toLowerCase();
-    const run = att === "normal" || att === "" ? normalRun++ : normalRun;
+    const att = normalizeAttention(e.attention);
+    const run = att === "normal" ? normalRun++ : normalRun;
     const bg = entityAccentColor(e.attention, c, run);
-    return { e, bg, onBg: c.inkColor };
+    return { e, bg, onBg: c.inkColor, attention: att };
   });
 
   const headerInner = (
@@ -152,7 +143,7 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
       )}
 
       {/* Entity cards */}
-      {items.map(({ e, bg, onBg }, i) =>
+      {items.map(({ e, bg, onBg, attention }, i) =>
         editable ? (
           <div
             key={i}
@@ -201,29 +192,22 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
             <div className="absolute top-2 right-2 flex items-start gap-1.5 z-10">
               {attentionPickerIndex === i ? (
                 <div
-                  className="flex items-center gap-1.5 rounded-full bg-white/95 px-1.5 py-1 shadow"
+                  className="rounded-full bg-white/95 px-1.5 py-1 shadow"
                   onClick={(ev) => ev.stopPropagation()}
                   onKeyDown={(ev) => ev.stopPropagation()}
                 >
-                  {ATTENTION_PICKER_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.attention}
-                      type="button"
-                      title={opt.title}
-                      className={`${COLOR_DOT_CLASS} transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
-                      style={{ background: c[opt.colorKey] }}
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        updateEntity(i, { attention: opt.attention });
-                        setAttentionPickerIndex(null);
-                      }}
-                    />
-                  ))}
+                  <AttentionColorPicker
+                    value={attention}
+                    profile={profile}
+                    onChange={(next) => {
+                      updateEntity(i, { attention: next });
+                      setAttentionPickerIndex(null);
+                    }}
+                  />
                 </div>
               ) : (
                 <button
                   type="button"
-                  title="Выбрать цвет карточки"
                   className={`${COLOR_DOT_CLASS} transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
                   style={{ background: bg }}
                   onClick={(ev) => {
@@ -265,6 +249,7 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
           <EntityEditDialog
             open={editIndex !== null}
             entity={editIndex !== null ? entities[editIndex] ?? null : null}
+            profile={profile}
             onClose={() => setEditIndex(null)}
             onSave={(patch) => {
               if (editIndex !== null) updateEntity(editIndex, patch);
@@ -275,6 +260,7 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
             open={addOpen}
             entity={null}
             isNew
+            profile={profile}
             onClose={() => setAddOpen(false)}
             onSave={(patch) => {
               if (!patch.sectionId) return;
@@ -312,7 +298,7 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
                 <DialogTitle>Удалить карточку?</DialogTitle>
               </DialogHeader>
               <p className="text-sm text-muted-foreground">
-                Карточка вместе со всем содержимым будет удалена.
+                Карточка будет удалена полностью
               </p>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDeleteIndex(null)}>Оставить</Button>
@@ -333,7 +319,7 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
           <Dialog open={changeSec !== null} onOpenChange={(v) => { if (!v) setChangeSec(null); }}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Смените раздел карточки</DialogTitle>
+                <DialogTitle>Перенести карточку в другой раздел</DialogTitle>
               </DialogHeader>
               <div className="space-y-1.5">
                 <Label htmlFor="change-sec">Раздел</Label>

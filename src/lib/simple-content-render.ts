@@ -1,8 +1,8 @@
 import type { AnalysisEntity, AnalysisGroupItem, AnalysisJson, AnalysisSectionId } from "./types";
 
 const SECTION_LABELS: Record<AnalysisSectionId, string> = {
-  prerequisites: "Предпосылки",
-  main: "Основной раздел",
+  prerequisites: "Введение",
+  main: "Основная часть",
   additions: "Дополнения и уточнения",
 };
 

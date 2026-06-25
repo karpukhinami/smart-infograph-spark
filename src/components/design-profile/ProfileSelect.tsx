@@ -51,7 +51,7 @@ export function ProfileSelect({ value, onChange, className, allowCreate = true }
     <>
       <Select value={value} onValueChange={handleChange}>
         <SelectTrigger className={className}>
-          <SelectValue placeholder="Выберите профиль" />
+          <SelectValue placeholder="Выберите палитру" />
         </SelectTrigger>
         <SelectContent>
           {profiles.map((p) => (

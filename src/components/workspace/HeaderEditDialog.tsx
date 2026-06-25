@@ -57,7 +57,7 @@ export function HeaderEditDialog({ open, value, onClose, onSave }: Props) {
       ["Заголовок", topic],
       ["Предмет", subject],
       ["Класс", grade],
-      ["Саммари", summary],
+      ["Краткое содержание", summary],
     ] as const) {
       const err = checkBalance(t);
       if (err) return `${label}: ${err}`;
@@ -114,7 +114,7 @@ export function HeaderEditDialog({ open, value, onClose, onSave }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="hdr-summary">Саммари</Label>
+            <Label htmlFor="hdr-summary">Краткое содержание</Label>
             <Textarea
               id="hdr-summary"
               value={summary}
@@ -131,7 +131,7 @@ export function HeaderEditDialog({ open, value, onClose, onSave }: Props) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Отмена</Button>
+          <Button variant="outline" onClick={onClose}>Отменить</Button>
           <Button onClick={handleSave} disabled={!canSave}>Сохранить</Button>
         </DialogFooter>
       </DialogContent>

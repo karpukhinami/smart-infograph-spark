@@ -4,16 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
-import type { AnalysisAttention, AnalysisEntity, AnalysisSectionId } from "@/lib/types";
+import type { AnalysisAttention, AnalysisEntity, AnalysisSectionId, DesignProfile } from "@/lib/types";
+import { AttentionColorPicker, normalizeAttention } from "@/components/workspace/AttentionColorPicker";
 
 interface Props {
   open: boolean;
   entity: AnalysisEntity | null;
   isNew?: boolean;
+  profile?: DesignProfile | null;
   onClose: () => void;
   onSave: (patch: Partial<AnalysisEntity>) => void;
 }
@@ -44,8 +45,8 @@ function checkBalance(text: string): string | null {
 }
 
 const SECTION_OPTIONS: { value: AnalysisSectionId; label: string }[] = [
-  { value: "prerequisites", label: "Предпосылки" },
-  { value: "main", label: "Основное содержание" },
+  { value: "prerequisites", label: "Введение" },
+  { value: "main", label: "Основная часть" },
   { value: "additions", label: "Выводы и дополнения" },
 ];
 
@@ -64,7 +65,7 @@ function InfoIcon({ text }: { text: string }) {
   );
 }
 
-export function EntityEditDialog({ open, entity, isNew = false, onClose, onSave }: Props) {
+export function EntityEditDialog({ open, entity, isNew = false, profile = null, onClose, onSave }: Props) {
   const [sectionId, setSectionId] = useState<AnalysisSectionId | "">("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -92,8 +93,8 @@ export function EntityEditDialog({ open, entity, isNew = false, onClose, onSave 
     setContent(asText(entity.content));
     setFormula(asText(entity.formula));
     setAddendum(asText(entity.cardAddendum));
-    const att = String(entity.attention ?? "normal").toLowerCase();
-    setAttention(att === "main" ? "core" : (att as AnalysisAttention));
+    const att = normalizeAttention(entity.attention);
+    setAttention(att);
     setIcon(entity.icon ?? "");
     setVisualDescription(entity.visual?.description ?? "");
   }, [entity, open]);
@@ -147,10 +148,8 @@ export function EntityEditDialog({ open, entity, isNew = false, onClose, onSave 
         <div className="space-y-4">
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <Label htmlFor="ent-section">
-                Раздел <span className="text-destructive">*</span>
-              </Label>
-              <InfoIcon text="Этот параметр повлияет на расположение карточки на инфографике: предпосылки размещаются в верхней части изображения, основное содержание — в центральной, а выводы и дополнения — внизу." />
+              <Label htmlFor="ent-section">Раздел (обязательно)</Label>
+              <InfoIcon text="Выбор повлияет на расположение карточки на инфографике: введение размещается в верхней части изображения, основное содержание — в центральной, а выводы и дополнения — внизу." />
             </div>
             <Select value={sectionId} onValueChange={(v) => setSectionId(v as AnalysisSectionId)}>
               <SelectTrigger id="ent-section" className={sectionEmpty ? "border-destructive" : ""}>
@@ -165,9 +164,7 @@ export function EntityEditDialog({ open, entity, isNew = false, onClose, onSave 
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="ent-title">
-              Заголовок{isNew && <span className="text-destructive"> *</span>}
-            </Label>
+            <Label htmlFor="ent-title">Заголовок (обязательно)</Label>
             <Input
               id="ent-title"
               value={title}
@@ -177,9 +174,7 @@ export function EntityEditDialog({ open, entity, isNew = false, onClose, onSave 
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="ent-content">
-              Основное содержание <span className="text-destructive">*</span>
-            </Label>
+            <Label htmlFor="ent-content">Основное содержание (обязательно)</Label>
             <Textarea
               id="ent-content"
               value={content}
@@ -215,24 +210,7 @@ export function EntityEditDialog({ open, entity, isNew = false, onClose, onSave 
 
           <div className="space-y-2">
             <Label>Цвет карточки</Label>
-            <RadioGroup
-              value={attention}
-              onValueChange={(v) => setAttention(v as AnalysisAttention)}
-              className="flex flex-col gap-2"
-            >
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="core" id="att-core" />
-                <Label htmlFor="att-core" className="font-normal cursor-pointer">Главный цвет</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="normal" id="att-normal" />
-                <Label htmlFor="att-normal" className="font-normal cursor-pointer">Пастель</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="accent" id="att-accent" />
-                <Label htmlFor="att-accent" className="font-normal cursor-pointer">Контрастная пастель</Label>
-              </div>
-            </RadioGroup>
+            <AttentionColorPicker value={attention} onChange={setAttention} profile={profile} />
           </div>
 
           <div className="space-y-1.5">
@@ -249,8 +227,8 @@ export function EntityEditDialog({ open, entity, isNew = false, onClose, onSave 
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <Label htmlFor="ent-visual-desc">Описание картинки</Label>
-              <InfoIcon text="Опишите пожелания к иллюстрации карточки: чем подробнее — тем лучше" />
+              <Label htmlFor="ent-visual-desc">Описание изображения</Label>
+              <InfoIcon text="Опишите подробно пожелания к иллюстрации карточки" />
             </div>
             <Textarea
               id="ent-visual-desc"
@@ -268,7 +246,7 @@ export function EntityEditDialog({ open, entity, isNew = false, onClose, onSave 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Отмена</Button>
+          <Button variant="outline" onClick={onClose}>Отменить</Button>
           <Button onClick={handleSave} disabled={!canSave}>Сохранить</Button>
         </DialogFooter>
       </DialogContent>

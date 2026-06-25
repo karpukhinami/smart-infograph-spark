@@ -23,7 +23,6 @@ import {
   RotateCcw,
   RefreshCw,
   Upload,
-  ImagePlus,
   Sparkles,
   ImageIcon,
   Download,
@@ -52,6 +51,11 @@ import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
 import { SimpleImageRating } from "@/components/workspace/SimpleImageRating";
 import { cn } from "@/lib/utils";
 import { isAdminShellPath } from "@/lib/admin-shell";
+import {
+  importSourceFiles,
+  SOURCE_FILE_ACCEPT,
+} from "@/lib/source-file-import";
+import { buildSourceTextForPrompt, hasSourceMaterials } from "@/lib/source-material";
 import { HomeYandexMetrika } from "@/components/analytics/HomeYandexMetrika";
 import { isHomeAnalyticsRoute } from "@/lib/analytics/yandex-metrika";
 import {
@@ -81,26 +85,26 @@ export const Route = createFileRoute("/")({
 });
 
 const SUBJECTS = [
-  "Математика",
   "Алгебра",
-  "Геометрия",
-  "Русский язык",
-  "Литература",
-  "Физика",
-  "Химия",
+  "Английский язык",
+  "Астрономия",
   "Биология",
   "География",
-  "История",
-  "Обществознание",
+  "Геометрия",
+  "Изобразительное искусство",
   "Информатика",
-  "Английский язык",
-  "Окружающий мир",
-  "Технология",
-  "ИЗО",
+  "История",
+  "Литература",
+  "Математика",
   "Музыка",
+  "ОБЗР",
+  "Обществознание",
+  "Окружающий мир",
+  "Русский язык",
+  "Технология",
+  "Физика",
   "Физкультура",
-  "ОБЖ",
-  "Астрономия",
+  "Химия",
   "Другое",
 ];
 const GRADES = [...Array.from({ length: 11 }, (_, i) => String(i + 1)), "Другое"];
@@ -148,7 +152,8 @@ export function SimpleHome() {
   const setUserWishes = useProjectStore((s) => s.setUserWishes);
   const attachedImages = useProjectStore((s) => s.attachedImages);
   const addAttachedImages = useProjectStore((s) => s.addAttachedImages);
-  const removeAttachedImage = useProjectStore((s) => s.removeAttachedImage);
+  const uploadedSourceText = useProjectStore((s) => s.uploadedSourceText);
+  const setUploadedSourceText = useProjectStore((s) => s.setUploadedSourceText);
   const simpleCurrent = useProjectStore((s) => s.simpleCurrentImage);
   const simpleVersions = useProjectStore((s) => s.simpleImageVersions);
   const setSimpleCurrent = useProjectStore((s) => s.setSimpleCurrentImage);
@@ -184,7 +189,6 @@ export function SimpleHome() {
   const [imageFullscreen, setImageFullscreen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const enabledStyles = useMemo<InfographicStyle[]>(() => styles.filter((s) => s.enabled), [styles]);
   const activeStyle = useMemo(
@@ -201,7 +205,7 @@ export function SimpleHome() {
     return JSON.stringify(activeContent.value.analysis) !== JSON.stringify(editSnapshot);
   }, [editMode, editSnapshot, activeContent?.value.analysis]);
 
-  const hasSource = Boolean(source.text.trim());
+  const hasSource = hasSourceMaterials(source.text, uploadedSourceText, attachedImages);
   const useTopicOnlyPrompt = !hasSource;
 
   const subjectOk = Boolean(source.subject);
@@ -249,16 +253,14 @@ export function SimpleHome() {
 
   async function onFileChosen(files: FileList | null) {
     if (!files?.length) return;
-    touchFormInput("file_upload");
-    const arr = Array.from(files);
-    const images = arr.filter((f) => f.type.startsWith("image/"));
-    const texts = arr.filter((f) => !f.type.startsWith("image/"));
-    for (const t of texts) {
-      const text = await t.text();
-      const cur = source.text.trim();
-      setSource({ text: cur ? `${cur}\n\n${text}` : text });
-    }
-    if (images.length) await attachImageFiles(images);
+    touchFormInput("attach_file");
+    await importSourceFiles(Array.from(files), {
+      getUploadedText: () => uploadedSourceText,
+      setUploadedText: setUploadedSourceText,
+      addImages: addAttachedImages,
+      onSuccess: (message) => toast.success(message),
+      onError: (message) => toast.error(message),
+    });
   }
 
   // === Analysis ===
@@ -270,7 +272,7 @@ export function SimpleHome() {
     const filled = template
       .replaceAll("{{USER_INSTRUCTIONS}}", merged || "(нет)")
       .replaceAll("{{STYLES_LIST}}", stylesList || "(стилей не задано)")
-      .replaceAll("{{SOURCE_TEXT}}", source.text || "")
+      .replaceAll("{{SOURCE_TEXT}}", buildSourceTextForPrompt(source.text, uploadedSourceText) || "")
       .replaceAll("{{TOPIC}}", source.topic || "")
       .replaceAll("{{SUBJECT}}", source.subject || "")
       .replaceAll("{{GRADE}}", source.grade || "")
@@ -332,7 +334,7 @@ export function SimpleHome() {
       label: "simple design brief",
       parse: (v) => v as DesignBriefResult,
     });
-    if (!briefRes?.PromptForImageGeneration) throw new Error("Модель не вернула PromptForImageGeneration");
+    if (!briefRes?.PromptForImageGeneration) throw new Error("Инструкции для генерации инфографики не готовы");
 
     const finalPrompt = buildSimpleHomeImagePrompt({
       profile,
@@ -350,7 +352,7 @@ export function SimpleHome() {
   // === One-shot: generate everything ===
   async function onGenerateAll() {
     if (!canGenerate) {
-      toast.error("Заполните предмет и класс. Если нет подходящей опции, выберите «Другое».");
+      toast.error("Заполните предмет и класс. Если нет подходящего варианта, выберите «Другое».");
       return;
     }
     if (trackHome) {
@@ -442,9 +444,9 @@ export function SimpleHome() {
           trigger: "regen_image",
         });
       }
-      toast.success("Изображение готово");
+      toast.success("Инфографика готова");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать изображение");
+      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать");
     } finally {
       setLoading(null);
       setImageStage(null);
@@ -507,9 +509,9 @@ export function SimpleHome() {
           trigger: "regen_after_edit",
         });
       }
-      toast.success("Изображение готово");
+      toast.success("Инфографика готова");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать изображение");
+      toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать");
     } finally {
       setLoading(null);
       setImageStage(null);
@@ -618,7 +620,7 @@ export function SimpleHome() {
                   touchFormInput("topic");
                   setSource({ topic: e.target.value });
                 }}
-                placeholder="Что изучаем?"
+                placeholder="Впишите название темы"
               />
             </div>
           </div>
@@ -632,7 +634,7 @@ export function SimpleHome() {
                 touchFormInput("user_instructions");
                 setSource({ userInstructions: e.target.value });
               }}
-              placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
+              placeholder="На чём сделать акцент, что пропустить, особенности аудитории…"
             />
           </div>
 
@@ -650,16 +652,16 @@ export function SimpleHome() {
                 <Label htmlFor="sw-edu" className="text-sm font-normal cursor-pointer">
                   Учебные иллюстрации
                 </Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="size-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-xs">
-                    {source.educationalIllustrations
-                      ? 'Иллюстрации, отражающие предметное содержание — чертежи, схемы, диаграммы — добавляются только в случае необходимости. Если хотите увидеть больше предметных иллюстраций, отметьте это в поле «Дополнительные инструкции».'
-                      : 'Иллюстрации, отражающие предметное содержание — чертежи, схемы, диаграммы — запрещены.'}
-                  </TooltipContent>
-                </Tooltip>
+                {source.educationalIllustrations && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="size-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      Иллюстрации по предмету — только если необходимы. Если хотите много — отметьте «Дополнительных инструкциях».
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Switch
@@ -673,16 +675,16 @@ export function SimpleHome() {
                 <Label htmlFor="sw-narr" className="text-sm font-normal cursor-pointer">
                   Сюжетные иллюстрации
                 </Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="size-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-xs">
-                    {source.narrativeIllustrations
-                      ? 'Иллюстрации развлекательного характера, призванные привлечь внимание ученика, добавляются умеренно на основе темы и класса. Если хотите более точно задать их содержание, отметьте это в поле «Дополнительные инструкции».'
-                      : 'Иллюстрации развлекательного характера, призванные привлечь внимание ученика, отсутствуют.'}
-                  </TooltipContent>
-                </Tooltip>
+                {source.narrativeIllustrations && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="size-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      Иллюстрации для привлечения внимания. Если хотите описать их точнее, отметьте это в «Дополнительных инструкциях».
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </div>
             </div>
           </TooltipProvider>
@@ -690,34 +692,21 @@ export function SimpleHome() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-xs">Исходный материал (необязательно)</Label>
-              <div className="flex gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    touchFormInput("attach_file");
-                    fileInputRef.current?.click();
-                  }}
-                >
-                  <Upload className="size-3.5 mr-1" /> Файл
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    touchFormInput("attach_image");
-                    imageInputRef.current?.click();
-                  }}
-                >
-                  <ImagePlus className="size-3.5 mr-1" /> Картинка
-                </Button>
-              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  touchFormInput("attach_file");
+                  fileInputRef.current?.click();
+                }}
+              >
+                <Upload className="size-3.5 mr-1" /> Файл
+              </Button>
             </div>
             <Textarea
               rows={6}
-              placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки уйдут в модель как мультимодальный вход."
+              placeholder="Вставьте текст или изображение(Ctrl/Cmd + V) "
               value={source.text}
               onChange={(e) => {
                 touchFormInput("source_text");
@@ -725,38 +714,10 @@ export function SimpleHome() {
               }}
               onPaste={onPasteCapture}
             />
-            {attachedImages.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {attachedImages.map((url, i) => (
-                  <div key={i} className="relative">
-                    <img src={url} alt="" className="size-16 object-cover rounded border" />
-                    <button
-                      type="button"
-                      onClick={() => removeAttachedImage(i)}
-                      className="absolute -top-1 -right-1 size-5 rounded-full bg-background border text-xs leading-none"
-                      title="Убрать"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.md,image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                void onFileChosen(e.target.files);
-                e.target.value = "";
-              }}
-            />
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/*"
+              accept={SOURCE_FILE_ACCEPT}
               multiple
               className="hidden"
               onChange={(e) => {
@@ -777,12 +738,12 @@ export function SimpleHome() {
             <AlertDialogHeader>
               <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
               <AlertDialogDescription>
-                Все сгенерированные изображения будут уничтожены, проект полностью сбросится.
+                Форма ввода данных будет очищена
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Отмена</AlertDialogCancel>
-              <AlertDialogAction onClick={onConfirmReset}>ОК</AlertDialogAction>
+              <AlertDialogCancel>Отменить</AlertDialogCancel>
+              <AlertDialogAction onClick={onConfirmReset}>Начать заново</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -814,7 +775,7 @@ export function SimpleHome() {
         {/* IMAGE PANEL */}
         <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3 min-h-12">
-            <h2 className="text-sm font-semibold text-muted-foreground">Итоговое изображение</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground">Итоговая инфографика</h2>
             {simpleCurrent && !isBusy && (
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -848,7 +809,7 @@ export function SimpleHome() {
                         setRegenImageOpen(true);
                       }}
                     >
-                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать изображение
+                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать инфографику
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent className="text-xs">Текстовое содержание не изменится</TooltipContent>
@@ -863,7 +824,7 @@ export function SimpleHome() {
                 <aside className="flex w-[4.5rem] shrink-0 flex-col overflow-hidden rounded-md border border-border bg-muted/40">
                   <div className="shrink-0 border-b border-border px-1 py-1.5 text-center text-[10px] leading-tight text-muted-foreground">
                     <div className="font-medium">Версии</div>
-                    <div>сейчас {currentVerLabel}</div>
+                    <div>Сейчас открыта {currentVerLabel}</div>
                   </div>
                   <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
                     {sidebarVersions.map((v) => (
@@ -897,15 +858,15 @@ export function SimpleHome() {
                   {loading === "analyze" ? (
                     <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
                       <Loader2 className="size-8 animate-spin" />
-                      <div>Шаг 1 из 2 — формируем контент…</div>
+                      <div>Шаг 1 из 3 — подбираем контент…</div>
                     </div>
                   ) : loading === "image" ? (
                     <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
                       <Loader2 className="size-8 animate-spin" />
                       <div>
                         {imageStage === "brief"
-                          ? "Шаг 2 из 2 — составляем дизайн-бриф…"
-                          : "Шаг 2 из 2 — генерируем изображение…"}
+                          ? "Шаг 2 из 3 — придумываем дизайн…"
+                          : "Шаг 3 из 3 — генерируем инфографику…"}
                       </div>
                     </div>
                   ) : simpleCurrent ? (
@@ -931,7 +892,7 @@ export function SimpleHome() {
                   ) : (
                     <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
                       <ImageIcon className="size-8 opacity-50" />
-                      Итоговое изображение появится здесь
+                      Итоговая инфографика появится здесь
                     </div>
                   )}
                 </div>
@@ -969,7 +930,7 @@ export function SimpleHome() {
                       Сбросить изменения
                     </Button>
                     <Button variant="outline" size="sm" onClick={onSaveEdits}>
-                      Сохранить без перегенерации
+                      Сохранить изменения
                     </Button>
                     <Button
                       size="sm"
@@ -1008,7 +969,7 @@ export function SimpleHome() {
 
           {editMode && (
             <div className="shrink-0 space-y-1.5 border-b border-border px-5 py-3">
-              <Label className="text-xs">Цветовая схема</Label>
+              <Label className="text-xs">Цветовая палитра</Label>
               <ProfileSelect
                 value={selectedProfileName ?? activeProfile?.profileName ?? ""}
                 onChange={setSelectedProfileName}
@@ -1068,12 +1029,12 @@ export function SimpleHome() {
           <AlertDialogHeader>
             <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
             <AlertDialogDescription>
-              Все сгенерированные изображения будут уничтожены, проект полностью сбросится.
+              Все сгенерированные инфографики и тексты вкладки «Контент» будут удалены
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction onClick={onConfirmReset}>ОК</AlertDialogAction>
+            <AlertDialogCancel>Отменить</AlertDialogCancel>
+            <AlertDialogAction onClick={onConfirmReset}>Начать заново</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1142,24 +1103,23 @@ function RegenerateImageDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Перегенерация изображения</DialogTitle>
+          <DialogTitle>Перегенерация инфографики</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            Перегенерация идёт на основе содержимого вкладки «Контент» без учёта текущей генерации изображения;
-            если хотите поменять содержимое инфографики, перейдите на вкладку «Контент».
+            Новая генерация на основе вкладки «Контент» без учёта текущей генерации. Если хотите поменять текст инфографики, перейдите во вкладку «Контент».
           </p>
           <div className="space-y-1.5">
-            <Label className="text-xs">Цветовая схема</Label>
+            <Label className="text-xs">Цветовая палитра</Label>
             <ProfileSelect value={profile} onChange={setProfile} allowCreate={allowCreate} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Дополнительные требования к изображению</Label>
+            <Label className="text-xs">Дополнительные требования к инфографике</Label>
             <Textarea
               rows={3}
               value={wishes}
               onChange={(e) => setWishes(e.target.value)}
-              placeholder="Например: вынести формулу крупно, добавить иконку треугольника…"
+              placeholder="Например, написать формулы крупнее, добавить чертёж на карточку с определением …"
             />
           </div>
         </div>
@@ -1210,8 +1170,7 @@ function RegenerateContentDialog({
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            Перегенерация контента производится на основе введённых ранее параметров и прикреплённых материалов;
-            если вы хотите изменить их, нажмите «Начать заново».
+            Перегенерация произойдёт на основе исходных параметров и материалов. Если хотите изменить их, нажмите «Начать заново».
           </p>
           <div className="rounded-md border border-border">
             <button
@@ -1229,8 +1188,8 @@ function RegenerateContentDialog({
                 <div><span className="font-medium text-foreground">Тема:</span> {topic || "—"}</div>
                 <div className="italic">
                   {basedOn === "materials"
-                    ? "генерация на основе прикреплённых материалов"
-                    : "генерация по теме"}
+                    ? "Генерация на основе прикреплённых материалов"
+                    : "Генерация по теме"}
                 </div>
               </div>
             )}
@@ -1241,7 +1200,7 @@ function RegenerateContentDialog({
               rows={4}
               value={extra}
               onChange={(e) => setExtra(e.target.value)}
-              placeholder="Что подправить, на что сделать акцент…"
+              placeholder="Что переделать и каким образом…"
             />
           </div>
         </div>
@@ -1276,11 +1235,11 @@ function RegenerateAfterEditDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v) onCancel(); }}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Перегенерация изображения</DialogTitle>
+          <DialogTitle>Перегенерация инфографики</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            Перегенерация изображения на основе внесённых в содержание инфографики изменений.
+            Перегенерация инфографики на основе изменённого контента
           </p>
           <div className="space-y-1.5">
             <Label className="text-xs">Дополнительные требования к изображению</Label>
@@ -1288,7 +1247,7 @@ function RegenerateAfterEditDialog({
               rows={3}
               value={wishes}
               onChange={(e) => setWishes(e.target.value)}
-              placeholder="Например: вынести формулу крупно, добавить иконку треугольника…"
+              placeholder="Например, написать все формулы крупнее, добавить чертёж на карточку с определением …"
             />
           </div>
         </div>
