@@ -52,6 +52,28 @@ import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
 import { SimpleImageRating } from "@/components/workspace/SimpleImageRating";
 import { cn } from "@/lib/utils";
 import { isAdminShellPath } from "@/lib/admin-shell";
+import { HomeYandexMetrika } from "@/components/analytics/HomeYandexMetrika";
+import { isHomeAnalyticsRoute } from "@/lib/analytics/yandex-metrika";
+import {
+  trackHomeContentSuccess,
+  trackHomeEditModeEnter,
+  trackHomeEditSave,
+  trackHomeEditSaveAndRegenClick,
+  trackHomeEditSaveAndRegenSuccess,
+  trackHomeFormInputStart,
+  trackHomeGenerateClick,
+  trackHomeImageDownload,
+  trackHomeImageFullscreen,
+  trackHomeImageRate,
+  trackHomeImageSuccess,
+  trackHomeRegenContentClick,
+  trackHomeRegenContentSuccess,
+  trackHomeRegenImageClick,
+  trackHomeRegenImageSuccess,
+  trackHomeResetClick,
+  trackHomeResetConfirm,
+  trackHomeVersionSwitch,
+} from "@/lib/analytics/home-events";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "AI Infographic Generator" }] }),
@@ -141,6 +163,14 @@ export function SimpleHome() {
   const profiles = useSettingsStore((s) => s.profiles);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const allowNewDesignProfile = isAdminShellPath(pathname);
+  const trackHome = isHomeAnalyticsRoute(pathname);
+  const formInputStartedRef = useRef(false);
+
+  function touchFormInput(inputName: string) {
+    if (!trackHome || formInputStartedRef.current) return;
+    formInputStartedRef.current = true;
+    trackHomeFormInputStart(pathname, inputName);
+  }
 
   const [loading, setLoading] = useState<null | "analyze" | "image">(null);
   const [imageStage, setImageStage] = useState<null | "brief" | "render">(null);
@@ -212,12 +242,14 @@ export function SimpleHome() {
       .filter((f): f is File => !!f);
     if (imageFiles.length) {
       e.preventDefault();
+      touchFormInput("paste_image");
       await attachImageFiles(imageFiles);
     }
   }
 
   async function onFileChosen(files: FileList | null) {
     if (!files?.length) return;
+    touchFormInput("file_upload");
     const arr = Array.from(files);
     const images = arr.filter((f) => f.type.startsWith("image/"));
     const texts = arr.filter((f) => !f.type.startsWith("image/"));
@@ -321,17 +353,42 @@ export function SimpleHome() {
       toast.error("Заполните предмет и класс. Если нет подходящей опции, выберите «Другое».");
       return;
     }
+    if (trackHome) {
+      trackHomeGenerateClick(pathname, {
+        has_source_text: hasSource,
+        has_attached_images: attachedImages.length > 0,
+        subject: source.subject || "",
+        grade: source.grade || "",
+        topic_length: (source.topic || "").length,
+      });
+    }
     try {
       setPaneMode("image");
       setLoading("analyze");
       const summary = await runAnalyze();
       if (!summary) return;
+      if (trackHome) {
+        trackHomeContentSuccess(pathname, {
+          entity_count: summary.analysis?.entities?.length ?? 0,
+          has_source_text: hasSource,
+          generation_mode: hasSource ? "with_materials" : "topic_only",
+        });
+      }
       // pick profile from recommendation if user hasn't chosen one
       const recName = summary.recommendedDesignProfile;
       const useProfile = selectedProfileName ?? recName ?? null;
       if (!selectedProfileName && recName) setSelectedProfileName(recName);
       setLoading("image");
       await runImage({ useProfileName: useProfile });
+      if (trackHome) {
+        const img = useProjectStore.getState().simpleCurrentImage;
+        trackHomeImageSuccess(pathname, {
+          version_number: img?.versionNumber ?? 1,
+          image_versions_count: useProjectStore.getState().simpleImageVersions.length,
+          profile_name: useProfile ?? selectedProfileName ?? "",
+          trigger: "initial",
+        });
+      }
       toast.success("Инфографика готова");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось сгенерировать");
@@ -347,7 +404,13 @@ export function SimpleHome() {
       setRegenContentOpen(false);
       setLoading("analyze");
       setPaneMode("content");
-      await runAnalyze(extraInstructions);
+      const summary = await runAnalyze(extraInstructions);
+      if (trackHome && summary) {
+        trackHomeRegenContentSuccess(pathname, {
+          entity_count: summary.analysis?.entities?.length ?? 0,
+          has_extra_instructions: Boolean(extraInstructions.trim()),
+        });
+      }
       toast.success("Контент обновлён");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать контент");
@@ -365,6 +428,20 @@ export function SimpleHome() {
       setLoading("image");
       setPaneMode("image");
       await runImage({ useProfileName: profileName });
+      if (trackHome) {
+        const img = useProjectStore.getState().simpleCurrentImage;
+        trackHomeRegenImageSuccess(pathname, {
+          version_number: img?.versionNumber ?? 1,
+          profile_name: profileName ?? selectedProfileName ?? "",
+          has_wishes: Boolean(wishes.trim()),
+        });
+        trackHomeImageSuccess(pathname, {
+          version_number: img?.versionNumber ?? 1,
+          image_versions_count: useProjectStore.getState().simpleImageVersions.length,
+          profile_name: profileName ?? selectedProfileName ?? "",
+          trigger: "regen_image",
+        });
+      }
       toast.success("Изображение готово");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать изображение");
@@ -375,6 +452,8 @@ export function SimpleHome() {
   }
 
   function onConfirmReset() {
+    if (trackHome) trackHomeResetConfirm(pathname);
+    formInputStartedRef.current = false;
     clearSimpleImages();
     resetProject();
     setResetOpen(false);
@@ -386,15 +465,18 @@ export function SimpleHome() {
 
   function onEnterEditMode() {
     if (!activeContent?.value.analysis) return;
+    if (trackHome) trackHomeEditModeEnter(pathname);
     setEditSnapshot(JSON.parse(JSON.stringify(activeContent.value.analysis)) as AnalysisJson);
     setEditMode(true);
   }
   function onSaveEdits() {
+    if (trackHome) trackHomeEditSave(pathname);
     setEditSnapshot(null);
     setEditMode(false);
     toast.success("Изменения сохранены");
   }
   function onSaveAndRegen() {
+    if (trackHome) trackHomeEditSaveAndRegenClick(pathname);
     // Save (changes are already applied to the store); exit edit mode and open regen dialog
     setEditSnapshot(null);
     setEditMode(false);
@@ -412,6 +494,19 @@ export function SimpleHome() {
       setLoading("image");
       setPaneMode("image");
       await runImage({ useProfileName: selectedProfileName ?? activeProfile?.profileName ?? null });
+      if (trackHome) {
+        const img = useProjectStore.getState().simpleCurrentImage;
+        trackHomeEditSaveAndRegenSuccess(pathname, {
+          version_number: img?.versionNumber ?? 1,
+          has_wishes: Boolean(wishes.trim()),
+        });
+        trackHomeImageSuccess(pathname, {
+          version_number: img?.versionNumber ?? 1,
+          image_versions_count: useProjectStore.getState().simpleImageVersions.length,
+          profile_name: selectedProfileName ?? activeProfile?.profileName ?? "",
+          trigger: "regen_after_edit",
+        });
+      }
       toast.success("Изображение готово");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось перегенерировать изображение");
@@ -436,11 +531,19 @@ export function SimpleHome() {
   if (!showResults) {
     return (
       <div className="mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto px-4 pt-8 pb-6">
+        <HomeYandexMetrika />
         <SimpleHomePageTitle className="mb-6" />
         <section className="rounded-lg border border-border bg-card p-5 space-y-5">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-semibold">Данные инфографики</h1>
-            <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (trackHome) trackHomeResetClick(pathname);
+                setResetOpen(true);
+              }}
+            >
               <RotateCcw className="size-3.5 mr-1" /> Начать заново
             </Button>
           </div>
@@ -451,7 +554,13 @@ export function SimpleHome() {
                 Предмет
                 <RequiredStar />
               </Label>
-              <Select value={source.subject || ""} onValueChange={(v) => setSource({ subject: v })}>
+              <Select
+                value={source.subject || ""}
+                onValueChange={(v) => {
+                  touchFormInput("subject");
+                  setSource({ subject: v });
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Выберите предмет" />
                 </SelectTrigger>
@@ -469,7 +578,13 @@ export function SimpleHome() {
                 Класс
                 <RequiredStar />
               </Label>
-              <Select value={source.grade || ""} onValueChange={(v) => setSource({ grade: v })}>
+              <Select
+                value={source.grade || ""}
+                onValueChange={(v) => {
+                  touchFormInput("grade");
+                  setSource({ grade: v });
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Выберите класс" />
                 </SelectTrigger>
@@ -486,7 +601,10 @@ export function SimpleHome() {
               <Label className="text-xs">Тема</Label>
               <Input
                 value={source.topic || ""}
-                onChange={(e) => setSource({ topic: e.target.value })}
+                onChange={(e) => {
+                  touchFormInput("topic");
+                  setSource({ topic: e.target.value });
+                }}
                 placeholder="Что изучаем?"
               />
             </div>
@@ -497,7 +615,10 @@ export function SimpleHome() {
             <Textarea
               rows={2}
               value={source.userInstructions}
-              onChange={(e) => setSource({ userInstructions: e.target.value })}
+              onChange={(e) => {
+                touchFormInput("user_instructions");
+                setSource({ userInstructions: e.target.value });
+              }}
               placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
             />
           </div>
@@ -508,7 +629,10 @@ export function SimpleHome() {
                 <Switch
                   id="sw-edu"
                   checked={source.educationalIllustrations}
-                  onCheckedChange={(v) => setSource({ educationalIllustrations: v })}
+                  onCheckedChange={(v) => {
+                    touchFormInput("educational_illustrations");
+                    setSource({ educationalIllustrations: v });
+                  }}
                 />
                 <Label htmlFor="sw-edu" className="text-sm font-normal cursor-pointer">
                   Учебные иллюстрации
@@ -528,7 +652,10 @@ export function SimpleHome() {
                 <Switch
                   id="sw-narr"
                   checked={source.narrativeIllustrations}
-                  onCheckedChange={(v) => setSource({ narrativeIllustrations: v })}
+                  onCheckedChange={(v) => {
+                    touchFormInput("narrative_illustrations");
+                    setSource({ narrativeIllustrations: v });
+                  }}
                 />
                 <Label htmlFor="sw-narr" className="text-sm font-normal cursor-pointer">
                   Сюжетные иллюстрации
@@ -555,7 +682,10 @@ export function SimpleHome() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    touchFormInput("attach_file");
+                    fileInputRef.current?.click();
+                  }}
                 >
                   <Upload className="size-3.5 mr-1" /> Файл
                 </Button>
@@ -563,7 +693,10 @@ export function SimpleHome() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => imageInputRef.current?.click()}
+                  onClick={() => {
+                    touchFormInput("attach_image");
+                    imageInputRef.current?.click();
+                  }}
                 >
                   <ImagePlus className="size-3.5 mr-1" /> Картинка
                 </Button>
@@ -573,7 +706,10 @@ export function SimpleHome() {
               rows={6}
               placeholder="Вставьте текст или картинку (Ctrl/Cmd + V). Картинки уйдут в модель как мультимодальный вход."
               value={source.text}
-              onChange={(e) => setSource({ text: e.target.value })}
+              onChange={(e) => {
+                touchFormInput("source_text");
+                setSource({ text: e.target.value });
+              }}
               onPaste={onPasteCapture}
             />
             {attachedImages.length > 0 && (
@@ -658,12 +794,16 @@ export function SimpleHome() {
   return (
     <TooltipProvider delayDuration={150}>
     <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 basis-0 flex-col overflow-hidden px-4 py-3">
+      <HomeYandexMetrika />
       <div className="mb-3 flex shrink-0 items-center justify-between gap-4">
         <SimpleHomePageTitle className="text-3xl" />
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setResetOpen(true)}
+          onClick={() => {
+            if (trackHome) trackHomeResetClick(pathname);
+            setResetOpen(true);
+          }}
           disabled={editMode || isBusy}
         >
           <RotateCcw className="size-3.5 mr-1" /> Начать заново
@@ -689,13 +829,25 @@ export function SimpleHome() {
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
+                    if (trackHome) {
+                      trackHomeImageDownload(pathname, {
+                        version_number: simpleCurrent.versionNumber ?? 1,
+                      });
+                    }
                   }}
                 >
                   <Download className="size-3.5 mr-1" /> Сохранить
                 </Button>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button size="sm" variant="outline" onClick={() => setRegenImageOpen(true)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (trackHome) trackHomeRegenImageClick(pathname);
+                        setRegenImageOpen(true);
+                      }}
+                    >
                       <RefreshCw className="size-3.5 mr-1" /> Перегенерировать изображение
                     </Button>
                   </TooltipTrigger>
@@ -718,7 +870,15 @@ export function SimpleHome() {
                       <button
                         key={v.id}
                         type="button"
-                        onClick={() => swapSimpleVersion(v.id)}
+                        onClick={() => {
+                          if (trackHome && simpleCurrent) {
+                            trackHomeVersionSwitch(pathname, {
+                              from_version: simpleCurrent.versionNumber ?? 1,
+                              to_version: v.versionNumber ?? 1,
+                            });
+                          }
+                          swapSimpleVersion(v.id);
+                        }}
                         className="group relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded border hover:ring-2 hover:ring-ring"
                         title={`Открыть ver.${v.versionNumber ?? "?"}`}
                       >
@@ -751,7 +911,14 @@ export function SimpleHome() {
                   ) : simpleCurrent ? (
                     <button
                       type="button"
-                      onClick={() => setImageFullscreen(true)}
+                      onClick={() => {
+                        if (trackHome && simpleCurrent) {
+                          trackHomeImageFullscreen(pathname, {
+                            version_number: simpleCurrent.versionNumber ?? 1,
+                          });
+                        }
+                        setImageFullscreen(true);
+                      }}
                       className="flex h-full w-full cursor-zoom-in items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       title="Открыть на весь экран"
                     >
@@ -771,7 +938,18 @@ export function SimpleHome() {
 
                 {simpleCurrent && !isBusy && (
                   <div className="shrink-0">
-                    <SimpleImageRating imageId={simpleCurrent.id} />
+                    <SimpleImageRating
+                      imageId={simpleCurrent.id}
+                      onRate={
+                        trackHome
+                          ? (rating) =>
+                              trackHomeImageRate(pathname, {
+                                version_number: simpleCurrent.versionNumber ?? 1,
+                                rating,
+                              })
+                          : undefined
+                      }
+                    />
                   </div>
                 )}
               </div>
@@ -809,7 +987,14 @@ export function SimpleHome() {
                     </Button>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => setRegenContentOpen(true)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (trackHome) trackHomeRegenContentClick(pathname);
+                            setRegenContentOpen(true);
+                          }}
+                        >
                           <RefreshCw className="size-3.5 mr-1" /> Перегенерировать контент
                         </Button>
                       </TooltipTrigger>

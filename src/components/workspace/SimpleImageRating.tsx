@@ -6,9 +6,10 @@ const RATING_ACCENT = "#A78BFA";
 
 interface Props {
   imageId: string;
+  onRate?: (rating: "like" | "dislike") => void;
 }
 
-export function SimpleImageRating({ imageId }: Props) {
+export function SimpleImageRating({ imageId, onRate }: Props) {
   const rating = useProjectStore((s) => s.simpleImageRatings[imageId]);
   const setRating = useProjectStore((s) => s.setSimpleImageRating);
 
@@ -32,7 +33,10 @@ export function SimpleImageRating({ imageId }: Props) {
         style={btnStyle("like")}
         title="Нравится"
         aria-pressed={rating === "like"}
-        onClick={() => setRating(imageId, "like")}
+        onClick={() => {
+          setRating(imageId, "like");
+          onRate?.("like");
+        }}
       >
         <ThumbsUp className="size-3.5" />
       </button>
@@ -42,7 +46,10 @@ export function SimpleImageRating({ imageId }: Props) {
         style={btnStyle("dislike")}
         title="Не нравится"
         aria-pressed={rating === "dislike"}
-        onClick={() => setRating(imageId, "dislike")}
+        onClick={() => {
+          setRating(imageId, "dislike");
+          onRate?.("dislike");
+        }}
       >
         <ThumbsDown className="size-3.5" />
       </button>
