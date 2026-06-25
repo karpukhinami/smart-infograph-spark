@@ -2,17 +2,17 @@
   {
     "profileName": "Оранжевый",
     "colors": {
-      "backgroundColor": "#F5F6FF",
-      "surfaceColor": "#F5F6FF",
-      "primaryColor": "#FF8800",
-      "detailSoftColor": "#FFE3C2",
-      "detailDeepColor": "#FFD4A3",
-      "contrastSoftColor": "#D9D4FF",
-      "inkColor": "#101828",
-      "headerColor": "#1A2236",
+      "backgroundColor": "#FFFFFF",
+      "surfaceColor": "#FFFFFF",
+      "primaryColor": "#FFAA57",
+      "detailSoftColor": "#F8E0C9",
+      "detailDeepColor": "#FFD6AE",
+      "contrastSoftColor": "#D7D2FA",
+      "inkColor": "#0C1126",
+      "headerColor": "#293642",
       "lightTextColor": "#FFFFFF",
-      "spotAccentColor": "#F074FF",
-      "mutedheaderTextColor": "#9399BD"
+      "spotAccentColor": "#0C71C9",
+      "mutedheaderTextColor": "#818C96"
     },
     "typography": {
       "styleId": "geometric_grotesque",
@@ -23,17 +23,17 @@
   {
     "profileName": "Индиго",
     "colors": {
-      "backgroundColor": "#F5F6FF",
-      "surfaceColor": "#F5F6FF",
-      "primaryColor": "#503AE0",
-      "detailSoftColor": "#D9D4FF",
-      "detailDeepColor": "#B7B1EF",
-      "contrastSoftColor": "#FFD4A3",
-      "inkColor": "#101828",
-      "headerColor": "#1A2236",
+      "backgroundColor": "#FFFFFF",
+      "surfaceColor": "#FFFFFF",
+      "primaryColor": "#7262DE",
+      "detailSoftColor": "#D7D2FA",
+      "detailDeepColor": "#C3BCF4",
+      "contrastSoftColor": "#BDE8DC",
+      "inkColor": "#0C1126",
+      "headerColor": "#323852",
       "lightTextColor": "#FFFFFF",
-      "spotAccentColor": "#F074FF",
-      "mutedheaderTextColor": "#9399BD"
+      "spotAccentColor": "#068A6A",
+      "mutedheaderTextColor": "#737B9C"
     },
     "typography": {
       "styleId": "geometric_grotesque",
