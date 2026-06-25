@@ -527,6 +527,19 @@ export function SimpleHome() {
 
   const analysisJson = activeContent?.value.analysis ?? null;
 
+  const sidebarVersions = useMemo(
+    () =>
+      [...simpleVersions].sort(
+        (a, b) =>
+          (a.versionNumber ?? Number.MAX_SAFE_INTEGER) - (b.versionNumber ?? Number.MAX_SAFE_INTEGER) ||
+          a.createdAt - b.createdAt,
+      ),
+    [simpleVersions],
+  );
+  const currentVerLabel = simpleCurrent
+    ? `ver.${simpleCurrent.versionNumber ?? sidebarVersions.length + 1}`
+    : "ver.1";
+
   // ============ INPUT VIEW ============
   if (!showResults) {
     return (
@@ -778,19 +791,6 @@ export function SimpleHome() {
   }
 
   // ============ RESULTS VIEW ============
-  const sidebarVersions = useMemo(
-    () =>
-      [...simpleVersions].sort(
-        (a, b) =>
-          (a.versionNumber ?? Number.MAX_SAFE_INTEGER) - (b.versionNumber ?? Number.MAX_SAFE_INTEGER) ||
-          a.createdAt - b.createdAt,
-      ),
-    [simpleVersions],
-  );
-  const currentVerLabel = simpleCurrent
-    ? `ver.${simpleCurrent.versionNumber ?? sidebarVersions.length + 1}`
-    : "ver.1";
-
   return (
     <TooltipProvider delayDuration={150}>
     <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 basis-0 flex-col overflow-hidden px-4 py-3">
