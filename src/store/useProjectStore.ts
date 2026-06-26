@@ -11,6 +11,7 @@ import type {
 import type { ProgrammaticRenderSpec } from "@/lib/render-spec/types";
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from "@/lib/models";
 import { renderAnalysisJson } from "@/lib/analysis-render";
+import { createQuotaAwareSessionStorage } from "@/lib/browser-storage-quota";
 
 
 export type BriefMode = "design" | "programmatic";
@@ -112,6 +113,7 @@ interface ProjectState {
   setSimpleImageRating: (id: string, rating: "like" | "dislike") => void;
   archiveSimpleCurrentImage: () => void;
   swapSimpleVersion: (id: string) => void;
+  deleteSimpleImage: (id: string) => void;
   clearSimpleImages: () => void;
 
   models: { analysis: string; brief: string; image: string };
@@ -435,6 +437,47 @@ export const useProjectStore = create<ProjectState>()(
           };
         }),
 
+      deleteSimpleImage: (id) =>
+        set((s) => {
+          const ratings = { ...s.simpleImageRatings };
+          delete ratings[id];
+
+          if (s.simpleCurrentImage?.id === id) {
+            if (s.simpleImageVersions.length === 0) {
+              return { simpleCurrentImage: null, simpleImageRatings: ratings };
+            }
+            let bestIdx = 0;
+            let bestVer = s.simpleImageVersions[0].versionNumber ?? 0;
+            s.simpleImageVersions.forEach((v, i) => {
+              const vn = v.versionNumber ?? 0;
+              if (vn >= bestVer) {
+                bestVer = vn;
+                bestIdx = i;
+              }
+            });
+            const newVersions = s.simpleImageVersions.slice();
+            const [promoted] = newVersions.splice(bestIdx, 1);
+            return {
+              simpleCurrentImage: {
+                id: promoted.id,
+                dataUrl: promoted.dataUrl,
+                prompt: promoted.prompt,
+                versionNumber: promoted.versionNumber ?? 1,
+              },
+              simpleImageVersions: newVersions,
+              simpleImageRatings: ratings,
+            };
+          }
+
+          const idx = s.simpleImageVersions.findIndex((v) => v.id === id);
+          if (idx >= 0) {
+            const newVersions = s.simpleImageVersions.slice();
+            newVersions.splice(idx, 1);
+            return { simpleImageVersions: newVersions, simpleImageRatings: ratings };
+          }
+
+          return { simpleImageRatings: ratings };
+        }),
 
       models: {
         analysis: DEFAULT_TEXT_MODEL,
@@ -447,7 +490,9 @@ export const useProjectStore = create<ProjectState>()(
       name: "infographic-project",
       version: 7,
       migrate: () => undefined as unknown as ProjectState,
-      storage: createJSONStorage(() => (typeof window !== "undefined" ? sessionStorage : (undefined as unknown as Storage))),
+      storage: createJSONStorage(() =>
+        typeof window !== "undefined" ? createQuotaAwareSessionStorage() : (undefined as unknown as Storage),
+      ),
     },
   ),
 );

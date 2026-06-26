@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import type { AnalysisEntity, AnalysisGroupItem, AnalysisJson, AnalysisSectionId, DesignProfile } from "@/lib/types";
 import { Markdown } from "@/components/workspace/Markdown";
 import { EntityEditDialog } from "@/components/workspace/EntityEditDialog";
@@ -77,6 +77,10 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
   const [changeSec, setChangeSec] = useState<{ index: number; section: AnalysisSectionId | "" } | null>(null);
   const [attentionPickerIndex, setAttentionPickerIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (editIndex !== null || addOpen) setAttentionPickerIndex(null);
+  }, [editIndex, addOpen]);
 
   const subjectShown = displayMeta(analysis.subject);
   const gradeShown = displayMeta(analysis.grade);
@@ -253,6 +257,8 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
             onClose={() => setEditIndex(null)}
             onSave={(patch) => {
               if (editIndex !== null) updateEntity(editIndex, patch);
+              setEditIndex(null);
+              setAttentionPickerIndex(null);
             }}
           />
 
@@ -276,6 +282,7 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
                 visual: patch.visual ?? null,
               };
               addEntity(newEntity);
+              setAddOpen(false);
             }}
           />
 

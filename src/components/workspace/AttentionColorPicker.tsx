@@ -63,7 +63,10 @@ export function AttentionColorPicker({ value, onChange, profile, size = "md", cl
             normalized === opt.attention && LAVENDER_RING,
           )}
           style={{ background: c[opt.colorKey] }}
-          onClick={() => onChange(opt.attention)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange(opt.attention);
+          }}
         />
       ))}
     </div>

@@ -49,7 +49,10 @@ import type { AnalysisJson, ContentSummary, DesignBriefResult, InfographicStyle 
 import { Markdown } from "@/components/workspace/Markdown";
 import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
 import { SimpleImageRating } from "@/components/workspace/SimpleImageRating";
+import { ImageVersionDeleteButton } from "@/components/workspace/ImageVersionDeleteButton";
 import { cn } from "@/lib/utils";
+import { downloadInfographicPng } from "@/lib/download-infographic";
+import { hasEnoughStorageForNewImage, onStorageQuotaExceeded } from "@/lib/browser-storage-quota";
 import { isAdminShellPath } from "@/lib/admin-shell";
 import {
   importSourceFiles,
@@ -159,6 +162,7 @@ export function SimpleHome() {
   const setSimpleCurrent = useProjectStore((s) => s.setSimpleCurrentImage);
   const archiveSimple = useProjectStore((s) => s.archiveSimpleCurrentImage);
   const swapSimpleVersion = useProjectStore((s) => s.swapSimpleVersion);
+  const deleteSimpleImage = useProjectStore((s) => s.deleteSimpleImage);
   const clearSimpleImages = useProjectStore((s) => s.clearSimpleImages);
   const replaceActiveAnalysis = useProjectStore((s) => s.replaceActiveAnalysis);
 
@@ -187,6 +191,9 @@ export function SimpleHome() {
   const [regenContentOpen, setRegenContentOpen] = useState(false);
   const [regenAfterEditOpen, setRegenAfterEditOpen] = useState(false);
   const [imageFullscreen, setImageFullscreen] = useState(false);
+  const [deleteImageId, setDeleteImageId] = useState<string | null>(null);
+  const [storageRegenWarningOpen, setStorageRegenWarningOpen] = useState(false);
+  const [storageQuotaFullscreen, setStorageQuotaFullscreen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -227,6 +234,49 @@ export function SimpleHome() {
   useEffect(() => {
     if (!simpleCurrent) setImageFullscreen(false);
   }, [simpleCurrent?.id]);
+
+  useEffect(() => {
+    return onStorageQuotaExceeded(() => setStorageQuotaFullscreen(true));
+  }, []);
+
+  const deleteImageTarget = useMemo(() => {
+    if (!deleteImageId) return null;
+    if (simpleCurrent?.id === deleteImageId) return simpleCurrent;
+    return simpleVersions.find((v) => v.id === deleteImageId) ?? null;
+  }, [deleteImageId, simpleCurrent, simpleVersions]);
+
+  function imageDownloadTopic(): string | undefined {
+    const analysis = activeContent?.value.analysis;
+    return analysis?.topic?.trim() || source.topic?.trim() || undefined;
+  }
+
+  function downloadSimpleImageEntry(entry: { dataUrl: string; versionNumber?: number }) {
+    downloadInfographicPng(entry.dataUrl, imageDownloadTopic());
+    if (trackHome) {
+      trackHomeImageDownload(pathname, {
+        version_number: entry.versionNumber ?? 1,
+      });
+    }
+  }
+
+  async function ensureStorageForRegen(): Promise<boolean> {
+    const ok = await hasEnoughStorageForNewImage();
+    if (!ok) setStorageRegenWarningOpen(true);
+    return ok;
+  }
+
+  async function openImageGenerationDialog() {
+    if (!(await ensureStorageForRegen())) return;
+    if (trackHome) trackHomeRegenImageClick(pathname);
+    setRegenImageOpen(true);
+  }
+
+  function confirmDeleteImage(saveFirst: boolean) {
+    if (!deleteImageTarget) return;
+    if (saveFirst) downloadSimpleImageEntry(deleteImageTarget);
+    deleteSimpleImage(deleteImageTarget.id);
+    setDeleteImageId(null);
+  }
 
   async function attachImageFiles(files: File[]) {
     if (!files.length) return;
@@ -300,6 +350,10 @@ export function SimpleHome() {
 
   // === Image ===
   async function runImage(opts: { useProfileName?: string | null } = {}): Promise<void> {
+    if (!(await hasEnoughStorageForNewImage())) {
+      setStorageQuotaFullscreen(true);
+      throw new Error("Недостаточно места в хранилище браузера");
+    }
     const project = useProjectStore.getState();
     const settings = useSettingsStore.getState();
     const profiles = settings.profiles;
@@ -478,11 +532,13 @@ export function SimpleHome() {
     toast.success("Изменения сохранены");
   }
   function onSaveAndRegen() {
-    if (trackHome) trackHomeEditSaveAndRegenClick(pathname);
-    // Save (changes are already applied to the store); exit edit mode and open regen dialog
-    setEditSnapshot(null);
-    setEditMode(false);
-    setRegenAfterEditOpen(true);
+    void (async () => {
+      if (!(await ensureStorageForRegen())) return;
+      if (trackHome) trackHomeEditSaveAndRegenClick(pathname);
+      setEditSnapshot(null);
+      setEditMode(false);
+      setRegenAfterEditOpen(true);
+    })();
   }
   function onCancelRegenAfterEdit() {
     // Return to active editing without reverting saved changes
@@ -776,43 +832,41 @@ export function SimpleHome() {
         <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3 min-h-12">
             <h2 className="text-sm font-semibold text-muted-foreground">Итоговая инфографика</h2>
-            {simpleCurrent && !isBusy && (
+            {activeContent && !isBusy && (
               <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const title = analysisJson?.topic?.trim() || source.topic?.trim() || "без названия";
-                    const safe = title.replace(/[\\/:*?"<>|]+/g, "").slice(0, 120);
-                    const a = document.createElement("a");
-                    a.href = simpleCurrent.dataUrl;
-                    a.download = `инфографика: ${safe}.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    if (trackHome) {
-                      trackHomeImageDownload(pathname, {
-                        version_number: simpleCurrent.versionNumber ?? 1,
-                      });
-                    }
-                  }}
-                >
-                  <Download className="size-3.5 mr-1" /> Сохранить
-                </Button>
+                {simpleCurrent && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => downloadSimpleImageEntry(simpleCurrent)}
+                  >
+                    <Download className="size-3.5 mr-1" /> Сохранить
+                  </Button>
+                )}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       size="sm"
                       variant="outline"
+                      disabled={editMode}
                       onClick={() => {
-                        if (trackHome) trackHomeRegenImageClick(pathname);
-                        setRegenImageOpen(true);
+                        void openImageGenerationDialog();
                       }}
                     >
-                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать инфографику
+                      {simpleCurrent ? (
+                        <>
+                          <RefreshCw className="size-3.5 mr-1" /> Перегенерировать инфографику
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="size-3.5 mr-1" /> Сгенерировать инфографику
+                        </>
+                      )}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent className="text-xs">Текстовое содержание не изменится</TooltipContent>
+                  {simpleCurrent && (
+                    <TooltipContent className="text-xs">Текстовое содержание не изменится</TooltipContent>
+                  )}
                 </Tooltip>
               </div>
             )}
@@ -828,26 +882,34 @@ export function SimpleHome() {
                   </div>
                   <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
                     {sidebarVersions.map((v) => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => {
-                          if (trackHome && simpleCurrent) {
-                            trackHomeVersionSwitch(pathname, {
-                              from_version: simpleCurrent.versionNumber ?? 1,
-                              to_version: v.versionNumber ?? 1,
-                            });
-                          }
-                          swapSimpleVersion(v.id);
-                        }}
-                        className="group relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded border hover:ring-2 hover:ring-ring"
-                        title={`Открыть ver.${v.versionNumber ?? "?"}`}
-                      >
-                        <img src={v.dataUrl} alt="" className="h-full w-full object-cover" />
-                        <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[10px] text-white">
-                          ver.{v.versionNumber ?? "?"}
-                        </span>
-                      </button>
+                      <div key={v.id} className="group relative aspect-[3/4] w-full shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (trackHome && simpleCurrent) {
+                              trackHomeVersionSwitch(pathname, {
+                                from_version: simpleCurrent.versionNumber ?? 1,
+                                to_version: v.versionNumber ?? 1,
+                              });
+                            }
+                            swapSimpleVersion(v.id);
+                          }}
+                          className="relative h-full w-full overflow-hidden rounded border hover:ring-2 hover:ring-ring"
+                          title={`Открыть ver.${v.versionNumber ?? "?"}`}
+                        >
+                          <img src={v.dataUrl} alt="" className="h-full w-full object-cover" />
+                          <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[10px] text-white">
+                            ver.{v.versionNumber ?? "?"}
+                          </span>
+                        </button>
+                        <ImageVersionDeleteButton
+                          className="absolute top-1 right-1 z-10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteImageId(v.id);
+                          }}
+                        />
+                      </div>
                     ))}
                   </div>
                 </aside>
@@ -870,25 +932,34 @@ export function SimpleHome() {
                       </div>
                     </div>
                   ) : simpleCurrent ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (trackHome && simpleCurrent) {
-                          trackHomeImageFullscreen(pathname, {
-                            version_number: simpleCurrent.versionNumber ?? 1,
-                          });
-                        }
-                        setImageFullscreen(true);
-                      }}
-                      className="flex h-full w-full cursor-zoom-in items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      title="Открыть на весь экран"
-                    >
-                      <img
-                        src={simpleCurrent.dataUrl}
-                        alt=""
-                        className="max-h-full max-w-full object-contain"
+                    <div className="relative flex h-full w-full">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (trackHome && simpleCurrent) {
+                            trackHomeImageFullscreen(pathname, {
+                              version_number: simpleCurrent.versionNumber ?? 1,
+                            });
+                          }
+                          setImageFullscreen(true);
+                        }}
+                        className="flex h-full w-full cursor-zoom-in items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        title="Открыть на весь экран"
+                      >
+                        <img
+                          src={simpleCurrent.dataUrl}
+                          alt=""
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      </button>
+                      <ImageVersionDeleteButton
+                        className="absolute top-2 right-2 z-10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteImageId(simpleCurrent.id);
+                        }}
                       />
-                    </button>
+                    </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
                       <ImageIcon className="size-8 opacity-50" />
@@ -1019,6 +1090,70 @@ export function SimpleHome() {
             className="max-h-full max-w-full object-contain"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>
+      )}
+
+      <Dialog open={deleteImageId !== null} onOpenChange={(open) => { if (!open) setDeleteImageId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Удалить инфографику?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Инфографика будет удалена из проекта. Рекомендуем сохранить её перед удалением
+          </p>
+          <DialogFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
+            <Button
+              variant="default"
+              className="w-full"
+              onClick={() => confirmDeleteImage(true)}
+            >
+              Сохранить и удалить
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => confirmDeleteImage(false)}
+            >
+              Удалить без сохранения
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => setDeleteImageId(null)}
+            >
+              Отменить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={storageRegenWarningOpen} onOpenChange={setStorageRegenWarningOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Недостаточно места</AlertDialogTitle>
+            <AlertDialogDescription>
+              Хранилища браузера не хватит для сохранения нового изображения. Удалите одну из ранее созданных инфографик прежде чем выполнять перегенерацию
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Понятно</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {storageQuotaFullscreen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 p-6"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="storage-quota-title"
+        >
+          <div className="max-w-lg space-y-5 text-center">
+            <p id="storage-quota-title" className="text-base leading-relaxed">
+              Хранилища браузера недостаточно для сохранения нового изображения. Удалите одну из ранее созданных инфографик прежде чем выполнять перегенерацию или начните новый проект
+            </p>
+            <Button onClick={() => setStorageQuotaFullscreen(false)}>Понятно</Button>
+          </div>
         </div>
       )}
 
