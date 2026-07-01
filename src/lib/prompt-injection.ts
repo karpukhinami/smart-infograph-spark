@@ -31,6 +31,34 @@ const COLOR_ROLE_LABELS: Array<{ key: keyof DesignProfileColors; label: string }
   { key: "mutedheaderTextColor", label: "Вторичный светлый текст в шапке (mutedheaderTextColor)" },
 ];
 
+const PASTEL_FILL_LABEL = "Пастельная заливка (detailSoftColor)";
+
+function normalizeHex(hex: string): string {
+  return hex.trim().toUpperCase();
+}
+
+/** True when both pastel roles share the same hex — palette lists one unified pastel fill. */
+export function pastelColorsUnified(colors: DesignProfileColors | undefined): boolean {
+  const soft = colors?.detailSoftColor;
+  const deep = colors?.detailDeepColor;
+  if (!soft || !deep) return false;
+  return normalizeHex(soft) === normalizeHex(deep);
+}
+
+function paletteRoleEntries(
+  colors: DesignProfileColors | undefined,
+): Array<{ key: keyof DesignProfileColors; label: string }> {
+  const unifiedPastel = pastelColorsUnified(colors);
+  return COLOR_ROLE_LABELS.flatMap(({ key, label }) => {
+    if (!colors?.[key]) return [];
+    if (unifiedPastel && key === "detailDeepColor") return [];
+    if (unifiedPastel && key === "detailSoftColor") {
+      return [{ key, label: PASTEL_FILL_LABEL }];
+    }
+    return [{ key, label }];
+  });
+}
+
 // Original free-mode prose; preserved for the free style design brief.
 export function designProfileProse(profile: DesignProfile | null | undefined): string {
   if (!profile) return "(дизайн-профиль не задан)";
@@ -44,7 +72,7 @@ export function designProfileProse(profile: DesignProfile | null | undefined): s
   );
   lines.push(`Профиль: ${profile.profileName}.`);
   lines.push("Палитра по ролям:");
-  for (const { key, label } of COLOR_ROLE_LABELS) {
+  for (const { key, label } of paletteRoleEntries(c)) {
     const hex = c?.[key];
     if (hex) lines.push(`- ${label}: ${hex}.`);
   }
@@ -82,9 +110,21 @@ const COLOR_USE_FOR: Record<keyof DesignProfileColors, string> = {
 };
 
 /** One palette row: role name, hex from the active profile, then usage description. */
-function colorPaletteLine(key: keyof DesignProfileColors, hex: string): string {
-  const roleLabel = COLOR_ROLE_LABELS.find((r) => r.key === key)?.label ?? key;
-  return `- ${roleLabel} ${hex} — ${COLOR_USE_FOR[key]}`;
+function colorPaletteLine(
+  key: keyof DesignProfileColors,
+  hex: string,
+  unifiedPastel: boolean,
+): string {
+  let roleLabel = COLOR_ROLE_LABELS.find((r) => r.key === key)?.label ?? key;
+  if (unifiedPastel && key === "detailSoftColor") {
+    roleLabel = PASTEL_FILL_LABEL;
+  }
+  let useFor = COLOR_USE_FOR[key];
+  if (unifiedPastel && key === "detailSoftColor") {
+    useFor =
+      "use for soft pastel background fills of secondary content zones (detailSoftColor; single unified pastel — no alternation between cards)";
+  }
+  return `- ${roleLabel} ${hex} — ${useFor}`;
 }
 
 const FONT_FAMILY_PLACEHOLDER = "[FONT_FAMILY_PLACEHOLDER]";
@@ -275,10 +315,11 @@ export function designProfileColorsAndRules(profile: DesignProfile | null | unde
   lines.push("LAYER 1 -- COLOR AND TYPOGRAPHY GENERAL RULES");
   lines.push("");
   lines.push("PALETTE AND FONT:");
-  for (const { key } of COLOR_ROLE_LABELS) {
+  const unifiedPastel = pastelColorsUnified(c);
+  for (const { key } of paletteRoleEntries(c)) {
     const hex = c?.[key];
     if (!hex) continue;
-    lines.push(colorPaletteLine(key, hex));
+    lines.push(colorPaletteLine(key, hex, unifiedPastel));
   }
   if (typoStyle) {
     lines.push("");
