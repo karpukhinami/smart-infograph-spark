@@ -148,7 +148,7 @@ function layer1RulesTemplate(): string {
 
 2. TITLE CARD (HEADER AREA) COLORING RULES
 
-- Card background: {{headerColor}}
+- Card background: {{headerColor}}. Use it for the background of the title card without exceptions.
 
 - Title text:
 
@@ -156,11 +156,9 @@ function layer1RulesTemplate(): string {
 
 - Style: VERY BOLD, UPPERCASE, max 2 lines
 
-- Optional: one key word may use {{primaryColor}} if semantically important; will be specified in the title card description in LAYER 3
-
 - Meta pill (subject + grade):
 
-- Background: {{headerColor}}
+- Background: {{headerColor}}, but mixed slightly with white.
 
 - Text color: {{mutedheaderTextColor}}
 
@@ -180,6 +178,8 @@ function layer1RulesTemplate(): string {
 
 - Color accents in title card text must not affect full sentences or structural elements
 
+- title card must not be white or nude.
+
 
 CARD COLORING RULES
 
@@ -190,9 +190,9 @@ CARD COLORING RULES
 
 3. Card caption plate styling rules:
 
-- caption plate background: {{headerColor}}
+- caption plate background: {{headerColor}}, use this color only!
 
-- caption plate text: {{lightTextColor}}
+- caption plate text: {{lightTextColor}}, use this color only! No other color can appear in the caption plate text!
 
 - Typography: UPPERCASE, BOLD
 

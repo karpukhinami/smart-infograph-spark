@@ -59,6 +59,8 @@ import {
   SOURCE_FILE_ACCEPT,
 } from "@/lib/source-file-import";
 import { buildSourceTextForPrompt, hasSourceMaterials } from "@/lib/source-material";
+import { archiveImageToGoogle } from "@/lib/archive-client";
+import type { GenTrigger } from "@/lib/google/archive-schema";
 import { HomeYandexMetrika } from "@/components/analytics/HomeYandexMetrika";
 import { isHomeAnalyticsRoute } from "@/lib/analytics/yandex-metrika";
 import {
@@ -349,7 +351,9 @@ export function SimpleHome() {
   }
 
   // === Image ===
-  async function runImage(opts: { useProfileName?: string | null } = {}): Promise<void> {
+  async function runImage(
+    opts: { useProfileName?: string | null; genTrigger?: GenTrigger } = {},
+  ): Promise<void> {
     if (!(await hasEnoughStorageForNewImage())) {
       setStorageQuotaFullscreen(true);
       throw new Error("Недостаточно места в хранилище браузера");
@@ -400,7 +404,53 @@ export function SimpleHome() {
     setImageStage("render");
     const dataUrl = await callImageLLM({ model: project.models.image, prompt: finalPrompt });
     archiveSimple();
-    setSimpleCurrent({ dataUrl, prompt: finalPrompt });
+    const generationSnapshot = {
+      educationalIllustrations: project.source.educationalIllustrations,
+      narrativeIllustrations: project.source.narrativeIllustrations,
+    };
+    setSimpleCurrent({
+      dataUrl,
+      prompt: finalPrompt,
+      generationSnapshot,
+    });
+
+    const after = useProjectStore.getState();
+    const image = after.simpleCurrentImage;
+    if (!image) return;
+
+    const analysis = content.value.analysis;
+    const genTrigger = opts.genTrigger ?? "initial";
+    void archiveImageToGoogle({
+      imageId: image.id,
+      dataUrl,
+      sessionId: after.ensureArchiveSessionId(),
+      sessionFolderId: after.archiveSessionFolderId,
+      version: image.versionNumber ?? 1,
+      genTrigger,
+      subject: analysis?.subject?.trim() || project.source.subject || "",
+      className: analysis?.grade?.trim() || project.source.grade || "",
+      topic: analysis?.topic?.trim() || project.source.topic || "",
+      addedContent: hasSourceMaterials(
+        project.source.text,
+        after.uploadedSourceText,
+        after.attachedImages,
+      ),
+      style: style.name,
+      profile: profile?.profileName ?? "",
+      analysisModel: project.models.analysis,
+      briefModel: project.models.brief,
+      imageModel: project.models.image,
+    }).then((result) => {
+      if (!result) return;
+      const store = useProjectStore.getState();
+      store.setArchiveSessionFolder(result.sessionFolderId, result.folderLink);
+      store.setSimpleImageArchiveMeta(image.id, {
+        sheetRow: result.sheetRow,
+        driveFileId: result.driveFileId,
+        driveLink: result.driveLink,
+        folderLink: result.folderLink,
+      });
+    });
   }
 
   // === One-shot: generate everything ===
@@ -435,7 +485,7 @@ export function SimpleHome() {
       const useProfile = selectedProfileName ?? recName ?? null;
       if (!selectedProfileName && recName) setSelectedProfileName(recName);
       setLoading("image");
-      await runImage({ useProfileName: useProfile });
+      await runImage({ useProfileName: useProfile, genTrigger: "initial" });
       if (trackHome) {
         const img = useProjectStore.getState().simpleCurrentImage;
         trackHomeImageSuccess(pathname, {
@@ -483,7 +533,7 @@ export function SimpleHome() {
       setUserWishes(wishes);
       setLoading("image");
       setPaneMode("image");
-      await runImage({ useProfileName: profileName });
+      await runImage({ useProfileName: profileName, genTrigger: "regen_image" });
       if (trackHome) {
         const img = useProjectStore.getState().simpleCurrentImage;
         trackHomeRegenImageSuccess(pathname, {
@@ -551,7 +601,10 @@ export function SimpleHome() {
       setUserWishes(wishes);
       setLoading("image");
       setPaneMode("image");
-      await runImage({ useProfileName: selectedProfileName ?? activeProfile?.profileName ?? null });
+      await runImage({
+        useProfileName: selectedProfileName ?? activeProfile?.profileName ?? null,
+        genTrigger: "regen_after_edit",
+      });
       if (trackHome) {
         const img = useProjectStore.getState().simpleCurrentImage;
         trackHomeEditSaveAndRegenSuccess(pathname, {
@@ -972,6 +1025,12 @@ export function SimpleHome() {
                   <div className="shrink-0">
                     <SimpleImageRating
                       imageId={simpleCurrent.id}
+                      showIllustrationsRow={
+                        Boolean(
+                          simpleCurrent.generationSnapshot?.educationalIllustrations ||
+                            simpleCurrent.generationSnapshot?.narrativeIllustrations,
+                        )
+                      }
                       onRate={
                         trackHome
                           ? (rating) =>

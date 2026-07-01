@@ -9,6 +9,11 @@ import type {
   Versioned,
 } from "@/lib/types";
 import type { ProgrammaticRenderSpec } from "@/lib/render-spec/types";
+import type {
+  SimpleImageFeedbackDetail,
+  SimpleImageGenerationSnapshot,
+} from "@/lib/image-feedback-types";
+import type { SimpleImageArchiveMeta } from "@/lib/google/archive-schema";
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from "@/lib/models";
 import { renderAnalysisJson } from "@/lib/analysis-render";
 import { createQuotaAwareSessionStorage } from "@/lib/browser-storage-quota";
@@ -22,6 +27,8 @@ export interface SimpleImageEntry {
   prompt: string;
   versionNumber: number;
   createdAt?: number;
+  /** Snapshot of illustration toggles at generation time. */
+  generationSnapshot?: SimpleImageGenerationSnapshot;
 }
 
 function v<T>(value: T): Versioned<T> {
@@ -109,12 +116,35 @@ interface ProjectState {
   simpleCurrentImage: SimpleImageEntry | null;
   simpleImageVersions: (SimpleImageEntry & { createdAt: number })[];
   simpleImageRatings: Record<string, "like" | "dislike">;
-  setSimpleCurrentImage: (img: { id?: string; dataUrl: string; prompt: string; versionNumber?: number } | null) => void;
+  simpleImageFeedbacks: Record<string, SimpleImageFeedbackDetail>;
+  /** Once true, the feedback modal is not shown again for this image id. */
+  simpleImageFeedbackCompleted: Record<string, boolean>;
+  setSimpleCurrentImage: (
+    img: {
+      id?: string;
+      dataUrl: string;
+      prompt: string;
+      versionNumber?: number;
+      generationSnapshot?: SimpleImageGenerationSnapshot;
+    } | null,
+  ) => void;
   setSimpleImageRating: (id: string, rating: "like" | "dislike") => void;
+  setSimpleImageFeedback: (id: string, feedback: SimpleImageFeedbackDetail) => void;
+  markSimpleImageFeedbackCompleted: (id: string) => void;
   archiveSimpleCurrentImage: () => void;
   swapSimpleVersion: (id: string) => void;
   deleteSimpleImage: (id: string) => void;
   clearSimpleImages: () => void;
+
+  /** Google archive: sheet row + Drive links for a generated image. */
+  simpleImageArchiveMeta: Record<string, SimpleImageArchiveMeta>;
+  /** One Drive folder per browser session (until reset). */
+  archiveSessionId: string | null;
+  archiveSessionFolderId: string | null;
+  archiveSessionFolderLink: string | null;
+  ensureArchiveSessionId: () => string;
+  setArchiveSessionFolder: (folderId: string, folderLink: string) => void;
+  setSimpleImageArchiveMeta: (imageId: string, meta: SimpleImageArchiveMeta) => void;
 
   models: { analysis: string; brief: string; image: string };
   setModel: (k: "analysis" | "brief" | "image", id: string) => void;
@@ -157,6 +187,12 @@ export const useProjectStore = create<ProjectState>()(
           simpleCurrentImage: null,
           simpleImageVersions: [],
           simpleImageRatings: {},
+          simpleImageFeedbacks: {},
+          simpleImageFeedbackCompleted: {},
+          simpleImageArchiveMeta: {},
+          archiveSessionId: null,
+          archiveSessionFolderId: null,
+          archiveSessionFolderLink: null,
 
         }),
 
@@ -366,6 +402,25 @@ export const useProjectStore = create<ProjectState>()(
       simpleCurrentImage: null,
       simpleImageVersions: [],
       simpleImageRatings: {},
+      simpleImageFeedbacks: {},
+      simpleImageFeedbackCompleted: {},
+      simpleImageArchiveMeta: {},
+      archiveSessionId: null,
+      archiveSessionFolderId: null,
+      archiveSessionFolderLink: null,
+      ensureArchiveSessionId: () => {
+        const cur = get().archiveSessionId;
+        if (cur) return cur;
+        const id = crypto.randomUUID();
+        set({ archiveSessionId: id });
+        return id;
+      },
+      setArchiveSessionFolder: (folderId, folderLink) =>
+        set({ archiveSessionFolderId: folderId, archiveSessionFolderLink: folderLink }),
+      setSimpleImageArchiveMeta: (imageId, meta) =>
+        set((s) => ({
+          simpleImageArchiveMeta: { ...s.simpleImageArchiveMeta, [imageId]: meta },
+        })),
       setSimpleCurrentImage: (img) =>
         set((s) => {
           if (!img) return { simpleCurrentImage: null };
@@ -377,12 +432,21 @@ export const useProjectStore = create<ProjectState>()(
               dataUrl: img.dataUrl,
               prompt: img.prompt,
               versionNumber,
+              generationSnapshot: img.generationSnapshot,
             },
           };
         }),
       setSimpleImageRating: (id, rating) =>
         set((s) => ({
           simpleImageRatings: { ...s.simpleImageRatings, [id]: rating },
+        })),
+      setSimpleImageFeedback: (id, feedback) =>
+        set((s) => ({
+          simpleImageFeedbacks: { ...s.simpleImageFeedbacks, [id]: feedback },
+        })),
+      markSimpleImageFeedbackCompleted: (id) =>
+        set((s) => ({
+          simpleImageFeedbackCompleted: { ...s.simpleImageFeedbackCompleted, [id]: true },
         })),
       archiveSimpleCurrentImage: () =>
         set((s) => {
@@ -400,13 +464,21 @@ export const useProjectStore = create<ProjectState>()(
                 dataUrl: s.simpleCurrentImage.dataUrl,
                 prompt: s.simpleCurrentImage.prompt,
                 versionNumber,
+                generationSnapshot: s.simpleCurrentImage.generationSnapshot,
               },
             ],
             simpleCurrentImage: null,
           };
         }),
       clearSimpleImages: () =>
-        set({ simpleCurrentImage: null, simpleImageVersions: [], simpleImageRatings: {} }),
+        set({
+          simpleCurrentImage: null,
+          simpleImageVersions: [],
+          simpleImageRatings: {},
+          simpleImageFeedbacks: {},
+          simpleImageFeedbackCompleted: {},
+          simpleImageArchiveMeta: {},
+        }),
       swapSimpleVersion: (id) =>
         set((s) => {
           if (!s.simpleCurrentImage) return {};
@@ -425,6 +497,7 @@ export const useProjectStore = create<ProjectState>()(
             dataUrl: s.simpleCurrentImage.dataUrl,
             prompt: s.simpleCurrentImage.prompt,
             versionNumber: currentVersionNumber,
+            generationSnapshot: s.simpleCurrentImage.generationSnapshot,
           });
           return {
             simpleImageVersions: newVersions,
@@ -433,6 +506,7 @@ export const useProjectStore = create<ProjectState>()(
               dataUrl: chosen.dataUrl,
               prompt: chosen.prompt,
               versionNumber: resolveSimpleVersionNumber(chosen, s.simpleImageVersions),
+              generationSnapshot: chosen.generationSnapshot,
             },
           };
         }),
@@ -441,10 +515,22 @@ export const useProjectStore = create<ProjectState>()(
         set((s) => {
           const ratings = { ...s.simpleImageRatings };
           delete ratings[id];
+          const feedbacks = { ...s.simpleImageFeedbacks };
+          delete feedbacks[id];
+          const feedbackCompleted = { ...s.simpleImageFeedbackCompleted };
+          delete feedbackCompleted[id];
+          const archiveMeta = { ...s.simpleImageArchiveMeta };
+          delete archiveMeta[id];
 
           if (s.simpleCurrentImage?.id === id) {
             if (s.simpleImageVersions.length === 0) {
-              return { simpleCurrentImage: null, simpleImageRatings: ratings };
+              return {
+                simpleCurrentImage: null,
+                simpleImageRatings: ratings,
+                simpleImageFeedbacks: feedbacks,
+                simpleImageFeedbackCompleted: feedbackCompleted,
+                simpleImageArchiveMeta: archiveMeta,
+              };
             }
             let bestIdx = 0;
             let bestVer = s.simpleImageVersions[0].versionNumber ?? 0;
@@ -463,9 +549,13 @@ export const useProjectStore = create<ProjectState>()(
                 dataUrl: promoted.dataUrl,
                 prompt: promoted.prompt,
                 versionNumber: promoted.versionNumber ?? 1,
+                generationSnapshot: promoted.generationSnapshot,
               },
               simpleImageVersions: newVersions,
               simpleImageRatings: ratings,
+              simpleImageFeedbacks: feedbacks,
+              simpleImageFeedbackCompleted: feedbackCompleted,
+              simpleImageArchiveMeta: archiveMeta,
             };
           }
 
@@ -473,10 +563,21 @@ export const useProjectStore = create<ProjectState>()(
           if (idx >= 0) {
             const newVersions = s.simpleImageVersions.slice();
             newVersions.splice(idx, 1);
-            return { simpleImageVersions: newVersions, simpleImageRatings: ratings };
+            return {
+              simpleImageVersions: newVersions,
+              simpleImageRatings: ratings,
+              simpleImageFeedbacks: feedbacks,
+              simpleImageFeedbackCompleted: feedbackCompleted,
+              simpleImageArchiveMeta: archiveMeta,
+            };
           }
 
-          return { simpleImageRatings: ratings };
+          return {
+            simpleImageRatings: ratings,
+            simpleImageFeedbacks: feedbacks,
+            simpleImageFeedbackCompleted: feedbackCompleted,
+            simpleImageArchiveMeta: archiveMeta,
+          };
         }),
 
       models: {
@@ -488,8 +589,20 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "infographic-project",
-      version: 7,
-      migrate: () => undefined as unknown as ProjectState,
+      version: 9,
+      migrate: (persisted, fromVersion) => {
+        const state = persisted as ProjectState;
+        if (fromVersion < 9) {
+          return {
+            ...state,
+            simpleImageArchiveMeta: state.simpleImageArchiveMeta ?? {},
+            archiveSessionId: state.archiveSessionId ?? null,
+            archiveSessionFolderId: state.archiveSessionFolderId ?? null,
+            archiveSessionFolderLink: state.archiveSessionFolderLink ?? null,
+          };
+        }
+        return state;
+      },
       storage: createJSONStorage(() =>
         typeof window !== "undefined" ? createQuotaAwareSessionStorage() : (undefined as unknown as Storage),
       ),
