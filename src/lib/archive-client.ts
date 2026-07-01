@@ -34,23 +34,40 @@ export interface ArchiveFeedbackPayload {
   >;
 }
 
+export type ArchiveError = { ok: false; status: number; message: string };
+export type ArchiveImageSuccess = SimpleImageArchiveMeta & {
+  ok: true;
+  sessionFolderId: string;
+};
+
 export async function archiveImageToGoogle(
   payload: ArchiveImagePayload,
-): Promise<(SimpleImageArchiveMeta & { sessionFolderId: string }) | null> {
+): Promise<ArchiveImageSuccess | ArchiveError> {
   try {
     const res = await fetch("/api/archive-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) return null;
-    return (await res.json()) as SimpleImageArchiveMeta & { sessionFolderId: string };
-  } catch {
-    return null;
+    const text = await res.text().catch(() => "");
+    if (!res.ok) {
+      const message = text || res.statusText || "Archive request failed";
+      console.error("[archive-image]", res.status, message);
+      return { ok: false, status: res.status, message };
+    }
+    const data = JSON.parse(text) as SimpleImageArchiveMeta & { sessionFolderId: string };
+    console.info("[archive-image] ok", { sheetRow: data.sheetRow, imageId: payload.imageId });
+    return { ok: true, ...data };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Network error";
+    console.error("[archive-image]", message);
+    return { ok: false, status: 0, message };
   }
 }
 
-export async function updateArchiveFeedback(payload: ArchiveFeedbackPayload): Promise<boolean> {
+export async function updateArchiveFeedback(
+  payload: ArchiveFeedbackPayload,
+): Promise<{ ok: true } | ArchiveError> {
   try {
     const axes = payload.detail ?? {
       colors: "neutral" as BipolarFeedbackValue,
@@ -77,8 +94,33 @@ export async function updateArchiveFeedback(payload: ArchiveFeedbackPayload): Pr
         comment: axes.comment ?? "",
       }),
     });
-    return res.ok;
-  } catch {
-    return false;
+    if (res.ok) {
+      console.info("[archive-feedback] ok", { sheetRow: payload.sheetRow });
+      return { ok: true };
+    }
+    const text = await res.text().catch(() => "");
+    const message = text || res.statusText || "Feedback update failed";
+    console.error("[archive-feedback]", res.status, message);
+    return { ok: false, status: res.status, message };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Network error";
+    console.error("[archive-feedback]", message);
+    return { ok: false, status: 0, message };
   }
+}
+
+/** Poll until archive finishes, fails, or timeout. */
+export async function waitForArchiveSheetRow(
+  _imageId: string,
+  getState: () => { sheetRow?: number; error?: string },
+  timeoutMs = 90_000,
+): Promise<number | null> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const { sheetRow, error } = getState();
+    if (error) return null;
+    if (sheetRow) return sheetRow;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return null;
 }

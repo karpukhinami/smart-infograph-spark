@@ -15,6 +15,7 @@ import { Route as StylesRouteImport } from './routes/styles'
 import { Route as PromptsRouteImport } from './routes/prompts'
 import { Route as DesignProfilesRouteImport } from './routes/design-profiles'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiArchiveStatusRouteImport } from './routes/api/archive-status'
 import { Route as ApiArchiveFeedbackRouteImport } from './routes/api/archive-feedback'
 import { Route as ApiArchiveImageRouteImport } from './routes/api/archive-image'
 import { Route as ApiLlmRouteImport } from './routes/api/llm'
@@ -51,6 +52,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiArchiveStatusRoute = ApiArchiveStatusRouteImport.update({
+  id: '/api/archive-status',
+  path: '/api/archive-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiArchiveFeedbackRoute = ApiArchiveFeedbackRouteImport.update({
   id: '/api/archive-feedback',
   path: '/api/archive-feedback',
@@ -84,6 +90,7 @@ export interface FileRoutesByFullPath {
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
   '/workspace': typeof WorkspaceRoute
+  '/api/archive-status': typeof ApiArchiveStatusRoute
   '/api/archive-feedback': typeof ApiArchiveFeedbackRoute
   '/api/archive-image': typeof ApiArchiveImageRoute
   '/api/extract-document-text': typeof ApiExtractDocumentTextRoute
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
   '/workspace': typeof WorkspaceRoute
+  '/api/archive-status': typeof ApiArchiveStatusRoute
   '/api/archive-feedback': typeof ApiArchiveFeedbackRoute
   '/api/archive-image': typeof ApiArchiveImageRoute
   '/api/extract-document-text': typeof ApiExtractDocumentTextRoute
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
   '/workspace': typeof WorkspaceRoute
+  '/api/archive-status': typeof ApiArchiveStatusRoute
   '/api/archive-feedback': typeof ApiArchiveFeedbackRoute
   '/api/archive-image': typeof ApiArchiveImageRoute
   '/api/extract-document-text': typeof ApiExtractDocumentTextRoute
@@ -126,6 +135,7 @@ export interface FileRouteTypes {
     | '/styles'
     | '/view_all'
     | '/workspace'
+    | '/api/archive-status'
     | '/api/archive-feedback'
     | '/api/archive-image'
     | '/api/extract-document-text'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/styles'
     | '/view_all'
     | '/workspace'
+    | '/api/archive-status'
     | '/api/archive-feedback'
     | '/api/archive-image'
     | '/api/extract-document-text'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/styles'
     | '/view_all'
     | '/workspace'
+    | '/api/archive-status'
     | '/api/archive-feedback'
     | '/api/archive-image'
     | '/api/extract-document-text'
@@ -166,6 +178,7 @@ export interface RootRouteChildren {
   StylesRoute: typeof StylesRoute
   View_allRoute: typeof View_allRoute
   WorkspaceRoute: typeof WorkspaceRoute
+  ApiArchiveStatusRoute: typeof ApiArchiveStatusRoute
   ApiArchiveFeedbackRoute: typeof ApiArchiveFeedbackRoute
   ApiArchiveImageRoute: typeof ApiArchiveImageRoute
   ApiExtractDocumentTextRoute: typeof ApiExtractDocumentTextRoute
@@ -217,6 +230,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/archive-status': {
+      id: '/api/archive-status'
+      path: '/api/archive-status'
+      fullPath: '/api/archive-status'
+      preLoaderRoute: typeof ApiArchiveStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/archive-feedback': {
       id: '/api/archive-feedback'
       path: '/api/archive-feedback'
@@ -262,6 +282,7 @@ const rootRouteChildren: RootRouteChildren = {
   StylesRoute: StylesRoute,
   View_allRoute: View_allRoute,
   WorkspaceRoute: WorkspaceRoute,
+  ApiArchiveStatusRoute: ApiArchiveStatusRoute,
   ApiArchiveFeedbackRoute: ApiArchiveFeedbackRoute,
   ApiArchiveImageRoute: ApiArchiveImageRoute,
   ApiExtractDocumentTextRoute: ApiExtractDocumentTextRoute,

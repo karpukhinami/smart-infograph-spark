@@ -441,8 +441,16 @@ export function SimpleHome() {
       briefModel: project.models.brief,
       imageModel: project.models.image,
     }).then((result) => {
-      if (!result) return;
       const store = useProjectStore.getState();
+      if (!result.ok) {
+        const msg =
+          result.status === 503
+            ? "Google-архив не настроен на сервере (503). Проверьте GOOGLE_* на Render."
+            : `Не удалось сохранить картинку (${result.status}): ${result.message.slice(0, 100)}`;
+        store.setSimpleImageArchiveError(image.id, msg);
+        toast.error(msg, { duration: 8000 });
+        return;
+      }
       store.setArchiveSessionFolder(result.sessionFolderId, result.folderLink);
       store.setSimpleImageArchiveMeta(image.id, {
         sheetRow: result.sheetRow,
@@ -450,6 +458,7 @@ export function SimpleHome() {
         driveLink: result.driveLink,
         folderLink: result.folderLink,
       });
+      toast.success("Картинка сохранена на Google Drive");
     });
   }
 

@@ -145,6 +145,9 @@ interface ProjectState {
   ensureArchiveSessionId: () => string;
   setArchiveSessionFolder: (folderId: string, folderLink: string) => void;
   setSimpleImageArchiveMeta: (imageId: string, meta: SimpleImageArchiveMeta) => void;
+  /** Set when POST /api/archive-image fails — stops feedback polling early. */
+  simpleImageArchiveErrors: Record<string, string>;
+  setSimpleImageArchiveError: (imageId: string, message: string) => void;
 
   models: { analysis: string; brief: string; image: string };
   setModel: (k: "analysis" | "brief" | "image", id: string) => void;
@@ -190,6 +193,7 @@ export const useProjectStore = create<ProjectState>()(
           simpleImageFeedbacks: {},
           simpleImageFeedbackCompleted: {},
           simpleImageArchiveMeta: {},
+          simpleImageArchiveErrors: {},
           archiveSessionId: null,
           archiveSessionFolderId: null,
           archiveSessionFolderLink: null,
@@ -405,6 +409,7 @@ export const useProjectStore = create<ProjectState>()(
       simpleImageFeedbacks: {},
       simpleImageFeedbackCompleted: {},
       simpleImageArchiveMeta: {},
+      simpleImageArchiveErrors: {},
       archiveSessionId: null,
       archiveSessionFolderId: null,
       archiveSessionFolderLink: null,
@@ -418,8 +423,17 @@ export const useProjectStore = create<ProjectState>()(
       setArchiveSessionFolder: (folderId, folderLink) =>
         set({ archiveSessionFolderId: folderId, archiveSessionFolderLink: folderLink }),
       setSimpleImageArchiveMeta: (imageId, meta) =>
+        set((s) => {
+          const errors = { ...s.simpleImageArchiveErrors };
+          delete errors[imageId];
+          return {
+            simpleImageArchiveMeta: { ...s.simpleImageArchiveMeta, [imageId]: meta },
+            simpleImageArchiveErrors: errors,
+          };
+        }),
+      setSimpleImageArchiveError: (imageId, message) =>
         set((s) => ({
-          simpleImageArchiveMeta: { ...s.simpleImageArchiveMeta, [imageId]: meta },
+          simpleImageArchiveErrors: { ...s.simpleImageArchiveErrors, [imageId]: message },
         })),
       setSimpleCurrentImage: (img) =>
         set((s) => {
@@ -478,6 +492,7 @@ export const useProjectStore = create<ProjectState>()(
           simpleImageFeedbacks: {},
           simpleImageFeedbackCompleted: {},
           simpleImageArchiveMeta: {},
+          simpleImageArchiveErrors: {},
         }),
       swapSimpleVersion: (id) =>
         set((s) => {
@@ -596,6 +611,7 @@ export const useProjectStore = create<ProjectState>()(
           return {
             ...state,
             simpleImageArchiveMeta: state.simpleImageArchiveMeta ?? {},
+            simpleImageArchiveErrors: state.simpleImageArchiveErrors ?? {},
             archiveSessionId: state.archiveSessionId ?? null,
             archiveSessionFolderId: state.archiveSessionFolderId ?? null,
             archiveSessionFolderLink: state.archiveSessionFolderLink ?? null,

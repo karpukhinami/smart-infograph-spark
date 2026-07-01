@@ -28,12 +28,12 @@ interface AxisRowProps {
 
 function AxisRow({ topic, leftLabel, rightLabel, value, onChange }: AxisRowProps) {
   return (
-    <div className="space-y-1.5">
-      <div className="text-xs font-medium text-muted-foreground">{topic}</div>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+    <div className="space-y-0.5">
+      <div className="text-[11px] font-medium text-muted-foreground">{topic}</div>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
         <button
           type="button"
-          className={poleLabelClass(value === "left")}
+          className={poleLabelClass("left", value === "left")}
           onClick={() => onChange("left")}
         >
           {leftLabel}
@@ -45,7 +45,7 @@ function AxisRow({ topic, leftLabel, rightLabel, value, onChange }: AxisRowProps
         />
         <button
           type="button"
-          className={poleLabelClass(value === "right")}
+          className={poleLabelClass("right", value === "right")}
           onClick={() => onChange("right")}
         >
           {rightLabel}
@@ -86,8 +86,8 @@ export function ImageFeedbackModal({
 
   const intro =
     rating === "dislike"
-      ? "Жаль, что результат не понравился. Если укажете, что именно — будет проще улучшить генерацию. Все пункты необязательны."
-      : "Спасибо за оценку! Пара уточнений поможет сделать сервис лучше. Все пункты необязательны.";
+      ? "Жаль, что результат не понравился. Если укажете, что именно — будет проще улучшить генерацию."
+      : "Спасибо за оценку! Пара уточнений поможет сделать сервис лучше.";
 
   const handleSubmit = () => {
     const detail: SimpleImageFeedbackDetail = {
@@ -112,13 +112,13 @@ export function ImageFeedbackModal({
         if (!next) onSkip();
       }}
     >
-      <DialogContent className="max-w-md gap-4 sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-md gap-3 sm:max-w-lg">
+        <DialogHeader className="space-y-1">
           <DialogTitle className="text-base">Обратная связь</DialogTitle>
-          <DialogDescription className="text-sm leading-relaxed">{intro}</DialogDescription>
+          <DialogDescription className="text-xs leading-snug">{intro}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 max-h-[min(52vh,420px)] overflow-y-auto pr-1">
+        <div className="space-y-2.5">
           <AxisRow
             topic="Цвета"
             leftLabel="понравились"
@@ -157,26 +157,26 @@ export function ImageFeedbackModal({
             />
           )}
 
-          <div className="space-y-1.5 pt-1">
-            <Label htmlFor="image-feedback-comment" className="text-xs">
+          <div className="space-y-1">
+            <Label htmlFor="image-feedback-comment" className="text-[11px]">
               Комментарий (опционально)
             </Label>
             <Textarea
               id="image-feedback-comment"
-              rows={3}
+              rows={2}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Что ещё стоит учесть…"
-              className="text-sm resize-none"
+              className="min-h-0 resize-none text-sm"
             />
           </div>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button type="button" variant="outline" onClick={onSkip}>
+          <Button type="button" variant="outline" size="sm" onClick={onSkip}>
             Пропустить
           </Button>
-          <Button type="button" onClick={handleSubmit}>
+          <Button type="button" size="sm" onClick={handleSubmit}>
             Отправить
           </Button>
         </DialogFooter>

@@ -1,8 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { BipolarFeedbackValue } from "@/lib/image-feedback-types";
 
-const ACCENT = "#A78BFA";
-
 interface Props {
   value: BipolarFeedbackValue;
   onChange: (value: "left" | "right") => void;
@@ -11,7 +9,11 @@ interface Props {
 
 export function BipolarSwitch({ value, onChange, ariaLabel }: Props) {
   const thumbPosition =
-    value === "left" ? "left-0.5" : value === "right" ? "left-[calc(100%-1.25rem-0.125rem)]" : "left-1/2 -translate-x-1/2";
+    value === "left"
+      ? "left-0.5"
+      : value === "right"
+        ? "left-[calc(100%-1.25rem-0.125rem)]"
+        : "left-1/2 -translate-x-1/2";
 
   return (
     <button
@@ -20,16 +22,15 @@ export function BipolarSwitch({ value, onChange, ariaLabel }: Props) {
       aria-label={ariaLabel}
       aria-checked={value === "right" ? true : value === "left" ? false : undefined}
       className={cn(
-        "relative h-7 w-14 shrink-0 rounded-full border transition-colors",
-        value === "neutral"
-          ? "border-border bg-muted/80"
-          : "border-[#A78BFA]/50 bg-[#A78BFA]/15",
+        "relative h-6 w-12 shrink-0 rounded-full border transition-colors",
+        value === "neutral" && "border-border bg-muted/80",
+        value === "left" && "border-emerald-500/50 bg-emerald-500/15",
+        value === "right" && "border-red-500/50 bg-red-500/15",
       )}
       onClick={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const pickRight = x >= rect.width / 2;
-        onChange(pickRight ? "right" : "left");
+        onChange(x >= rect.width / 2 ? "right" : "left");
       }}
       onKeyDown={(e) => {
         if (e.key === "ArrowLeft") {
@@ -46,7 +47,9 @@ export function BipolarSwitch({ value, onChange, ariaLabel }: Props) {
         aria-hidden
         className={cn(
           "absolute top-0.5 size-5 rounded-full shadow-sm transition-all duration-200",
-          value === "neutral" ? "bg-muted-foreground/35" : "bg-[#A78BFA]",
+          value === "neutral" && "bg-muted-foreground/35",
+          value === "left" && "bg-emerald-500",
+          value === "right" && "bg-red-500",
           thumbPosition,
         )}
       />
@@ -54,12 +57,11 @@ export function BipolarSwitch({ value, onChange, ariaLabel }: Props) {
   );
 }
 
-export function poleLabelClass(active: boolean) {
+export function poleLabelClass(side: "left" | "right", active: boolean) {
   return cn(
-    "rounded-md px-2 py-1.5 text-xs leading-tight transition-colors cursor-pointer select-none text-center",
-    active ? "font-medium text-[#6D28D9]" : "text-muted-foreground hover:text-foreground",
-    active && "bg-[#A78BFA]/20",
+    "rounded-md px-1.5 py-1 text-[11px] leading-tight transition-colors cursor-pointer select-none text-center",
+    !active && "text-muted-foreground hover:text-foreground",
+    active && side === "left" && "font-medium text-emerald-800 bg-emerald-500/20",
+    active && side === "right" && "font-medium text-red-800 bg-red-500/20",
   );
 }
-
-export { ACCENT as BIPOLAR_ACCENT };
