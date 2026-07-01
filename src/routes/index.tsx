@@ -60,6 +60,7 @@ import {
 } from "@/lib/source-file-import";
 import { buildSourceTextForPrompt, hasSourceMaterials } from "@/lib/source-material";
 import { archiveImageToGoogle } from "@/lib/archive-client";
+import { DEFAULT_HOME_DESIGN_PROFILE } from "@/lib/design-profile-defaults";
 import type { GenTrigger } from "@/lib/google/archive-schema";
 import { HomeYandexMetrika } from "@/components/analytics/HomeYandexMetrika";
 import { isHomeAnalyticsRoute } from "@/lib/analytics/yandex-metrika";
@@ -480,6 +481,7 @@ export function SimpleHome() {
     try {
       setPaneMode("image");
       setLoading("analyze");
+      const profileBeforeAnalyze = useProjectStore.getState().selectedProfileName;
       const summary = await runAnalyze();
       if (!summary) return;
       if (trackHome) {
@@ -489,10 +491,8 @@ export function SimpleHome() {
           generation_mode: hasSource ? "with_materials" : "topic_only",
         });
       }
-      // pick profile from recommendation if user hasn't chosen one
-      const recName = summary.recommendedDesignProfile;
-      const useProfile = selectedProfileName ?? recName ?? null;
-      if (!selectedProfileName && recName) setSelectedProfileName(recName);
+      const useProfile = profileBeforeAnalyze ?? DEFAULT_HOME_DESIGN_PROFILE;
+      if (!profileBeforeAnalyze) setSelectedProfileName(DEFAULT_HOME_DESIGN_PROFILE);
       setLoading("image");
       await runImage({ useProfileName: useProfile, genTrigger: "initial" });
       if (trackHome) {

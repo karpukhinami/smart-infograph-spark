@@ -1,0 +1,64 @@
+Архив картинок в Google Drive — личный аккаунт (без Workspace)
+================================================================
+
+ЧТО ПРОИСХОДИТ
+--------------
+При сохранении картинки приложение загружает файл от имени service account
+(технический аккаунт из JSON-ключа Google Cloud).
+
+Ошибка:
+  Service Accounts do not have storage quota
+
+У service account нет своего места в Google Drive. Файл, который он создаёт,
+принадлежит ему — а квоты у него нет. Поэтому загрузка падает с 500.
+
+Запись в Google Таблицу при этом может работать — проблема только с Drive.
+
+Расшарить папку в «Мой диск» на email service account недостаточно:
+файл всё равно создаётся от имени SA и квота не появляется.
+
+Общий диск (Shared Drive) решает проблему, но он доступен только в
+Google Workspace. Личного Workspace нет — этот путь недоступен.
+
+
+ЧТО ДЕЛАТЬ ДАЛЬШЕ (варианты)
+----------------------------
+
+1. Google Workspace (платно)
+   Создать общий диск, добавить service account участником,
+   указать ID папки на общем диске в GOOGLE_DRIVE_FOLDER_ID на Render.
+   Код менять не нужно (supportsAllDrives уже есть).
+
+2. OAuth от личного Google-аккаунта (изменения в коде)
+   Вместо service account для Drive — авторизация под вашим Gmail.
+   Файлы будут в вашем «Мой диск», квота — ваша.
+   Нужно: OAuth client, refresh token, доработка auth.ts и drive.ts.
+
+3. Другое хранилище (изменения в коде)
+   Например S3, Cloudflare R2, Supabase Storage.
+   Service account / ключи облака вместо Drive.
+
+4. Временно без архива картинок
+   Оставить только таблицу (Sheets) или отключить upload до выбора варианта.
+
+
+ТЕКУЩЕЕ СОСТОЯНИЕ ПРОЕКТА
+-------------------------
+- Ключ Google на Render настроен (private key с BEGIN/END и \n).
+- Архив: src/lib/google/, API /api/archive-image, /api/archive-feedback.
+- Env на Render: GOOGLE_SERVICE_ACCOUNT_JSON (или CLIENT_EMAIL + PRIVATE_KEY),
+  GOOGLE_DRIVE_FOLDER_ID, GOOGLE_SHEETS_ID.
+- GOOGLE_DRIVE_FOLDER_ID сейчас указывает на папку в личном Drive — не работает.
+
+
+РЕКОМЕНДАЦИЯ ДЛЯ ПРОДОЛЖЕНИЯ
+----------------------------
+Без Workspace самый прямой путь для личного использования — вариант 2 (OAuth)
+или 3 (другое хранилище). Выбрать один и доработать backend upload.
+
+Файлы для правок:
+  src/lib/google/auth.ts
+  src/lib/google/drive.ts
+  src/routes/api/archive-image.ts
+
+Документация колонок таблицы: docs/google-sheet-columns.txt
