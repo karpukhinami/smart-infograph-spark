@@ -12,7 +12,15 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    build: {
+      sourcemap: false,
+      reportCompressedSize: false,
+    },
+  },
   nitro: {
     preset: "render_com",
+    // Trace instead of inlining — googleapis is huge and can OOM the bundler.
+    traceDeps: ["googleapis", "sharp"],
   },
 });

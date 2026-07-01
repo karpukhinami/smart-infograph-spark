@@ -27,9 +27,10 @@ export const SHEET_COL = {
   brief_model: 21,
   image_model: 22,
   folder_link: 23,
+  image_id: 24,
 } as const;
 
-export const SHEET_COLUMN_COUNT = 23;
+export const SHEET_COLUMN_COUNT = 24;
 
 export function encodeRating(rating: ImageFeedbackRating | null | undefined): string {
   if (rating === "like") return "1";
@@ -69,6 +70,7 @@ export interface ArchiveGenerationFields {
   briefModel: string;
   imageModel: string;
   folderLink: string;
+  imageId: string;
 }
 
 export function buildInitialSheetRow(fields: ArchiveGenerationFields): string[] {
@@ -88,6 +90,7 @@ export function buildInitialSheetRow(fields: ArchiveGenerationFields): string[] 
   row[SHEET_COL.brief_model - 1] = fields.briefModel;
   row[SHEET_COL.image_model - 1] = fields.imageModel;
   row[SHEET_COL.folder_link - 1] = fields.folderLink;
+  row[SHEET_COL.image_id - 1] = fields.imageId;
   return row;
 }
 

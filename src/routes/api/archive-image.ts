@@ -81,6 +81,7 @@ export const Route = createFileRoute("/api/archive-image")({
             briefModel: body.briefModel ?? "",
             imageModel: body.imageModel ?? "",
             folderLink,
+            imageId: body.imageId,
           });
 
           return Response.json({
