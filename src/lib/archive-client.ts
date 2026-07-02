@@ -2,8 +2,10 @@ import type { GenTrigger, SimpleImageArchiveMeta } from "@/lib/google/archive-sc
 import type {
   BipolarFeedbackValue,
   ImageFeedbackRating,
+  PendingArchiveFeedback,
   SimpleImageFeedbackDetail,
 } from "@/lib/image-feedback-types";
+import { useProjectStore } from "@/store/useProjectStore";
 
 export interface ArchiveImagePayload {
   imageId: string;
@@ -23,15 +25,9 @@ export interface ArchiveImagePayload {
   imageModel: string;
 }
 
-export interface ArchiveFeedbackPayload {
-  sheetRow: number;
-  rating: ImageFeedbackRating;
-  feedbackSent: 0 | 1;
-  showIllustrationsRow: boolean;
-  detail?: Pick<
-    SimpleImageFeedbackDetail,
-    "colors" | "composition" | "extraElements" | "text" | "illustrations" | "comment"
-  >;
+export interface ArchiveFeedbackPayload extends PendingArchiveFeedback {
+  sheetRow?: number;
+  imageId: string;
 }
 
 export type ArchiveError = {
@@ -45,6 +41,24 @@ export type ArchiveImageSuccess = SimpleImageArchiveMeta & {
   ok: true;
   sessionFolderId: string;
 };
+
+export type SubmitArchiveFeedbackResult =
+  | { ok: true; queued: false }
+  | { ok: true; queued: true }
+  | ArchiveError;
+
+function feedbackAxes(payload: PendingArchiveFeedback) {
+  return (
+    payload.detail ?? {
+      colors: "neutral" as BipolarFeedbackValue,
+      composition: "neutral" as BipolarFeedbackValue,
+      extraElements: "neutral" as BipolarFeedbackValue,
+      text: "neutral" as BipolarFeedbackValue,
+      illustrations: "neutral" as BipolarFeedbackValue,
+      comment: "",
+    }
+  );
+}
 
 export async function archiveImageToGoogle(
   payload: ArchiveImagePayload,
@@ -89,20 +103,14 @@ export async function updateArchiveFeedback(
   payload: ArchiveFeedbackPayload,
 ): Promise<{ ok: true } | ArchiveError> {
   try {
-    const axes = payload.detail ?? {
-      colors: "neutral" as BipolarFeedbackValue,
-      composition: "neutral" as BipolarFeedbackValue,
-      extraElements: "neutral" as BipolarFeedbackValue,
-      text: "neutral" as BipolarFeedbackValue,
-      illustrations: "neutral" as BipolarFeedbackValue,
-      comment: "",
-    };
+    const axes = feedbackAxes(payload);
 
     const res = await fetch("/api/archive-feedback", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sheetRow: payload.sheetRow,
+        imageId: payload.imageId,
         rating: payload.rating,
         feedbackSent: payload.feedbackSent,
         showIllustrationsRow: payload.showIllustrationsRow,
@@ -115,7 +123,10 @@ export async function updateArchiveFeedback(
       }),
     });
     if (res.ok) {
-      console.info("[archive-feedback] ok", { sheetRow: payload.sheetRow });
+      console.info("[archive-feedback] ok", {
+        sheetRow: payload.sheetRow,
+        imageId: payload.imageId,
+      });
       return { ok: true };
     }
     const text = await res.text().catch(() => "");
@@ -131,9 +142,9 @@ export async function updateArchiveFeedback(
 
 /** Poll until archive finishes, fails, or timeout. */
 export async function waitForArchiveSheetRow(
-  _imageId: string,
+  imageId: string,
   getState: () => { sheetRow?: number; error?: string },
-  timeoutMs = 90_000,
+  timeoutMs = 180_000,
 ): Promise<number | null> {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
@@ -142,5 +153,75 @@ export async function waitForArchiveSheetRow(
     if (sheetRow) return sheetRow;
     await new Promise((r) => setTimeout(r, 400));
   }
+  console.warn("[archive-feedback] wait timeout", { imageId, timeoutMs });
   return null;
+}
+
+export async function flushPendingArchiveFeedback(
+  imageId: string,
+  sheetRow?: number,
+): Promise<{ ok: true } | ArchiveError | null> {
+  const store = useProjectStore.getState();
+  const pending = store.pendingArchiveFeedback[imageId];
+  if (!pending) return null;
+
+  const row = sheetRow ?? store.simpleImageArchiveMeta[imageId]?.sheetRow;
+  const result = await updateArchiveFeedback({ ...pending, imageId, sheetRow: row });
+  if (result.ok) {
+    store.clearPendingArchiveFeedback(imageId);
+  }
+  return result;
+}
+
+/** Send feedback now, or queue until the sheet row for this image is ready. */
+export async function submitArchiveFeedback(
+  imageId: string,
+  payload: PendingArchiveFeedback,
+): Promise<SubmitArchiveFeedbackResult> {
+  const store = useProjectStore.getState();
+
+  if (store.simpleImageArchiveErrors[imageId]) {
+    return { ok: false, status: 0, message: store.simpleImageArchiveErrors[imageId] };
+  }
+
+  const existingRow = store.simpleImageArchiveMeta[imageId]?.sheetRow;
+  if (existingRow) {
+    const result = await updateArchiveFeedback({ ...payload, imageId, sheetRow: existingRow });
+    if (result.ok) store.clearPendingArchiveFeedback(imageId);
+    return result.ok ? { ok: true, queued: false } : result;
+  }
+
+  const sheetRow = await waitForArchiveSheetRow(imageId, () => {
+    const s = useProjectStore.getState();
+    return {
+      sheetRow: s.simpleImageArchiveMeta[imageId]?.sheetRow,
+      error: s.simpleImageArchiveErrors[imageId],
+    };
+  });
+
+  if (sheetRow) {
+    const result = await updateArchiveFeedback({ ...payload, imageId, sheetRow });
+    if (result.ok) store.clearPendingArchiveFeedback(imageId);
+    return result.ok ? { ok: true, queued: false } : result;
+  }
+
+  if (useProjectStore.getState().simpleImageArchiveErrors[imageId]) {
+    return {
+      ok: false,
+      status: 0,
+      message: useProjectStore.getState().simpleImageArchiveErrors[imageId],
+    };
+  }
+
+  store.setPendingArchiveFeedback(imageId, payload);
+  console.info("[archive-feedback] queued until archive row is ready", { imageId });
+  return { ok: true, queued: true };
+}
+
+/** Retry queued feedback for all images that already have a sheet row. */
+export async function flushAllPendingArchiveFeedback(): Promise<void> {
+  const store = useProjectStore.getState();
+  for (const imageId of Object.keys(store.pendingArchiveFeedback)) {
+    await flushPendingArchiveFeedback(imageId);
+  }
 }

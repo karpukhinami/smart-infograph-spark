@@ -65,7 +65,7 @@ import {
   SOURCE_FILE_ACCEPT,
 } from "@/lib/source-file-import";
 import { buildSourceTextForPrompt, hasSourceMaterials } from "@/lib/source-material";
-import { archiveImageToGoogle } from "@/lib/archive-client";
+import { archiveImageToGoogle, flushAllPendingArchiveFeedback, flushPendingArchiveFeedback } from "@/lib/archive-client";
 import { DEFAULT_HOME_DESIGN_PROFILE } from "@/lib/design-profile-defaults";
 import type { GenTrigger } from "@/lib/google/archive-schema";
 import { HomeYandexMetrika } from "@/components/analytics/HomeYandexMetrika";
@@ -250,6 +250,10 @@ export function SimpleHome() {
       setStorageQuotaWarningContext(context);
       setStorageQuotaWarningOpen(true);
     });
+  }, []);
+
+  useEffect(() => {
+    void flushAllPendingArchiveFeedback();
   }, []);
 
   const deleteImageTarget = useMemo(() => {
@@ -472,6 +476,9 @@ export function SimpleHome() {
         driveFileId: result.driveFileId,
         driveLink: result.driveLink,
         folderLink: result.folderLink,
+      });
+      void flushPendingArchiveFeedback(image.id, result.sheetRow).then((flushResult) => {
+        if (flushResult?.ok) toast.success("Оценка сохранена");
       });
     });
     return true;

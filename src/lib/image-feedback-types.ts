@@ -26,3 +26,13 @@ export const EMPTY_FEEDBACK_AXES = {
   text: "neutral" as BipolarFeedbackValue,
   illustrations: "neutral" as BipolarFeedbackValue,
 };
+
+export interface PendingArchiveFeedback {
+  rating: ImageFeedbackRating;
+  feedbackSent: 0 | 1;
+  showIllustrationsRow: boolean;
+  detail?: Pick<
+    SimpleImageFeedbackDetail,
+    "colors" | "composition" | "extraElements" | "text" | "illustrations" | "comment"
+  >;
+}

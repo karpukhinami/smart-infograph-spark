@@ -94,6 +94,24 @@ export async function appendGenerationRow(
   return { sheetRow };
 }
 
+export async function findSheetRowByImageId(imageId: string): Promise<number | null> {
+  const auth = getGoogleAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const name = await resolveSheetName(auth);
+  const col = columnLetter(SHEET_COL.image_id);
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+    range: sheetRange(name, `${col}:${col}`),
+  });
+
+  const rows = res.data.values ?? [];
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i]?.[0]?.trim() === imageId) return i + 1;
+  }
+  return null;
+}
+
 export async function updateFeedbackRow(
   sheetRow: number,
   fields: FeedbackUpdateFields,

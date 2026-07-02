@@ -4,10 +4,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/store/useProjectStore";
 import { ImageFeedbackModal } from "@/components/workspace/ImageFeedbackModal";
-import {
-  updateArchiveFeedback,
-  waitForArchiveSheetRow,
-} from "@/lib/archive-client";
+import { submitArchiveFeedback } from "@/lib/archive-client";
 import {
   EMPTY_FEEDBACK_AXES,
   type ImageFeedbackRating,
@@ -42,22 +39,8 @@ export function SimpleImageRating({ imageId, showIllustrationsRow, onRate }: Pro
     sent: boolean;
     detail?: SimpleImageFeedbackDetail;
   }) => {
-    const sheetRow = await waitForArchiveSheetRow(imageId, () => {
-      const s = useProjectStore.getState();
-      return {
-        sheetRow: s.simpleImageArchiveMeta[imageId]?.sheetRow,
-        error: s.simpleImageArchiveErrors[imageId],
-      };
-    });
-
-    if (!sheetRow) {
-      toast.error("Не удалось сохранить оценку", { duration: 5000 });
-      return;
-    }
-
     const currentRating = useProjectStore.getState().simpleImageRatings[imageId] ?? modalRating;
-    const result = await updateArchiveFeedback({
-      sheetRow,
+    const result = await submitArchiveFeedback(imageId, {
       rating: currentRating,
       feedbackSent: opts.sent ? 1 : 0,
       showIllustrationsRow,
@@ -69,11 +52,14 @@ export function SimpleImageRating({ imageId, showIllustrationsRow, onRate }: Pro
           },
     });
 
-    if (result.ok) {
-      toast.success("Оценка сохранена");
-    } else {
+    if (!result.ok) {
       toast.error("Не удалось сохранить оценку");
+      return;
     }
+
+    if (result.queued) return;
+
+    toast.success("Оценка сохранена");
   };
 
   const handleRate = (kind: ImageFeedbackRating) => {

@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { isGoogleArchiveConfigured } from "@/lib/google/auth";
-import { updateFeedbackRow } from "@/lib/google/sheets";
+import { findSheetRowByImageId, updateFeedbackRow } from "@/lib/google/sheets";
 import type { BipolarFeedbackValue, ImageFeedbackRating } from "@/lib/image-feedback-types";
 
 interface ReqBody {
-  sheetRow: number;
+  sheetRow?: number;
+  imageId?: string;
   rating: ImageFeedbackRating;
   feedbackSent: 0 | 1;
   showIllustrationsRow: boolean;
@@ -34,12 +35,20 @@ export const Route = createFileRoute("/api/archive-feedback")({
           return new Response("Invalid JSON", { status: 400 });
         }
 
-        if (!body?.sheetRow || !body?.rating) {
-          return new Response("Missing sheetRow or rating", { status: 400 });
+        if (!body?.rating) {
+          return new Response("Missing rating", { status: 400 });
+        }
+
+        let sheetRow = body.sheetRow;
+        if (!sheetRow && body.imageId) {
+          sheetRow = (await findSheetRowByImageId(body.imageId)) ?? undefined;
+        }
+        if (!sheetRow) {
+          return new Response("Missing sheetRow or imageId not found in sheet", { status: 404 });
         }
 
         try {
-          await updateFeedbackRow(body.sheetRow, {
+          await updateFeedbackRow(sheetRow, {
             rating: body.rating,
             feedbackSent: body.feedbackSent,
             color: body.color,

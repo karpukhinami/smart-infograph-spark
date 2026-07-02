@@ -14,6 +14,7 @@ import type {
   SimpleImageGenerationSnapshot,
 } from "@/lib/image-feedback-types";
 import type { SimpleImageArchiveMeta } from "@/lib/google/archive-schema";
+import type { PendingArchiveFeedback } from "@/lib/image-feedback-types";
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from "@/lib/models";
 import { renderAnalysisJson } from "@/lib/analysis-render";
 import { createQuotaAwareSessionStorage } from "@/lib/browser-storage-quota";
@@ -148,6 +149,10 @@ interface ProjectState {
   /** Set when POST /api/archive-image fails — stops feedback polling early. */
   simpleImageArchiveErrors: Record<string, string>;
   setSimpleImageArchiveError: (imageId: string, message: string) => void;
+  /** Feedback waiting for sheetRow after user rated before archive finished. */
+  pendingArchiveFeedback: Record<string, PendingArchiveFeedback>;
+  setPendingArchiveFeedback: (imageId: string, feedback: PendingArchiveFeedback) => void;
+  clearPendingArchiveFeedback: (imageId: string) => void;
 
   models: { analysis: string; brief: string; image: string };
   setModel: (k: "analysis" | "brief" | "image", id: string) => void;
@@ -194,6 +199,7 @@ export const useProjectStore = create<ProjectState>()(
           simpleImageFeedbackCompleted: {},
           simpleImageArchiveMeta: {},
           simpleImageArchiveErrors: {},
+          pendingArchiveFeedback: {},
           archiveSessionId: null,
           archiveSessionFolderId: null,
           archiveSessionFolderLink: null,
@@ -410,6 +416,7 @@ export const useProjectStore = create<ProjectState>()(
       simpleImageFeedbackCompleted: {},
       simpleImageArchiveMeta: {},
       simpleImageArchiveErrors: {},
+      pendingArchiveFeedback: {},
       archiveSessionId: null,
       archiveSessionFolderId: null,
       archiveSessionFolderLink: null,
@@ -435,6 +442,16 @@ export const useProjectStore = create<ProjectState>()(
         set((s) => ({
           simpleImageArchiveErrors: { ...s.simpleImageArchiveErrors, [imageId]: message },
         })),
+      setPendingArchiveFeedback: (imageId, feedback) =>
+        set((s) => ({
+          pendingArchiveFeedback: { ...s.pendingArchiveFeedback, [imageId]: feedback },
+        })),
+      clearPendingArchiveFeedback: (imageId) =>
+        set((s) => {
+          const pending = { ...s.pendingArchiveFeedback };
+          delete pending[imageId];
+          return { pendingArchiveFeedback: pending };
+        }),
       setSimpleCurrentImage: (img) =>
         set((s) => {
           if (!img) return { simpleCurrentImage: null };
@@ -493,6 +510,7 @@ export const useProjectStore = create<ProjectState>()(
           simpleImageFeedbackCompleted: {},
           simpleImageArchiveMeta: {},
           simpleImageArchiveErrors: {},
+          pendingArchiveFeedback: {},
         }),
       swapSimpleVersion: (id) =>
         set((s) => {
@@ -604,7 +622,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "infographic-project",
-      version: 9,
+      version: 10,
       migrate: (persisted, fromVersion) => {
         const state = persisted as ProjectState;
         if (fromVersion < 9) {
@@ -615,6 +633,13 @@ export const useProjectStore = create<ProjectState>()(
             archiveSessionId: state.archiveSessionId ?? null,
             archiveSessionFolderId: state.archiveSessionFolderId ?? null,
             archiveSessionFolderLink: state.archiveSessionFolderLink ?? null,
+            pendingArchiveFeedback: state.pendingArchiveFeedback ?? {},
+          };
+        }
+        if (fromVersion < 10) {
+          return {
+            ...state,
+            pendingArchiveFeedback: state.pendingArchiveFeedback ?? {},
           };
         }
         return state;
