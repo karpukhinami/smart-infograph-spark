@@ -54,7 +54,11 @@ export const Route = createFileRoute("/api/archive-feedback")({
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Feedback update failed";
           console.error("[archive-feedback]", msg);
-          return new Response(msg, { status: 500 });
+          const hint =
+            msg.includes("invalid_grant") || msg.includes("invalid_client")
+              ? " Проверьте GOOGLE_OAUTH_* на Render."
+              : "";
+          return new Response(msg + hint, { status: 500 });
         }
       },
     },

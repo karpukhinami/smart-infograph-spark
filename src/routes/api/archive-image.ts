@@ -94,7 +94,11 @@ export const Route = createFileRoute("/api/archive-image")({
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Archive failed";
           console.error("[archive-image]", msg);
-          return new Response(msg, { status: 500 });
+          const hint =
+            msg.includes("invalid_grant") || msg.includes("invalid_client")
+              ? " Проверьте GOOGLE_OAUTH_* на Render или получите новый refresh token."
+              : "";
+          return new Response(msg + hint, { status: 500 });
         }
       },
     },

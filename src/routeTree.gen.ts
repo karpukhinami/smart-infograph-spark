@@ -15,12 +15,12 @@ import { Route as StylesRouteImport } from './routes/styles'
 import { Route as PromptsRouteImport } from './routes/prompts'
 import { Route as DesignProfilesRouteImport } from './routes/design-profiles'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiArchiveStatusRouteImport } from './routes/api/archive-status'
-import { Route as ApiArchiveFeedbackRouteImport } from './routes/api/archive-feedback'
-import { Route as ApiArchiveImageRouteImport } from './routes/api/archive-image'
 import { Route as ApiLlmRouteImport } from './routes/api/llm'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as ApiExtractDocumentTextRouteImport } from './routes/api/extract-document-text'
+import { Route as ApiArchiveStatusRouteImport } from './routes/api/archive-status'
+import { Route as ApiArchiveImageRouteImport } from './routes/api/archive-image'
+import { Route as ApiArchiveFeedbackRouteImport } from './routes/api/archive-feedback'
 
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
@@ -52,21 +52,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiArchiveStatusRoute = ApiArchiveStatusRouteImport.update({
-  id: '/api/archive-status',
-  path: '/api/archive-status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiArchiveFeedbackRoute = ApiArchiveFeedbackRouteImport.update({
-  id: '/api/archive-feedback',
-  path: '/api/archive-feedback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiArchiveImageRoute = ApiArchiveImageRouteImport.update({
-  id: '/api/archive-image',
-  path: '/api/archive-image',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiLlmRoute = ApiLlmRouteImport.update({
   id: '/api/llm',
   path: '/api/llm',
@@ -82,6 +67,21 @@ const ApiExtractDocumentTextRoute = ApiExtractDocumentTextRouteImport.update({
   path: '/api/extract-document-text',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiArchiveStatusRoute = ApiArchiveStatusRouteImport.update({
+  id: '/api/archive-status',
+  path: '/api/archive-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiArchiveImageRoute = ApiArchiveImageRouteImport.update({
+  id: '/api/archive-image',
+  path: '/api/archive-image',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiArchiveFeedbackRoute = ApiArchiveFeedbackRouteImport.update({
+  id: '/api/archive-feedback',
+  path: '/api/archive-feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -90,9 +90,9 @@ export interface FileRoutesByFullPath {
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
   '/workspace': typeof WorkspaceRoute
-  '/api/archive-status': typeof ApiArchiveStatusRoute
   '/api/archive-feedback': typeof ApiArchiveFeedbackRoute
   '/api/archive-image': typeof ApiArchiveImageRoute
+  '/api/archive-status': typeof ApiArchiveStatusRoute
   '/api/extract-document-text': typeof ApiExtractDocumentTextRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
@@ -104,9 +104,9 @@ export interface FileRoutesByTo {
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
   '/workspace': typeof WorkspaceRoute
-  '/api/archive-status': typeof ApiArchiveStatusRoute
   '/api/archive-feedback': typeof ApiArchiveFeedbackRoute
   '/api/archive-image': typeof ApiArchiveImageRoute
+  '/api/archive-status': typeof ApiArchiveStatusRoute
   '/api/extract-document-text': typeof ApiExtractDocumentTextRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
@@ -119,9 +119,9 @@ export interface FileRoutesById {
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
   '/workspace': typeof WorkspaceRoute
-  '/api/archive-status': typeof ApiArchiveStatusRoute
   '/api/archive-feedback': typeof ApiArchiveFeedbackRoute
   '/api/archive-image': typeof ApiArchiveImageRoute
+  '/api/archive-status': typeof ApiArchiveStatusRoute
   '/api/extract-document-text': typeof ApiExtractDocumentTextRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/llm': typeof ApiLlmRoute
@@ -135,9 +135,9 @@ export interface FileRouteTypes {
     | '/styles'
     | '/view_all'
     | '/workspace'
-    | '/api/archive-status'
     | '/api/archive-feedback'
     | '/api/archive-image'
+    | '/api/archive-status'
     | '/api/extract-document-text'
     | '/api/generate-image'
     | '/api/llm'
@@ -149,9 +149,9 @@ export interface FileRouteTypes {
     | '/styles'
     | '/view_all'
     | '/workspace'
-    | '/api/archive-status'
     | '/api/archive-feedback'
     | '/api/archive-image'
+    | '/api/archive-status'
     | '/api/extract-document-text'
     | '/api/generate-image'
     | '/api/llm'
@@ -163,9 +163,9 @@ export interface FileRouteTypes {
     | '/styles'
     | '/view_all'
     | '/workspace'
-    | '/api/archive-status'
     | '/api/archive-feedback'
     | '/api/archive-image'
+    | '/api/archive-status'
     | '/api/extract-document-text'
     | '/api/generate-image'
     | '/api/llm'
@@ -178,9 +178,9 @@ export interface RootRouteChildren {
   StylesRoute: typeof StylesRoute
   View_allRoute: typeof View_allRoute
   WorkspaceRoute: typeof WorkspaceRoute
-  ApiArchiveStatusRoute: typeof ApiArchiveStatusRoute
   ApiArchiveFeedbackRoute: typeof ApiArchiveFeedbackRoute
   ApiArchiveImageRoute: typeof ApiArchiveImageRoute
+  ApiArchiveStatusRoute: typeof ApiArchiveStatusRoute
   ApiExtractDocumentTextRoute: typeof ApiExtractDocumentTextRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiLlmRoute: typeof ApiLlmRoute
@@ -230,27 +230,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/archive-status': {
-      id: '/api/archive-status'
-      path: '/api/archive-status'
-      fullPath: '/api/archive-status'
-      preLoaderRoute: typeof ApiArchiveStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/archive-feedback': {
-      id: '/api/archive-feedback'
-      path: '/api/archive-feedback'
-      fullPath: '/api/archive-feedback'
-      preLoaderRoute: typeof ApiArchiveFeedbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/archive-image': {
-      id: '/api/archive-image'
-      path: '/api/archive-image'
-      fullPath: '/api/archive-image'
-      preLoaderRoute: typeof ApiArchiveImageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/llm': {
       id: '/api/llm'
       path: '/api/llm'
@@ -272,6 +251,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExtractDocumentTextRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/archive-status': {
+      id: '/api/archive-status'
+      path: '/api/archive-status'
+      fullPath: '/api/archive-status'
+      preLoaderRoute: typeof ApiArchiveStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/archive-image': {
+      id: '/api/archive-image'
+      path: '/api/archive-image'
+      fullPath: '/api/archive-image'
+      preLoaderRoute: typeof ApiArchiveImageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/archive-feedback': {
+      id: '/api/archive-feedback'
+      path: '/api/archive-feedback'
+      fullPath: '/api/archive-feedback'
+      preLoaderRoute: typeof ApiArchiveFeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -282,9 +282,9 @@ const rootRouteChildren: RootRouteChildren = {
   StylesRoute: StylesRoute,
   View_allRoute: View_allRoute,
   WorkspaceRoute: WorkspaceRoute,
-  ApiArchiveStatusRoute: ApiArchiveStatusRoute,
   ApiArchiveFeedbackRoute: ApiArchiveFeedbackRoute,
   ApiArchiveImageRoute: ApiArchiveImageRoute,
+  ApiArchiveStatusRoute: ApiArchiveStatusRoute,
   ApiExtractDocumentTextRoute: ApiExtractDocumentTextRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiLlmRoute: ApiLlmRoute,

@@ -140,7 +140,7 @@ Google Таблица — колонки для архива генераций 
 -----------------------
 
 Структура:
-  {GOOGLE_DRIVE_FOLDER_ID}/          ← корневая папка (расшарена на service account)
+  {GOOGLE_DRIVE_FOLDER_ID}/          ← корневая папка в «Мой диск» (OAuth-аккаунт)
     2025-06-24_a1b2c3d4/             ← одна папка на session_id
       v1_1719234567890.jpg
       v2_1719234890123.jpg
@@ -157,18 +157,16 @@ Google Таблица — колонки для архива генераций 
 Переменные окружения (сервер)
 -----------------------------
 
-GOOGLE_DRIVE_FOLDER_ID   — ID корневой папки на Drive
-GOOGLE_SHEETS_ID         — ID Google Таблицы
+GOOGLE_DRIVE_FOLDER_ID   — ID корневой папки на Drive (в аккаунте OAuth)
+GOOGLE_SHEETS_ID         — ID Google Таблицы (в том же аккаунте)
 GOOGLE_SHEET_NAME        — (необязательно) имя листа, по умолчанию «Sheet1»
 
-Учётные данные service account — один из вариантов:
-  GOOGLE_SERVICE_ACCOUNT_JSON  — весь JSON ключ одной строкой
-  или пара:
-  GOOGLE_CLIENT_EMAIL
-  GOOGLE_PRIVATE_KEY           — с символами \n вместо переносов строк
+OAuth (Drive + Sheets) — все три обязательны:
+  GOOGLE_OAUTH_CLIENT_ID
+  GOOGLE_OAUTH_CLIENT_SECRET
+  GOOGLE_OAUTH_REFRESH_TOKEN
 
-Корневая папка Drive и таблица должны быть расшарены на email service account
-с правом «Редактор».
+Refresh token выдаётся с scope drive.file и spreadsheets (см. docs/google-drive-personal-account.txt).
 
 
 Переключатели иллюстраций (контекст для illustration)
