@@ -159,7 +159,8 @@ Google Таблица — колонки для архива генераций 
 
 GOOGLE_DRIVE_FOLDER_ID   — ID корневой папки на Drive (в аккаунте OAuth)
 GOOGLE_SHEETS_ID         — ID Google Таблицы (в том же аккаунте)
-GOOGLE_SHEET_NAME        — (необязательно) имя листа, по умолчанию «Sheet1»
+GOOGLE_SHEET_NAME        — (необязательно) имя вкладки листа. Если не задано —
+                           берётся первый лист таблицы (часто «Лист1» в русской локали)
 
 OAuth (Drive + Sheets) — все три обязательны:
   GOOGLE_OAUTH_CLIENT_ID

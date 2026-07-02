@@ -1,3 +1,4 @@
+import type { OAuth2Client } from "google-auth-library";
 import { google } from "googleapis";
 import { getGoogleAuth } from "@/lib/google/auth";
 import {
@@ -9,8 +10,55 @@ import {
   type FeedbackUpdateFields,
 } from "@/lib/google/archive-schema";
 
-function sheetName(): string {
-  return process.env.GOOGLE_SHEET_NAME?.trim() || "Sheet1";
+let cachedSheetName: { spreadsheetId: string; name: string } | null = null;
+
+/** A1 prefix with quoted sheet title (handles «Лист1», spaces, etc.). */
+function sheetRange(sheetTitle: string, cells: string): string {
+  const escaped = sheetTitle.replace(/'/g, "''");
+  return `'${escaped}'!${cells}`;
+}
+
+async function resolveSheetName(auth: OAuth2Client): Promise<string> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_ID?.trim();
+  if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_ID missing");
+
+  const configured = process.env.GOOGLE_SHEET_NAME?.trim();
+  if (
+    cachedSheetName?.spreadsheetId === spreadsheetId &&
+    (!configured || cachedSheetName.name === configured)
+  ) {
+    return cachedSheetName.name;
+  }
+
+  const sheets = google.sheets({ version: "v4", auth });
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties.title",
+  });
+
+  const titles =
+    meta.data.sheets
+      ?.map((s) => s.properties?.title)
+      .filter((t): t is string => Boolean(t)) ?? [];
+
+  if (titles.length === 0) {
+    throw new Error("Google Таблица не содержит листов");
+  }
+
+  let name: string;
+  if (configured) {
+    if (!titles.includes(configured)) {
+      throw new Error(
+        `Лист «${configured}» не найден. Доступные листы: ${titles.join(", ")}. Проверьте GOOGLE_SHEET_NAME на Render.`,
+      );
+    }
+    name = configured;
+  } else {
+    name = titles[0];
+  }
+
+  cachedSheetName = { spreadsheetId, name };
+  return name;
 }
 
 function columnLetter(index1Based: number): string {
@@ -29,12 +77,12 @@ export async function appendGenerationRow(
 ): Promise<{ sheetRow: number }> {
   const auth = getGoogleAuth();
   const sheets = google.sheets({ version: "v4", auth });
-  const name = sheetName();
+  const name = await resolveSheetName(auth);
   const row = buildInitialSheetRow(fields);
 
   const res = await sheets.spreadsheets.values.append({
     spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-    range: `${name}!A:A`,
+    range: sheetRange(name, "A:A"),
     valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: [row] },
@@ -52,14 +100,14 @@ export async function updateFeedbackRow(
 ): Promise<void> {
   const auth = getGoogleAuth();
   const sheets = google.sheets({ version: "v4", auth });
-  const name = sheetName();
+  const name = await resolveSheetName(auth);
   const startCol = columnLetter(SHEET_COL.rating);
   const endCol = columnLetter(SHEET_COL.comment);
   const values = buildFeedbackSheetValues(fields);
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-    range: `${name}!${startCol}${sheetRow}:${endCol}${sheetRow}`,
+    range: sheetRange(name, `${startCol}${sheetRow}:${endCol}${sheetRow}`),
     valueInputOption: "RAW",
     requestBody: { values: [values] },
   });

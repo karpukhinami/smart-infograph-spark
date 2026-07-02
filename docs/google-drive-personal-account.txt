@@ -1,34 +1,70 @@
-Архив в Google Drive и Google Таблицу — OAuth (личный Gmail)
-============================================================
-
-СХЕМА
------
-Картинки и строки таблицы пишутся от имени вашего Gmail через OAuth refresh token.
-Service account для архива не используется.
-
-На Render:
-  GOOGLE_OAUTH_CLIENT_ID
-  GOOGLE_OAUTH_CLIENT_SECRET
-  GOOGLE_OAUTH_REFRESH_TOKEN
-  GOOGLE_DRIVE_FOLDER_ID   — папка в «Мой диск» этого Gmail
-  GOOGLE_SHEETS_ID         — таблица в том же аккаунте
-  GOOGLE_SHEET_NAME        — (необязательно) имя листа, по умолчанию Sheet1
-
-Refresh token должен быть выдан с scope:
-  https://www.googleapis.com/auth/drive.file
-  https://www.googleapis.com/auth/spreadsheets
-
-Получение refresh token: OAuth 2.0 Playground + Web application client
-(redirect URI: https://developers.google.com/oauthplayground).
-
-Код: src/lib/google/auth.ts — getGoogleAuth() возвращает OAuth2Client.
-Drive: src/lib/google/drive.ts
-Sheets: src/lib/google/sheets.ts
-API: /api/archive-image, /api/archive-feedback, /api/archive-status
-
-Папку и таблицу расшаривать на service account не нужно.
-
-При ошибке invalid_grant — заново получить refresh token в Playground.
-
-Колонки таблицы: docs/google-sheet-columns.txt
-
+Архив в Google Drive и Google Таблицу — OAuth (личный Gmail)
+
+============================================================
+
+
+
+СХЕМА
+
+-----
+
+Картинки и строки таблицы пишутся от имени вашего Gmail через OAuth refresh token.
+
+Service account для архива не используется.
+
+
+
+На Render:
+
+  GOOGLE_OAUTH_CLIENT_ID
+
+  GOOGLE_OAUTH_CLIENT_SECRET
+
+  GOOGLE_OAUTH_REFRESH_TOKEN
+
+  GOOGLE_DRIVE_FOLDER_ID   — папка в «Мой диск» этого Gmail
+
+  GOOGLE_SHEETS_ID         — таблица в том же аккаунте
+
+  GOOGLE_SHEET_NAME        — (необязательно) имя вкладки листа в таблице.
+                             Если не задано — используется первый лист
+                             (в русской локали это обычно «Лист1», не Sheet1).
+                             Должно совпадать с названием вкладки внизу таблицы.
+
+
+
+Refresh token должен быть выдан с scope:
+
+  https://www.googleapis.com/auth/drive.file
+
+  https://www.googleapis.com/auth/spreadsheets
+
+
+
+Получение refresh token: OAuth 2.0 Playground + Web application client
+
+(redirect URI: https://developers.google.com/oauthplayground).
+
+
+
+Код: src/lib/google/auth.ts — getGoogleAuth() возвращает OAuth2Client.
+
+Drive: src/lib/google/drive.ts
+
+Sheets: src/lib/google/sheets.ts
+
+API: /api/archive-image, /api/archive-feedback, /api/archive-status
+
+
+
+Папку и таблицу расшаривать на service account не нужно.
+
+
+
+При ошибке invalid_grant — заново получить refresh token в Playground.
+
+
+
+Колонки таблицы: docs/google-sheet-columns.txt
+
+
