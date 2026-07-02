@@ -49,18 +49,23 @@ export const Route = createFileRoute("/api/archive-image")({
           return new Response("Missing required fields", { status: 400 });
         }
 
+        let sessionFolderId: string | undefined;
+        let folderLink: string | undefined;
+
         try {
           const raw = decodeDataUrlToBuffer(body.dataUrl);
           const jpegBuffer = await compressImageToJpeg(raw);
 
-          const { folderId, folderLink } = await ensureSessionFolder({
+          const folder = await ensureSessionFolder({
             rootFolderId,
             sessionId: body.sessionId,
             sessionFolderId: body.sessionFolderId,
           });
+          sessionFolderId = folder.folderId;
+          folderLink = folder.folderLink;
 
           const { fileId, driveLink } = await uploadSessionImage({
-            folderId,
+            folderId: sessionFolderId,
             version: body.version,
             jpegBuffer,
           });
@@ -89,7 +94,7 @@ export const Route = createFileRoute("/api/archive-image")({
             driveFileId: fileId,
             driveLink,
             folderLink,
-            sessionFolderId: folderId,
+            sessionFolderId,
           });
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Archive failed";
@@ -98,6 +103,14 @@ export const Route = createFileRoute("/api/archive-image")({
             msg.includes("invalid_grant") || msg.includes("invalid_client")
               ? " Проверьте GOOGLE_OAUTH_* на Render или получите новый refresh token."
               : "";
+
+          if (sessionFolderId && folderLink) {
+            return Response.json(
+              { error: msg + hint, sessionFolderId, folderLink },
+              { status: 500 },
+            );
+          }
+
           return new Response(msg + hint, { status: 500 });
         }
       },

@@ -34,7 +34,13 @@ export interface ArchiveFeedbackPayload {
   >;
 }
 
-export type ArchiveError = { ok: false; status: number; message: string };
+export type ArchiveError = {
+  ok: false;
+  status: number;
+  message: string;
+  sessionFolderId?: string;
+  folderLink?: string;
+};
 export type ArchiveImageSuccess = SimpleImageArchiveMeta & {
   ok: true;
   sessionFolderId: string;
@@ -51,9 +57,23 @@ export async function archiveImageToGoogle(
     });
     const text = await res.text().catch(() => "");
     if (!res.ok) {
-      const message = text || res.statusText || "Archive request failed";
+      let message = text || res.statusText || "Archive request failed";
+      let sessionFolderId: string | undefined;
+      let folderLink: string | undefined;
+      try {
+        const parsed = JSON.parse(text) as {
+          error?: string;
+          sessionFolderId?: string;
+          folderLink?: string;
+        };
+        if (parsed.error) message = parsed.error;
+        sessionFolderId = parsed.sessionFolderId;
+        folderLink = parsed.folderLink;
+      } catch {
+        /* plain text error body */
+      }
       console.error("[archive-image]", res.status, message);
-      return { ok: false, status: res.status, message };
+      return { ok: false, status: res.status, message, sessionFolderId, folderLink };
     }
     const data = JSON.parse(text) as SimpleImageArchiveMeta & { sessionFolderId: string };
     console.info("[archive-image] ok", { sheetRow: data.sheetRow, imageId: payload.imageId });

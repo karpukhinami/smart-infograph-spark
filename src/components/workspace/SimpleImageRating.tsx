@@ -51,12 +51,7 @@ export function SimpleImageRating({ imageId, showIllustrationsRow, onRate }: Pro
     });
 
     if (!sheetRow) {
-      const err = useProjectStore.getState().simpleImageArchiveErrors[imageId];
-      toast.error(
-        err ??
-          "Оценка не попала в таблицу: картинка ещё не сохранена. F12 → Network → archive-image.",
-        { duration: 8000 },
-      );
+      toast.error("Не удалось сохранить оценку", { duration: 5000 });
       return;
     }
 
@@ -75,11 +70,9 @@ export function SimpleImageRating({ imageId, showIllustrationsRow, onRate }: Pro
     });
 
     if (result.ok) {
-      toast.success("Оценка сохранена в таблицу");
-    } else if (result.status === 503) {
-      toast.error("Google-архив не настроен на сервере (503). Проверьте переменные окружения на Render.");
+      toast.success("Оценка сохранена");
     } else {
-      toast.error(`Не удалось обновить таблицу: ${result.message.slice(0, 120)}`);
+      toast.error("Не удалось сохранить оценку");
     }
   };
 

@@ -444,12 +444,14 @@ export function SimpleHome() {
     }).then((result) => {
       const store = useProjectStore.getState();
       if (!result.ok) {
+        if (result.sessionFolderId) {
+          store.setArchiveSessionFolder(result.sessionFolderId, result.folderLink ?? "");
+        }
         const msg =
           result.status === 503
-            ? "Google-архив не настроен на сервере (503). Проверьте GOOGLE_OAUTH_* и GOOGLE_DRIVE_FOLDER_ID / GOOGLE_SHEETS_ID на Render."
-            : `Не удалось сохранить картинку (${result.status}): ${result.message.slice(0, 100)}`;
+            ? "Google-архив не настроен на сервере (503)."
+            : `Archive failed (${result.status}): ${result.message.slice(0, 100)}`;
         store.setSimpleImageArchiveError(image.id, msg);
-        toast.error(msg, { duration: 8000 });
         return;
       }
       store.setArchiveSessionFolder(result.sessionFolderId, result.folderLink);
@@ -459,7 +461,6 @@ export function SimpleHome() {
         driveLink: result.driveLink,
         folderLink: result.folderLink,
       });
-      toast.success("Картинка сохранена на Google Drive");
     });
   }
 

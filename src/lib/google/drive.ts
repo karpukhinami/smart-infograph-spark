@@ -28,6 +28,25 @@ export async function ensureSessionFolder(opts: {
   const shortId = opts.sessionId.slice(0, 8);
   const name = `${date}_${shortId}`;
 
+  const existing = await drive.files.list({
+    q: [
+      `'${opts.rootFolderId}' in parents`,
+      "mimeType='application/vnd.google-apps.folder'",
+      "trashed=false",
+      `name contains '_${shortId}'`,
+    ].join(" and "),
+    fields: "files(id)",
+    pageSize: 1,
+    orderBy: "createdTime",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+
+  const existingId = existing.data.files?.[0]?.id;
+  if (existingId) {
+    return { folderId: existingId, folderLink: driveFolderLink(existingId) };
+  }
+
   const created = await drive.files.create({
     requestBody: {
       name,
