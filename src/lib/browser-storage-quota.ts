@@ -5,16 +5,30 @@ export const MIN_FREE_FOR_NEW_IMAGE = 1024 * 1024;
 
 const DEFAULT_QUOTA = 5 * 1024 * 1024;
 
-type QuotaListener = () => void;
+export type StorageQuotaContext = "save-image" | "regen";
+
+type QuotaListener = (context: StorageQuotaContext) => void;
 const quotaListeners = new Set<QuotaListener>();
+const shownQuotaWarnings = new Set<StorageQuotaContext>();
 
 export function onStorageQuotaExceeded(listener: QuotaListener): () => void {
   quotaListeners.add(listener);
   return () => quotaListeners.delete(listener);
 }
 
-function emitStorageQuotaExceeded() {
-  quotaListeners.forEach((fn) => fn());
+/** Показать предупреждение не чаще одного раза для каждого контекста, пока место не освободится. */
+export function tryNotifyStorageQuotaExceeded(context: StorageQuotaContext): boolean {
+  if (shownQuotaWarnings.has(context)) return false;
+  shownQuotaWarnings.add(context);
+  quotaListeners.forEach((fn) => fn(context));
+  return true;
+}
+
+/** Сбросить «уже показано», если в хранилище снова достаточно места. */
+export async function refreshStorageQuotaWarningState(): Promise<void> {
+  if (await hasEnoughStorageForNewImage()) {
+    shownQuotaWarnings.clear();
+  }
 }
 
 function isQuotaError(e: unknown): boolean {
@@ -68,7 +82,7 @@ export function createQuotaAwareSessionStorage(): StateStorage {
       try {
         storage.setItem(name, value);
       } catch (e) {
-        if (isQuotaError(e)) emitStorageQuotaExceeded();
+        if (isQuotaError(e)) tryNotifyStorageQuotaExceeded("save-image");
         throw e;
       }
     },

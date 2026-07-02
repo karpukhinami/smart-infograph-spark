@@ -52,7 +52,13 @@ import { SimpleImageRating } from "@/components/workspace/SimpleImageRating";
 import { ImageVersionDeleteButton } from "@/components/workspace/ImageVersionDeleteButton";
 import { cn } from "@/lib/utils";
 import { downloadInfographicPng } from "@/lib/download-infographic";
-import { hasEnoughStorageForNewImage, onStorageQuotaExceeded } from "@/lib/browser-storage-quota";
+import {
+  hasEnoughStorageForNewImage,
+  onStorageQuotaExceeded,
+  refreshStorageQuotaWarningState,
+  tryNotifyStorageQuotaExceeded,
+  type StorageQuotaContext,
+} from "@/lib/browser-storage-quota";
 import { isAdminShellPath } from "@/lib/admin-shell";
 import {
   importSourceFiles,
@@ -195,8 +201,9 @@ export function SimpleHome() {
   const [regenAfterEditOpen, setRegenAfterEditOpen] = useState(false);
   const [imageFullscreen, setImageFullscreen] = useState(false);
   const [deleteImageId, setDeleteImageId] = useState<string | null>(null);
-  const [storageRegenWarningOpen, setStorageRegenWarningOpen] = useState(false);
-  const [storageQuotaFullscreen, setStorageQuotaFullscreen] = useState(false);
+  const [storageQuotaWarningOpen, setStorageQuotaWarningOpen] = useState(false);
+  const [storageQuotaWarningContext, setStorageQuotaWarningContext] =
+    useState<StorageQuotaContext>("save-image");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -239,7 +246,10 @@ export function SimpleHome() {
   }, [simpleCurrent?.id]);
 
   useEffect(() => {
-    return onStorageQuotaExceeded(() => setStorageQuotaFullscreen(true));
+    return onStorageQuotaExceeded((context) => {
+      setStorageQuotaWarningContext(context);
+      setStorageQuotaWarningOpen(true);
+    });
   }, []);
 
   const deleteImageTarget = useMemo(() => {
@@ -263,8 +273,9 @@ export function SimpleHome() {
   }
 
   async function ensureStorageForRegen(): Promise<boolean> {
+    await refreshStorageQuotaWarningState();
     const ok = await hasEnoughStorageForNewImage();
-    if (!ok) setStorageRegenWarningOpen(true);
+    if (!ok) tryNotifyStorageQuotaExceeded("regen");
     return ok;
   }
 
@@ -279,6 +290,7 @@ export function SimpleHome() {
     if (saveFirst) downloadSimpleImageEntry(deleteImageTarget);
     deleteSimpleImage(deleteImageTarget.id);
     setDeleteImageId(null);
+    void refreshStorageQuotaWarningState();
   }
 
   async function attachImageFiles(files: File[]) {
@@ -354,11 +366,7 @@ export function SimpleHome() {
   // === Image ===
   async function runImage(
     opts: { useProfileName?: string | null; genTrigger?: GenTrigger } = {},
-  ): Promise<void> {
-    if (!(await hasEnoughStorageForNewImage())) {
-      setStorageQuotaFullscreen(true);
-      throw new Error("Недостаточно места в хранилище браузера");
-    }
+  ): Promise<boolean> {
     const project = useProjectStore.getState();
     const settings = useSettingsStore.getState();
     const profiles = settings.profiles;
@@ -415,9 +423,13 @@ export function SimpleHome() {
       generationSnapshot,
     });
 
+    if (!(await hasEnoughStorageForNewImage())) {
+      tryNotifyStorageQuotaExceeded("save-image");
+    }
+
     const after = useProjectStore.getState();
     const image = after.simpleCurrentImage;
-    if (!image) return;
+    if (!image) return false;
 
     const analysis = content.value.analysis;
     const genTrigger = opts.genTrigger ?? "initial";
@@ -462,6 +474,7 @@ export function SimpleHome() {
         folderLink: result.folderLink,
       });
     });
+    return true;
   }
 
   // === One-shot: generate everything ===
@@ -495,7 +508,8 @@ export function SimpleHome() {
       const useProfile = profileBeforeAnalyze ?? DEFAULT_HOME_DESIGN_PROFILE;
       if (!profileBeforeAnalyze) setSelectedProfileName(DEFAULT_HOME_DESIGN_PROFILE);
       setLoading("image");
-      await runImage({ useProfileName: useProfile, genTrigger: "initial" });
+      const imageOk = await runImage({ useProfileName: useProfile, genTrigger: "initial" });
+      if (!imageOk) return;
       if (trackHome) {
         const img = useProjectStore.getState().simpleCurrentImage;
         trackHomeImageSuccess(pathname, {
@@ -543,7 +557,8 @@ export function SimpleHome() {
       setUserWishes(wishes);
       setLoading("image");
       setPaneMode("image");
-      await runImage({ useProfileName: profileName, genTrigger: "regen_image" });
+      const imageOk = await runImage({ useProfileName: profileName, genTrigger: "regen_image" });
+      if (!imageOk) return;
       if (trackHome) {
         const img = useProjectStore.getState().simpleCurrentImage;
         trackHomeRegenImageSuccess(pathname, {
@@ -576,6 +591,7 @@ export function SimpleHome() {
     setEditMode(false);
     setEditSnapshot(null);
     setPaneMode("image");
+    void refreshStorageQuotaWarningState();
     toast.success("Проект сброшен");
   }
 
@@ -611,10 +627,11 @@ export function SimpleHome() {
       setUserWishes(wishes);
       setLoading("image");
       setPaneMode("image");
-      await runImage({
+      const imageOk = await runImage({
         useProfileName: selectedProfileName ?? activeProfile?.profileName ?? null,
         genTrigger: "regen_after_edit",
       });
+      if (!imageOk) return;
       if (trackHome) {
         const img = useProjectStore.getState().simpleCurrentImage;
         trackHomeEditSaveAndRegenSuccess(pathname, {
@@ -1196,12 +1213,14 @@ export function SimpleHome() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={storageRegenWarningOpen} onOpenChange={setStorageRegenWarningOpen}>
+      <AlertDialog open={storageQuotaWarningOpen} onOpenChange={setStorageQuotaWarningOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Недостаточно места</AlertDialogTitle>
             <AlertDialogDescription>
-              Хранилища браузера не хватит для сохранения нового изображения. Удалите одну из ранее созданных инфографик прежде чем выполнять перегенерацию
+              {storageQuotaWarningContext === "regen"
+                ? "Хранилища браузера не хватит для сохранения нового изображения. Удалите одну из ранее созданных инфографик прежде чем выполнять перегенерацию."
+                : "Хранилища браузера недостаточно для сохранения нового изображения. Удалите одну из ранее созданных инфографик или начните новый проект."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1209,22 +1228,6 @@ export function SimpleHome() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {storageQuotaFullscreen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 p-6"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="storage-quota-title"
-        >
-          <div className="max-w-lg space-y-5 text-center">
-            <p id="storage-quota-title" className="text-base leading-relaxed">
-              Хранилища браузера недостаточно для сохранения нового изображения. Удалите одну из ранее созданных инфографик прежде чем выполнять перегенерацию или начните новый проект
-            </p>
-            <Button onClick={() => setStorageQuotaFullscreen(false)}>Понятно</Button>
-          </div>
-        </div>
-      )}
 
 
       {/* Reset confirm */}
