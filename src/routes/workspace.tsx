@@ -464,7 +464,8 @@ ${activeContent.value.content}`;
 
 
   return (
-    <div className="mx-auto max-w-[1600px] p-4 space-y-3">
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-[1600px] p-4 space-y-3">
       <div className="flex justify-end">
         <HelpFiles />
       </div>
@@ -777,6 +778,7 @@ ${activeContent.value.content}`;
           </Tabs>
         </div>
       </section>
+      </div>
       </div>
 
       <RefineDialog
