@@ -14,6 +14,7 @@ import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
+import { A4AutoLayoutView } from "@/components/workspace/A4AutoLayoutView";
 import { WireframeView } from "@/components/workspace/WireframeView";
 import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
@@ -679,6 +680,7 @@ ${activeContent.value.content}`;
           <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as PaneMode)}>
             <TabsList>
               <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
+              <TabsTrigger value="auto-layout" disabled={!activeContent?.value.analysis}>авто-макет</TabsTrigger>
               <TabsTrigger value="wireframe" disabled={!activeBrief && !activeSpec}>Каркас</TabsTrigger>
               <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
@@ -723,6 +725,14 @@ ${activeContent.value.content}`;
                 </>
               ) : (
                 <EmptyState text="Запустите анализ, чтобы увидеть здесь сводку по контенту." />
+              )}
+            </TabsContent>
+
+            <TabsContent value="auto-layout" className="p-2 space-y-2">
+              {activeContent?.value.analysis ? (
+                <A4AutoLayoutView analysis={activeContent.value.analysis} active={paneMode === "auto-layout"} />
+              ) : (
+                <EmptyState text="Авто-макет доступен после анализа в strict-режиме (структурированный JSON)." />
               )}
             </TabsContent>
 

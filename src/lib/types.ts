@@ -161,7 +161,7 @@ export interface DesignBriefResult {
   WireframeSketch?: string;
 }
 
-export type PaneMode = "content" | "wireframe" | "image";
+export type PaneMode = "content" | "auto-layout" | "wireframe" | "image";
 
 export interface Versioned<T> {
   id: string;
