@@ -1,4 +1,4 @@
-import { PX_WIDTH_KEYS, WIDTHS } from "@/lib/a4-layout/constants";
+import { PX_WIDTH_KEYS, WIDTHS, isWideCardFraction } from "@/lib/a4-layout/constants";
 import type { A4LayoutSettings, A4LayoutSummary, EntityHint, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
 import { asArray, flattenText, textStats } from "@/lib/a4-layout/text";
 
@@ -115,7 +115,7 @@ export function estimateEntityAtFraction(entity: LayoutEntity, s: A4LayoutSettin
   let rightGain: number | null = null;
   let rightStatus = "unavailable";
 
-  if (hasAddendum && fraction >= 2 / 3) {
+  if (hasAddendum && isWideCardFraction(fraction)) {
     const splitGap = 8;
     const splitCandidates = fraction >= 1 ? [0.58, 0.64, 0.7, 0.76] : [0.5, 0.56, 0.62, 0.68];
     let bestRight: { height: number } | null = null;

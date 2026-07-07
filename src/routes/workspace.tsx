@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -86,7 +86,6 @@ function Workspace() {
   const uploadedSourceText = useProjectStore((s) => s.uploadedSourceText);
   const setUploadedSourceText = useProjectStore((s) => s.setUploadedSourceText);
 
-
   const activeContent = useActiveContent();
   const activeBrief = useActiveBrief();
   const activeImage = useActiveImage();
@@ -101,6 +100,8 @@ function Workspace() {
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
   const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine">(null);
   const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
+  const [manualLayoutTemplate, setManualLayoutTemplate] = useState("");
+  const [appliedManualLayout, setAppliedManualLayout] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -116,6 +117,25 @@ function Workspace() {
 
   const hasSource = hasSourceMaterials(source.text, uploadedSourceText, attachedImages);
   const useTopicOnlyPrompt = !hasSource;
+
+  useEffect(() => {
+    setAppliedManualLayout(null);
+  }, [activeContent?.id]);
+
+  function onRecalculateManualLayout() {
+    if (!activeContent?.value.analysis) {
+      toast.error("Сначала выполните анализ контента");
+      return;
+    }
+    const text = manualLayoutTemplate.trim();
+    if (!text) {
+      toast.error("Введите шаблон рядов — по одной строке на ряд");
+      return;
+    }
+    setAppliedManualLayout(text);
+    setPaneMode("auto-layout");
+    toast.success("Макет пересчитан по шаблону");
+  }
 
   // Legacy OCR-as-text fallback removed: images are now passed multimodally to the analysis model.
 
@@ -613,6 +633,32 @@ ${activeContent.value.content}`;
             </div>
             {mode === "strict" && briefMode === "programmatic" ? (
               <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="manual-layout-template">
+                    Ручной ввод шаблона
+                  </Label>
+                  <Textarea
+                    id="manual-layout-template"
+                    rows={5}
+                    spellCheck={false}
+                    placeholder={"1\n1:1\n1:2:1"}
+                    value={manualLayoutTemplate}
+                    onChange={(e) => setManualLayoutTemplate(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Одна строка — один ряд. Карточки берутся из JSON в исходном порядке:{" "}
+                    <code>1</code> — одна на всю ширину, <code>1:1</code> — две поровну, <code>1:2:1</code> — три в заданной пропорции.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onRecalculateManualLayout}
+                    disabled={loading !== null || !activeContent?.value.analysis}
+                  >
+                    Пересчитать
+                  </Button>
+                </div>
                 <PromptDisclosure
                   label="Показать промпт технического макета"
                   value={prompts.codeBasedProduct}
@@ -730,7 +776,11 @@ ${activeContent.value.content}`;
 
             <TabsContent value="auto-layout" className="p-2 space-y-2">
               {activeContent?.value.analysis ? (
-                <A4AutoLayoutView analysis={activeContent.value.analysis} active={paneMode === "auto-layout"} />
+                <A4AutoLayoutView
+                  analysis={activeContent.value.analysis}
+                  active={paneMode === "auto-layout"}
+                  manualTemplate={appliedManualLayout}
+                />
               ) : (
                 <EmptyState text="Авто-макет доступен после анализа в strict-режиме (структурированный JSON)." />
               )}

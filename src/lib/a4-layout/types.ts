@@ -95,6 +95,8 @@ export interface LayoutPlan {
   alternatives: unknown[];
   decisions: unknown[];
   trace: unknown[];
+  manual?: boolean;
+  manualErrors?: string[];
 }
 
 export interface A4RowTargets {
@@ -119,6 +121,7 @@ export interface A4AutoLayoutResult {
   plan: LayoutPlan;
   settings: A4LayoutSettings;
   rowTargets: A4RowTargets;
+  manualErrors?: string[];
 }
 
 export type { AnalysisJson };

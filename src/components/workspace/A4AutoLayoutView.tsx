@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { AnalysisJson } from "@/lib/types";
 import {
   buildA4AutoLayout,
+  buildA4ManualLayout,
   checkA4Overflow,
   renderA4CardClassName,
   renderA4CardInner,
@@ -14,6 +15,8 @@ interface Props {
   analysis: AnalysisJson;
   /** When false, DOM fit is deferred until the tab becomes visible. */
   active: boolean;
+  /** When set, layout is built from this manual template instead of auto-optimization. */
+  manualTemplate?: string | null;
 }
 
 function typesetFormulas(root: HTMLElement) {
@@ -34,9 +37,15 @@ function typesetFormulas(root: HTMLElement) {
   });
 }
 
-export function A4AutoLayoutView({ analysis, active }: Props) {
-  const layout = useMemo(() => buildA4AutoLayout(analysis), [analysis]);
-  const { summary, plan, settings, rowTargets } = layout;
+export function A4AutoLayoutView({ analysis, active, manualTemplate = null }: Props) {
+  const layout = useMemo(() => {
+    const trimmed = manualTemplate?.trim();
+    if (trimmed) return buildA4ManualLayout(analysis, trimmed);
+    return buildA4AutoLayout(analysis);
+  }, [analysis, manualTemplate]);
+
+  const { summary, plan, settings, rowTargets, manualErrors } = layout;
+  const isManual = Boolean(manualTemplate?.trim());
   const rootRef = useRef<HTMLDivElement>(null);
   const [metrics, setMetrics] = useState("");
   const [overflowText, setOverflowText] = useState("");
@@ -69,6 +78,16 @@ export function A4AutoLayoutView({ analysis, active }: Props) {
 
   return (
     <div ref={rootRef} className="a4-auto-layout-root">
+      {isManual ? (
+        <div className="a4-layout-mode-note">Ручной шаблон рядов</div>
+      ) : (
+        <div className="a4-layout-mode-note a4-layout-mode-note-auto">Автоматический расчёт рядов</div>
+      )}
+
+      {manualErrors && manualErrors.length > 0 ? (
+        <div className="a4-manual-warnings">{manualErrors.join("\n")}</div>
+      ) : null}
+
       <div className="a4-summary-cards">
         <div className="a4-metric">
           <strong>{settings.pageWidthPx}×{settings.pageHeightPx}</strong>

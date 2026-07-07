@@ -1094,7 +1094,8 @@ Rules:
 - Full width cards can place addendums right if the main text is short or compact. If the text is long and dense, prefer below.
 - Row layout is mainly for two or three very short addendums.
 - Grid is for four addendums.
-- A combined addendum must keep every item on a separate line.
+- If several addendums are combined into one item, you may place short pieces in one line separated by commas, semicolons or another clear separator when it is more logical than separate lines.
+- If several addendums remain as separate items inside a stack, each item must remain visually separate.
 - Maximum addendum items: 4.
 
 CONTENT RULES
@@ -1129,6 +1130,7 @@ Object 2: layout
 Contains rows:
 - rows[]
 - every cardId exactly once
+- preserve the original card order strictly: do not reorder cardId values. You may only choose row breaks and widths.
 - width may use any positive fraction format supported by the renderer (for example 3/5, 7/10, 2/7)
 - the sum of widths inside every row must equal exactly 1
 - a row may contain no more than 4 cards
@@ -1536,6 +1538,25 @@ function estimateEntityAtFraction(entity, s, fraction) {
       return sameSection(cards) && sameEntityType(cards);
     }
 
+    // Strong semantic sequences are allowed to override visual height balance.
+    // Generic similarity is not enough: a trio should be forced only for real
+    // same-order structures such as algorithm/classification steps or parallel
+    // action forms.
+    function isStrongSameOrderSequence(cards) {
+      if (!cards || cards.length < 2 || !sameSemanticOrder(cards)) return false;
+      const allowed = new Set(['algorithmStep', 'classificationItem', 'actionList']);
+      return cards.every(c => allowed.has(c.entityType));
+    }
+
+    function rowHeightBalance(row, maxAbsGap = 64, minRatio = 0.72) {
+      if (!row || !Array.isArray(row.heights) || row.heights.length < 2) return { ok: true, min: 0, max: 0, gap: 0, ratio: 1 };
+      const max = Math.max(...row.heights);
+      const min = Math.min(...row.heights);
+      const gap = max - min;
+      const ratio = max <= 0 ? 1 : min / max;
+      return { ok: gap <= maxAbsGap && ratio >= minRatio, min, max, gap, ratio };
+    }
+
     function sameTypeRunLength(cards, startIndex) {
       const first = cards[startIndex];
       if (!first) return 0;
@@ -1807,7 +1828,9 @@ function estimateEntityAtFraction(entity, s, fraction) {
         if (i + 2 < cards.length) {
           const k3 = cards[i + 2];
           const trioCards = [k1, k2, k3];
-          const preferTrio = isAlgorithmOrClassificationSequence(trioCards, previousCore) || sameSemanticOrder(trioCards);
+          const strictSemanticTrio = isAlgorithmOrClassificationSequence(trioCards, previousCore) || isStrongSameOrderSequence(trioCards);
+          const similarButNotStrict = !strictSemanticTrio && sameSemanticOrder(trioCards);
+          const preferTrio = strictSemanticTrio;
           const trioCandidates = allRowCandidates(trioCards, s, { preferTrio, discourageTrio: !preferTrio });
           const bestTrio = trioCandidates[0] || null;
           const single3 = singleFullRowCost(k3, s);
@@ -1815,7 +1838,9 @@ function estimateEntityAtFraction(entity, s, fraction) {
           const pairPlusThirdHeight = bestPair.rowHeight + s.gapPx + single3.rowHeight;
           const trioThresholdMultiplier = preferTrio ? 1.08 : 0.96;
           const trioThreshold = pairPlusThirdHeight * trioThresholdMultiplier;
-          const trioWins = bestTrio && bestTrio.rowHeight <= trioThreshold;
+          const trioBalance = rowHeightBalance(bestTrio);
+          const trioVisualAllowed = strictSemanticTrio || (trioBalance.ok && (bestTrio?.emptyRatio ?? 100) <= 24);
+          const trioWins = bestTrio && trioVisualAllowed && bestTrio.rowHeight <= trioThreshold;
 
           trace.push({
             stepIndex: i,
@@ -1823,6 +1848,10 @@ function estimateEntityAtFraction(entity, s, fraction) {
             cards: trioCards.map(c => c.entityIndex),
             titles: trioCards.map(c => c.title),
             semanticPriority: preferTrio,
+            strictSemanticTrio,
+            similarButNotStrict,
+            trioBalance,
+            trioVisualAllowed,
             compareAgainst: {
               pattern: `${bestPair.pattern} + 1`,
               cost: Math.round(pairPlusThirdCost),
@@ -1852,8 +1881,8 @@ function estimateEntityAtFraction(entity, s, fraction) {
               comparedToPairPlusFullHeight: Math.round(pairPlusThirdHeight),
               semanticPriority: preferTrio,
               reason: preferTrio
-                ? 'Три карточки являются шагами алгоритма или элементами классификации, поэтому ряд из трёх получает композиционный приоритет.'
-                : 'Три карточки в одном ряду заметно компактнее, чем лучшая пара плюс третья полноширинно.'
+                ? 'Три карточки являются строгой смысловой серией: шагами алгоритма, элементами классификации или параллельными actionList-формами, поэтому ряд из трёх получает композиционный приоритет.'
+                : 'Три карточки в одном ряду компактнее и проходят проверку визуального баланса высот.'
             });
             i += 3;
             continue;
@@ -2951,6 +2980,38 @@ function renderWireframe(summary, hints, plan, s) {
       return `<div class="a4-addendum-item a4-addendum-combined a4-formula">${items.map(v => `<p>${escapeHtml(a4LatexText(v))}</p>`).join('')}</div>`;
     }
 
+    function a4IsLatexLike(value) {
+      const t = String(value || '').trim();
+      return /^\$\$[\s\S]*\$\$$/.test(t) || /^\\\([\s\S]*\\\)$/.test(t) || /^\\\[[\s\S]*\\\]$/.test(t);
+    }
+
+    function a4RenderAddendumItemContent(item, allowHtml = false) {
+      const text = String(item || '').trim();
+      if (a4IsLatexLike(text)) return escapeHtml(a4LatexText(text));
+      return allowHtml ? sanitizeAIHtml(text) : escapeHtml(text);
+    }
+
+    function a4ExplicitAddendumHtml(itemsValue, fraction, placement, layout = 'single', allowHtml = false) {
+      const items = asArray(itemsValue).map(v => flattenText(v)).filter(Boolean).slice(0, 4);
+      if (!items.length) return '';
+      let safeLayout = ['single', 'stack', 'row', 'grid'].includes(layout) ? layout : 'single';
+      if (items.length === 1) safeLayout = 'single';
+      if (safeLayout === 'grid' && items.length < 4) safeLayout = items.length <= 2 ? 'row' : 'stack';
+      if (safeLayout === 'row' && items.length > 3) safeLayout = 'grid';
+
+      if (safeLayout === 'single') {
+        return `<div class="a4-addendum-item a4-addendum-combined"><p>${a4RenderAddendumItemContent(items.join('<br>'), allowHtml)}</p></div>`;
+      }
+
+      if (safeLayout === 'stack') {
+        const content = items.map(item => `<p>${a4RenderAddendumItemContent(item, allowHtml)}</p>`).join('');
+        return `<div class="a4-addendum-item a4-addendum-combined">${content}</div>`;
+      }
+
+      const cls = safeLayout === 'row' ? 'a4-addendum-row' : 'a4-addendum-grid';
+      return `<div class="${cls}">${items.map(item => `<div class="a4-addendum-item"><p>${a4RenderAddendumItemContent(item, allowHtml)}</p></div>`).join('')}</div>`;
+    }
+
     function a4AddendumHtml(value, fraction, placement) {
       const items = asArray(value).map(v => flattenText(v)).filter(Boolean);
       if (!items.length) return '';
@@ -2981,18 +3042,26 @@ function renderWireframe(summary, hints, plan, s) {
     function renderA4Card(entity, report = null, fraction = 1) {
       const title = entity.title ? `<div class="a4-title-pill">${escapeHtml(entity.title)}</div>` : '';
       const body = entity.contentHtml ? aiBodyHtml(entity) : a4BodyHtml(entity);
+      const aiAdd = entity.aiAddendums || null;
+      const aiItems = aiAdd ? asArray(aiAdd.items).map(v => flattenText(v)).filter(Boolean).slice(0, 4) : [];
+      const hasAIAddendum = aiItems.length > 0;
       const hasFormula = textStats(entity.formula).chars > 0;
       const hasAddendum = textStats(entity.cardAddendum).chars > 0;
-      const rightByEstimator = Boolean(hasAddendum && report && report.bestPlacement === 'rightOfBody' && report.heightRightPx != null);
-      // If there is only a compact formula, the old estimator has no rightHeight candidate,
-      // because right-side comparison was originally triggered by cardAddendum.
-      // On wide rows we can still put the formula into the same side cloud: geometry is fixed,
-      // and the independent DOM fit will validate the result inside this exact card.
-      const formulaOnlyRight = Boolean(!hasAddendum && hasFormula && fraction >= 2 / 3 && textStats(entity.content).chars > 0);
-      const useRight = Boolean((rightByEstimator || formulaOnlyRight) && fraction >= 2 / 3);
+
+      const aiPlacement = aiAdd && aiAdd.placement === 'right' ? 'right' : aiAdd && aiAdd.placement === 'below' ? 'below' : null;
+      const rightByEstimator = Boolean(!hasAIAddendum && hasAddendum && report && report.bestPlacement === 'rightOfBody' && report.heightRightPx != null);
+      const formulaOnlyRight = Boolean(!hasAIAddendum && !hasAddendum && hasFormula && fraction >= 2 / 3 && textStats(entity.content).chars > 0);
+      const useRight = hasAIAddendum ? aiPlacement === 'right' : Boolean((rightByEstimator || formulaOnlyRight) && fraction >= 2 / 3);
 
       let inner = '';
-      if (useRight) {
+      if (hasAIAddendum) {
+        const addHtml = `<div class="a4-addendum-zone">${a4ExplicitAddendumHtml(aiItems, fraction, aiPlacement || 'below', aiAdd.layout || 'single', true)}</div>`;
+        if (useRight) {
+          inner = `${title}<div class="a4-card-inner"><div class="a4-main-col">${body}</div><div class="a4-side-col">${addHtml}</div></div>`;
+        } else {
+          inner = `${title}${body}${addHtml}`;
+        }
+      } else if (useRight) {
         inner = `${title}<div class="a4-card-inner"><div class="a4-main-col">${body}</div><div class="a4-side-col">${a4SideFormulaAddendumHtml(entity.formula, entity.cardAddendum)}</div></div>`;
       } else {
         const formula = hasFormula ? a4FormulaHtml(entity.formula) : '';
@@ -3620,30 +3689,50 @@ function renderWireframe(summary, hints, plan, s) {
       return wrapper.innerHTML;
     }
 
+    function aiBodyHtml(entity) {
+      if (!entity.contentHtml) return a4BodyHtml(entity);
+      const html = String(entity.content || '').trim();
+      if (!html) return '';
+      return `<div class="a4-body">${html}</div>`;
+    }
+
+
+    function normalizedAIAddendums(addendums) {
+      const raw = addendums || {};
+      let items = [];
+      if (Array.isArray(raw)) items = raw;
+      else if (Array.isArray(raw.items)) items = raw.items;
+      else if (raw.items != null) items = [raw.items];
+      const placement = raw.placement === 'right' ? 'right' : 'below';
+      let layout = ['single', 'stack', 'row', 'grid'].includes(raw.layout) ? raw.layout : 'single';
+      items = items.map(v => flattenText(v)).filter(Boolean).slice(0, 4);
+      if (items.length <= 1) layout = 'single';
+      if (layout === 'grid' && items.length < 4) layout = items.length <= 2 ? 'row' : 'stack';
+      if (layout === 'row' && items.length > 3) layout = 'grid';
+      return { placement, layout, items };
+    }
+
     function aiCardsToEntities(result) {
       return (result.cards || []).map(card => {
-        const allAdd = card.addendums?.items || [];
-        const formula = allAdd.filter(x => /^\s*\$\$|^\s*\\\(|^\s*\\\[/.test(String(x)));
-        const add = allAdd.filter(x => !formula.includes(x));
+        const add = normalizedAIAddendums(card.addendums);
         return {
           title: card.title || '',
           content: sanitizeAIHtml(card.content || ''),
           contentHtml: true,
-          formula,
-          cardAddendum: add.map(x => sanitizeAIHtml(x)),
-          attention: card.attention || 'normal'
+          formula: null,
+          cardAddendum: null,
+          aiAddendums: add,
+          attention: card.attention || 'normal',
+          entityType: 'aiCard',
+          sectionId: 'main'
         };
       });
     }
 
-    function aiBodyHtml(entity) {
-      return entity.contentHtml ? entity.content : a4BodyHtml(entity);
-    }
-
-
     function parseAIWidth(value) {
       if (typeof value === 'number' && value > 0) return value;
       const text = String(value || '').trim();
+      if (/^\d+(?:\.\d+)?%$/.test(text)) return Number(text.slice(0, -1)) / 100;
       if (text.includes('/')) {
         const parts = text.split('/').map(Number);
         if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) return parts[0] / parts[1];
@@ -3651,95 +3740,139 @@ function renderWireframe(summary, hints, plan, s) {
       return Number(text) || 0;
     }
 
-    function normalizeAIRows(rows) {
-      return (rows || []).map(row => {
-        let cards = Array.isArray(row.cards) ? row.cards.slice(0, 4) : [];
-        let total = cards.reduce((sum, c) => sum + parseAIWidth(c.width), 0);
-        if (!total) total = 1;
-        // Renderer normalizes only malformed totals. Valid AI layouts remain untouched.
-        cards = cards.map(c => ({ ...c, fraction: parseAIWidth(c.width) / total }));
-        return { ...row, cards };
+    function normalizeAIRowsForRender(rows, totalCards) {
+      if (!Array.isArray(rows)) throw new Error('AI layout.rows is missing');
+      const flat = [];
+      rows.forEach(row => (row.cards || []).forEach(c => flat.push(c)));
+      const ids = flat.map(c => Number(c.cardId));
+      const expected = Array.from({ length: totalCards }, (_, i) => i + 1);
+      const sorted = ids.slice().sort((a, b) => a - b);
+      if (sorted.length !== expected.length || sorted.some((id, i) => id !== expected[i])) {
+        throw new Error('AI layout must contain every cardId exactly once');
+      }
+      if (ids.some((id, i) => id !== expected[i])) {
+        throw new Error('AI layout changed card order. Card order must stay exactly 1, 2, 3...; only row breaks and widths may change.');
+      }
+
+      return rows.map((row, rowIndex) => {
+        const sourceCards = (row.cards || []).slice(0, 4);
+        if (!sourceCards.length) throw new Error(`AI row ${rowIndex + 1} is empty`);
+        if ((row.cards || []).length > 4) throw new Error(`AI row ${rowIndex + 1} has more than 4 cards`);
+        const cards = sourceCards.map(c => {
+          const cardId = Number(c.cardId);
+          const width = parseAIWidth(c.width);
+          if (!(width > 0)) throw new Error(`AI row ${rowIndex + 1}, card ${cardId}: invalid width`);
+          return { cardId, width, originalWidth: c.width };
+        });
+        const total = cards.reduce((sum, c) => sum + c.width, 0);
+        if (Math.abs(total - 1) > 0.02) throw new Error(`AI row ${rowIndex + 1}: widths must sum to 1, got ${Math.round(total * 1000) / 1000}`);
+        return { cards: cards.map(c => ({ ...c, fraction: c.width / total })) };
       });
     }
 
+    function makeAIReportForCard(hint, fraction, entity) {
+      const report = hint ? { ...hint.atFraction(fraction) } : { bestHeightPx: 100, heightBelowPx: 100, heightRightPx: null, fit: 'good', bestPlacement: 'belowBody' };
+      const add = entity.aiAddendums || { placement: 'below', layout: 'single', items: [] };
+      if (add.placement === 'right') {
+        report.bestPlacement = 'rightOfBody';
+        if (report.heightRightPx == null) report.heightRightPx = report.heightBelowPx || report.bestHeightPx || 100;
+        report.bestHeightPx = report.heightRightPx;
+      } else {
+        report.bestPlacement = 'belowBody';
+        report.bestHeightPx = report.heightBelowPx || report.bestHeightPx || 100;
+      }
+      return report;
+    }
 
-    function normalizeAIOrder(layout, totalCards) {
-      if (!layout || !Array.isArray(layout.rows)) return layout;
-      const all = layout.rows.flatMap(r => r.cards || []);
-      const sorted = all.slice().sort((a,b) => (a.cardId||0)-(b.cardId||0));
-      const same = all.every((c,i) => c.cardId === sorted[i]?.cardId);
-      if (same) return layout;
-      // Preserve source order if the model accidentally moved cards.
-      let index = 0;
+    function buildAILayoutPlan(result, settings) {
+      const entities = aiCardsToEntities(result);
+      const hints = entities.map((e, i) => analyzeEntity(e, i, settings));
+      const rowsIn = normalizeAIRowsForRender(result.layout?.rows || [], entities.length);
+      const rows = rowsIn.map(row => {
+        const cards = row.cards.map(c => {
+          const entity = entities[c.cardId - 1];
+          const hint = hints[c.cardId - 1];
+          const report = makeAIReportForCard(hint, c.fraction, entity);
+          return {
+            sourceEntity: entity,
+            entityIndex: c.cardId - 1,
+            title: entity.title || `Card ${c.cardId}`,
+            fraction: c.fraction,
+            reports: report,
+            atFraction: fraction => makeAIReportForCard(hint, fraction, entity)
+          };
+        });
+        const reports = cards.map(c => c.reports);
+        const heights = reports.map(r => Math.max(34, r.bestHeightPx || r.heightBelowPx || 100));
+        return {
+          cards,
+          fractions: cards.map(c => c.fraction),
+          reports,
+          heights,
+          rowHeight: Math.max(...heights),
+          cost: Math.max(...heights),
+          pattern: cards.map(c => String(c.fraction)).join(':'),
+          emptyRatio: 0,
+          mixedSections: false
+        };
+      });
+      const availableHeight = settings.pageHeightPx - 2 * settings.outerMarginPx;
+      const totalRowsHeight = rows.reduce((sum, r) => sum + r.rowHeight, 0) + Math.max(0, rows.length - 1) * settings.gapPx;
       return {
-        rows: layout.rows.map(row => ({
-          ...row,
-          cards: (row.cards || []).map(() => sorted[index++]).filter(Boolean)
-        }))
+        rows,
+        score: rows.reduce((sum, r) => sum + (r.cost || r.rowHeight), 0),
+        totalRowsHeight: Math.round(totalRowsHeight),
+        availableHeight: Math.round(availableHeight),
+        fitRatio: Math.round((totalRowsHeight / Math.max(1, availableHeight)) * 100),
+        verdict: totalRowsHeight <= availableHeight ? 'aiLayout' : 'aiOverflowRisk'
       };
     }
 
-    // AI preview uses the same A4 construction pipeline as the main A4 tab.
-    // Only the source of rows changes: mechanical layout or AI-proposed layout.
-    function renderAILayoutPreview(result) {
-      const box = document.getElementById('aiPreview');
-      if (!box || !result?.layout?.rows) return;
-
-      const settings = getSettings();
-      const entities = aiCardsToEntities(result);
-      const hints = entities.map((e, i) => analyzeEntity(e, i, settings));
-      const normalizedLayout = normalizeAIOrder(result.layout, entities.length);
-
-      const plan = {
-        rows: normalizedLayout.rows.map(row => {
-          const cards = row.cards.map(c => {
-            const fraction = parseAIWidth(c.width);
-            const hint = hints[c.cardId - 1];
-            const report = hint ? hint.atFraction(fraction) : { bestHeightPx: 100, fit: 'good' };
-            return {
-              sourceEntity: entities[c.cardId - 1],
-              entityIndex: c.cardId - 1,
-              fraction,
-              reports: report,
-              title: entities[c.cardId - 1]?.title || ''
-            };
-          });
-          return {
-            cards,
-            fractions: cards.map(c => c.fraction),
-            reports: cards.map(c => c.reports),
-            rowHeight: Math.max(...cards.map(c => c.reports.bestHeightPx || 100)),
-            heights: cards.map(c => c.reports.bestHeightPx || 100)
-          };
-        })
-      };
-
-      const rowTargets = computeA4RowTargets(plan, settings, lastAnalyzedPayload || {});
-      let html = `<div class="poster-shell"><div class="poster-frame a4-clean" style="--a4-page-h:${settings.pageHeightPx}px; width:${settings.pageWidthPx}px; min-width:${settings.pageWidthPx}px; height:${settings.pageHeightPx}px; min-height:${settings.pageHeightPx}px; padding:${settings.outerMarginPx}px;">
-        ${renderA4Header(lastAnalyzedPayload || {}, rowTargets.headerHeight, settings)}
-        <div class="a4-card-area" style="gap:${rowTargets.rowGap}px; height:${rowTargets.availableRowsHeight}px; margin-top:${rowTargets.headerGap}px;">`;
-
-      plan.rows.forEach((row, idx) => {
-        const h = Math.round(rowTargets.targetHeights[idx]);
-        html += `<div class="a4-row" style="height:${h}px; min-height:${h}px; grid-template-columns:${row.fractions.map(f => `${f}fr`).join(' ')}">`;
-        row.cards.forEach(card => {
-          html += renderA4Card(card.sourceEntity, card.reports, card.fraction);
+    function renderA4PlanInto(container, summary, plan, settings, label = 'A4 preview') {
+      const root = typeof container === 'string' ? document.querySelector(container) : container;
+      if (!root) return;
+      const rowTargets = computeA4RowTargets(plan, settings, summary || {});
+      let html = `<div class="wf-font-note">${escapeHtml(label)}: сначала созданы фиксированные окна по тем же расчётам, затем контент подогнан тем же DOM-fit.</div>
+        <div class="poster-shell"><div class="poster-frame a4-clean" style="--a4-page-h:${settings.pageHeightPx}px; --a4-gap:${rowTargets.rowGap}px; width:${settings.pageWidthPx}px; min-width:${settings.pageWidthPx}px; height:${settings.pageHeightPx}px; min-height:${settings.pageHeightPx}px; padding:${settings.outerMarginPx}px;">
+          ${renderA4Header(summary || {}, rowTargets.headerHeight, settings)}
+          <div class="a4-card-area" style="gap:${rowTargets.rowGap}px; height:${rowTargets.availableRowsHeight}px; margin-top:${rowTargets.headerGap}px;">`;
+      plan.rows.forEach((row, rowIndex) => {
+        const rowHeight = Math.max(34, Math.round(rowTargets.targetHeights[rowIndex] || row.rowHeight || 80));
+        html += `<div class="a4-row" data-est-height="${Math.round(row.rowHeight || rowHeight)}" data-fixed-height="${rowHeight}" style="grid-template-columns:${row.fractions.map(f => `minmax(0, ${f}fr)`).join(' ')}; height:${rowHeight}px; min-height:${rowHeight}px; max-height:${rowHeight}px;">`;
+        row.cards.forEach((card, i) => {
+          html += renderA4Card(card.sourceEntity, row.reports[i], row.fractions[i]);
         });
         html += `</div>`;
       });
-
-      html += `</div></div></div>`;
-      box.innerHTML = html;
-
+      html += `</div></div></div><div class="wf-dom-metrics ai-dom-metrics"></div><div class="wf-overflow-summary ai-overflow-summary"></div>`;
+      root.innerHTML = html;
       requestAnimationFrame(() => {
-        const cards = Array.from(box.querySelectorAll('.a4-card[data-a4-fit-card="1"]'));
-        cards.forEach(card => a4FitCardIndependent(card));
+        const metrics = root.querySelector('.ai-dom-metrics');
+        const overflow = root.querySelector('.ai-overflow-summary');
+        runA4PostLayoutFitIn(root, rowTargets, metrics);
+        const afterTypeset = () => {
+          runA4PostLayoutFitIn(root, rowTargets, metrics);
+          checkA4OverflowIn(root, overflow);
+        };
         if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
-          window.MathJax.typesetPromise();
+          window.MathJax.typesetPromise(Array.from(root.querySelectorAll('.a4-card'))).finally(afterTypeset);
+        } else {
+          afterTypeset();
         }
       });
     }
 
+    function renderAILayoutPreview(result) {
+      const box = document.getElementById('aiPreview');
+      if (!box || !result?.layout?.rows) return;
+      try {
+        const settings = getSettings();
+        const plan = buildAILayoutPlan(result, settings);
+        renderA4PlanInto(box, lastAnalyzedPayload || {}, plan, settings, 'AI A4');
+      } catch (e) {
+        box.innerHTML = `<div class="error" style="display:block;">Ошибка AI-рендера: ${escapeHtml(e.message || e)}</div>`;
+      }
+    }
 
     async function loadOpenRouterKey() {
       openRouterKey = localStorage.getItem('openrouter_key') || '';
@@ -4137,6 +4270,77 @@ function renderReport(summary, hints, plan) {
           }
         });
       });
+    }
+
+    function normalizeRowFontSpreadIn(root) {
+      const scope = typeof root === 'string' ? document.querySelector(root) : root;
+      if (!scope) return;
+      scope.querySelectorAll('.a4-row').forEach(row => {
+        const cards = Array.from(row.querySelectorAll('.a4-card[data-a4-fit-card="1"]')).filter(isCardMeasurable);
+        if (cards.length < 2) return;
+        const bodySizes = cards.map(card => Number.parseFloat(getComputedStyle(card).getPropertyValue('--body-font')) || 10);
+        const titleSizes = cards.map(card => Number.parseFloat(getComputedStyle(card).getPropertyValue('--title-font')) || 10);
+        const minBody = Math.min(...bodySizes);
+        const minTitle = Math.min(...titleSizes);
+        cards.forEach((card, i) => {
+          const bodyTooLarge = bodySizes[i] - minBody > 0.5;
+          const titleTooLarge = titleSizes[i] - minTitle > 0.5;
+          if (!bodyTooLarge && !titleTooLarge) return;
+          const current = {
+            titleFont: titleTooLarge ? minTitle : titleSizes[i],
+            bodyFont: bodyTooLarge ? minBody : bodySizes[i],
+            addFont: Math.max(5, (bodyTooLarge ? minBody : bodySizes[i]) - 1),
+            titlePadY: Number.parseFloat(getComputedStyle(card).getPropertyValue('--title-pad-y')) || 8,
+            titlePadX: Number.parseFloat(getComputedStyle(card).getPropertyValue('--title-pad-x')) || 12,
+            addPadY: Number.parseFloat(getComputedStyle(card).getPropertyValue('--add-pad-y')) || 8,
+            addPadX: Number.parseFloat(getComputedStyle(card).getPropertyValue('--add-pad-x')) || 12,
+            gapTitleBody: Number.parseFloat(getComputedStyle(card).getPropertyValue('--gap-title-body')) || 18,
+            gapBodyAdd: Number.parseFloat(getComputedStyle(card).getPropertyValue('--gap-body-add')) || 18,
+            gapAddItems: Number.parseFloat(getComputedStyle(card).getPropertyValue('--gap-add-items')) || 9,
+            cardPadY: Number.parseFloat(getComputedStyle(card).getPropertyValue('--a4-card-pad-y')) || 12,
+            cardPadX: Number.parseFloat(getComputedStyle(card).getPropertyValue('--a4-card-pad-x')) || 12
+          };
+          a4ApplyFitState(card, current);
+        });
+      });
+    }
+
+    function runA4PostLayoutFitIn(root, rowTargets, metricsBox = null) {
+      const scope = typeof root === 'string' ? document.querySelector(root) : root;
+      if (!scope || !isElementActuallyVisible(scope)) return;
+      const cards = Array.from(scope.querySelectorAll('.a4-card[data-a4-fit-card="1"]')).filter(isCardMeasurable);
+      const results = cards.map(card => a4FitCardIndependent(card));
+      normalizeRowFontSpreadIn(scope);
+      const overflowCount = results.filter(r => r.measure.overflow).length;
+      const freeTotal = results.reduce((sum, r) => sum + Math.max(0, r.measure.free), 0);
+      if (metricsBox) {
+        metricsBox.style.display = 'block';
+        metricsBox.textContent = `A4 fixed windows: header ${Math.round(rowTargets.headerHeight || 0)}px, row scale ${Math.round(rowTargets.rowScale * 1000) / 1000}, row gap ${Math.round(rowTargets.rowGap * 100) / 100}px, fixed row heights ${rowTargets.targetHeights.map(h => Math.round(h)).join('/')} , cards ${cards.length}, overflow ${overflowCount}, total free ${Math.round(freeTotal)}px.`;
+      }
+    }
+
+    function checkA4OverflowIn(root, box = null) {
+      const scope = typeof root === 'string' ? document.querySelector(root) : root;
+      if (!scope) return [];
+      const problems = [];
+      Array.from(scope.querySelectorAll('.a4-card[data-a4-fit-card="1"]')).filter(isCardMeasurable).forEach((card, idx) => {
+        const m = a4MeasureCard(card);
+        card.classList.toggle('fit-overflow', m.overflow);
+        if (m.overflow) {
+          const title = card.querySelector('.a4-title-pill')?.textContent?.trim() || `card ${idx + 1}`;
+          problems.push(`${idx + 1}. ${title}: overflow ${Math.ceil(Math.max(0, -m.free))} px`);
+        }
+      });
+      if (box) {
+        if (problems.length) {
+          box.style.display = 'block';
+          box.textContent = 'Переполнение осталось в отдельных фиксированных окнах:\n' + problems.join('\n');
+        } else {
+          box.style.display = 'none';
+          box.textContent = '';
+        }
+      }
+      return problems;
     }
 
     // Replaces the previous runner: it does nothing while the A4 tab is hidden, because hidden

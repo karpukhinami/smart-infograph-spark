@@ -1,3 +1,4 @@
+import { isWideCardFraction } from "@/lib/a4-layout/constants";
 import type { A4LayoutSettings, A4LayoutSummary, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
 import { asArray, escapeHtml, flattenText, textStats } from "@/lib/a4-layout/text";
 import { metaText } from "@/lib/a4-layout/estimate";
@@ -13,7 +14,7 @@ export function a4LatexText(text: unknown): string {
 function a4ChooseAddendumLayout(addItems: string[], fraction: number, placement: string) {
   if (placement === "right") return "stack";
   const maxLen = addItems.reduce((m, x) => Math.max(m, String(x).length), 0);
-  if (addItems.length === 2 && maxLen <= 42 && fraction >= 2 / 3) return "row";
+  if (addItems.length === 2 && maxLen <= 42 && isWideCardFraction(fraction)) return "row";
   return "stack";
 }
 
@@ -57,14 +58,24 @@ function a4SideFormulaAddendumHtml(formulaValue: unknown, addendumValue: unknown
   return `<div class="a4-addendum-zone"><div class="a4-addendum-item a4-side-combined">${formula}${add}</div></div>`;
 }
 
+function resolveUseRightColumn(entity: LayoutEntity, report: WidthReport | null, fraction: number): boolean {
+  if (!isWideCardFraction(fraction)) return false;
+  const hasFormula = textStats(entity.formula).chars > 0;
+  const hasAddendum = textStats(entity.cardAddendum).chars > 0;
+  if (!hasFormula && !hasAddendum) return false;
+
+  if (hasAddendum && report?.heightRightPx != null) {
+    if (report.bestPlacement === "rightOfBody") return true;
+    if (report.heightRightPx < report.heightBelowPx) return true;
+  }
+
+  return Boolean(!hasAddendum && hasFormula && textStats(entity.content).chars > 0);
+}
+
 export function renderA4CardInner(entity: LayoutEntity, report: WidthReport | null = null, fraction = 1): string {
   const title = entity.title ? `<div class="a4-title-pill"><span>${escapeHtml(entity.title)}</span></div>` : "";
   const body = a4BodyHtml(entity);
-  const hasFormula = textStats(entity.formula).chars > 0;
-  const hasAddendum = textStats(entity.cardAddendum).chars > 0;
-  const rightByEstimator = Boolean(hasAddendum && report && report.bestPlacement === "rightOfBody" && report.heightRightPx != null);
-  const formulaOnlyRight = Boolean(!hasAddendum && hasFormula && fraction >= 2 / 3 && textStats(entity.content).chars > 0);
-  const useRight = Boolean((rightByEstimator || formulaOnlyRight) && fraction >= 2 / 3);
+  const useRight = resolveUseRightColumn(entity, report, fraction);
 
   if (useRight) {
     return `${title}<div class="a4-card-inner"><div class="a4-main-col">${body}</div><div class="a4-side-col">${a4SideFormulaAddendumHtml(entity.formula, entity.cardAddendum)}</div></div>`;
@@ -77,11 +88,7 @@ export function renderA4CardInner(entity: LayoutEntity, report: WidthReport | nu
 }
 
 export function renderA4CardClassName(entity: LayoutEntity, report: WidthReport | null, fraction: number): string {
-  const hasAddendum = textStats(entity.cardAddendum).chars > 0;
-  const hasFormula = textStats(entity.formula).chars > 0;
-  const rightByEstimator = Boolean(hasAddendum && report && report.bestPlacement === "rightOfBody" && report.heightRightPx != null);
-  const formulaOnlyRight = Boolean(!hasAddendum && hasFormula && fraction >= 2 / 3 && textStats(entity.content).chars > 0);
-  const useRight = Boolean((rightByEstimator || formulaOnlyRight) && fraction >= 2 / 3);
+  const useRight = resolveUseRightColumn(entity, report, fraction);
   return [
     "a4-card",
     entity.attention === "core" ? "is-core" : "",

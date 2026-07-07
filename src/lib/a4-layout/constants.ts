@@ -25,3 +25,8 @@ export const PX_WIDTH_KEYS = [
   { key: "full", label: "1/1", fraction: 1 },
   { key: "quarter", label: "1/4", fraction: 1 / 4 },
 ] as const;
+
+/** Card is wide enough for side addendum/formula (relaxed for manual ratios like 5/6). */
+export function isWideCardFraction(fraction: number): boolean {
+  return fraction > 0.5;
+}
