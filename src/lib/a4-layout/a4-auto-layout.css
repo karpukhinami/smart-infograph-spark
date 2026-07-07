@@ -209,8 +209,8 @@
 }
 
 .a4-auto-layout-root .a4-body .accent {
-  color: var(--a4-spot-accent, #0c71c9);
-  background: color-mix(in srgb, var(--a4-spot-accent, #0c71c9) 14%, transparent);
+  color: var(--a4-accent-text, #ffffff);
+  background: var(--a4-accent-bg, var(--a4-spot-accent, #0c71c9));
   border-radius: 4px;
   padding: 0 0.15em;
 }

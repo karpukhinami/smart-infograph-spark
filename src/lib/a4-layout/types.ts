@@ -126,12 +126,28 @@ export interface A4LayoutSummary {
   grade: string | null;
 }
 
+export interface A4DomFitOptions {
+  balanceRowFonts: boolean;
+  allowAddendumRight: boolean;
+}
+
+export const DEFAULT_A4_DOM_FIT_OPTIONS: A4DomFitOptions = {
+  balanceRowFonts: true,
+  allowAddendumRight: true,
+};
+
+export interface A4RenderOptions {
+  allowAddendumRight?: boolean;
+}
+
 export interface A4AutoLayoutResult {
   summary: A4LayoutSummary;
   plan: LayoutPlan;
   settings: A4LayoutSettings;
   rowTargets: A4RowTargets;
   manualErrors?: string[];
+  domFitOptions?: A4DomFitOptions;
+  manualUsedAutoRatios?: boolean;
 }
 
 export type { AnalysisJson };

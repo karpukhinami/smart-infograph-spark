@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Loader2, RefreshCw, RotateCcw, Upload, Sparkles } from "lucide-react";
 import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
@@ -14,7 +15,7 @@ import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
-import { A4AutoLayoutView } from "@/components/workspace/A4AutoLayoutView";
+import { A4AutoLayoutView, type ManualLayoutApply } from "@/components/workspace/A4AutoLayoutView";
 import { A4LayoutCanvas } from "@/components/workspace/A4LayoutCanvas";
 import { WireframeView } from "@/components/workspace/WireframeView";
 import { RefineDialog } from "@/components/workspace/RefineDialog";
@@ -104,7 +105,9 @@ function Workspace() {
   const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine" | "ai-layout">(null);
   const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
   const [manualLayoutTemplate, setManualLayoutTemplate] = useState("");
-  const [appliedManualLayout, setAppliedManualLayout] = useState<string | null>(null);
+  const [manualBalanceRowFonts, setManualBalanceRowFonts] = useState(true);
+  const [manualAllowAddendumRight, setManualAllowAddendumRight] = useState(true);
+  const [appliedManualLayout, setAppliedManualLayout] = useState<ManualLayoutApply | null>(null);
   const [aiLayoutResult, setAiLayoutResult] = useState<AILayoutResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -141,22 +144,33 @@ function Workspace() {
 
   const aiLayoutCanvas = useMemo(() => {
     if (!activeContent?.value.analysis || !aiLayoutResult) return null;
-    return buildA4AILayout(activeContent.value.analysis, aiLayoutResult);
-  }, [activeContent?.value.analysis, aiLayoutResult]);
+    return buildA4AILayout(activeContent.value.analysis, aiLayoutResult, {
+      balanceRowFonts: manualBalanceRowFonts,
+      allowAddendumRight: manualAllowAddendumRight,
+    });
+  }, [
+    activeContent?.value.analysis,
+    aiLayoutResult,
+    manualBalanceRowFonts,
+    manualAllowAddendumRight,
+  ]);
 
   function onRecalculateManualLayout() {
     if (!activeContent?.value.analysis) {
       toast.error("Сначала выполните анализ контента");
       return;
     }
-    const text = manualLayoutTemplate.trim();
-    if (!text) {
-      toast.error("Введите шаблон рядов — по одной строке на ряд");
-      return;
-    }
-    setAppliedManualLayout(text);
+    setAppliedManualLayout({
+      template: manualLayoutTemplate.trim(),
+      balanceRowFonts: manualBalanceRowFonts,
+      allowAddendumRight: manualAllowAddendumRight,
+    });
     setPaneMode("auto-layout");
-    toast.success("Макет пересчитан по шаблону");
+    toast.success(
+      manualLayoutTemplate.trim()
+        ? "Макет пересчитан по шаблону"
+        : "Макет пересчитан (ряды как в авто)",
+    );
   }
 
   // Legacy OCR-as-text fallback removed: images are now passed multimodally to the analysis model.
@@ -657,7 +671,30 @@ ${activeContent.value.content}`;
                   <p className="text-xs text-muted-foreground">
                     Одна строка — один ряд. Карточки берутся из JSON в исходном порядке:{" "}
                     <code>1</code> — одна на всю ширину, <code>1:1</code> — две поровну, <code>1:2:1</code> — три в заданной пропорции.
+                    Пустое поле при пересчёте — те же ряды, что в авто-макете.
                   </p>
+                  <div className="flex flex-col gap-3 pt-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="manual-balance-fonts" className="text-xs font-normal cursor-pointer">
+                        Подгонять размер шрифтов в ряду
+                      </Label>
+                      <Switch
+                        id="manual-balance-fonts"
+                        checked={manualBalanceRowFonts}
+                        onCheckedChange={setManualBalanceRowFonts}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="manual-addendum-right" className="text-xs font-normal cursor-pointer">
+                        Переносить аддендумы
+                      </Label>
+                      <Switch
+                        id="manual-addendum-right"
+                        checked={manualAllowAddendumRight}
+                        onCheckedChange={setManualAllowAddendumRight}
+                      />
+                    </div>
+                  </div>
                   <Button
                     type="button"
                     variant="secondary"
@@ -788,7 +825,7 @@ ${activeContent.value.content}`;
                   analysis={activeContent.value.analysis}
                   active={paneMode === "auto-layout"}
                   profile={activeProfile}
-                  manualTemplate={appliedManualLayout}
+                  manualApply={appliedManualLayout}
                 />
               ) : (
                 <EmptyState text="Авто-макет доступен после анализа в strict-режиме (структурированный JSON)." />

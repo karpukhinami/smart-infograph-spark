@@ -73,6 +73,8 @@ export function buildA4ProfileThemeStyle(profile: DesignProfile | null | undefin
     ["--a4-ink" as string]: c.inkColor,
     ["--a4-surface" as string]: c.surfaceColor,
     ["--a4-spot-accent" as string]: c.spotAccentColor,
+    ["--a4-accent-bg" as string]: c.spotAccentColor,
+    ["--a4-accent-text" as string]: c.lightTextColor,
     ["--a4-title-pill-bg" as string]: c.headerColor,
     ["--a4-title-pill-text" as string]: c.lightTextColor,
   };

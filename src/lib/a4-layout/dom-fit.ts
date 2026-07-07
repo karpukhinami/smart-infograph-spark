@@ -1,4 +1,5 @@
-import type { A4RowTargets } from "@/lib/a4-layout/types";
+import type { A4RowTargets, A4DomFitOptions } from "@/lib/a4-layout/types";
+import { DEFAULT_A4_DOM_FIT_OPTIONS } from "@/lib/a4-layout/types";
 
 interface FitState {
   titleFont: number;
@@ -235,7 +236,12 @@ function normalizeRowFontSpread(root: HTMLElement) {
   });
 }
 
-export function runA4DomFit(root: HTMLElement, rowTargets: A4RowTargets, visible = true): string {
+export function runA4DomFit(
+  root: HTMLElement,
+  rowTargets: A4RowTargets,
+  visible = true,
+  options: A4DomFitOptions = DEFAULT_A4_DOM_FIT_OPTIONS,
+): string {
   if (!visible) {
     return "A4 построен. Подгонка будет выполнена после открытия вкладки.";
   }
@@ -247,7 +253,9 @@ export function runA4DomFit(root: HTMLElement, rowTargets: A4RowTargets, visible
   }
 
   const results = cards.map((card) => a4FitCardIndependent(card));
-  normalizeRowFontSpread(root);
+  if (options.balanceRowFonts) {
+    normalizeRowFontSpread(root);
+  }
   const overflowCount = results.filter((r) => r.measure.overflow).length;
   const freeTotal = results.reduce((sum, r) => sum + Math.max(0, r.measure.free), 0);
   return `A4 fixed windows: header ${Math.round(rowTargets.headerHeight || 0)}px, row scale ${Math.round(rowTargets.rowScale * 1000) / 1000}, row gap ${Math.round(rowTargets.rowGap * 100) / 100}px, fixed row heights ${rowTargets.targetHeights.map((h) => Math.round(h)).join("/")} , cards ${cards.length}, overflow ${overflowCount}, total free ${Math.round(freeTotal)}px.`;

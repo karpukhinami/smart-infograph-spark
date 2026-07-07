@@ -1,6 +1,6 @@
 import { isWideCardFraction } from "@/lib/a4-layout/constants";
 import { sanitizeAIHtml } from "@/lib/a4-layout/sanitize-ai-html";
-import type { A4LayoutSettings, A4LayoutSummary, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
+import type { A4LayoutSettings, A4LayoutSummary, A4RenderOptions, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
 import { asArray, escapeHtml, flattenText, textStats } from "@/lib/a4-layout/text";
 import { metaText } from "@/lib/a4-layout/estimate";
 
@@ -120,12 +120,20 @@ function cardAuxFlags(entity: LayoutEntity) {
   };
 }
 
-function resolveUseRightColumn(entity: LayoutEntity, report: WidthReport | null, fraction: number): boolean {
+function resolveUseRightColumn(
+  entity: LayoutEntity,
+  report: WidthReport | null,
+  fraction: number,
+  renderOptions?: A4RenderOptions,
+): boolean {
+  const allowRight = renderOptions?.allowAddendumRight !== false;
   const { hasAIAddendum, aiAdd, hasFormula, hasAddendum } = cardAuxFlags(entity);
 
   if (hasAIAddendum) {
-    return aiAdd?.placement === "right";
+    return allowRight && aiAdd?.placement === "right";
   }
+
+  if (!allowRight) return false;
 
   if (!isWideCardFraction(fraction)) return false;
   if (!hasFormula && !hasAddendum) return false;
@@ -138,11 +146,16 @@ function resolveUseRightColumn(entity: LayoutEntity, report: WidthReport | null,
   return Boolean(!hasAddendum && hasFormula && textStats(entity.content).chars > 0);
 }
 
-export function renderA4CardInner(entity: LayoutEntity, report: WidthReport | null = null, fraction = 1): string {
+export function renderA4CardInner(
+  entity: LayoutEntity,
+  report: WidthReport | null = null,
+  fraction = 1,
+  renderOptions?: A4RenderOptions,
+): string {
   const { aiAdd, aiItems, hasAIAddendum, aiPlacement, hasFormula, hasAddendum } = cardAuxFlags(entity);
   const title = entity.title ? `<div class="a4-title-pill"><span>${escapeHtml(entity.title)}</span></div>` : "";
   const body = entity.contentHtml ? aiBodyHtml(entity) : a4BodyHtml(entity);
-  const useRight = resolveUseRightColumn(entity, report, fraction);
+  const useRight = resolveUseRightColumn(entity, report, fraction, renderOptions);
 
   if (hasAIAddendum) {
     const addHtml = `<div class="a4-addendum-zone">${a4ExplicitAddendumHtml(aiItems, fraction, aiPlacement, aiAdd?.layout || "single", true)}</div>`;
@@ -162,8 +175,13 @@ export function renderA4CardInner(entity: LayoutEntity, report: WidthReport | nu
   return `${title}${body}${zone}`;
 }
 
-export function renderA4CardClassName(entity: LayoutEntity, report: WidthReport | null, fraction: number): string {
-  const useRight = resolveUseRightColumn(entity, report, fraction);
+export function renderA4CardClassName(
+  entity: LayoutEntity,
+  report: WidthReport | null,
+  fraction: number,
+  renderOptions?: A4RenderOptions,
+): string {
+  const useRight = resolveUseRightColumn(entity, report, fraction, renderOptions);
   return [
     "a4-card",
     entity.attention === "core" ? "is-core" : "",

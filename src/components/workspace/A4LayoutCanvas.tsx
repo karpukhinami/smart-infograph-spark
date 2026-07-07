@@ -48,7 +48,11 @@ export function A4LayoutCanvas({
   modeNoteClassName = "a4-layout-mode-note",
   manualErrors,
 }: Props) {
-  const { summary, plan, settings, rowTargets } = layout;
+  const { summary, plan, settings, rowTargets, domFitOptions } = layout;
+  const renderOptions = useMemo(
+    () => ({ allowAddendumRight: domFitOptions?.allowAddendumRight !== false }),
+    [domFitOptions?.allowAddendumRight],
+  );
   const profileTheme = useMemo(() => buildA4ProfileThemeStyle(profile), [profile]);
   const rootRef = useRef<HTMLDivElement>(null);
   const [metrics, setMetrics] = useState("");
@@ -59,7 +63,7 @@ export function A4LayoutCanvas({
     if (!root) return;
 
     const runFit = () => {
-      const msg = runA4DomFit(root, rowTargets, active);
+      const msg = runA4DomFit(root, rowTargets, active, domFitOptions);
       setMetrics(msg);
       const problems = checkA4Overflow(root);
       setOverflowText(
@@ -80,7 +84,7 @@ export function A4LayoutCanvas({
     };
 
     requestAnimationFrame(afterTypeset);
-  }, [layout, rowTargets, active, profile?.profileName]);
+  }, [layout, rowTargets, active, profile?.profileName, domFitOptions]);
 
   const cardCount = plan.rows.reduce((sum, row) => sum + row.cards.length, 0);
 
@@ -159,14 +163,14 @@ export function A4LayoutCanvas({
                     <article
                       key={card.entityIndex}
                       className={[
-                        renderA4CardClassName(card.sourceEntity, row.reports[i], row.fractions[i]),
+                        renderA4CardClassName(card.sourceEntity, row.reports[i], row.fractions[i], renderOptions),
                         a4CardSurfaceClass(card.sourceEntity.attention, card.entityIndex),
                       ]
                         .filter(Boolean)
                         .join(" ")}
                       data-a4-fit-card="1"
                       dangerouslySetInnerHTML={{
-                        __html: renderA4CardInner(card.sourceEntity, row.reports[i], row.fractions[i]),
+                        __html: renderA4CardInner(card.sourceEntity, row.reports[i], row.fractions[i], renderOptions),
                       }}
                     />
                   ))}

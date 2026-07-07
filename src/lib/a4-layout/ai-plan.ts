@@ -5,12 +5,14 @@ import { sanitizeAIHtml } from "@/lib/a4-layout/sanitize-ai-html";
 import { normalizeAIRowsForRender, type AILayoutResult } from "@/lib/a4-layout/ai-response";
 import type {
   A4AutoLayoutResult,
+  A4DomFitOptions,
   AiAddendumsSpec,
   EntityHint,
   LayoutEntity,
   LayoutPlan,
   WidthReport,
 } from "@/lib/a4-layout/types";
+import { DEFAULT_A4_DOM_FIT_OPTIONS } from "@/lib/a4-layout/types";
 import { asArray, flattenText } from "@/lib/a4-layout/text";
 import type { AnalysisJson } from "@/lib/types";
 
@@ -36,16 +38,19 @@ function normalizedAIAddendums(addendums: AILayoutResult["cards"][0]["addendums"
   return { placement, layout, items: normalizedItems };
 }
 
-function aiCardsToEntities(result: AILayoutResult): LayoutEntity[] {
+function aiCardsToEntities(result: AILayoutResult, allowAddendumRight: boolean): LayoutEntity[] {
   return (result.cards || []).map((card) => {
     const add = normalizedAIAddendums(card.addendums);
+    const aiAddendums: AiAddendumsSpec = allowAddendumRight
+      ? add
+      : { ...add, placement: "below" };
     return {
       title: card.title || "",
       content: sanitizeAIHtml(card.content || ""),
       contentHtml: true,
       formula: null,
       cardAddendum: null,
-      aiAddendums: add,
+      aiAddendums,
       attention: card.attention || "normal",
       entityType: "aiCard",
       sectionId: "main",
@@ -67,8 +72,12 @@ function makeAIReportForCard(hint: EntityHint, fraction: number, entity: LayoutE
   return report;
 }
 
-function buildAILayoutPlan(result: AILayoutResult, settings = DEFAULT_A4_SETTINGS): LayoutPlan {
-  const entities = aiCardsToEntities(result);
+function buildAILayoutPlan(
+  result: AILayoutResult,
+  settings = DEFAULT_A4_SETTINGS,
+  domFitOptions: A4DomFitOptions = DEFAULT_A4_DOM_FIT_OPTIONS,
+): LayoutPlan {
+  const entities = aiCardsToEntities(result, domFitOptions.allowAddendumRight);
   const hints = entities.map((e, i) => analyzeEntity(e, i, settings));
   const rowsIn = normalizeAIRowsForRender(result.layout?.rows || [], entities.length);
 
@@ -113,7 +122,11 @@ function buildAILayoutPlan(result: AILayoutResult, settings = DEFAULT_A4_SETTING
 }
 
 /** Turn parsed AI response into a full A4 layout result for rendering. */
-export function buildA4AILayout(analysis: AnalysisJson, aiResult: AILayoutResult): A4AutoLayoutResult {
+export function buildA4AILayout(
+  analysis: AnalysisJson,
+  aiResult: AILayoutResult,
+  domFitOptions: A4DomFitOptions = DEFAULT_A4_DOM_FIT_OPTIONS,
+): A4AutoLayoutResult {
   const settings = { ...DEFAULT_A4_SETTINGS };
   const summary = {
     topic: analysis.topic,
@@ -121,7 +134,7 @@ export function buildA4AILayout(analysis: AnalysisJson, aiResult: AILayoutResult
     subject: analysis.subject,
     grade: analysis.grade,
   };
-  const plan = buildAILayoutPlan(aiResult, settings);
+  const plan = buildAILayoutPlan(aiResult, settings, domFitOptions);
   const rowTargets = computeA4RowTargets(plan, settings, summary);
-  return { summary, plan, settings, rowTargets };
+  return { summary, plan, settings, rowTargets, domFitOptions };
 }

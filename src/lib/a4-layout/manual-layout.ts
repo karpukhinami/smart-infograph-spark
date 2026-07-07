@@ -1,4 +1,30 @@
-import type { A4LayoutSettings, EntityHint, LayoutPlan, LayoutRow } from "@/lib/a4-layout/types";
+import type { A4LayoutSettings, A4DomFitOptions, EntityHint, LayoutPlan, LayoutRow, WidthReport } from "@/lib/a4-layout/types";
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? Math.abs(a) : gcd(b, a % b);
+}
+
+/** Converts row fractions to a manual ratio line, e.g. [0.5, 0.5] → "1:1". */
+export function fractionsToRatioLine(fractions: number[]): string {
+  const scaled = fractions.map((f) => Math.round(f * 10000));
+  let g = scaled[0] ?? 1;
+  for (let i = 1; i < scaled.length; i++) g = gcd(g, scaled[i]);
+  const nums = scaled.map((n) => Math.max(1, Math.round(n / Math.max(1, g))));
+  return nums.join(":");
+}
+
+export function layoutPlanToManualRatiosText(plan: LayoutPlan): string {
+  return plan.rows.map((row) => fractionsToRatioLine(row.fractions)).join("\n");
+}
+
+function applyAddendumPlacement(report: WidthReport, allowAddendumRight: boolean): WidthReport {
+  if (allowAddendumRight || report.bestPlacement !== "rightOfBody") return report;
+  return {
+    ...report,
+    bestPlacement: "belowBody",
+    bestHeightPx: report.heightBelowPx,
+  };
+}
 
 export interface ParsedManualPattern {
   ratio: string;
@@ -41,6 +67,7 @@ export function buildManualLayoutPlan(
   hints: EntityHint[],
   settings: A4LayoutSettings,
   manualRatiosText: string,
+  options: Pick<A4DomFitOptions, "allowAddendumRight"> = { allowAddendumRight: true },
 ): { plan: LayoutPlan; errors: string[] } {
   const ordered = preserveOriginalOrder(hints);
   const parsed = parseManualRatios(manualRatiosText);
@@ -63,7 +90,9 @@ export function buildManualLayoutPlan(
       break;
     }
 
-    const reports = cards.map((card, j) => card.atFraction(pattern.fractions[j]));
+    const reports = cards.map((card, j) =>
+      applyAddendumPlacement(card.atFraction(pattern.fractions[j]), options.allowAddendumRight),
+    );
     const heights = reports.map((r) => r.bestHeightPx);
     const rowHeight = Math.max(...heights);
     const empty = heights.reduce((sum, h) => sum + Math.max(0, rowHeight - h), 0);
