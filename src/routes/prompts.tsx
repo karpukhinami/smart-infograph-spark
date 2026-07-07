@@ -35,6 +35,13 @@ function PromptsPage() {
         value={prompts.designBrief}
         onChange={(v) => setPrompt("designBrief", v)}
       />
+      {mode === "strict" ? (
+        <Block
+          label="Промпт технического макета (AI A4)"
+          value={prompts.codeBasedProduct}
+          onChange={(v) => setPrompt("codeBasedProduct", v)}
+        />
+      ) : null}
       <Block
         label="Общие правила финального изображения"
         value={prompts.generalRules}

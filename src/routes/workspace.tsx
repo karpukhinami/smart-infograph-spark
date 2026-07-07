@@ -32,15 +32,11 @@ import {
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
 import {
-  AI_LAYOUT_PROMPT,
   buildA4AILayout,
   buildAIInputJSON,
-  DEFAULT_OPENROUTER_MODEL,
   normalizeAIResponse,
-  OPENROUTER_MODELS,
   type AILayoutResult,
 } from "@/lib/a4-layout";
-import { callOpenRouterChat } from "@/lib/openrouter-client";
 import { toPng } from "html-to-image";
 import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
 import { importSourceFiles, SOURCE_FILE_ACCEPT } from "@/lib/source-file-import";
@@ -52,33 +48,6 @@ export const Route = createFileRoute("/workspace")({
   component: Workspace,
 });
 
-const OPENROUTER_KEY_STORAGE = "openrouter_key";
-const OPENROUTER_MODEL_STORAGE = "openrouter_model";
-const AI_PROMPT_STORAGE = "ai_layout_prompt";
-
-function readStoredOpenRouterKey(): string {
-  try {
-    return localStorage.getItem(OPENROUTER_KEY_STORAGE) || "";
-  } catch {
-    return "";
-  }
-}
-
-function readStoredOpenRouterModel(): string {
-  try {
-    return localStorage.getItem(OPENROUTER_MODEL_STORAGE) || DEFAULT_OPENROUTER_MODEL;
-  } catch {
-    return DEFAULT_OPENROUTER_MODEL;
-  }
-}
-
-function readStoredAiPrompt(): string {
-  try {
-    return localStorage.getItem(AI_PROMPT_STORAGE) || AI_LAYOUT_PROMPT;
-  } catch {
-    return AI_LAYOUT_PROMPT;
-  }
-}
 const SUBJECTS = [
   "Математика", "Алгебра", "Геометрия", "Русский язык", "Литература",
   "Физика", "Химия", "Биология", "География", "История",
@@ -136,9 +105,6 @@ function Workspace() {
   const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
   const [manualLayoutTemplate, setManualLayoutTemplate] = useState("");
   const [appliedManualLayout, setAppliedManualLayout] = useState<string | null>(null);
-  const [openRouterKey, setOpenRouterKey] = useState(readStoredOpenRouterKey);
-  const [openRouterModel, setOpenRouterModel] = useState(readStoredOpenRouterModel);
-  const [aiLayoutPrompt, setAiLayoutPrompt] = useState(readStoredAiPrompt);
   const [aiLayoutResult, setAiLayoutResult] = useState<AILayoutResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -177,35 +143,6 @@ function Workspace() {
     if (!activeContent?.value.analysis || !aiLayoutResult) return null;
     return buildA4AILayout(activeContent.value.analysis, aiLayoutResult);
   }, [activeContent?.value.analysis, aiLayoutResult]);
-
-  function saveOpenRouterKey() {
-    const trimmed = openRouterKey.trim();
-    try {
-      localStorage.setItem(OPENROUTER_KEY_STORAGE, trimmed);
-    } catch {
-      /* ignore */
-    }
-    setOpenRouterKey(trimmed);
-    toast.success(trimmed ? "Ключ OpenRouter сохранён" : "Ключ очищен");
-  }
-
-  function onOpenRouterModelChange(model: string) {
-    setOpenRouterModel(model);
-    try {
-      localStorage.setItem(OPENROUTER_MODEL_STORAGE, model);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function onAiLayoutPromptChange(value: string) {
-    setAiLayoutPrompt(value);
-    try {
-      localStorage.setItem(AI_PROMPT_STORAGE, value);
-    } catch {
-      /* ignore */
-    }
-  }
 
   function onRecalculateManualLayout() {
     if (!activeContent?.value.analysis) {
@@ -359,16 +296,11 @@ function Workspace() {
       toast.error("Сначала выполните анализ контента");
       return;
     }
-    const key = openRouterKey.trim();
-    if (!key) {
-      toast.error("Укажите ключ OpenRouter");
-      return;
-    }
     try {
       setLoading("ai-layout");
       const input = buildAIInputJSON(activeContent.value.analysis);
-      const userMessage = `${aiLayoutPrompt.trim()}\n\nINPUT JSON:\n${JSON.stringify(input, null, 2)}`;
-      const raw = await callOpenRouterChat({ apiKey: key, model: openRouterModel, userMessage });
+      const prompt = `${prompts.codeBasedProduct.trim()}\n\nINPUT JSON:\n${JSON.stringify(input, null, 2)}`;
+      const raw = await callTextLLM({ model: models.brief, prompt });
       const parsed = normalizeAIResponse(raw);
       setAiLayoutResult(parsed);
       setPaneMode("wireframe");
@@ -709,38 +641,6 @@ ${activeContent.value.content}`;
             </div>
             {mode === "strict" && briefMode === "programmatic" ? (
               <>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label className="text-xs" htmlFor="openrouter-key">
-                      Ключ OpenRouter
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="openrouter-key"
-                        type="password"
-                        autoComplete="off"
-                        placeholder="sk-or-..."
-                        value={openRouterKey}
-                        onChange={(e) => setOpenRouterKey(e.target.value)}
-                        className="font-mono text-xs"
-                      />
-                      <Button type="button" variant="secondary" onClick={saveOpenRouterKey}>
-                        Сохранить
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Модель OpenRouter</Label>
-                    <Select value={openRouterModel} onValueChange={onOpenRouterModelChange}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {OPENROUTER_MODELS.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs" htmlFor="manual-layout-template">
                     Ручной ввод шаблона
@@ -768,9 +668,10 @@ ${activeContent.value.content}`;
                   </Button>
                 </div>
                 <PromptDisclosure
-                  label="Показать промпт технического макета (AI)"
-                  value={aiLayoutPrompt}
-                  onChange={onAiLayoutPromptChange}
+                  label="Показать промпт технического макета"
+                  value={prompts.codeBasedProduct}
+                  onChange={(v) => setPrompt("codeBasedProduct", v)}
+                  rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
                 />
                 <div>
                   <Button onClick={onCreateAILayout} disabled={loading !== null || !activeContent?.value.analysis}>

@@ -14,7 +14,7 @@ import promptStrictAnalysisWith from "@/data/prompts/strict/analysis-with-conten
 import promptStrictAnalysisTopic from "@/data/prompts/strict/analysis-topic-only.txt?raw";
 import promptStrictDesignBrief from "@/data/prompts/strict/design-brief.txt?raw";
 import promptStrictGeneralRules from "@/data/prompts/strict/general-rules.txt?raw";
-import promptStrictCodeBased from "@/data/prompts/strict/code-based-product.txt?raw";
+import { AI_LAYOUT_PROMPT } from "@/lib/a4-layout/ai-prompt";
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
 
@@ -25,7 +25,7 @@ interface PromptSet {
   analysisTopicOnly: string;
   designBrief: string;
   generalRules: string;
-  /** Strict-mode "code-based product" — programmatic render spec prompt. */
+  /** Strict-mode technical layout (AI A4) prompt. */
   codeBasedProduct: string;
 }
 
@@ -63,7 +63,7 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     analysisTopicOnly: promptStrictAnalysisTopic,
     designBrief: promptStrictDesignBrief,
     generalRules: promptStrictGeneralRules,
-    codeBasedProduct: promptStrictCodeBased,
+    codeBasedProduct: AI_LAYOUT_PROMPT,
   },
 };
 

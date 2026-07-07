@@ -1,12 +1,3 @@
-export const DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash";
-
-export const OPENROUTER_MODELS = [
-  { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash" },
-  { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro" },
-  { id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4" },
-  { id: "openai/gpt-4.1-mini", name: "GPT-4.1 Mini" },
-] as const;
-
 export const AI_LAYOUT_PROMPT = `You are designing an educational infographic layout.
 
 You receive prepared AI input JSON with:
