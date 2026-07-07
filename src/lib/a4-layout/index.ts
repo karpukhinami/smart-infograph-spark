@@ -53,3 +53,7 @@ export { DEFAULT_A4_SETTINGS } from "@/lib/a4-layout/settings";
 export { runA4DomFit, checkA4Overflow } from "@/lib/a4-layout/dom-fit";
 export { renderA4CardInner, renderA4CardClassName, renderA4HeaderHtml } from "@/lib/a4-layout/render";
 export { parseManualRatios } from "@/lib/a4-layout/manual-layout";
+export { buildAIInputJSON } from "@/lib/a4-layout/ai-input";
+export { AI_LAYOUT_PROMPT, DEFAULT_OPENROUTER_MODEL, OPENROUTER_MODELS } from "@/lib/a4-layout/ai-prompt";
+export { normalizeAIResponse, type AILayoutResult } from "@/lib/a4-layout/ai-response";
+export { buildA4AILayout } from "@/lib/a4-layout/ai-plan";

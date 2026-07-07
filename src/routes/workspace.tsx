@@ -8,13 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Loader2, RefreshCw, RotateCcw, Upload, Sparkles } from "lucide-react";
-import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage, useActiveSpec } from "@/store/useProjectStore";
+import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage } from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
 import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
 import { A4AutoLayoutView } from "@/components/workspace/A4AutoLayoutView";
+import { A4LayoutCanvas } from "@/components/workspace/A4LayoutCanvas";
 import { WireframeView } from "@/components/workspace/WireframeView";
 import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
@@ -30,8 +31,16 @@ import {
 // recognize-image prompt no longer used: images are passed multimodally to the analysis model.
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
-import { validateRenderSpec } from "@/lib/render-spec/validate";
-import { ProgrammaticRenderer } from "@/components/render-spec/ProgrammaticRenderer";
+import {
+  AI_LAYOUT_PROMPT,
+  buildA4AILayout,
+  buildAIInputJSON,
+  DEFAULT_OPENROUTER_MODEL,
+  normalizeAIResponse,
+  OPENROUTER_MODELS,
+  type AILayoutResult,
+} from "@/lib/a4-layout";
+import { callOpenRouterChat } from "@/lib/openrouter-client";
 import { toPng } from "html-to-image";
 import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
 import { importSourceFiles, SOURCE_FILE_ACCEPT } from "@/lib/source-file-import";
@@ -43,6 +52,33 @@ export const Route = createFileRoute("/workspace")({
   component: Workspace,
 });
 
+const OPENROUTER_KEY_STORAGE = "openrouter_key";
+const OPENROUTER_MODEL_STORAGE = "openrouter_model";
+const AI_PROMPT_STORAGE = "ai_layout_prompt";
+
+function readStoredOpenRouterKey(): string {
+  try {
+    return localStorage.getItem(OPENROUTER_KEY_STORAGE) || "";
+  } catch {
+    return "";
+  }
+}
+
+function readStoredOpenRouterModel(): string {
+  try {
+    return localStorage.getItem(OPENROUTER_MODEL_STORAGE) || DEFAULT_OPENROUTER_MODEL;
+  } catch {
+    return DEFAULT_OPENROUTER_MODEL;
+  }
+}
+
+function readStoredAiPrompt(): string {
+  try {
+    return localStorage.getItem(AI_PROMPT_STORAGE) || AI_LAYOUT_PROMPT;
+  } catch {
+    return AI_LAYOUT_PROMPT;
+  }
+}
 const SUBJECTS = [
   "Математика", "Алгебра", "Геометрия", "Русский язык", "Литература",
   "Физика", "Химия", "Биология", "География", "История",
@@ -80,7 +116,6 @@ function Workspace() {
   const pushImage = useProjectStore((s) => s.pushImage);
   const briefMode = useProjectStore((s) => s.briefMode);
   const setBriefMode = useProjectStore((s) => s.setBriefMode);
-  const pushSpec = useProjectStore((s) => s.pushSpec);
   const attachedImages = useProjectStore((s) => s.attachedImages);
   const addAttachedImages = useProjectStore((s) => s.addAttachedImages);
   const uploadedSourceText = useProjectStore((s) => s.uploadedSourceText);
@@ -89,7 +124,6 @@ function Workspace() {
   const activeContent = useActiveContent();
   const activeBrief = useActiveBrief();
   const activeImage = useActiveImage();
-  const activeSpec = useActiveSpec();
 
   const mode = useSettingsStore((s) => s.mode);
   const prompts = useCurrentPrompts();
@@ -98,10 +132,14 @@ function Workspace() {
   const profiles = useSettingsStore((s) => s.profiles);
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
-  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine">(null);
+  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine" | "ai-layout">(null);
   const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
   const [manualLayoutTemplate, setManualLayoutTemplate] = useState("");
   const [appliedManualLayout, setAppliedManualLayout] = useState<string | null>(null);
+  const [openRouterKey, setOpenRouterKey] = useState(readStoredOpenRouterKey);
+  const [openRouterModel, setOpenRouterModel] = useState(readStoredOpenRouterModel);
+  const [aiLayoutPrompt, setAiLayoutPrompt] = useState(readStoredAiPrompt);
+  const [aiLayoutResult, setAiLayoutResult] = useState<AILayoutResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -120,7 +158,42 @@ function Workspace() {
 
   useEffect(() => {
     setAppliedManualLayout(null);
+    setAiLayoutResult(null);
   }, [activeContent?.id]);
+
+  const aiLayoutCanvas = useMemo(() => {
+    if (!activeContent?.value.analysis || !aiLayoutResult) return null;
+    return buildA4AILayout(activeContent.value.analysis, aiLayoutResult);
+  }, [activeContent?.value.analysis, aiLayoutResult]);
+
+  function saveOpenRouterKey() {
+    const trimmed = openRouterKey.trim();
+    try {
+      localStorage.setItem(OPENROUTER_KEY_STORAGE, trimmed);
+    } catch {
+      /* ignore */
+    }
+    setOpenRouterKey(trimmed);
+    toast.success(trimmed ? "Ключ OpenRouter сохранён" : "Ключ очищен");
+  }
+
+  function onOpenRouterModelChange(model: string) {
+    setOpenRouterModel(model);
+    try {
+      localStorage.setItem(OPENROUTER_MODEL_STORAGE, model);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function onAiLayoutPromptChange(value: string) {
+    setAiLayoutPrompt(value);
+    try {
+      localStorage.setItem(AI_PROMPT_STORAGE, value);
+    } catch {
+      /* ignore */
+    }
+  }
 
   function onRecalculateManualLayout() {
     if (!activeContent?.value.analysis) {
@@ -269,34 +342,25 @@ function Workspace() {
     }
   }
 
-  async function onCreateProgrammaticSpec() {
-    if (!activeContent) return;
-    if (!activeStyle) { toast.error("Сначала выберите стиль"); return; }
+  async function onCreateAILayout() {
+    if (!activeContent?.value.analysis) {
+      toast.error("Сначала выполните анализ контента");
+      return;
+    }
+    const key = openRouterKey.trim();
+    if (!key) {
+      toast.error("Укажите ключ OpenRouter");
+      return;
+    }
     try {
-      setLoading("brief");
-      const filled = buildDesignBriefPrompt({
-        template: prompts.codeBasedProduct,
-        contentSummary: activeContent.value.content,
-        style: activeStyle,
-        profile: activeProfile,
-        userWishes,
-        generalRules: prompts.generalRules,
-      });
-      const raw = await callTextLLMForJson({
-        model: models.brief,
-        prompt: filled,
-        label: "render spec",
-        schemaHint: 'Верни JSON-объект формы { "ProgrammaticRenderSpec": { "format": {...}, "theme": {...}, "header": {...}, "rows": [...] } }.',
-        parse: (value) => value as unknown,
-      });
-      const { spec, warnings } = validateRenderSpec(raw, activeProfile ?? null);
-      pushSpec(spec);
+      setLoading("ai-layout");
+      const input = buildAIInputJSON(activeContent.value.analysis);
+      const userMessage = `${aiLayoutPrompt.trim()}\n\nINPUT JSON:\n${JSON.stringify(input, null, 2)}`;
+      const raw = await callOpenRouterChat({ apiKey: key, model: openRouterModel, userMessage });
+      const parsed = normalizeAIResponse(raw);
+      setAiLayoutResult(parsed);
       setPaneMode("wireframe");
-      if (warnings.length) {
-        toast.message("Технический макет создан с предупреждениями", { description: warnings.slice(0, 3).join("\n") });
-      } else {
-        toast.success("Технический макет создан");
-      }
+      toast.success("Технический макет от AI создан");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось создать технический макет");
     } finally {
@@ -633,6 +697,38 @@ ${activeContent.value.content}`;
             </div>
             {mode === "strict" && briefMode === "programmatic" ? (
               <>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs" htmlFor="openrouter-key">
+                      Ключ OpenRouter
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="openrouter-key"
+                        type="password"
+                        autoComplete="off"
+                        placeholder="sk-or-..."
+                        value={openRouterKey}
+                        onChange={(e) => setOpenRouterKey(e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                      <Button type="button" variant="secondary" onClick={saveOpenRouterKey}>
+                        Сохранить
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Модель OpenRouter</Label>
+                    <Select value={openRouterModel} onValueChange={onOpenRouterModelChange}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {OPENROUTER_MODELS.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs" htmlFor="manual-layout-template">
                     Ручной ввод шаблона
@@ -660,14 +756,13 @@ ${activeContent.value.content}`;
                   </Button>
                 </div>
                 <PromptDisclosure
-                  label="Показать промпт технического макета"
-                  value={prompts.codeBasedProduct}
-                  onChange={(v) => setPrompt("codeBasedProduct", v)}
-                  rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
+                  label="Показать промпт технического макета (AI)"
+                  value={aiLayoutPrompt}
+                  onChange={onAiLayoutPromptChange}
                 />
                 <div>
-                  <Button onClick={onCreateProgrammaticSpec} disabled={loading !== null}>
-                    {loading === "brief" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                  <Button onClick={onCreateAILayout} disabled={loading !== null || !activeContent?.value.analysis}>
+                    {loading === "ai-layout" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
                     Создать технический макет
                   </Button>
                 </div>
@@ -727,7 +822,7 @@ ${activeContent.value.content}`;
             <TabsList>
               <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
               <TabsTrigger value="auto-layout" disabled={!activeContent?.value.analysis}>авто-макет</TabsTrigger>
-              <TabsTrigger value="wireframe" disabled={!activeBrief && !activeSpec}>Каркас</TabsTrigger>
+              <TabsTrigger value="wireframe" disabled={!activeBrief && !aiLayoutCanvas}>Каркас</TabsTrigger>
               <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
 
@@ -787,12 +882,29 @@ ${activeContent.value.content}`;
             </TabsContent>
 
             <TabsContent value="wireframe" className="p-2 space-y-2">
-              {mode === "strict" && briefMode === "programmatic" && activeSpec ? (
-                <ProgrammaticPane
-                  spec={activeSpec.value}
-                  loading={loading !== null}
-                  onRegenerate={onCreateProgrammaticSpec}
-                />
+              {mode === "strict" && briefMode === "programmatic" && aiLayoutCanvas ? (
+                <>
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={onCreateAILayout} disabled={loading !== null}>
+                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
+                    </Button>
+                  </div>
+                  <A4LayoutCanvas
+                    layout={aiLayoutCanvas}
+                    active={paneMode === "wireframe"}
+                    modeNote="Технический макет (AI)"
+                  />
+                  {aiLayoutResult ? (
+                    <details className="rounded-md border border-border bg-background/60 p-2">
+                      <summary className="cursor-pointer text-xs text-muted-foreground">
+                        Показать ответ модели (JSON)
+                      </summary>
+                      <pre className="mt-2 overflow-auto text-xs">
+                        {JSON.stringify(aiLayoutResult, null, 2)}
+                      </pre>
+                    </details>
+                  ) : null}
+                </>
               ) : activeBrief ? (
                 <>
                   <div className="flex justify-end gap-2">

@@ -193,6 +193,13 @@
   margin: 0 0 0.18em;
 }
 
+.a4-auto-layout-root .a4-body .accent {
+  color: #1a4fd6;
+  background: rgba(26, 79, 214, 0.1);
+  border-radius: 4px;
+  padding: 0 0.15em;
+}
+
 .a4-auto-layout-root .a4-addendum-zone {
   margin-top: var(--gap-body-add);
   display: grid;

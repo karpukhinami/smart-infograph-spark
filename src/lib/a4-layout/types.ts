@@ -16,7 +16,17 @@ export interface A4LayoutSettings {
   optimizerMode: "balanced" | "compact" | "airy";
 }
 
-export type LayoutEntity = AnalysisEntity & { attention?: string };
+export interface AiAddendumsSpec {
+  placement: "below" | "right";
+  layout: "single" | "stack" | "row" | "grid";
+  items: string[];
+}
+
+export type LayoutEntity = AnalysisEntity & {
+  attention?: string;
+  contentHtml?: boolean;
+  aiAddendums?: AiAddendumsSpec | null;
+};
 
 export interface WidthReport {
   key: string;

@@ -1,4 +1,5 @@
 import { isWideCardFraction } from "@/lib/a4-layout/constants";
+import { sanitizeAIHtml } from "@/lib/a4-layout/sanitize-ai-html";
 import type { A4LayoutSettings, A4LayoutSummary, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
 import { asArray, escapeHtml, flattenText, textStats } from "@/lib/a4-layout/text";
 import { metaText } from "@/lib/a4-layout/estimate";
@@ -29,6 +30,52 @@ export function a4BodyHtml(entity: LayoutEntity): string {
   return `<div class="a4-body">${paragraphs.map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
 }
 
+function aiBodyHtml(entity: LayoutEntity): string {
+  if (!entity.contentHtml) return a4BodyHtml(entity);
+  const html = String(entity.content || "").trim();
+  if (!html) return "";
+  return `<div class="a4-body">${sanitizeAIHtml(html)}</div>`;
+}
+
+function a4IsLatexLike(value: string): boolean {
+  const t = String(value || "").trim();
+  return /^\$\$[\s\S]*\$\$$/.test(t) || /^\\\([\s\S]*\\\)$/.test(t) || /^\\\[[\s\S]*\\\]$/.test(t);
+}
+
+function a4RenderAddendumItemContent(item: string, allowHtml = false): string {
+  const text = String(item || "").trim();
+  if (a4IsLatexLike(text)) return escapeHtml(a4LatexText(text));
+  return allowHtml ? sanitizeAIHtml(text) : escapeHtml(text);
+}
+
+function a4ExplicitAddendumHtml(
+  itemsValue: unknown,
+  fraction: number,
+  placement: string,
+  layout: string = "single",
+  allowHtml = false,
+): string {
+  const items = asArray(itemsValue).map((v) => flattenText(v)).filter(Boolean).slice(0, 4);
+  if (!items.length) return "";
+
+  let safeLayout = ["single", "stack", "row", "grid"].includes(layout) ? layout : "single";
+  if (items.length === 1) safeLayout = "single";
+  if (safeLayout === "grid" && items.length < 4) safeLayout = items.length <= 2 ? "row" : "stack";
+  if (safeLayout === "row" && items.length > 3) safeLayout = "grid";
+
+  if (safeLayout === "single") {
+    return `<div class="a4-addendum-item a4-addendum-combined"><p>${a4RenderAddendumItemContent(items.join("<br>"), allowHtml)}</p></div>`;
+  }
+
+  if (safeLayout === "stack") {
+    const content = items.map((item) => `<p>${a4RenderAddendumItemContent(item, allowHtml)}</p>`).join("");
+    return `<div class="a4-addendum-item a4-addendum-combined">${content}</div>`;
+  }
+
+  const cls = safeLayout === "row" ? "a4-addendum-row" : "a4-addendum-grid";
+  return `<div class="${cls}">${items.map((item) => `<div class="a4-addendum-item"><p>${a4RenderAddendumItemContent(item, allowHtml)}</p></div>`).join("")}</div>`;
+}
+
 function a4FormulaHtml(value: unknown): string {
   const items = asArray(value).map((v) => flattenText(v)).filter(Boolean);
   if (!items.length) return "";
@@ -54,14 +101,33 @@ function a4SideFormulaAddendumHtml(formulaValue: unknown, addendumValue: unknown
   const addItems = asArray(addendumValue).map((v) => flattenText(v)).filter(Boolean);
   if (!formulaItems.length && !addItems.length) return "";
   const formula = formulaItems.map((v) => `<div class="a4-side-formula">${escapeHtml(a4LatexText(v))}</div>`).join("");
-  const add = addItems.length ? `<div class="a4-side-addendum">${addItems.map((v) => `<p>${escapeHtml(v)}</p>`).join("")}</div>` : "";
+  const add = addItems.length
+    ? `<div class="a4-side-addendum">${addItems.map((v) => `<p>${escapeHtml(v)}</p>`).join("")}</div>`
+    : "";
   return `<div class="a4-addendum-zone"><div class="a4-addendum-item a4-side-combined">${formula}${add}</div></div>`;
 }
 
+function cardAuxFlags(entity: LayoutEntity) {
+  const aiAdd = entity.aiAddendums || null;
+  const aiItems = aiAdd ? asArray(aiAdd.items).map((v) => flattenText(v)).filter(Boolean).slice(0, 4) : [];
+  return {
+    aiAdd,
+    aiItems,
+    hasAIAddendum: aiItems.length > 0,
+    aiPlacement: aiAdd?.placement === "right" ? ("right" as const) : ("below" as const),
+    hasFormula: textStats(entity.formula).chars > 0,
+    hasAddendum: textStats(entity.cardAddendum).chars > 0,
+  };
+}
+
 function resolveUseRightColumn(entity: LayoutEntity, report: WidthReport | null, fraction: number): boolean {
+  const { hasAIAddendum, aiAdd, hasFormula, hasAddendum } = cardAuxFlags(entity);
+
+  if (hasAIAddendum) {
+    return aiAdd?.placement === "right";
+  }
+
   if (!isWideCardFraction(fraction)) return false;
-  const hasFormula = textStats(entity.formula).chars > 0;
-  const hasAddendum = textStats(entity.cardAddendum).chars > 0;
   if (!hasFormula && !hasAddendum) return false;
 
   if (hasAddendum && report?.heightRightPx != null) {
@@ -73,9 +139,18 @@ function resolveUseRightColumn(entity: LayoutEntity, report: WidthReport | null,
 }
 
 export function renderA4CardInner(entity: LayoutEntity, report: WidthReport | null = null, fraction = 1): string {
+  const { aiAdd, aiItems, hasAIAddendum, aiPlacement, hasFormula, hasAddendum } = cardAuxFlags(entity);
   const title = entity.title ? `<div class="a4-title-pill"><span>${escapeHtml(entity.title)}</span></div>` : "";
-  const body = a4BodyHtml(entity);
+  const body = entity.contentHtml ? aiBodyHtml(entity) : a4BodyHtml(entity);
   const useRight = resolveUseRightColumn(entity, report, fraction);
+
+  if (hasAIAddendum) {
+    const addHtml = `<div class="a4-addendum-zone">${a4ExplicitAddendumHtml(aiItems, fraction, aiPlacement, aiAdd?.layout || "single", true)}</div>`;
+    if (useRight) {
+      return `${title}<div class="a4-card-inner"><div class="a4-main-col">${body}</div><div class="a4-side-col">${addHtml}</div></div>`;
+    }
+    return `${title}${body}${addHtml}`;
+  }
 
   if (useRight) {
     return `${title}<div class="a4-card-inner"><div class="a4-main-col">${body}</div><div class="a4-side-col">${a4SideFormulaAddendumHtml(entity.formula, entity.cardAddendum)}</div></div>`;

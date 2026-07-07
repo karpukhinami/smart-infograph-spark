@@ -10,6 +10,16 @@ export function flattenText(value: unknown): string {
   return String(value);
 }
 
+/** Plain text for line-count estimates when content may contain HTML. */
+export function stripHtmlTags(text: string): string {
+  return String(text || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function textStats(value: unknown) {
   const items = asArray(value).map((v) => flattenText(v)).filter(Boolean);
   const text = items.join("\n");

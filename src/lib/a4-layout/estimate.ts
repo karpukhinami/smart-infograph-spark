@@ -1,6 +1,6 @@
 import { PX_WIDTH_KEYS, WIDTHS, isWideCardFraction } from "@/lib/a4-layout/constants";
 import type { A4LayoutSettings, A4LayoutSummary, EntityHint, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
-import { asArray, flattenText, textStats } from "@/lib/a4-layout/text";
+import { asArray, flattenText, stripHtmlTags, textStats } from "@/lib/a4-layout/text";
 
 export function charsPerLine(widthPx: number, fontPx: number, avgCharEm: number): number {
   return Math.max(4, Math.floor(widthPx / (fontPx * avgCharEm)));
@@ -81,15 +81,56 @@ export function widthKeyForFraction(fraction: number): string {
   return "full";
 }
 
+function estimateAiAddendumBelowHeight(
+  items: string[],
+  layout: string,
+  cpl: number,
+  s: A4LayoutSettings,
+): number {
+  if (!items.length) return 0;
+  const lineH = s.bodyLinePx * 0.95;
+  const pad = 2 * s.insetPaddingYPx;
+  const plain = items.map((item) => stripHtmlTags(item));
+
+  if (layout === "row") {
+    const cols = Math.min(plain.length, 3);
+    const perCpl = Math.max(4, Math.floor((cpl * 0.92) / cols));
+    const maxLines = Math.max(...plain.map((item) => estimateLinesForString(item, perCpl, s.safety)));
+    return maxLines * lineH + pad;
+  }
+
+  if (layout === "grid") {
+    const perCpl = Math.max(4, Math.floor(cpl * 0.92 * 0.5));
+    const rowHeights = [plain.slice(0, 2), plain.slice(2, 4)].map((rowItems) => {
+      if (!rowItems.length) return 0;
+      return Math.max(...rowItems.map((item) => estimateLinesForString(item, perCpl, s.safety)));
+    });
+    const lines = rowHeights.reduce((sum, n) => sum + n, 0);
+    return lines * lineH + pad + (rowHeights.filter(Boolean).length > 1 ? 6 : 0);
+  }
+
+  const lines = plain.reduce(
+    (sum, item) => sum + estimateLinesForString(item, Math.floor(cpl * 0.92), s.safety),
+    0,
+  );
+  return lines * lineH + pad;
+}
+
 export function estimateEntityAtFraction(entity: LayoutEntity, s: A4LayoutSettings, fraction: number): WidthReport {
   const title = entity.title ?? null;
-  const body = entity.content ?? null;
+  const bodyRaw = entity.content ?? null;
+  const body = entity.contentHtml ? stripHtmlTags(flattenText(bodyRaw)) : bodyRaw;
   const formula = entity.formula ?? null;
   const addendum = entity.cardAddendum ?? null;
-  const isList = Array.isArray(body);
+  const aiSpec = entity.aiAddendums;
+  const aiItems = aiSpec ? asArray(aiSpec.items).map((v) => flattenText(v)).filter(Boolean) : [];
+  const hasAIAddendum = aiItems.length > 0;
+  const aiPlacement = aiSpec?.placement === "right" ? "right" : "below";
+  const aiLayout = aiSpec?.layout || "single";
+  const isList = Array.isArray(bodyRaw) && !entity.contentHtml;
   const hasFormula = textStats(formula).chars > 0;
   const addendumStats = textStats(addendum);
-  const hasAddendum = addendumStats.chars > 0;
+  const hasAddendum = !hasAIAddendum && addendumStats.chars > 0;
   const hasAddendumArray = Array.isArray(addendum);
   const widthKey = widthKeyForFraction(fraction);
   const outer = cardOuterWidthPx(fraction, s);
@@ -101,21 +142,31 @@ export function estimateEntityAtFraction(entity: LayoutEntity, s: A4LayoutSettin
   const formulaLines = hasFormula
     ? Math.max(asArray(formula).length, estimateLines(formula, Math.floor(cpl * 0.82), 1.05, false))
     : 0;
-  const addBelowLines = hasAddendum
-    ? estimateLines(addendum, Math.floor(cpl * 0.92), s.safety, hasAddendumArray)
-    : 0;
+  const addBelowLines = hasAIAddendum
+    ? 0
+    : hasAddendum
+      ? estimateLines(addendum, Math.floor(cpl * 0.92), s.safety, hasAddendumArray)
+      : 0;
   const titleHeight = title ? Math.max(s.titlePillPx, titleLines * 12 + 16) : 0;
   const bodyHeight = bodyLines * s.bodyLinePx;
   const formulaHeight = hasFormula ? formulaLines * (s.bodyLinePx * 1.02) + 14 : 0;
-  const addBelowHeight = hasAddendum ? addBelowLines * (s.bodyLinePx * 0.95) + 2 * s.insetPaddingYPx : 0;
-  const verticalGaps = (title ? 10 : 0) + (bodyLines ? 6 : 0) + (hasFormula ? 8 : 0) + (hasAddendum ? 8 : 0);
+  const addBelowHeight = hasAIAddendum
+    ? estimateAiAddendumBelowHeight(aiItems, aiLayout, cpl, s)
+    : hasAddendum
+      ? addBelowLines * (s.bodyLinePx * 0.95) + 2 * s.insetPaddingYPx
+      : 0;
+  const verticalGaps =
+    (title ? 10 : 0) +
+    (bodyLines ? 6 : 0) +
+    (hasFormula ? 8 : 0) +
+    (hasAddendum || hasAIAddendum ? 8 : 0);
   const paddingHeight = 2 * s.paddingYPx;
   const belowHeight = titleHeight + bodyHeight + formulaHeight + addBelowHeight + verticalGaps + paddingHeight;
   let rightHeight: number | null = null;
   let rightGain: number | null = null;
   let rightStatus = "unavailable";
 
-  if (hasAddendum && isWideCardFraction(fraction)) {
+  if ((hasAddendum || hasAIAddendum) && isWideCardFraction(fraction)) {
     const splitGap = 8;
     const splitCandidates = fraction >= 1 ? [0.58, 0.64, 0.7, 0.76] : [0.5, 0.56, 0.62, 0.68];
     let bestRight: { height: number } | null = null;
@@ -130,10 +181,18 @@ export function estimateEntityAtFraction(entity: LayoutEntity, s: A4LayoutSettin
         ? Math.max(asArray(formula).length, estimateLines(formula, Math.floor(addCpl * 0.82), 1.05, false))
         : 0;
       const formulaHeightRight = hasFormula ? formulaLinesRight * (s.bodyLinePx * 1.02) + 14 : 0;
-      const addLinesRight = estimateLines(addendum, addCpl, s.safety, hasAddendumArray);
+      const addLinesRight = hasAIAddendum
+        ? 0
+        : hasAddendum
+          ? estimateLines(addendum, addCpl, s.safety, hasAddendumArray)
+          : 0;
       const bodyRightHeight = bodyLinesRight * s.bodyLinePx;
-      const addRightHeight = addLinesRight * (s.bodyLinePx * 0.95) + 2 * s.insetPaddingYPx;
-      const sideGap = hasFormula && hasAddendum ? 8 : 0;
+      const addRightHeight = hasAIAddendum
+        ? estimateAiAddendumBelowHeight(aiItems, aiLayout === "row" || aiLayout === "grid" ? "stack" : aiLayout, addCpl, s)
+        : hasAddendum
+          ? addLinesRight * (s.bodyLinePx * 0.95) + 2 * s.insetPaddingYPx
+          : 0;
+      const sideGap = hasFormula && (hasAddendum || hasAIAddendum) ? 8 : 0;
       const sideRightHeight = formulaHeightRight + sideGap + addRightHeight;
       const h = titleHeight + Math.max(bodyRightHeight, sideRightHeight) + verticalGaps + paddingHeight;
       if (!bestRight || h < bestRight.height) {
@@ -146,8 +205,12 @@ export function estimateEntityAtFraction(entity: LayoutEntity, s: A4LayoutSettin
     rightStatus = rightGain >= 8 ? "recommended" : rightGain >= 1 ? "possible" : "avoid";
   }
 
-  const bestPlacement = rightHeight && rightHeight < belowHeight ? "rightOfBody" : "belowBody";
-  const bestHeight = bestPlacement === "rightOfBody" ? rightHeight! : belowHeight;
+  let bestPlacement = rightHeight && rightHeight < belowHeight ? "rightOfBody" : "belowBody";
+  if (hasAIAddendum) {
+    bestPlacement = aiPlacement === "right" ? "rightOfBody" : "belowBody";
+  }
+  const bestHeight =
+    bestPlacement === "rightOfBody" && rightHeight != null ? rightHeight : belowHeight;
   const fit = classifyFit(bestHeight, widthKey, entity);
 
   return {
