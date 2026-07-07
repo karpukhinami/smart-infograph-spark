@@ -141,10 +141,9 @@
 
 .a4-auto-layout-root .a4-title-pill {
   align-self: flex-start;
+  flex: 0 0 auto;
   width: fit-content;
   max-width: 100%;
-  min-height: 28px;
-  height: auto;
   border: 1px solid #d9deea;
   border-radius: 6px;
   padding: var(--title-pad-y) var(--title-pad-x);
@@ -153,10 +152,21 @@
   font-weight: 800;
   text-transform: uppercase;
   text-align: center;
+  overflow: visible;
   overflow-wrap: anywhere;
   white-space: normal;
   display: block;
+  height: auto;
+  max-height: none;
   color: #111827;
+}
+
+.a4-auto-layout-root .a4-title-pill span {
+  display: block;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .a4-auto-layout-root .a4-body {

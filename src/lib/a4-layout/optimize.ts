@@ -1,7 +1,8 @@
 import { ROW_PATTERNS, SECTION_ORDER } from "@/lib/a4-layout/constants";
+import { isAcceptableRowHeightBalance } from "@/lib/a4-layout/row-balance";
 import type { A4LayoutSettings, EntityHint, LayoutPlan, LayoutRow, RowCostResult } from "@/lib/a4-layout/types";
 
-type RowCostOptions = { ignoreCore?: boolean; preferTrio?: boolean; discourageTrio?: boolean };
+type RowCostOptions = { ignoreCore?: boolean; preferTrio?: boolean; discourageTrio?: boolean; semanticRow?: boolean };
 
 export function rowCost(
   cards: EntityHint[],
@@ -14,6 +15,9 @@ export function rowCost(
 
   const reports = cards.map((c, i) => c.atFraction(pattern.fractions[i]));
   const heights = reports.map((r) => r.bestHeightPx);
+  if (cards.length > 1 && !isAcceptableRowHeightBalance(heights, { semantic: options.semanticRow })) {
+    return null;
+  }
   const rowHeight = Math.max(...heights);
   const empty = heights.reduce((sum, h) => sum + Math.max(0, rowHeight - h), 0);
   const emptyRatio = empty / Math.max(1, rowHeight * cards.length);
@@ -75,8 +79,9 @@ function candidateSortValue(candidate: RowCostResult) {
 }
 
 function bestRowForCards(cards: EntityHint[], s: A4LayoutSettings, options: RowCostOptions = {}) {
+  const semanticRow = options.semanticRow ?? sameSemanticOrder(cards);
   const candidates = candidatePatternsForCount(cards.length)
-    .map((p) => rowCost(cards, p, s, options))
+    .map((p) => rowCost(cards, p, s, { ...options, semanticRow }))
     .filter((c): c is RowCostResult => Boolean(c))
     .sort((a, b) => candidateSortValue(a) - candidateSortValue(b));
   return candidates[0] || null;
@@ -176,8 +181,9 @@ function splitByCoreAndSection(hints: EntityHint[]) {
 }
 
 function allRowCandidates(cards: EntityHint[], s: A4LayoutSettings, options: RowCostOptions = {}) {
+  const semanticRow = options.semanticRow ?? sameSemanticOrder(cards);
   return candidatePatternsForCount(cards.length)
-    .map((p) => rowCost(cards, p, s, options))
+    .map((p) => rowCost(cards, p, s, { ...options, semanticRow }))
     .filter((c): c is RowCostResult => Boolean(c))
     .sort((a, b) => candidateSortValue(a) - candidateSortValue(b));
 }
@@ -234,7 +240,7 @@ function chooseRowsForRegularGroup(cards: EntityHint[], s: A4LayoutSettings, pre
         const k2k3Gain = k2k3Best ? k2k3VerticalHeight - k2k3Best.rowHeight : 0;
         const currentRunAllowsSkip = sameTypeRunLength(cards, i) === 1 || previousSameTypeRunLength(cards, i) >= 2;
 
-        if (currentRunAllowsSkip && k2k3Best && k2k3Gain >= Math.max(28, s.gapPx * 2.5)) {
+        if (currentRunAllowsSkip && k2k3Best && k2k3Gain >= Math.max(28, s.gapPx * 2.5) && isAcceptableRowHeightBalance(k2k3Best.heights, { semantic: k2k3Same })) {
           rows.push({ cards: [k1], ...single1, decision: "lookahead protects next pair: full-width" });
           decisions.push({
             entityIndexes: [k1.entityIndex],
@@ -266,7 +272,12 @@ function chooseRowsForRegularGroup(cards: EntityHint[], s: A4LayoutSettings, pre
     const pairThresholdMultiplier = sameOrderPair ? 1.08 : orderedMixedPair && k1IsTailOfSemanticRun ? 1.1 : orderedMixedPair ? 1.06 : 1.02;
     const pairHeightThreshold = stacked12Height * pairThresholdMultiplier;
     const pairHeightGain = stacked12Height - (bestPair ? bestPair.rowHeight : Infinity);
-    const pairWins = Boolean(bestPair && (bestPair.rowHeight <= pairHeightThreshold || (orderedMixedPair && pairHeightGain >= s.gapPx * 2)));
+    const pairBalanced = bestPair ? isAcceptableRowHeightBalance(bestPair.heights, { semantic: sameOrderPair }) : false;
+    const pairWins = Boolean(
+      bestPair &&
+        pairBalanced &&
+        (bestPair.rowHeight <= pairHeightThreshold || (orderedMixedPair && pairHeightGain >= s.gapPx * 2)),
+    );
 
     trace.push({
       stepIndex: i,
@@ -297,7 +308,8 @@ function chooseRowsForRegularGroup(cards: EntityHint[], s: A4LayoutSettings, pre
       const pairPlusThirdHeight = bestPair!.rowHeight + s.gapPx + single3.rowHeight;
       const trioThresholdMultiplier = preferTrio ? 1.08 : 0.96;
       const trioThreshold = pairPlusThirdHeight * trioThresholdMultiplier;
-      const trioWins = Boolean(bestTrio && bestTrio.rowHeight <= trioThreshold);
+      const trioBalanced = bestTrio ? isAcceptableRowHeightBalance(bestTrio.heights, { semantic: preferTrio }) : false;
+      const trioWins = Boolean(bestTrio && trioBalanced && bestTrio.rowHeight <= trioThreshold);
 
       trace.push({ stepIndex: i, type: "trio-check", cards: trioCards.map((c) => c.entityIndex), trioWins });
 
@@ -346,7 +358,7 @@ function rebalanceLonelyFinalRow(rows: LayoutRow[], s: A4LayoutSettings) {
 
   const newPair = [candidate, lonely];
   const pair = bestRowForCards(newPair, s);
-  if (!pair) return;
+  if (!pair || !isAcceptableRowHeightBalance(pair.heights)) return;
   const oldHeight = prev.rowHeight + s.gapPx + last.rowHeight;
   const newHeight = Math.max(prev.rowHeight, pair.rowHeight) + s.gapPx;
   if (newHeight > oldHeight) return;

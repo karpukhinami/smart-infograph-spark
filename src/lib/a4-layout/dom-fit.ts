@@ -65,7 +65,7 @@ function a4ApplyFitState(card: HTMLElement, state: FitState) {
 function a4LastContentBottom(card: HTMLElement): number {
   const cardRect = card.getBoundingClientRect();
   let bottom = cardRect.top;
-  [".a4-title-pill", ".a4-body p", ".a4-body li", ".a4-addendum-item"].forEach((selector) => {
+  [".a4-title-pill", ".a4-title-pill span", ".a4-body p", ".a4-body li", ".a4-addendum-item", ".a4-side-formula", ".a4-side-addendum p"].forEach((selector) => {
     card.querySelectorAll(selector).forEach((el) => {
       const rect = el.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) bottom = Math.max(bottom, rect.bottom);
@@ -94,12 +94,11 @@ function a4NormalizeTitlePadding(card: HTMLElement, state: FitState): FitState {
   const title = card.querySelector(".a4-title-pill") as HTMLElement | null;
   if (!title) return s;
 
+  // Shrink only horizontal padding; allow any number of title lines.
   for (let px = 40; px >= A4_FIT_MIN.titlePadX; px -= 4) {
     s.titlePadX = px;
     a4ApplyFitState(card, s);
-    const lineHeight = parseFloat(getComputedStyle(title).lineHeight) || 12;
-    const lines = Math.max(1, Math.round(title.scrollHeight / lineHeight));
-    if (lines <= 1 && title.scrollWidth <= title.clientWidth + 1) return { ...s };
+    if (title.scrollWidth <= title.clientWidth + 1) return { ...s };
   }
 
   s.titlePadX = A4_FIT_MIN.titlePadX;

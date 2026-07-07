@@ -58,7 +58,7 @@ function a4SideFormulaAddendumHtml(formulaValue: unknown, addendumValue: unknown
 }
 
 export function renderA4CardInner(entity: LayoutEntity, report: WidthReport | null = null, fraction = 1): string {
-  const title = entity.title ? `<div class="a4-title-pill">${escapeHtml(entity.title)}</div>` : "";
+  const title = entity.title ? `<div class="a4-title-pill"><span>${escapeHtml(entity.title)}</span></div>` : "";
   const body = a4BodyHtml(entity);
   const hasFormula = textStats(entity.formula).chars > 0;
   const hasAddendum = textStats(entity.cardAddendum).chars > 0;
