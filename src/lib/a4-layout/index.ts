@@ -57,3 +57,4 @@ export { buildAIInputJSON } from "@/lib/a4-layout/ai-input";
 export { AI_LAYOUT_PROMPT, DEFAULT_OPENROUTER_MODEL, OPENROUTER_MODELS } from "@/lib/a4-layout/ai-prompt";
 export { normalizeAIResponse, type AILayoutResult } from "@/lib/a4-layout/ai-response";
 export { buildA4AILayout } from "@/lib/a4-layout/ai-plan";
+export { buildA4ProfileThemeStyle, a4CardSurfaceClass, mixHex } from "@/lib/a4-layout/profile-theme";

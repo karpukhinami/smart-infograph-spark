@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { A4AutoLayoutResult } from "@/lib/a4-layout";
 import {
   checkA4Overflow,
@@ -9,11 +9,14 @@ import {
   renderA4CardInner,
   renderA4HeaderHtml,
 } from "@/lib/a4-layout/render";
+import { a4CardSurfaceClass, buildA4ProfileThemeStyle } from "@/lib/a4-layout/profile-theme";
+import type { DesignProfile } from "@/lib/types";
 import "@/lib/a4-layout/a4-auto-layout.css";
 
 interface Props {
   layout: A4AutoLayoutResult;
   active: boolean;
+  profile?: DesignProfile | null;
   modeNote?: string;
   modeNoteClassName?: string;
   manualErrors?: string[];
@@ -40,11 +43,13 @@ function typesetFormulas(root: HTMLElement) {
 export function A4LayoutCanvas({
   layout,
   active,
+  profile = null,
   modeNote,
   modeNoteClassName = "a4-layout-mode-note",
   manualErrors,
 }: Props) {
   const { summary, plan, settings, rowTargets } = layout;
+  const profileTheme = useMemo(() => buildA4ProfileThemeStyle(profile), [profile]);
   const rootRef = useRef<HTMLDivElement>(null);
   const [metrics, setMetrics] = useState("");
   const [overflowText, setOverflowText] = useState("");
@@ -75,7 +80,7 @@ export function A4LayoutCanvas({
     };
 
     requestAnimationFrame(afterTypeset);
-  }, [layout, rowTargets, active]);
+  }, [layout, rowTargets, active, profile?.profileName]);
 
   const cardCount = plan.rows.reduce((sum, row) => sum + row.cards.length, 0);
 
@@ -116,6 +121,7 @@ export function A4LayoutCanvas({
         <div
           className="poster-frame a4-clean"
           style={{
+            ...profileTheme,
             ["--a4-page-h" as string]: `${settings.pageHeightPx}px`,
             ["--a4-gap" as string]: `${rowTargets.rowGap}px`,
             width: settings.pageWidthPx,
@@ -152,7 +158,12 @@ export function A4LayoutCanvas({
                   {row.cards.map((card, i) => (
                     <article
                       key={card.entityIndex}
-                      className={renderA4CardClassName(card.sourceEntity, row.reports[i], row.fractions[i])}
+                      className={[
+                        renderA4CardClassName(card.sourceEntity, row.reports[i], row.fractions[i]),
+                        a4CardSurfaceClass(card.sourceEntity.attention, card.entityIndex),
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       data-a4-fit-card="1"
                       dangerouslySetInnerHTML={{
                         __html: renderA4CardInner(card.sourceEntity, row.reports[i], row.fractions[i]),

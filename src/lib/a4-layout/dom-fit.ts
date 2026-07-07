@@ -94,11 +94,14 @@ function a4NormalizeTitlePadding(card: HTMLElement, state: FitState): FitState {
   const title = card.querySelector(".a4-title-pill") as HTMLElement | null;
   if (!title) return s;
 
-  // Shrink only horizontal padding; allow any number of title lines.
+  // Single-line titles: shrink horizontal padding until the line fits.
+  // Multi-line titles: keep reducing padding to the minimum (more lines need more width).
   for (let px = 40; px >= A4_FIT_MIN.titlePadX; px -= 4) {
     s.titlePadX = px;
     a4ApplyFitState(card, s);
-    if (title.scrollWidth <= title.clientWidth + 1) return { ...s };
+    const lineHeight = Number.parseFloat(getComputedStyle(title).lineHeight) || 12;
+    const lines = Math.max(1, Math.round(title.scrollHeight / lineHeight));
+    if (lines <= 1 && title.scrollWidth <= title.clientWidth + 1) return { ...s };
   }
 
   s.titlePadX = A4_FIT_MIN.titlePadX;

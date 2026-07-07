@@ -21,7 +21,7 @@ import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { callTextLLMForJson } from "@/lib/llm-json";
-import { buildDesignBriefPrompt, designProfileColorsAndRules } from "@/lib/prompt-injection";
+import { buildDesignBriefPrompt, designProfileColorsAndRules, resolveDesignProfile } from "@/lib/prompt-injection";
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
 import {
   buildRefineContentPrompt,
@@ -148,9 +148,21 @@ function Workspace() {
     () => styles.find((s) => s.id === (selectedStyleId ?? activeContent?.value.recommendedStyle)),
     [styles, selectedStyleId, activeContent],
   );
+  const effectiveProfileName = useMemo(
+    () =>
+      selectedProfileName ??
+      activeContent?.value.recommendedDesignProfile ??
+      activeContent?.value.analysis?.recommendedDesignProfile ??
+      null,
+    [
+      selectedProfileName,
+      activeContent?.value.recommendedDesignProfile,
+      activeContent?.value.analysis?.recommendedDesignProfile,
+    ],
+  );
   const activeProfile = useMemo(
-    () => profiles.find((p) => p.profileName === selectedProfileName) ?? profiles[0],
-    [profiles, selectedProfileName],
+    () => resolveDesignProfile(profiles, effectiveProfileName),
+    [profiles, effectiveProfileName],
   );
 
   const hasSource = hasSourceMaterials(source.text, uploadedSourceText, attachedImages);
@@ -690,7 +702,7 @@ ${activeContent.value.content}`;
               <div>
                 <Label className="text-xs">Профиль дизайна (цвета и шрифты)</Label>
                 <ProfileSelect
-                  value={selectedProfileName ?? activeProfile?.profileName ?? ""}
+                  value={effectiveProfileName ?? activeProfile?.profileName ?? ""}
                   onChange={setSelectedProfileName}
                 />
               </div>
@@ -874,6 +886,7 @@ ${activeContent.value.content}`;
                 <A4AutoLayoutView
                   analysis={activeContent.value.analysis}
                   active={paneMode === "auto-layout"}
+                  profile={activeProfile}
                   manualTemplate={appliedManualLayout}
                 />
               ) : (
@@ -892,6 +905,7 @@ ${activeContent.value.content}`;
                   <A4LayoutCanvas
                     layout={aiLayoutCanvas}
                     active={paneMode === "wireframe"}
+                    profile={activeProfile}
                     modeNote="Технический макет (AI)"
                   />
                   {aiLayoutResult ? (

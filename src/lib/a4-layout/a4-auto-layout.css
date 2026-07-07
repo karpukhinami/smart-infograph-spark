@@ -9,10 +9,10 @@
   height: var(--a4-page-h, 842px);
   min-height: var(--a4-page-h, 842px);
   overflow: hidden;
-  background: #f7f8fc;
-  border: 1px solid #cfd6e6;
+  background: var(--a4-bg, #f7f8fc);
+  border: 1px solid color-mix(in srgb, var(--a4-ink, #0c1126) 14%, transparent);
   border-radius: 18px;
-  box-shadow: 0 16px 38px rgba(20, 28, 55, 0.08);
+  box-shadow: 0 16px 38px color-mix(in srgb, var(--a4-ink, #0c1126) 8%, transparent);
 }
 
 .a4-auto-layout-root .poster-frame.a4-clean::before {
@@ -42,9 +42,10 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
-  border: 1px solid #d9deea;
+  border: 1px solid color-mix(in srgb, var(--a4-ink, #0c1126) 16%, transparent);
   border-radius: 15px;
-  background: #fff;
+  background: var(--a4-card-soft, #fff);
+  color: var(--a4-ink, #0c1126);
   padding: var(--a4-card-pad-y, 15px) var(--a4-card-pad-x, 18px);
   overflow: hidden;
   position: relative;
@@ -64,11 +65,23 @@
 }
 
 .a4-auto-layout-root .a4-card.is-core {
+  background: var(--a4-card-core, #ffaa57);
   border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--a4-ink, #0c1126) 22%, transparent);
 }
 
 .a4-auto-layout-root .a4-card.is-accent {
+  background: var(--a4-card-accent, #d7d2fa);
   border-style: dashed;
+  border-color: color-mix(in srgb, var(--a4-ink, #0c1126) 20%, transparent);
+}
+
+.a4-auto-layout-root .a4-card.is-pastel-soft {
+  background: var(--a4-card-soft, #f8e0c9);
+}
+
+.a4-auto-layout-root .a4-card.is-pastel-deep {
+  background: var(--a4-card-deep, #ffd6ae);
 }
 
 .a4-auto-layout-root .a4-header-card {
@@ -82,9 +95,9 @@
   padding: 12px 40px 12px;
   flex: none;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--a4-header-bg, #293642);
   border-radius: 15px;
-  border: 1px solid #d9deea;
+  border: 1px solid color-mix(in srgb, var(--a4-ink, #0c1126) 16%, transparent);
 }
 
 .a4-auto-layout-root .a4-header-main {
@@ -105,7 +118,7 @@
   line-height: 33px;
   font-weight: 700;
   text-transform: uppercase;
-  color: #111827;
+  color: var(--a4-header-title, #ffffff);
   margin: 0 0 6px;
   overflow-wrap: anywhere;
 }
@@ -114,7 +127,7 @@
   font-size: var(--a4-header-summary-font, 14px);
   line-height: 18px;
   font-weight: 500;
-  color: #111827;
+  color: var(--a4-header-muted, #818c96);
   overflow-wrap: anywhere;
   max-width: 420px;
 }
@@ -123,11 +136,11 @@
   display: inline-flex;
   align-items: center;
   min-height: 28px;
-  border: 1px solid #d9deea;
+  border: 1px solid color-mix(in srgb, var(--a4-ink, #0c1126) 14%, transparent);
   border-radius: 14px;
   padding: 4px 12px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--a4-header-meta-bg, #3d4a56);
+  color: var(--a4-header-muted, #818c96);
   font-size: 12px;
   line-height: 1.1;
   font-weight: 700;
@@ -144,7 +157,7 @@
   flex: 0 0 auto;
   width: fit-content;
   max-width: 100%;
-  border: 1px solid #d9deea;
+  border: 1px solid color-mix(in srgb, var(--a4-ink, #0c1126) 14%, transparent);
   border-radius: 6px;
   padding: var(--title-pad-y) var(--title-pad-x);
   font-size: var(--title-font);
@@ -158,7 +171,8 @@
   display: block;
   height: auto;
   max-height: none;
-  color: #111827;
+  background: var(--a4-title-pill-bg, #293642);
+  color: var(--a4-title-pill-text, #ffffff);
 }
 
 .a4-auto-layout-root .a4-title-pill span {
@@ -174,6 +188,7 @@
   font-size: var(--body-font);
   line-height: 1.15;
   font-weight: 600;
+  color: var(--a4-ink, #0c1126);
   overflow-wrap: anywhere;
   word-break: normal;
   min-width: 0;
@@ -194,8 +209,8 @@
 }
 
 .a4-auto-layout-root .a4-body .accent {
-  color: #1a4fd6;
-  background: rgba(26, 79, 214, 0.1);
+  color: var(--a4-spot-accent, #0c71c9);
+  background: color-mix(in srgb, var(--a4-spot-accent, #0c71c9) 14%, transparent);
   border-radius: 4px;
   padding: 0 0.15em;
 }
@@ -209,12 +224,14 @@
 
 .a4-auto-layout-root .a4-addendum-item {
   min-height: 32px;
-  border: 1px solid #d9deea;
+  border: 1px solid color-mix(in srgb, var(--a4-ink, #0c1126) 14%, transparent);
   border-radius: 6px;
   padding: var(--add-pad-y) var(--add-pad-x);
   font-size: var(--add-font);
   line-height: 1.15;
   font-weight: 600;
+  background: var(--a4-surface, #ffffff);
+  color: var(--a4-ink, #0c1126);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -234,6 +251,7 @@
 .a4-auto-layout-root .a4-formula {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: var(--body-font);
+  color: var(--a4-ink, #0c1126);
 }
 
 .a4-auto-layout-root .a4-fit-badge {
