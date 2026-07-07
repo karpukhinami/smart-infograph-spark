@@ -654,6 +654,12 @@ export const useProjectStore = create<ProjectState>()(
 export function useActiveContent() {
   return useProjectStore((s) => s.contentVersions.find((v) => v.id === s.activeContentId) ?? null);
 }
+
+/** Synchronous read of the active content version (for layout/AI after in-tab edits). */
+export function getActiveContentVersion() {
+  const s = useProjectStore.getState();
+  return s.contentVersions.find((v) => v.id === s.activeContentId) ?? null;
+}
 export function useActiveBrief() {
   return useProjectStore((s) => s.briefVersions.find((v) => v.id === s.activeBriefId) ?? null);
 }

@@ -3,6 +3,7 @@ import type { AnalysisJson, DesignProfile } from "@/lib/types";
 import { buildA4AutoLayout, buildA4ManualLayout } from "@/lib/a4-layout";
 import type { A4DomFitOptions } from "@/lib/a4-layout/types";
 import { A4LayoutCanvas } from "@/components/workspace/A4LayoutCanvas";
+import { getActiveContentVersion } from "@/store/useProjectStore";
 
 export interface ManualLayoutApply {
   template: string;
@@ -20,12 +21,13 @@ interface Props {
 
 export function A4AutoLayoutView({ analysis, active, profile = null, manualApply = null }: Props) {
   const layout = useMemo(() => {
-    if (!manualApply) return buildA4AutoLayout(analysis);
+    const currentAnalysis = getActiveContentVersion()?.value.analysis ?? analysis;
+    if (!manualApply) return buildA4AutoLayout(currentAnalysis);
     const domFitOptions: A4DomFitOptions = {
       balanceRowFonts: manualApply.balanceRowFonts,
       allowAddendumRight: manualApply.allowAddendumRight,
     };
-    return buildA4ManualLayout(analysis, manualApply.template, domFitOptions);
+    return buildA4ManualLayout(currentAnalysis, manualApply.template, domFitOptions);
   }, [analysis, manualApply]);
 
   const modeNote = !manualApply

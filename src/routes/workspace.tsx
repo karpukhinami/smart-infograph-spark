@@ -9,7 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, RefreshCw, RotateCcw, Upload, Sparkles } from "lucide-react";
-import { useProjectStore, useActiveContent, useActiveBrief, useActiveImage } from "@/store/useProjectStore";
+import {
+  useProjectStore,
+  useActiveContent,
+  useActiveBrief,
+  useActiveImage,
+  getActiveContentVersion,
+} from "@/store/useProjectStore";
 import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/useSettingsStore";
 import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
@@ -108,6 +114,7 @@ function Workspace() {
   const [manualBalanceRowFonts, setManualBalanceRowFonts] = useState(true);
   const [manualAllowAddendumRight, setManualAllowAddendumRight] = useState(true);
   const [appliedManualLayout, setAppliedManualLayout] = useState<ManualLayoutApply | null>(null);
+  const [autoLayoutEpoch, setAutoLayoutEpoch] = useState(0);
   const [aiLayoutResult, setAiLayoutResult] = useState<AILayoutResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -156,7 +163,8 @@ function Workspace() {
   ]);
 
   function onRecalculateManualLayout() {
-    if (!activeContent?.value.analysis) {
+    const contentVer = getActiveContentVersion();
+    if (!contentVer?.value.analysis) {
       toast.error("Сначала выполните анализ контента");
       return;
     }
@@ -171,6 +179,18 @@ function Workspace() {
         ? "Макет пересчитан по шаблону"
         : "Макет пересчитан (ряды как в авто)",
     );
+  }
+
+  function onRedrawAutoLayout() {
+    const contentVer = getActiveContentVersion();
+    if (!contentVer?.value.analysis) {
+      toast.error("Сначала выполните анализ контента");
+      return;
+    }
+    setAppliedManualLayout(null);
+    setAutoLayoutEpoch((n) => n + 1);
+    setPaneMode("auto-layout");
+    toast.success("Авто-макет пересчитан по текущему контенту");
   }
 
   // Legacy OCR-as-text fallback removed: images are now passed multimodally to the analysis model.
@@ -306,13 +326,15 @@ function Workspace() {
   }
 
   async function onCreateAILayout() {
-    if (!activeContent?.value.analysis) {
+    const contentVer = getActiveContentVersion();
+    const analysis = contentVer?.value.analysis;
+    if (!analysis) {
       toast.error("Сначала выполните анализ контента");
       return;
     }
     try {
       setLoading("ai-layout");
-      const input = buildAIInputJSON(activeContent.value.analysis);
+      const input = buildAIInputJSON(analysis);
       const prompt = `${prompts.codeBasedProduct.trim()}\n\nINPUT JSON:\n${JSON.stringify(input, null, 2)}`;
       const raw = await callTextLLM({ model: models.brief, prompt });
       const parsed = normalizeAIResponse(raw);
@@ -821,12 +843,26 @@ ${activeContent.value.content}`;
 
             <TabsContent value="auto-layout" className="p-2 space-y-2">
               {activeContent?.value.analysis ? (
-                <A4AutoLayoutView
-                  analysis={activeContent.value.analysis}
-                  active={paneMode === "auto-layout"}
-                  profile={activeProfile}
-                  manualApply={appliedManualLayout}
-                />
+                <>
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={onRedrawAutoLayout}
+                      disabled={loading !== null}
+                    >
+                      <RefreshCw className="size-3.5 mr-1" />
+                      Перерисовать авто-макет
+                    </Button>
+                  </div>
+                  <A4AutoLayoutView
+                    key={autoLayoutEpoch}
+                    analysis={activeContent.value.analysis}
+                    active={paneMode === "auto-layout"}
+                    profile={activeProfile}
+                    manualApply={appliedManualLayout}
+                  />
+                </>
               ) : (
                 <EmptyState text="Авто-макет доступен после анализа в strict-режиме (структурированный JSON)." />
               )}

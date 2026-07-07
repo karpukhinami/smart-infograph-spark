@@ -54,6 +54,12 @@ Combining addendums:
 - When merged into one item (single or stack), you may put short pieces on one line separated by commas or semicolons if that reads better than separate lines; otherwise put each piece on its own line using <br>.
 - When items stay separate (row/grid), each item is its own inset; render order is left to right, then top to bottom.
 
+Relocating addendum content into main text:
+- If addendum material clearly dominates the card (substantially more text than the main body), you may move part of the addendum into content at your discretion.
+- Do this only when the result is correctly formatted (valid HTML per rules below) and reads naturally — the main body should gain supporting detail, not become a dump of unrelated fragments.
+- Do not drop information: anything not moved into content must remain in addendums.items.
+- Prefer keeping formulas in addendums unless a short inline fragment fits naturally in the body.
+
 CONTENT RULES
 Do not change the meaning of the text. Do not add or remove information.
 You may only change formatting: bold, accent highlights, line breaks, list structure.
