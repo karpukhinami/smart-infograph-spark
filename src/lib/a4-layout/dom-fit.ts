@@ -61,6 +61,7 @@ const FIT_STYLE_PROPS = [
   "--gap-add-items",
   "--a4-card-pad-y",
   "--a4-card-pad-x",
+  "--a4-side-col-pull",
 ] as const;
 
 function resolveMaxBodyFont(options: A4DomFitOptions): number {
@@ -281,8 +282,13 @@ function isCardMeasurable(card: HTMLElement): boolean {
   return Boolean(card && isElementActuallyVisible(card) && card.clientWidth > 0 && card.clientHeight > 0);
 }
 
+function cardHasAddendum(card: HTMLElement): boolean {
+  return Boolean(card.querySelector(".a4-addendum-zone"));
+}
+
 function a4GrowCardToFill(card: HTMLElement, baseState: FitState, options: A4DomFitOptions) {
   const maxFont = resolveMaxBodyFont(options);
+  const hasAddendum = cardHasAddendum(card);
   let best = { ...baseState };
   a4ApplyFitState(card, best);
 
@@ -298,12 +304,14 @@ function a4GrowCardToFill(card: HTMLElement, baseState: FitState, options: A4Dom
     best = { ...st };
   }
 
-  for (const gapTitle of [18, 22, 26, 30, 34, 38, 42]) {
-    if (gapTitle <= best.gapTitleBody) continue;
-    const st = { ...best, gapTitleBody: gapTitle };
-    a4ApplyFitState(card, st);
-    if (a4MeasureCard(card).overflow) break;
-    best = { ...st };
+  if (!hasAddendum) {
+    for (const gapTitle of [18, 22, 26, 30, 34, 38, 42]) {
+      if (gapTitle <= best.gapTitleBody) continue;
+      const st = { ...best, gapTitleBody: gapTitle };
+      a4ApplyFitState(card, st);
+      if (a4MeasureCard(card).overflow) break;
+      best = { ...st };
+    }
   }
 
   for (const cardPad of [12, 14, 16, 18, 20, 22, 24, 28, 32]) {
@@ -339,9 +347,9 @@ function a4GrowRowTogether(cards: HTMLElement[], options: A4DomFitOptions) {
 
   const gapSteps = [18, 22, 26, 30, 34, 38, 42, 46, 50];
   for (const gapTitle of gapSteps) {
-    const trial = bestStates.map((s) => ({
+    const trial = bestStates.map((s, i) => ({
       ...s,
-      gapTitleBody: Math.max(s.gapTitleBody, gapTitle),
+      gapTitleBody: cardHasAddendum(cards[i]) ? s.gapTitleBody : Math.max(s.gapTitleBody, gapTitle),
     }));
     trial.forEach((st, i) => a4ApplyFitState(cards[i], st));
     if (cards.some((card) => a4MeasureCard(card).overflow)) break;
@@ -368,6 +376,50 @@ function a4TightenAddendumGaps(root: HTMLElement) {
       }
     }
     a4ApplyFitState(card, state);
+  });
+}
+
+/** Pull right-column addendum up to title-pill top; stretch it vertically; grow add font if room. */
+function a4PullAndStretchSideAddendum(card: HTMLElement, options: A4DomFitOptions) {
+  if (!card.classList.contains("split-right")) return;
+
+  const titlePill = card.querySelector(".a4-title-pill") as HTMLElement | null;
+  const sideCol = card.querySelector(".a4-side-col") as HTMLElement | null;
+  if (!titlePill || !sideCol || !sideCol.querySelector(".a4-addendum-zone")) return;
+
+  card.style.setProperty("--a4-side-col-pull", "0px");
+
+  const titleTop = titlePill.getBoundingClientRect().top;
+  const sideTop = sideCol.getBoundingClientRect().top;
+  const targetPull = Math.max(0, Math.round(sideTop - titleTop));
+  let appliedPull = 0;
+
+  for (let pull = targetPull; pull >= 0; pull -= 2) {
+    card.style.setProperty("--a4-side-col-pull", pull + "px");
+    if (!a4MeasureCard(card).overflow) {
+      appliedPull = pull;
+      break;
+    }
+  }
+  card.style.setProperty("--a4-side-col-pull", appliedPull + "px");
+
+  let addFont = Number.parseFloat(getComputedStyle(card).getPropertyValue("--add-font")) || 9;
+  const bodyFont = Number.parseFloat(getComputedStyle(card).getPropertyValue("--body-font")) || 10;
+  const maxAdd = Math.min(bodyFont + 1, resolveMaxBodyFont(options));
+
+  while (addFont + 0.25 <= maxAdd) {
+    card.style.setProperty("--add-font", addFont + 0.25 + "px");
+    if (a4MeasureCard(card).overflow) {
+      card.style.setProperty("--add-font", addFont + "px");
+      return;
+    }
+    addFont += 0.25;
+  }
+}
+
+function a4PullSideAddendums(root: HTMLElement, options: A4DomFitOptions) {
+  root.querySelectorAll('.a4-card[data-a4-fit-card="1"].split-right').forEach((node) => {
+    a4PullAndStretchSideAddendum(node as HTMLElement, options);
   });
 }
 
@@ -443,6 +495,7 @@ export function runA4DomFit(
     cards.forEach((card) => a4GrowCardToFill(card, readFitState(card), options));
   }
   a4TightenAddendumGaps(root);
+  a4PullSideAddendums(root, options);
 
   const overflowCount = results.filter((r) => r.measure.overflow).length;
   const freeTotal = results.reduce((sum, r) => sum + Math.max(0, r.measure.free), 0);

@@ -204,7 +204,7 @@ export function renderA4HeaderHtml(summary: A4LayoutSummary, headerHeight: numbe
   const summaryText = summary.summary || "";
   const meta = metaText(summary);
   return `<article class="a4-card a4-header-card" style="--a4-header-h:${Math.round(headerHeight)}px; --a4-header-meta-inset:${A4_HEADER_META_INSET_PX}px; --a4-header-title-font:${A4_HEADER_TITLE_FONT_BASE}px; --a4-header-summary-font:${A4_HEADER_SUMMARY_FONT_BASE}px; --a4-header-title-line:${A4_HEADER_TITLE_LINE_BASE}px; --a4-header-summary-line:${A4_HEADER_SUMMARY_LINE_BASE}px;">
-    ${meta ? `<div class="a4-header-meta">${escapeHtml(meta)}</div>` : ""}
+    ${meta ? `<div class="a4-header-meta-row"><div class="a4-header-meta">${escapeHtml(meta)}</div></div>` : ""}
     <div class="a4-header-main">
       <div class="a4-header-title">${escapeHtml(topic)}</div>
       ${summaryText ? `<div class="a4-header-summary">${escapeHtml(summaryText)}</div>` : ""}
