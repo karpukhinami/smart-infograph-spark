@@ -16,18 +16,7 @@ export function a4LayoutExportPixelRatio(
   return A4_LAYOUT_EXPORT_WIDTH / logicalWidth;
 }
 
-async function waitForFormulaTypeset(root: HTMLElement, timeoutMs = 4000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    let pending = false;
-    root.querySelectorAll<HTMLElement>(".a4-formula p, .a4-side-formula").forEach((node) => {
-      if (node.textContent?.trim() && !node.querySelector(".katex")) pending = true;
-    });
-    if (!pending) return;
-    await new Promise((r) => setTimeout(r, 50));
-  }
-}
-
+import { waitForA4FormulaTypeset } from "@/lib/a4-layout/katex-typeset";
 function parseRgbBackground(el: HTMLElement): string {
   const bg = getComputedStyle(el).backgroundColor;
   return bg && bg !== "transparent" ? bg : "#f7f8fc";
@@ -64,7 +53,7 @@ function fitRasterToExportCanvas(dataUrl: string, backgroundColor: string): Prom
  * Uses pixelRatio (not oversized empty canvas) so content fills the page with proportional typography.
  */
 export async function exportA4LayoutPng(frame: HTMLElement): Promise<string> {
-  await waitForFormulaTypeset(frame);
+  await waitForA4FormulaTypeset(frame);
   frame.querySelectorAll(".a4-fit-badge").forEach((b) => b.remove());
 
   const backgroundColor = parseRgbBackground(frame);

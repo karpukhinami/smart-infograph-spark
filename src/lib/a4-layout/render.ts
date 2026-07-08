@@ -15,7 +15,11 @@ export function a4LatexText(text: unknown): string {
   let x = String(text ?? "").trim();
   x = x.replace(/\\([A-Za-z]+)/g, "\\$1").replace(/\\([{}])/g, "\\$1");
   const display = x.match(/^\$\$([\s\S]*?)\$\$$/);
-  if (display) return "\\(" + display[1].trim() + "\\)";
+  if (display) return display[1].trim();
+  const inline = x.match(/^\$([\s\S]*?)\$$/);
+  if (inline) return inline[1].trim();
+  const paren = x.match(/^\\\(([\s\S]*?)\\\)$/);
+  if (paren) return paren[1].trim();
   return x;
 }
 
@@ -46,7 +50,7 @@ function aiBodyHtml(entity: LayoutEntity): string {
 
 function a4IsLatexLike(value: string): boolean {
   const t = String(value || "").trim();
-  return /^\$\$[\s\S]*\$\$$/.test(t) || /^\\\([\s\S]*\\\)$/.test(t) || /^\\\[[\s\S]*\\\]$/.test(t);
+  return /^\$\$[\s\S]*\$\$$/.test(t) || /^\$[\s\S]*\$$/.test(t) || /^\\\([\s\S]*\\\)$/.test(t) || /^\\\[[\s\S]*\\\]$/.test(t);
 }
 
 function a4RenderAddendumItemContent(item: string, allowHtml = false): string {

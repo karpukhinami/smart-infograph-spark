@@ -284,6 +284,34 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: var(--body-font);
   color: var(--a4-ink, #0c1126);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.a4-auto-layout-root .a4-formula p,
+.a4-auto-layout-root .a4-side-formula {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.a4-auto-layout-root .a4-formula .katex,
+.a4-auto-layout-root .a4-formula .katex-display,
+.a4-auto-layout-root .a4-side-formula .katex,
+.a4-auto-layout-root .a4-side-formula .katex-display {
+  max-width: 100%;
+}
+
+.a4-auto-layout-root .a4-katex-display-inline {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-align: center;
+  margin: 0.2em 0;
+}
+
+.a4-auto-layout-root .a4-katex-inline {
+  display: inline;
+  white-space: nowrap;
 }
 
 .a4-auto-layout-root .a4-card.split-right .a4-card-inner {

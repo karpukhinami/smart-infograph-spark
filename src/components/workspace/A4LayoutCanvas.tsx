@@ -16,6 +16,7 @@ import {
   exportA4LayoutPng,
   runA4DomFit,
 } from "@/lib/a4-layout";
+import { typesetA4FormulasAndWait } from "@/lib/a4-layout/katex-typeset";
 import {
   renderA4CardClassName,
   renderA4CardInner,
@@ -42,37 +43,6 @@ interface Props {
   exportKind?: string;
   /** When false, span.accent uses accent color only (no filled background). */
   accentHighlightText?: boolean;
-}
-
-function typesetFormulas(root: HTMLElement) {
-  const nodes = root.querySelectorAll<HTMLElement>(".a4-formula p, .a4-side-formula");
-  nodes.forEach((node) => {
-    const raw = node.textContent?.trim();
-    if (!raw) return;
-    void import("katex").then((katex) => {
-      try {
-        katex.default.render(raw.replace(/^\\\(|\\\)$/g, "").replace(/^\$\$?|\$\$?$/g, ""), node, {
-          throwOnError: false,
-          displayMode: false,
-        });
-      } catch {
-        /* keep raw text */
-      }
-    });
-  });
-}
-
-async function typesetFormulasAndWait(root: HTMLElement, timeoutMs = 4000): Promise<void> {
-  typesetFormulas(root);
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    let pending = false;
-    root.querySelectorAll<HTMLElement>(".a4-formula p, .a4-side-formula").forEach((node) => {
-      if (node.textContent?.trim() && !node.querySelector(".katex")) pending = true;
-    });
-    if (!pending) return;
-    await new Promise((r) => setTimeout(r, 50));
-  }
 }
 
 export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A4LayoutCanvas(
@@ -145,15 +115,15 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
     const root = rootRef.current;
     if (!root) return;
 
-    const afterTypeset = () => {
+    const afterTypeset = async () => {
+      await typesetA4FormulasAndWait(root);
       runDomFit();
-      typesetFormulas(root);
-      requestAnimationFrame(() => {
-        runDomFit();
-      });
+      requestAnimationFrame(() => runDomFit());
     };
 
-    requestAnimationFrame(afterTypeset);
+    requestAnimationFrame(() => {
+      void afterTypeset();
+    });
   }, [layout, rowTargets, active, profile?.profileName, screenFitOptions, runDomFit]);
 
   const exportPng = useCallback(async () => {
@@ -186,7 +156,8 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
 
     try {
       runA4DomFit(clone, rowTargets, true, exportFitOptions);
-      await typesetFormulasAndWait(clone);
+      await typesetA4FormulasAndWait(clone);
+      runA4DomFit(clone, rowTargets, true, exportFitOptions);
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       const dataUrl = await exportA4LayoutPng(clone);
