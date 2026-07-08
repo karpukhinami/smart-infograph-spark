@@ -1,4 +1,4 @@
-import { isWideCardFraction } from "@/lib/a4-layout/constants";
+import { normalizeDisplayDollars } from "@/lib/a4-layout/katex-typeset";
 import { sanitizeAIHtml } from "@/lib/a4-layout/sanitize-ai-html";
 import type { A4LayoutSettings, A4LayoutSummary, A4RenderOptions, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
 import { asArray, escapeHtml, flattenText, formatLayoutHtmlText, normalizeLayoutBreaks, textStats } from "@/lib/a4-layout/text";
@@ -12,7 +12,7 @@ import {
 } from "@/lib/a4-layout/dom-fit";
 
 export function a4LatexText(text: unknown): string {
-  let x = String(text ?? "").trim();
+  let x = normalizeDisplayDollars(String(text ?? "").trim());
   x = x.replace(/\\([A-Za-z]+)/g, "\\$1").replace(/\\([{}])/g, "\\$1");
   const display = x.match(/^\$\$([\s\S]*?)\$\$$/);
   if (display) return display[1].trim();

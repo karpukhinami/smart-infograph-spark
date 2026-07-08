@@ -20,8 +20,16 @@ function loadKatex(): Promise<KatexApi> {
   return katexPromise;
 }
 
+export function normalizeDisplayDollars(text: string): string {
+  return String(text || "").replace(/\$\$([\s\S]+?)\$\$/g, (_match, inner: string) => `$${String(inner).trim()}$`);
+}
+
+function shouldUseDisplayMode(latex: string): boolean {
+  return /\\begin\{(aligned|cases|gathered|split)\}/.test(latex);
+}
+
 export function stripLatexDelimiters(raw: string): string {
-  let x = String(raw || "").trim();
+  let x = normalizeDisplayDollars(String(raw || "").trim());
   const display = x.match(/^\$\$([\s\S]*?)\$\$$/);
   if (display) return display[1].trim();
   const inline = x.match(/^\$([\s\S]*?)\$$/);
@@ -37,19 +45,73 @@ function textNeedsInlineTypeset(text: string): boolean {
   return INLINE_MATH_TEST_RE.test(text);
 }
 
-function tryBreakWideFormulaAtPlus(latex: string): string {
-  if (/\\begin\{/.test(latex)) return latex;
-  const eq = latex.match(/^(.+?=\s*)([\s\S]+)$/);
-  if (!eq) return latex;
-  const [, lhs, rhs] = eq;
-  if (!rhs.includes("+")) return latex;
-  const terms = rhs.split(/\s*\+\s*/).filter(Boolean);
-  if (terms.length < 2) return latex;
-  const lines = [`&${terms[0]}`];
-  for (let i = 1; i < terms.length; i++) {
-    lines.push(`&+ ${terms[i]}`);
+function findBreakableOperators(latex: string): Array<{ index: number; op: "+" | "=" }> {
+  const breaks: Array<{ index: number; op: "+" | "=" }> = [];
+  let depth = 0;
+  for (let i = 0; i < latex.length; i++) {
+    const ch = latex[i];
+    if (ch === "\\") {
+      i++;
+      while (i < latex.length && /[a-zA-Z]/.test(latex[i])) i++;
+      continue;
+    }
+    if (ch === "{") {
+      depth++;
+      continue;
+    }
+    if (ch === "}") {
+      if (depth > 0) depth--;
+      continue;
+    }
+    if (depth === 0 && (ch === "+" || ch === "=")) {
+      breaks.push({ index: i, op: ch });
+    }
   }
-  return `${lhs}\\begin{aligned}${lines.join(" \\\\ ")}\\end{aligned}`;
+  return breaks;
+}
+
+function buildAlignedAtPlus(latex: string, plusIndices: number[]): string {
+  const segments: string[] = [];
+  let last = 0;
+  for (const idx of plusIndices) {
+    segments.push(latex.slice(last, idx).trim());
+    last = idx + 1;
+  }
+  segments.push(latex.slice(last).trim());
+  if (segments.length < 2) return latex;
+
+  const lines = [`&${segments[0]} +`];
+  for (let i = 1; i < segments.length - 1; i++) {
+    lines.push(`&+ ${segments[i]} +`);
+  }
+  lines.push(`&+ ${segments[segments.length - 1]}`);
+  return `\\begin{aligned}${lines.join(" \\\\ ")}\\end{aligned}`;
+}
+
+function buildAlignedAtEquals(latex: string, eqIndex: number): string {
+  const lhs = latex.slice(0, eqIndex).trim();
+  const rhs = latex.slice(eqIndex + 1).trim();
+  if (!lhs || !rhs) return latex;
+  return `\\begin{aligned}&${lhs} = \\\\ &= ${rhs}\\end{aligned}`;
+}
+
+function tryBreakWideFormula(latex: string): string {
+  if (/\\begin\{/.test(latex)) return latex;
+
+  const breaks = findBreakableOperators(latex);
+  if (!breaks.length) return latex;
+
+  const plusBreaks = breaks.filter((b) => b.op === "+").map((b) => b.index);
+  if (plusBreaks.length >= 1) {
+    return buildAlignedAtPlus(latex, plusBreaks);
+  }
+
+  const eqBreak = breaks.find((b) => b.op === "=");
+  if (eqBreak) {
+    return buildAlignedAtEquals(latex, eqBreak.index);
+  }
+
+  return latex;
 }
 
 function renderKatex(node: HTMLElement, latex: string, displayMode: boolean, katex: KatexApi) {
@@ -98,13 +160,13 @@ function fitBlockKatex(root: HTMLElement) {
     const latex = node.dataset.a4LatexSource;
     if (!latex || node.dataset.a4KatexRetried === "1") return;
 
-    const broken = tryBreakWideFormulaAtPlus(latex);
+    const broken = tryBreakWideFormula(latex);
     if (broken === latex) return;
 
     node.dataset.a4KatexRetried = "1";
     void loadKatex().then((katex) => {
       node.textContent = "";
-      renderKatex(node, broken, true, katex);
+      renderKatex(node, broken, shouldUseDisplayMode(broken), katex);
       const next = node.querySelector<HTMLElement>(".katex, .katex-display");
       if (next) shrinkKatexToFit(next, container);
     });
@@ -113,7 +175,7 @@ function fitBlockKatex(root: HTMLElement) {
 
 function typesetBlockFormulas(root: HTMLElement, katex: KatexApi) {
   root.querySelectorAll<HTMLElement>(BLOCK_FORMULA_SELECTOR).forEach((node) => {
-    const raw = node.textContent?.trim();
+    const raw = normalizeDisplayDollars(node.textContent?.trim() || "");
     if (!raw) return;
     if (node.querySelector(".katex") && !textNeedsInlineTypeset(raw) && !raw.includes("$")) return;
 
@@ -121,12 +183,12 @@ function typesetBlockFormulas(root: HTMLElement, katex: KatexApi) {
     node.dataset.a4LatexSource = latex;
     node.dataset.a4KatexRetried = "";
     node.textContent = "";
-    renderKatex(node, latex, true, katex);
+    renderKatex(node, latex, shouldUseDisplayMode(latex), katex);
   });
 }
 
 function typesetInlineMathInTextNode(textNode: Text, katex: KatexApi) {
-  const text = textNode.textContent || "";
+  const text = normalizeDisplayDollars(textNode.textContent || "");
   if (!textNeedsInlineTypeset(text)) return;
 
   INLINE_MATH_RE.lastIndex = 0;
@@ -148,11 +210,11 @@ function typesetInlineMathInTextNode(textNode: Text, katex: KatexApi) {
     const displayLatex = match[1];
     const inlineLatex = match[2] ?? match[3] ?? match[4];
     const latex = (displayLatex ?? inlineLatex ?? "").trim();
-    const isDisplay = Boolean(displayLatex || match[4]);
+    const displayMode = shouldUseDisplayMode(latex);
 
     const span = document.createElement("span");
-    span.className = isDisplay ? "a4-katex-display-inline" : "a4-katex-inline";
-    renderKatex(span, latex, isDisplay, katex);
+    span.className = displayMode ? "a4-katex-display-inline" : "a4-katex-inline";
+    renderKatex(span, latex, displayMode, katex);
     frag.appendChild(span);
     lastIndex = INLINE_MATH_RE.lastIndex;
   }
