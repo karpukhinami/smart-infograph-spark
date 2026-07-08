@@ -12,9 +12,9 @@ interface ReqBody {
 
 const OPENROUTER_TIMEOUT_MS = 180_000;
 
-/** Gemini via chat/completions uses image_config.image_size, not top-level resolution. */
+/** Gemini image_config.image_size — use "512", not "0.5K" (INVALID_ARGUMENT). */
 function mapCardResolutionToImageSize(resolution: string): string {
-  if (resolution === "512") return "0.5K";
+  if (resolution === "512") return "512";
   if (resolution === "1K") return "1K";
   if (resolution === "2K") return "2K";
   if (resolution === "4K") return "4K";
@@ -70,7 +70,8 @@ export const Route = createFileRoute("/api/generate-image")({
             openRouterPayload.image_config = imageConfig;
 
             console.log("[OpenRouter card image]", {
-              model: openRouterPayload.model,
+              model: body.model,
+              upstreamModel: openRouterPayload.model,
               prompt: body.prompt,
               resolution: body.resolution ?? null,
               aspect_ratio: body.aspect_ratio ?? null,
