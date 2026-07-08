@@ -81,7 +81,12 @@ export async function callTextLLM(opts: {
   return data.text;
 }
 
-export async function callImageLLM(opts: { model: string; prompt: string }): Promise<string> {
+export async function callImageLLM(opts: {
+  model: string;
+  prompt: string;
+  resolution?: string;
+  aspect_ratio?: string;
+}): Promise<string> {
   const res = await fetch("/api/generate-image", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

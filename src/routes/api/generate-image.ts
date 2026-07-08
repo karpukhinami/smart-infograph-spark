@@ -5,6 +5,9 @@ import { isOpenRouterModel, resolveUpstreamModelId } from "@/lib/models";
 interface ReqBody {
   model: string;
   prompt: string;
+  /** Card visual only — OpenRouter image size/aspect (omitted for full infographic). */
+  resolution?: string;
+  aspect_ratio?: string;
 }
 
 const OPENROUTER_TIMEOUT_MS = 180_000;
@@ -45,6 +48,24 @@ export const Route = createFileRoute("/api/generate-image")({
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
           let upstream: Response;
+          const openRouterPayload: Record<string, unknown> = {
+            model: resolveUpstreamModelId(body.model),
+            messages: [{ role: "user", content: body.prompt }],
+            modalities: ["image", "text"],
+            usage: { include: true },
+          };
+          if (body.resolution) openRouterPayload.resolution = body.resolution;
+          if (body.aspect_ratio) openRouterPayload.aspect_ratio = body.aspect_ratio;
+
+          if (body.resolution || body.aspect_ratio) {
+            console.log("[OpenRouter card image]", {
+              model: openRouterPayload.model,
+              prompt: body.prompt,
+              resolution: body.resolution ?? null,
+              aspect_ratio: body.aspect_ratio ?? null,
+            });
+          }
+
           try {
             upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
               method: "POST",
@@ -52,12 +73,7 @@ export const Route = createFileRoute("/api/generate-image")({
                 Authorization: `Bearer ${OPENROUTER_API_KEY}`,
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({
-                model: resolveUpstreamModelId(body.model),
-                messages: [{ role: "user", content: body.prompt }],
-                modalities: ["image", "text"],
-                usage: { include: true },
-              }),
+              body: JSON.stringify(openRouterPayload),
               signal: controller.signal,
             });
           } catch (e) {
