@@ -1,3 +1,4 @@
+import { isWideCardFraction } from "@/lib/a4-layout/constants";
 import { normalizeDisplayDollars } from "@/lib/a4-layout/katex-typeset";
 import { sanitizeAIHtml } from "@/lib/a4-layout/sanitize-ai-html";
 import type { A4LayoutSettings, A4LayoutSummary, A4RenderOptions, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
