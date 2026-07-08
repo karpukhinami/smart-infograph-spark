@@ -12,13 +12,25 @@ interface ReqBody {
 
 const OPENROUTER_TIMEOUT_MS = 180_000;
 
-/** Gemini image_config.image_size — use "512", not "0.5K" (INVALID_ARGUMENT). */
-function mapCardResolutionToImageSize(resolution: string): string {
-  if (resolution === "512") return "512";
-  if (resolution === "1K") return "1K";
-  if (resolution === "2K") return "2K";
-  if (resolution === "4K") return "4K";
-  return resolution;
+function openRouterHeaders(): HeadersInit {
+  return {
+    Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+    "Content-Type": "application/json",
+  };
+}
+
+function openRouterErrorResponse(status: number, body: ReqBody, rawText: string) {
+  return Response.json(
+    {
+      b64: "",
+      usage: null,
+      model: body.model,
+      provider: "openrouter",
+      raw: rawText,
+      error: `Upstream ${status}: ${rawText.slice(0, 400) || String(status)}`,
+    },
+    { status },
+  );
 }
 
 function isContextTooLongError(text: string): boolean {
@@ -56,39 +68,47 @@ export const Route = createFileRoute("/api/generate-image")({
           }
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
+          const upstreamModel = resolveUpstreamModelId(body.model);
+          const isCardImage = Boolean(body.resolution || body.aspect_ratio);
           let upstream: Response;
-          const openRouterPayload: Record<string, unknown> = {
-            model: resolveUpstreamModelId(body.model),
-            messages: [{ role: "user", content: body.prompt }],
-            modalities: ["image", "text"],
-            usage: { include: true },
-          };
-          if (body.resolution || body.aspect_ratio) {
-            const imageConfig: Record<string, string> = {};
-            if (body.aspect_ratio) imageConfig.aspect_ratio = body.aspect_ratio;
-            if (body.resolution) imageConfig.image_size = mapCardResolutionToImageSize(body.resolution);
-            openRouterPayload.image_config = imageConfig;
-
-            console.log("[OpenRouter card image]", {
-              model: body.model,
-              upstreamModel: openRouterPayload.model,
-              prompt: body.prompt,
-              resolution: body.resolution ?? null,
-              aspect_ratio: body.aspect_ratio ?? null,
-              image_config: imageConfig,
-            });
-          }
 
           try {
-            upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(openRouterPayload),
-              signal: controller.signal,
-            });
+            if (isCardImage) {
+              const imagesPayload: Record<string, unknown> = {
+                model: upstreamModel,
+                prompt: body.prompt,
+              };
+              if (body.resolution) imagesPayload.resolution = body.resolution;
+              if (body.aspect_ratio) imagesPayload.aspect_ratio = body.aspect_ratio;
+
+              console.log("[OpenRouter card image]", {
+                endpoint: "/api/v1/images",
+                model: body.model,
+                upstreamModel,
+                prompt: body.prompt,
+                resolution: body.resolution ?? null,
+                aspect_ratio: body.aspect_ratio ?? null,
+              });
+
+              upstream = await fetch("https://openrouter.ai/api/v1/images", {
+                method: "POST",
+                headers: openRouterHeaders(),
+                body: JSON.stringify(imagesPayload),
+                signal: controller.signal,
+              });
+            } else {
+              upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: openRouterHeaders(),
+                body: JSON.stringify({
+                  model: upstreamModel,
+                  messages: [{ role: "user", content: body.prompt }],
+                  modalities: ["image", "text"],
+                  usage: { include: true },
+                }),
+                signal: controller.signal,
+              });
+            }
           } catch (e) {
             clearTimeout(timer);
             if ((e as Error)?.name === "AbortError") {
@@ -112,17 +132,50 @@ export const Route = createFileRoute("/api/generate-image")({
                 { status: 413 },
               );
             }
-            return Response.json(
-              {
-                b64: "",
-                usage: null,
-                model: body.model,
-                provider: "openrouter",
-                raw: rawText,
-                error: `Upstream ${upstream.status}: ${rawText.slice(0, 400) || upstream.statusText}`,
-              },
-              { status: upstream.status },
-            );
+            return openRouterErrorResponse(upstream.status, body, rawText);
+          }
+
+          if (isCardImage) {
+            let imageData: {
+              data?: Array<{ b64_json?: string }>;
+              usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+              error?: { message?: string };
+            };
+            try {
+              imageData = JSON.parse(rawText);
+            } catch {
+              return Response.json(
+                { b64: "", usage: null, model: body.model, provider: "openrouter", raw: rawText, error: "Upstream вернул не-JSON ответ." },
+                { status: 502 },
+              );
+            }
+            if (imageData.error?.message) {
+              return Response.json(
+                { b64: "", usage: null, model: body.model, provider: "openrouter", raw: rawText, error: imageData.error.message },
+                { status: 502 },
+              );
+            }
+            const b64 = imageData.data?.[0]?.b64_json;
+            if (!b64) {
+              return Response.json(
+                {
+                  b64: "",
+                  usage: imageData.usage ?? null,
+                  model: body.model,
+                  provider: "openrouter",
+                  raw: rawText,
+                  error: "Модель не вернула изображение. См. сырой ответ.",
+                },
+                { status: 502 },
+              );
+            }
+            return Response.json({
+              b64,
+              usage: imageData.usage ?? null,
+              model: body.model,
+              provider: "openrouter",
+              raw: rawText,
+            });
           }
 
           let data: {
