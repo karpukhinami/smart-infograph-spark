@@ -44,6 +44,7 @@ export function A4AutoLayoutView({ analysis, active, profile = null, manualApply
       modeNote={modeNote}
       modeNoteClassName={manualApply ? "a4-layout-mode-note" : "a4-layout-mode-note a4-layout-mode-note-auto"}
       manualErrors={layout.manualErrors}
+      exportKind="авто-макет"
     />
   );
 }

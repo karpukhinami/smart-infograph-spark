@@ -881,6 +881,7 @@ ${activeContent.value.content}`;
                     active={paneMode === "wireframe"}
                     profile={activeProfile}
                     modeNote="Технический макет (AI)"
+                    exportKind="технический макет"
                   />
                   {aiLayoutResult ? (
                     <details className="rounded-md border border-border bg-background/60 p-2">

@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { Loader2, Download } from "lucide-react";
 import type { A4AutoLayoutResult } from "@/lib/a4-layout";
 import {
+  A4_LAYOUT_EXPORT_HEIGHT,
+  A4_LAYOUT_EXPORT_WIDTH,
   checkA4Overflow,
+  exportA4LayoutPng,
   runA4DomFit,
 } from "@/lib/a4-layout";
 import {
@@ -10,6 +15,8 @@ import {
   renderA4HeaderHtml,
 } from "@/lib/a4-layout/render";
 import { a4CardSurfaceClass, buildA4ProfileThemeStyle } from "@/lib/a4-layout/profile-theme";
+import { downloadLayoutPng } from "@/lib/download-infographic";
+import { Button } from "@/components/ui/button";
 import type { DesignProfile } from "@/lib/types";
 import "@/lib/a4-layout/a4-auto-layout.css";
 
@@ -20,6 +27,8 @@ interface Props {
   modeNote?: string;
   modeNoteClassName?: string;
   manualErrors?: string[];
+  /** Prefix for exported PNG filename, e.g. «авто-макет». */
+  exportKind?: string;
 }
 
 function typesetFormulas(root: HTMLElement) {
@@ -47,6 +56,7 @@ export function A4LayoutCanvas({
   modeNote,
   modeNoteClassName = "a4-layout-mode-note",
   manualErrors,
+  exportKind = "макет",
 }: Props) {
   const { summary, plan, settings, rowTargets, domFitOptions } = layout;
   const renderOptions = useMemo(
@@ -55,8 +65,29 @@ export function A4LayoutCanvas({
   );
   const profileTheme = useMemo(() => buildA4ProfileThemeStyle(profile), [profile]);
   const rootRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [displayScale, setDisplayScale] = useState(1);
+  const [exporting, setExporting] = useState(false);
   const [metrics, setMetrics] = useState("");
   const [overflowText, setOverflowText] = useState("");
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const updateScale = () => {
+      const width = viewport.clientWidth;
+      if (width <= 0) return;
+      const next = width / settings.pageWidthPx;
+      setDisplayScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
+    };
+
+    updateScale();
+    const ro = new ResizeObserver(updateScale);
+    ro.observe(viewport);
+    return () => ro.disconnect();
+  }, [settings.pageWidthPx]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -88,9 +119,40 @@ export function A4LayoutCanvas({
 
   const cardCount = plan.rows.reduce((sum, row) => sum + row.cards.length, 0);
 
+  const onExportPng = useCallback(async () => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    if (!active) {
+      toast.error("Откройте вкладку с макетом перед экспортом");
+      return;
+    }
+    try {
+      setExporting(true);
+      if (rootRef.current) {
+        runA4DomFit(rootRef.current, rowTargets, true, domFitOptions);
+        typesetFormulas(rootRef.current);
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      }
+      const dataUrl = await exportA4LayoutPng(frame);
+      downloadLayoutPng(dataUrl, exportKind, summary.topic);
+      toast.success(`PNG ${A4_LAYOUT_EXPORT_WIDTH}×${A4_LAYOUT_EXPORT_HEIGHT} сохранён`);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось экспортировать PNG");
+    } finally {
+      setExporting(false);
+    }
+  }, [active, domFitOptions, exportKind, rowTargets, summary.topic]);
+
   return (
     <div ref={rootRef} className="a4-auto-layout-root">
       {modeNote ? <div className={modeNoteClassName}>{modeNote}</div> : null}
+
+      <div className="flex justify-end mb-2">
+        <Button size="sm" variant="outline" onClick={onExportPng} disabled={exporting || !active}>
+          {exporting ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <Download className="size-3.5 mr-1" />}
+          Экспорт PNG ({A4_LAYOUT_EXPORT_WIDTH}×{A4_LAYOUT_EXPORT_HEIGHT})
+        </Button>
+      </div>
 
       {manualErrors && manualErrors.length > 0 ? (
         <div className="a4-manual-warnings">{manualErrors.join("\n")}</div>
@@ -101,7 +163,10 @@ export function A4LayoutCanvas({
           <strong>
             {settings.pageWidthPx}×{settings.pageHeightPx}
           </strong>
-          <span>A4 frame, px</span>
+          <span>
+            A4 frame, px
+            {displayScale !== 1 ? ` · показано ×${displayScale.toFixed(2)}` : ""}
+          </span>
         </div>
         <div className="a4-metric">
           <strong>{Math.round(rowTargets.headerHeight)}</strong>
@@ -121,62 +186,82 @@ export function A4LayoutCanvas({
         </div>
       </div>
 
-      <div className="poster-shell">
+      <div ref={viewportRef} className="a4-poster-viewport">
         <div
-          className="poster-frame a4-clean"
+          className="a4-poster-scale-host"
           style={{
-            ...profileTheme,
-            ["--a4-page-h" as string]: `${settings.pageHeightPx}px`,
-            ["--a4-gap" as string]: `${rowTargets.rowGap}px`,
-            width: settings.pageWidthPx,
-            minWidth: settings.pageWidthPx,
-            height: settings.pageHeightPx,
-            minHeight: settings.pageHeightPx,
-            padding: settings.outerMarginPx,
+            width: Math.round(settings.pageWidthPx * displayScale),
+            height: Math.round(settings.pageHeightPx * displayScale),
           }}
         >
-          <div dangerouslySetInnerHTML={{ __html: renderA4HeaderHtml(summary, rowTargets.headerHeight, settings) }} />
           <div
-            className="a4-card-area"
+            className="poster-shell"
             style={{
-              gap: rowTargets.rowGap,
-              height: rowTargets.availableRowsHeight,
-              marginTop: rowTargets.headerGap,
+              transform: `scale(${displayScale})`,
+              transformOrigin: "top left",
+              width: settings.pageWidthPx,
+              height: settings.pageHeightPx,
             }}
           >
-            {plan.rows.map((row, rowIndex) => {
-              const rowHeight = Math.max(34, Math.round(rowTargets.targetHeights[rowIndex]));
-              return (
-                <div
-                  key={rowIndex}
-                  className="a4-row"
-                  data-est-height={Math.round(row.rowHeight)}
-                  data-fixed-height={rowHeight}
-                  style={{
-                    gridTemplateColumns: row.fractions.map((f) => `minmax(0, ${f}fr)`).join(" "),
-                    height: rowHeight,
-                    minHeight: rowHeight,
-                    maxHeight: rowHeight,
-                  }}
-                >
-                  {row.cards.map((card, i) => (
-                    <article
-                      key={card.entityIndex}
-                      className={[
-                        renderA4CardClassName(card.sourceEntity, row.reports[i], row.fractions[i], renderOptions),
-                        a4CardSurfaceClass(card.sourceEntity.attention, card.entityIndex),
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      data-a4-fit-card="1"
-                      dangerouslySetInnerHTML={{
-                        __html: renderA4CardInner(card.sourceEntity, row.reports[i], row.fractions[i], renderOptions),
+            <div
+              ref={frameRef}
+              className="poster-frame a4-clean"
+              data-a4-layout-frame="1"
+              style={{
+                ...profileTheme,
+                ["--a4-page-h" as string]: `${settings.pageHeightPx}px`,
+                ["--a4-gap" as string]: `${rowTargets.rowGap}px`,
+                width: settings.pageWidthPx,
+                minWidth: settings.pageWidthPx,
+                height: settings.pageHeightPx,
+                minHeight: settings.pageHeightPx,
+                padding: settings.outerMarginPx,
+              }}
+            >
+              <div dangerouslySetInnerHTML={{ __html: renderA4HeaderHtml(summary, rowTargets.headerHeight, settings) }} />
+              <div
+                className="a4-card-area"
+                style={{
+                  gap: rowTargets.rowGap,
+                  height: rowTargets.availableRowsHeight,
+                  marginTop: rowTargets.headerGap,
+                }}
+              >
+                {plan.rows.map((row, rowIndex) => {
+                  const rowHeight = Math.max(34, Math.round(rowTargets.targetHeights[rowIndex]));
+                  return (
+                    <div
+                      key={rowIndex}
+                      className="a4-row"
+                      data-est-height={Math.round(row.rowHeight)}
+                      data-fixed-height={rowHeight}
+                      style={{
+                        gridTemplateColumns: row.fractions.map((f) => `minmax(0, ${f}fr)`).join(" "),
+                        height: rowHeight,
+                        minHeight: rowHeight,
+                        maxHeight: rowHeight,
                       }}
-                    />
-                  ))}
-                </div>
-              );
-            })}
+                    >
+                      {row.cards.map((card, i) => (
+                        <article
+                          key={card.entityIndex}
+                          className={[
+                            renderA4CardClassName(card.sourceEntity, row.reports[i], row.fractions[i], renderOptions),
+                            a4CardSurfaceClass(card.sourceEntity.attention, card.entityIndex),
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          data-a4-fit-card="1"
+                          dangerouslySetInnerHTML={{
+                            __html: renderA4CardInner(card.sourceEntity, row.reports[i], row.fractions[i], renderOptions),
+                          }}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>

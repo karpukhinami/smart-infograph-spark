@@ -110,14 +110,6 @@ function a4NormalizeTitlePadding(card: HTMLElement, state: FitState): FitState {
   return s;
 }
 
-function a4AddFitBadge(card: HTMLElement, state: FitState, measure: { free: number; clientHeight: number }, stage: string) {
-  card.querySelectorAll(".a4-fit-badge").forEach((b) => b.remove());
-  const badge = document.createElement("div");
-  badge.className = "a4-fit-badge";
-  badge.textContent = `${stage} · ${state.bodyFont.toFixed(1)}px · free ${Math.round(measure.free)}px · h ${measure.clientHeight}`;
-  card.appendChild(badge);
-}
-
 function a4FitCardIndependent(card: HTMLElement) {
   let best: { state: FitState; measure: ReturnType<typeof a4MeasureCard>; stage: string } | null = null;
   card.querySelectorAll(".a4-fit-badge").forEach((b) => b.remove());
@@ -188,7 +180,6 @@ function a4FitCardIndependent(card: HTMLElement) {
   a4ApplyFitState(card, best.state);
   const after = a4MeasureCard(card);
   card.classList.toggle("fit-overflow", after.overflow);
-  a4AddFitBadge(card, best.state, after, best.stage);
   return { ...best, measure: after };
 }
 

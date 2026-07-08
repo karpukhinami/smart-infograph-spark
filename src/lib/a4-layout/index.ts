@@ -79,3 +79,8 @@ export { AI_LAYOUT_PROMPT } from "@/lib/a4-layout/ai-prompt";
 export { normalizeAIResponse, type AILayoutResult } from "@/lib/a4-layout/ai-response";
 export { buildA4AILayout } from "@/lib/a4-layout/ai-plan";
 export { buildA4ProfileThemeStyle, a4CardSurfaceClass, mixHex } from "@/lib/a4-layout/profile-theme";
+export {
+  exportA4LayoutPng,
+  A4_LAYOUT_EXPORT_WIDTH,
+  A4_LAYOUT_EXPORT_HEIGHT,
+} from "@/lib/a4-layout/export-png";

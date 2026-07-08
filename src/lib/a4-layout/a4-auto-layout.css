@@ -1,8 +1,18 @@
 /* A4 auto-layout — ported from a4_card_layout_dom_fit_v1_with_AI.html (A4 tab only) */
 
-.a4-auto-layout-root .poster-shell {
+.a4-auto-layout-root .a4-poster-viewport {
+  width: 100%;
   overflow: auto;
   padding: 6px 0 2px;
+}
+
+.a4-auto-layout-root .a4-poster-scale-host {
+  margin-inline: auto;
+}
+
+.a4-auto-layout-root .a4-poster-viewport .poster-shell {
+  overflow: visible;
+  padding: 0;
 }
 
 .a4-auto-layout-root .poster-frame.a4-clean {
@@ -42,7 +52,7 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
-  border: 1px solid color-mix(in srgb, var(--a4-ink, #0c1126) 16%, transparent);
+  border: none;
   border-radius: 15px;
   background: var(--a4-card-soft, #fff);
   color: var(--a4-ink, #0c1126);
@@ -66,14 +76,10 @@
 
 .a4-auto-layout-root .a4-card.is-core {
   background: var(--a4-card-core, #ffaa57);
-  border-width: 1.5px;
-  border-color: color-mix(in srgb, var(--a4-ink, #0c1126) 22%, transparent);
 }
 
 .a4-auto-layout-root .a4-card.is-accent {
   background: var(--a4-card-accent, #d7d2fa);
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--a4-ink, #0c1126) 20%, transparent);
 }
 
 .a4-auto-layout-root .a4-card.is-pastel-soft {
@@ -97,7 +103,7 @@
   overflow: hidden;
   background: var(--a4-header-bg, #293642);
   border-radius: 15px;
-  border: 1px solid color-mix(in srgb, var(--a4-ink, #0c1126) 16%, transparent);
+  border: none;
 }
 
 .a4-auto-layout-root .a4-header-main {
@@ -252,20 +258,6 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: var(--body-font);
   color: var(--a4-ink, #0c1126);
-}
-
-.a4-auto-layout-root .a4-fit-badge {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  border: 1px solid rgba(17, 24, 39, 0.12);
-  background: rgba(17, 24, 39, 0.06);
-  border-radius: 10px;
-  padding: 3px 6px;
-  font-size: 9px;
-  line-height: 1;
-  color: #475467;
-  pointer-events: none;
 }
 
 .a4-auto-layout-root .a4-card.split-right .a4-card-inner {
