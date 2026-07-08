@@ -251,7 +251,18 @@ export function validateAnalysisJson(raw: unknown): AnalysisJson {
       icon: (e.icon as string | null) ?? null,
       visual:
         e.visual && typeof e.visual === "object"
-          ? (e.visual as { type: string; description: string })
+          ? (() => {
+              const v = e.visual as { type?: string | null; description?: string; generatedImage?: string };
+              const generatedImage =
+                typeof v.generatedImage === "string" && v.generatedImage.startsWith("data:image/")
+                  ? v.generatedImage
+                  : undefined;
+              return {
+                type: v.type ?? null,
+                description: String(v.description ?? ""),
+                ...(generatedImage ? { generatedImage } : {}),
+              };
+            })()
           : null,
       example: (e.example as string | string[] | null) ?? null,
       priority: (e.priority as AnalysisEntity["priority"]) ?? undefined,

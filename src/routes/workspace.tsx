@@ -20,7 +20,7 @@ import { useSettingsStore, useCurrentPrompts, useCurrentStyles } from "@/store/u
 import { ModelPicker } from "@/components/workspace/ModelPicker";
 import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
-import { SimpleContentPreview } from "@/components/workspace/SimpleContentPreview";
+import { WorkspaceContentPreview } from "@/components/workspace/WorkspaceContentPreview";
 import { A4AutoLayoutView, type ManualLayoutApply } from "@/components/workspace/A4AutoLayoutView";
 import { A4LayoutCanvas } from "@/components/workspace/A4LayoutCanvas";
 import { WireframeView } from "@/components/workspace/WireframeView";
@@ -811,7 +811,11 @@ ${activeContent.value.content}`;
                   </div>
                   <div className="rounded-md border border-border p-3 bg-background">
                     {activeContent.value.analysis ? (
-                      <SimpleContentPreview analysis={activeContent.value.analysis} profile={activeProfile ?? null} />
+                      <WorkspaceContentPreview
+                        analysis={activeContent.value.analysis}
+                        profile={activeProfile ?? null}
+                        imageModel={models.image}
+                      />
                     ) : (
                       <Markdown>{activeContent.value.content}</Markdown>
                     )}

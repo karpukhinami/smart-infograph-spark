@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from "react";
+import { useState, useEffect, type CSSProperties, type ReactNode } from "react";
 import type { AnalysisEntity, AnalysisGroupItem, AnalysisJson, AnalysisSectionId, DesignProfile } from "@/lib/types";
 import { Markdown } from "@/components/workspace/Markdown";
 import { EntityEditDialog } from "@/components/workspace/EntityEditDialog";
@@ -15,6 +15,8 @@ interface Props {
   analysis: AnalysisJson;
   profile: DesignProfile | null;
   editable?: boolean;
+  /** Extra controls rendered next to the color dot (workspace: visual icon). */
+  renderCardToolbarExtra?: (index: number, entity: AnalysisEntity) => ReactNode;
 }
 
 function isOther(v: string | null | undefined): boolean {
@@ -63,7 +65,7 @@ function entityAccentColor(
   return normalRun % 2 === 0 ? colors.detailSoftColor : colors.detailDeepColor;
 }
 
-export function SimpleContentPreview({ analysis, profile, editable = true }: Props) {
+export function SimpleContentPreview({ analysis, profile, editable = true, renderCardToolbarExtra }: Props) {
   const c = { ...FALLBACK, ...(profile?.colors ?? {}) };
   const entities = analysis.entities ?? [];
   const updateEntity = useProjectStore((s) => s.updateActiveAnalysisEntity);
@@ -192,7 +194,7 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
             </div>
-            {/* Color dot + delete (top-right) */}
+            {/* Color dot + extra + delete (top-right) */}
             <div className="absolute top-2 right-2 flex items-start gap-1.5 z-10">
               {attentionPickerIndex === i ? (
                 <div
@@ -220,6 +222,7 @@ export function SimpleContentPreview({ analysis, profile, editable = true }: Pro
                   }}
                 />
               )}
+              {renderCardToolbarExtra?.(i, e)}
               <button
                 type="button"
                 onClick={(ev) => { ev.stopPropagation(); setDeleteIndex(i); }}

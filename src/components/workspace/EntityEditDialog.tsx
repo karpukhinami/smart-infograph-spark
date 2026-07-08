@@ -122,7 +122,17 @@ export function EntityEditDialog({ open, entity, isNew = false, profile = null, 
   const handleSave = () => {
     if (!canSave) return;
     const visDescT = visualDescription.trim();
-    const visual = visDescT === "" ? null : { type: null, description: visDescT };
+    const prevDesc = entity?.visual?.description?.trim() ?? "";
+    let visual: AnalysisEntity["visual"] = null;
+    if (visDescT !== "") {
+      visual = {
+        type: entity?.visual?.type ?? null,
+        description: visDescT,
+        ...(entity?.visual?.generatedImage && visDescT === prevDesc
+          ? { generatedImage: entity.visual.generatedImage }
+          : {}),
+      };
+    }
     onSave({
       sectionId: sectionId as AnalysisSectionId,
       title: titleEmpty ? null : title,

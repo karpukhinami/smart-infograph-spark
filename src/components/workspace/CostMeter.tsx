@@ -33,10 +33,11 @@ export function CostMeter() {
 
   return (
     <div className="relative rounded-lg border border-border bg-card/95 shadow-sm backdrop-blur text-xs max-w-[min(96vw,640px)]">
+      <div className="flex items-center gap-1 pr-1">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 px-3 py-1.5 w-full"
+        className="flex flex-1 items-center gap-2 px-3 py-1.5 min-w-0"
         title="Расход токенов и стоимость запросов"
       >
         <span className="font-mono font-semibold">{fmtUsd(total.cost)}</span>
@@ -50,6 +51,19 @@ export function CostMeter() {
         )}
         {allowExpand && (open ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />)}
       </button>
+      {(history.length > 0 || rawHistory.length > 0) && (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2 shrink-0 text-muted-foreground hover:text-foreground"
+          title="Очистить историю расходов и сырые ответы"
+          onClick={() => reset()}
+        >
+          <X className="size-3.5" />
+        </Button>
+      )}
+      </div>
       {open && (
         <div className="border-t border-border">
           <div className="flex border-b border-border">
@@ -140,6 +154,14 @@ export function CostMeter() {
                         {selectedRaw.raw}
                       </pre>
                       <div className="pt-2 flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => reset()}
+                        >
+                          <X className="size-3 mr-1" /> Очистить всё
+                        </Button>
                         <Button
                           size="sm"
                           variant="ghost"
