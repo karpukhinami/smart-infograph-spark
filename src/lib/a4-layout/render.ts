@@ -196,7 +196,7 @@ export function renderA4HeaderHtml(summary: A4LayoutSummary, headerHeight: numbe
   const topic = String(summary.topic || "Без заголовка").toUpperCase();
   const summaryText = summary.summary || "";
   const meta = metaText(summary);
-  return `<article class="a4-card a4-header-card" style="--a4-header-h:${Math.round(headerHeight)}px; --a4-header-title-font:26.07px; --a4-header-summary-font:14px;">
+  return `<article class="a4-card a4-header-card" style="--a4-header-h:${Math.round(headerHeight)}px; --a4-header-title-font:26.07px; --a4-header-summary-font:14px; --a4-header-title-line:33px; --a4-header-summary-line:18px;">
     ${meta ? `<div class="a4-header-meta">${escapeHtml(meta)}</div>` : ""}
     <div class="a4-header-main">
       <div class="a4-header-title">${escapeHtml(topic)}</div>

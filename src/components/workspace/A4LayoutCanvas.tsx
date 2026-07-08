@@ -12,8 +12,12 @@ import type { A4AutoLayoutResult } from "@/lib/a4-layout";
 import {
   A4_LAYOUT_EXPORT_HEIGHT,
   A4_LAYOUT_EXPORT_WIDTH,
+  A4_DOM_FIT_EXPORT_OPTIONS,
+  A4_DOM_FIT_SCREEN_OPTIONS,
+  captureA4FitStyles,
   checkA4Overflow,
   exportA4LayoutPng,
+  restoreA4FitStyles,
   runA4DomFit,
 } from "@/lib/a4-layout";
 import {
@@ -82,12 +86,30 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
   const viewportRef = useRef<HTMLDivElement>(null);
   const [displayScale, setDisplayScale] = useState(1);
 
+  const screenFitOptions = useMemo(
+    () => ({
+      ...A4_DOM_FIT_SCREEN_OPTIONS,
+      allowAddendumRight: domFitOptions?.allowAddendumRight !== false,
+      balanceRowFonts: domFitOptions?.balanceRowFonts !== false,
+    }),
+    [domFitOptions?.allowAddendumRight, domFitOptions?.balanceRowFonts],
+  );
+
+  const exportFitOptions = useMemo(
+    () => ({
+      ...A4_DOM_FIT_EXPORT_OPTIONS,
+      allowAddendumRight: domFitOptions?.allowAddendumRight !== false,
+      balanceRowFonts: domFitOptions?.balanceRowFonts !== false,
+    }),
+    [domFitOptions?.allowAddendumRight, domFitOptions?.balanceRowFonts],
+  );
+
   const runDomFit = useCallback(() => {
     const root = rootRef.current;
     if (!root || !active) return;
-    runA4DomFit(root, rowTargets, true, domFitOptions);
+    runA4DomFit(root, rowTargets, true, screenFitOptions);
     checkA4Overflow(root);
-  }, [active, domFitOptions, rowTargets]);
+  }, [active, rowTargets, screenFitOptions]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -101,13 +123,10 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
     };
 
     updateScale();
-    const ro = new ResizeObserver(() => {
-      updateScale();
-      requestAnimationFrame(runDomFit);
-    });
+    const ro = new ResizeObserver(updateScale);
     ro.observe(viewport);
     return () => ro.disconnect();
-  }, [runDomFit, settings.pageWidthPx]);
+  }, [settings.pageWidthPx]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -122,7 +141,7 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
     };
 
     requestAnimationFrame(afterTypeset);
-  }, [layout, rowTargets, active, profile?.profileName, domFitOptions, runDomFit, displayScale]);
+  }, [layout, rowTargets, active, profile?.profileName, screenFitOptions, runDomFit]);
 
   const exportPng = useCallback(async () => {
     const frame = frameRef.current;
@@ -132,18 +151,33 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
       return;
     }
     try {
-      if (rootRef.current) {
-        runA4DomFit(rootRef.current, rowTargets, true, domFitOptions);
-        typesetFormulas(rootRef.current);
+      const root = rootRef.current;
+      const shell = frame.parentElement;
+      if (!root) return;
+
+      const savedStyles = captureA4FitStyles(root);
+      const prevTransform = shell?.style.transform ?? "";
+
+      if (shell) shell.style.transform = "none";
+
+      try {
+        runA4DomFit(root, rowTargets, true, exportFitOptions);
+        typesetFormulas(root);
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        const dataUrl = await exportA4LayoutPng(frame);
+        downloadLayoutPng(dataUrl, exportKind, summary.topic);
+        toast.success(`PNG ${A4_LAYOUT_EXPORT_WIDTH}×${A4_LAYOUT_EXPORT_HEIGHT} сохранён`);
+      } finally {
+        restoreA4FitStyles(savedStyles);
+        if (shell) shell.style.transform = prevTransform;
+        runA4DomFit(root, rowTargets, true, screenFitOptions);
+        checkA4Overflow(root);
       }
-      const dataUrl = await exportA4LayoutPng(frame);
-      downloadLayoutPng(dataUrl, exportKind, summary.topic);
-      toast.success(`PNG ${A4_LAYOUT_EXPORT_WIDTH}×${A4_LAYOUT_EXPORT_HEIGHT} сохранён`);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось экспортировать PNG");
     }
-  }, [active, domFitOptions, exportKind, rowTargets, summary.topic]);
+  }, [active, exportFitOptions, exportKind, rowTargets, screenFitOptions, summary.topic]);
 
   useImperativeHandle(ref, () => ({ exportPng }), [exportPng]);
 

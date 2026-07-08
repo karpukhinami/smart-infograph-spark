@@ -121,7 +121,7 @@
 
 .a4-auto-layout-root .a4-header-title {
   font-size: var(--a4-header-title-font, 26px);
-  line-height: 33px;
+  line-height: var(--a4-header-title-line, 33px);
   font-weight: 700;
   text-transform: uppercase;
   color: var(--a4-header-title, #ffffff);
@@ -131,7 +131,7 @@
 
 .a4-auto-layout-root .a4-header-summary {
   font-size: var(--a4-header-summary-font, 14px);
-  line-height: 18px;
+  line-height: var(--a4-header-summary-line, 18px);
   font-weight: 500;
   color: var(--a4-header-muted, #818c96);
   overflow-wrap: anywhere;

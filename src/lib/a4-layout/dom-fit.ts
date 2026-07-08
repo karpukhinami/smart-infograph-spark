@@ -1,5 +1,5 @@
 import type { A4RowTargets, A4DomFitOptions } from "@/lib/a4-layout/types";
-import { DEFAULT_A4_DOM_FIT_OPTIONS } from "@/lib/a4-layout/types";
+import { A4_DOM_FIT_EXPORT_OPTIONS, A4_DOM_FIT_SCREEN_OPTIONS, DEFAULT_A4_DOM_FIT_OPTIONS } from "@/lib/a4-layout/types";
 
 interface FitState {
   titleFont: number;
@@ -16,6 +16,22 @@ interface FitState {
   cardPadX: number;
 }
 
+interface CardMeasure {
+  scrollHeight: number;
+  clientHeight: number;
+  overflow: boolean;
+  free: number;
+}
+
+export const A4_HEADER_TITLE_FONT_BASE = 26.07;
+export const A4_HEADER_SUMMARY_FONT_BASE = 14;
+export const A4_HEADER_TITLE_LINE_BASE = 33;
+export const A4_HEADER_SUMMARY_LINE_BASE = 18;
+export const A4_BODY_FONT_BASE = 10;
+
+/** Safety ceiling only — normal fitting stops on overflow long before this. */
+const A4_FIT_GROW_CEILING = 96;
+
 const A4_FIT_MIN = {
   titleFont: 6,
   bodyFont: 6,
@@ -30,6 +46,30 @@ const A4_FIT_MIN = {
   cardPadY: 6,
   cardPadX: 12,
 };
+
+const FIT_STYLE_PROPS = [
+  "--title-font",
+  "--body-font",
+  "--add-font",
+  "--title-pad-y",
+  "--title-pad-x",
+  "--add-pad-y",
+  "--add-pad-x",
+  "--gap-title-body",
+  "--gap-body-add",
+  "--gap-add-items",
+  "--a4-card-pad-y",
+  "--a4-card-pad-x",
+  "--a4-header-title-font",
+  "--a4-header-summary-font",
+  "--a4-header-title-line",
+  "--a4-header-summary-line",
+] as const;
+
+function resolveMaxBodyFont(options: A4DomFitOptions): number {
+  if (options.maxBodyFont == null) return A4_FIT_GROW_CEILING;
+  return options.maxBodyFont;
+}
 
 function a4DefaultFitState(font = 10): FitState {
   return {
@@ -84,32 +124,15 @@ function a4LastContentBottom(card: HTMLElement): number {
   return bottom - cardRect.top;
 }
 
-function a4MeasureCard(card: HTMLElement) {
-  const cardRect = card.getBoundingClientRect();
+function a4MeasureCard(card: HTMLElement): CardMeasure {
   const cs = getComputedStyle(card);
   const padBottom = parseFloat(cs.paddingBottom) || 0;
+  const cardRect = card.getBoundingClientRect();
   const scaleY = card.clientHeight > 0 ? cardRect.height / card.clientHeight : 1;
-  const allowedBottom = cardRect.height - padBottom * scaleY;
-  const bottom = a4LastContentBottom(card);
+  const allowedBottom = card.clientHeight - padBottom;
+  const bottom = a4LastContentBottom(card) / (scaleY || 1);
   const overflowY = bottom > allowedBottom + 0.5;
   const overflowX = card.scrollWidth > card.clientWidth + 0.5;
-  return {
-    titleFont: Number.parseFloat(getComputedStyle(card).getPropertyValue("--title-font")) || 10,
-    bodyFont: Number.parseFloat(getComputedStyle(card).getPropertyValue("--body-font")) || 10,
-    addFont: Number.parseFloat(getComputedStyle(card).getPropertyValue("--add-font")) || 9,
-    titlePadY: Number.parseFloat(getComputedStyle(card).getPropertyValue("--title-pad-y")) || 8,
-    titlePadX: Number.parseFloat(getComputedStyle(card).getPropertyValue("--title-pad-x")) || 40,
-    addPadY: Number.parseFloat(getComputedStyle(card).getPropertyValue("--add-pad-y")) || 8,
-    addPadX: Number.parseFloat(getComputedStyle(card).getPropertyValue("--add-pad-x")) || 12,
-    gapTitleBody: Number.parseFloat(getComputedStyle(card).getPropertyValue("--gap-title-body")) || 10,
-    gapBodyAdd: Number.parseFloat(getComputedStyle(card).getPropertyValue("--gap-body-add")) || 8,
-    gapAddItems: Number.parseFloat(getComputedStyle(card).getPropertyValue("--gap-add-items")) || 9,
-    cardPadY: Number.parseFloat(getComputedStyle(card).getPropertyValue("--a4-card-pad-y")) || 12,
-    cardPadX: Number.parseFloat(getComputedStyle(card).getPropertyValue("--a4-card-pad-x")) || 12,
-  };
-}
-
-function readFitState(card: HTMLElement): FitState {
   return {
     scrollHeight: Math.round(bottom + padBottom),
     clientHeight: card.clientHeight,
@@ -118,13 +141,87 @@ function readFitState(card: HTMLElement): FitState {
   };
 }
 
+function readFitState(card: HTMLElement): FitState {
+  const cs = getComputedStyle(card);
+  const bodyFont = Number.parseFloat(cs.getPropertyValue("--body-font")) || 10;
+  return {
+    titleFont: Number.parseFloat(cs.getPropertyValue("--title-font")) || bodyFont,
+    bodyFont,
+    addFont: Number.parseFloat(cs.getPropertyValue("--add-font")) || Math.max(5, bodyFont - 1),
+    titlePadY: Number.parseFloat(cs.getPropertyValue("--title-pad-y")) || 8,
+    titlePadX: Number.parseFloat(cs.getPropertyValue("--title-pad-x")) || 40,
+    addPadY: Number.parseFloat(cs.getPropertyValue("--add-pad-y")) || 8,
+    addPadX: Number.parseFloat(cs.getPropertyValue("--add-pad-x")) || 12,
+    gapTitleBody: Number.parseFloat(cs.getPropertyValue("--gap-title-body")) || 18,
+    gapBodyAdd: Number.parseFloat(cs.getPropertyValue("--gap-body-add")) || 18,
+    gapAddItems: Number.parseFloat(cs.getPropertyValue("--gap-add-items")) || 9,
+    cardPadY: Number.parseFloat(cs.getPropertyValue("--a4-card-pad-y")) || 12,
+    cardPadX: Number.parseFloat(cs.getPropertyValue("--a4-card-pad-x")) || 12,
+  };
+}
+
+function maxCardBodyFont(root: HTMLElement): number {
+  let max = A4_BODY_FONT_BASE;
+  root.querySelectorAll('.a4-card[data-a4-fit-card="1"]').forEach((card) => {
+    const body = Number.parseFloat(getComputedStyle(card as HTMLElement).getPropertyValue("--body-font")) || A4_BODY_FONT_BASE;
+    max = Math.max(max, body);
+  });
+  return max;
+}
+
+function setHeaderFontScale(header: HTMLElement, scale: number) {
+  header.style.setProperty("--a4-header-title-font", `${A4_HEADER_TITLE_FONT_BASE * scale}px`);
+  header.style.setProperty("--a4-header-summary-font", `${A4_HEADER_SUMMARY_FONT_BASE * scale}px`);
+  header.style.setProperty("--a4-header-title-line", `${A4_HEADER_TITLE_LINE_BASE * scale}px`);
+  header.style.setProperty("--a4-header-summary-line", `${A4_HEADER_SUMMARY_LINE_BASE * scale}px`);
+}
+
+/** Scale page header fonts proportionally to fitted card body size; shrink if header box overflows. */
+export function applyA4HeaderFonts(root: HTMLElement) {
+  const header = root.querySelector(".a4-header-card") as HTMLElement | null;
+  if (!header) return;
+
+  const maxBody = maxCardBodyFont(root);
+  let scale = maxBody / A4_BODY_FONT_BASE;
+  setHeaderFontScale(header, scale);
+
+  const main = header.querySelector(".a4-header-main") as HTMLElement | null;
+  if (!main) return;
+
+  for (let i = 0; i < 40 && main.scrollHeight > header.clientHeight - 4; i += 1) {
+    scale = Math.max(0.75, scale - 0.05);
+    setHeaderFontScale(header, scale);
+  }
+}
+
+export function captureA4FitStyles(root: HTMLElement): Map<HTMLElement, Record<string, string>> {
+  const snapshot = new Map<HTMLElement, Record<string, string>>();
+  root.querySelectorAll('.a4-card[data-a4-fit-card="1"], .a4-header-card').forEach((node) => {
+    const el = node as HTMLElement;
+    const props: Record<string, string> = {};
+    FIT_STYLE_PROPS.forEach((prop) => {
+      props[prop] = el.style.getPropertyValue(prop);
+    });
+    snapshot.set(el, props);
+  });
+  return snapshot;
+}
+
+export function restoreA4FitStyles(snapshot: Map<HTMLElement, Record<string, string>>) {
+  snapshot.forEach((props, el) => {
+    FIT_STYLE_PROPS.forEach((prop) => {
+      const value = props[prop];
+      if (value) el.style.setProperty(prop, value);
+      else el.style.removeProperty(prop);
+    });
+  });
+}
+
 function a4NormalizeTitlePadding(card: HTMLElement, state: FitState): FitState {
   const s = { ...state };
   const title = card.querySelector(".a4-title-pill") as HTMLElement | null;
   if (!title) return s;
 
-  // Single-line titles: shrink horizontal padding until the line fits.
-  // Multi-line titles: keep reducing padding to the minimum (more lines need more width).
   for (let px = 40; px >= A4_FIT_MIN.titlePadX; px -= 4) {
     s.titlePadX = px;
     a4ApplyFitState(card, s);
@@ -138,8 +235,9 @@ function a4NormalizeTitlePadding(card: HTMLElement, state: FitState): FitState {
   return s;
 }
 
-function a4FitCardIndependent(card: HTMLElement) {
-  let best: { state: FitState; measure: ReturnType<typeof a4MeasureCard>; stage: string } | null = null;
+function a4FitCardIndependent(card: HTMLElement, options: A4DomFitOptions) {
+  const maxFont = resolveMaxBodyFont(options);
+  let best: { state: FitState; measure: CardMeasure; stage: string } | null = null;
   card.querySelectorAll(".a4-fit-badge").forEach((b) => b.remove());
   card.classList.remove("fit-overflow");
 
@@ -149,7 +247,7 @@ function a4FitCardIndependent(card: HTMLElement) {
 
   function growFromStandard(baseState: FitState) {
     let previous = { state: { ...baseState }, measure: a4MeasureCard(card), stage: "base" };
-    for (let font = 10.25; font <= 24; font += 0.25) {
+    for (let font = 10.25; font <= maxFont; font += 0.25) {
       const st = a4NormalizeTitlePadding(card, { ...a4DefaultFitState(font), cardPadY: 12, cardPadX: 12, gapTitleBody: 18, gapBodyAdd: 18 });
       a4ApplyFitState(card, st);
       const m = a4MeasureCard(card);
@@ -220,11 +318,12 @@ function isCardMeasurable(card: HTMLElement): boolean {
   return Boolean(card && isElementActuallyVisible(card) && card.clientWidth > 0 && card.clientHeight > 0);
 }
 
-function a4GrowCardToFill(card: HTMLElement, baseState: FitState) {
+function a4GrowCardToFill(card: HTMLElement, baseState: FitState, options: A4DomFitOptions) {
+  const maxFont = resolveMaxBodyFont(options);
   let best = { ...baseState };
   a4ApplyFitState(card, best);
 
-  for (let font = baseState.bodyFont; font <= 24; font += 0.25) {
+  for (let font = baseState.bodyFont; font <= maxFont; font += 0.25) {
     const st = a4NormalizeTitlePadding(card, {
       ...best,
       titleFont: font,
@@ -244,7 +343,7 @@ function a4GrowCardToFill(card: HTMLElement, baseState: FitState) {
     best = { ...st };
   }
 
-  for (const cardPad of [12, 14, 16, 18, 20, 22, 24]) {
+  for (const cardPad of [12, 14, 16, 18, 20, 22, 24, 28, 32]) {
     if (cardPad <= best.cardPadY) continue;
     const st = { ...best, cardPadY: cardPad, cardPadX: cardPad };
     a4ApplyFitState(card, st);
@@ -255,12 +354,13 @@ function a4GrowCardToFill(card: HTMLElement, baseState: FitState) {
   a4ApplyFitState(card, best);
 }
 
-function a4GrowRowTogether(cards: HTMLElement[]) {
+function a4GrowRowTogether(cards: HTMLElement[], options: A4DomFitOptions) {
   if (cards.length === 0) return;
+  const maxFont = resolveMaxBodyFont(options);
   const baseStates = cards.map((card) => readFitState(card));
   let bestStates = baseStates.map((s) => ({ ...s }));
 
-  for (let font = Math.min(...baseStates.map((s) => s.bodyFont)); font <= 24; font += 0.25) {
+  for (let font = Math.min(...baseStates.map((s) => s.bodyFont)); font <= maxFont; font += 0.25) {
     const trial = bestStates.map((s, i) =>
       a4NormalizeTitlePadding(cards[i], {
         ...s,
@@ -274,7 +374,7 @@ function a4GrowRowTogether(cards: HTMLElement[]) {
     bestStates = trial.map((s) => ({ ...s }));
   }
 
-  const gapSteps = [18, 22, 26, 30, 34, 38, 42];
+  const gapSteps = [18, 22, 26, 30, 34, 38, 42, 46, 50];
   for (const gapTitle of gapSteps) {
     const trial = bestStates.map((s) => ({
       ...s,
@@ -289,17 +389,17 @@ function a4GrowRowTogether(cards: HTMLElement[]) {
   bestStates.forEach((st, i) => a4ApplyFitState(cards[i], st));
 }
 
-function a4FillVerticalSpace(root: HTMLElement) {
+function a4FillVerticalSpace(root: HTMLElement, options: A4DomFitOptions) {
   root.querySelectorAll(".a4-row").forEach((row) => {
     const cards = Array.from(row.querySelectorAll('.a4-card[data-a4-fit-card="1"]')).filter((c): c is HTMLElement =>
       isCardMeasurable(c as HTMLElement),
     );
     if (cards.length === 0) return;
     if (cards.length === 1) {
-      a4GrowCardToFill(cards[0], readFitState(cards[0]));
+      a4GrowCardToFill(cards[0], readFitState(cards[0]), options);
       return;
     }
-    a4GrowRowTogether(cards);
+    a4GrowRowTogether(cards, options);
   });
 }
 
@@ -353,16 +453,19 @@ export function runA4DomFit(
     return `A4 построен, но ${cards.length - measurable.length} карточек пока не имеют реального DOM-размера.`;
   }
 
-  const results = cards.map((card) => a4FitCardIndependent(card));
+  const results = cards.map((card) => a4FitCardIndependent(card, options));
   if (options.balanceRowFonts) {
     normalizeRowFontSpread(root);
-    a4FillVerticalSpace(root);
+    a4FillVerticalSpace(root, options);
   } else {
-    cards.forEach((card) => a4GrowCardToFill(card, readFitState(card)));
+    cards.forEach((card) => a4GrowCardToFill(card, readFitState(card), options));
   }
+  applyA4HeaderFonts(root);
+
   const overflowCount = results.filter((r) => r.measure.overflow).length;
   const freeTotal = results.reduce((sum, r) => sum + Math.max(0, r.measure.free), 0);
-  return `A4 fixed windows: header ${Math.round(rowTargets.headerHeight || 0)}px, row scale ${Math.round(rowTargets.rowScale * 1000) / 1000}, row gap ${Math.round(rowTargets.rowGap * 100) / 100}px, fixed row heights ${rowTargets.targetHeights.map((h) => Math.round(h)).join("/")} , cards ${cards.length}, overflow ${overflowCount}, total free ${Math.round(freeTotal)}px.`;
+  const target = options.fitTarget ?? "screen";
+  return `A4 [${target}] fixed windows: header ${Math.round(rowTargets.headerHeight || 0)}px, row scale ${Math.round(rowTargets.rowScale * 1000) / 1000}, row gap ${Math.round(rowTargets.rowGap * 100) / 100}px, fixed row heights ${rowTargets.targetHeights.map((h) => Math.round(h)).join("/")} , cards ${cards.length}, overflow ${overflowCount}, total free ${Math.round(freeTotal)}px.`;
 }
 
 export function checkA4Overflow(root: HTMLElement): string[] {
@@ -378,3 +481,5 @@ export function checkA4Overflow(root: HTMLElement): string[] {
   });
   return problems;
 }
+
+export { A4_DOM_FIT_SCREEN_OPTIONS, A4_DOM_FIT_EXPORT_OPTIONS };
