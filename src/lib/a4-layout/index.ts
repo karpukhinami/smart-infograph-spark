@@ -83,4 +83,5 @@ export {
   exportA4LayoutPng,
   A4_LAYOUT_EXPORT_WIDTH,
   A4_LAYOUT_EXPORT_HEIGHT,
+  a4LayoutExportPixelRatio,
 } from "@/lib/a4-layout/export-png";

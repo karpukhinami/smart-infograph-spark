@@ -1,8 +1,8 @@
-import { useMemo } from "react";
+import { forwardRef, useMemo } from "react";
 import type { AnalysisJson, DesignProfile } from "@/lib/types";
 import { buildA4AutoLayout, buildA4ManualLayout } from "@/lib/a4-layout";
 import type { A4DomFitOptions } from "@/lib/a4-layout/types";
-import { A4LayoutCanvas } from "@/components/workspace/A4LayoutCanvas";
+import { A4LayoutCanvas, type A4LayoutCanvasHandle } from "@/components/workspace/A4LayoutCanvas";
 import { getActiveContentVersion } from "@/store/useProjectStore";
 
 export interface ManualLayoutApply {
@@ -19,7 +19,10 @@ interface Props {
   manualApply?: ManualLayoutApply | null;
 }
 
-export function A4AutoLayoutView({ analysis, active, profile = null, manualApply = null }: Props) {
+export const A4AutoLayoutView = forwardRef<A4LayoutCanvasHandle, Props>(function A4AutoLayoutView(
+  { analysis, active, profile = null, manualApply = null },
+  ref,
+) {
   const layout = useMemo(() => {
     const currentAnalysis = getActiveContentVersion()?.value.analysis ?? analysis;
     if (!manualApply) return buildA4AutoLayout(currentAnalysis);
@@ -38,6 +41,7 @@ export function A4AutoLayoutView({ analysis, active, profile = null, manualApply
 
   return (
     <A4LayoutCanvas
+      ref={ref}
       layout={layout}
       active={active}
       profile={profile}
@@ -47,4 +51,4 @@ export function A4AutoLayoutView({ analysis, active, profile = null, manualApply
       exportKind="авто-макет"
     />
   );
-}
+});

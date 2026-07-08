@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, type RefObject } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, RefreshCw, RotateCcw, Upload, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, RotateCcw, Upload, Sparkles, Download } from "lucide-react";
 import {
   useProjectStore,
   useActiveContent,
@@ -22,7 +22,8 @@ import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { WorkspaceContentPreview } from "@/components/workspace/WorkspaceContentPreview";
 import { A4AutoLayoutView, type ManualLayoutApply } from "@/components/workspace/A4AutoLayoutView";
-import { A4LayoutCanvas } from "@/components/workspace/A4LayoutCanvas";
+import { A4LayoutCanvas, type A4LayoutCanvasHandle } from "@/components/workspace/A4LayoutCanvas";
+import { A4_LAYOUT_EXPORT_HEIGHT, A4_LAYOUT_EXPORT_WIDTH } from "@/lib/a4-layout";
 import { WireframeView } from "@/components/workspace/WireframeView";
 import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
@@ -116,6 +117,9 @@ function Workspace() {
   const [appliedManualLayout, setAppliedManualLayout] = useState<ManualLayoutApply | null>(null);
   const [autoLayoutEpoch, setAutoLayoutEpoch] = useState(0);
   const [aiLayoutResult, setAiLayoutResult] = useState<AILayoutResult | null>(null);
+  const autoLayoutCanvasRef = useRef<A4LayoutCanvasHandle>(null);
+  const wireframeLayoutCanvasRef = useRef<A4LayoutCanvasHandle>(null);
+  const [layoutExporting, setLayoutExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -191,6 +195,16 @@ function Workspace() {
     setAutoLayoutEpoch((n) => n + 1);
     setPaneMode("auto-layout");
     toast.success("Авто-макет пересчитан по текущему контенту");
+  }
+
+  async function onExportLayout(ref: RefObject<A4LayoutCanvasHandle | null>) {
+    if (!ref.current) return;
+    try {
+      setLayoutExporting(true);
+      await ref.current.exportPng();
+    } finally {
+      setLayoutExporting(false);
+    }
   }
 
   // Legacy OCR-as-text fallback removed: images are now passed multimodally to the analysis model.
@@ -848,18 +862,32 @@ ${activeContent.value.content}`;
             <TabsContent value="auto-layout" className="p-2 space-y-2">
               {activeContent?.value.analysis ? (
                 <>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={onRedrawAutoLayout}
-                      disabled={loading !== null}
+                      disabled={loading !== null || layoutExporting}
                     >
                       <RefreshCw className="size-3.5 mr-1" />
                       Перерисовать авто-макет
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onExportLayout(autoLayoutCanvasRef)}
+                      disabled={loading !== null || layoutExporting || paneMode !== "auto-layout"}
+                    >
+                      {layoutExporting ? (
+                        <Loader2 className="size-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <Download className="size-3.5 mr-1" />
+                      )}
+                      Экспорт PNG ({A4_LAYOUT_EXPORT_WIDTH}×{A4_LAYOUT_EXPORT_HEIGHT})
+                    </Button>
                   </div>
                   <A4AutoLayoutView
+                    ref={autoLayoutCanvasRef}
                     key={autoLayoutEpoch}
                     analysis={activeContent.value.analysis}
                     active={paneMode === "auto-layout"}
@@ -876,11 +904,25 @@ ${activeContent.value.content}`;
               {mode === "strict" && briefMode === "programmatic" && aiLayoutCanvas ? (
                 <>
                   <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" onClick={onCreateAILayout} disabled={loading !== null}>
+                    <Button size="sm" variant="outline" onClick={onCreateAILayout} disabled={loading !== null || layoutExporting}>
                       <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onExportLayout(wireframeLayoutCanvasRef)}
+                      disabled={loading !== null || layoutExporting || paneMode !== "wireframe"}
+                    >
+                      {layoutExporting ? (
+                        <Loader2 className="size-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <Download className="size-3.5 mr-1" />
+                      )}
+                      Экспорт PNG ({A4_LAYOUT_EXPORT_WIDTH}×{A4_LAYOUT_EXPORT_HEIGHT})
                     </Button>
                   </div>
                   <A4LayoutCanvas
+                    ref={wireframeLayoutCanvasRef}
                     layout={aiLayoutCanvas}
                     active={paneMode === "wireframe"}
                     profile={activeProfile}

@@ -66,9 +66,18 @@ function a4ApplyFitState(card: HTMLElement, state: FitState) {
 function a4LastContentBottom(card: HTMLElement): number {
   const cardRect = card.getBoundingClientRect();
   let bottom = cardRect.top;
-  [".a4-title-pill", ".a4-title-pill span", ".a4-body p", ".a4-body li", ".a4-addendum-item", ".a4-side-formula", ".a4-side-addendum p"].forEach((selector) => {
+  const selectors = [
+    ".a4-title-pill",
+    ".a4-title-pill span",
+    ".a4-body p",
+    ".a4-body li",
+    ".a4-addendum-item",
+    ".a4-side-formula",
+    ".a4-side-addendum p",
+  ];
+  selectors.forEach((selector) => {
     card.querySelectorAll(selector).forEach((el) => {
-      const rect = el.getBoundingClientRect();
+      const rect = (el as HTMLElement).getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) bottom = Math.max(bottom, rect.bottom);
     });
   });
@@ -76,12 +85,31 @@ function a4LastContentBottom(card: HTMLElement): number {
 }
 
 function a4MeasureCard(card: HTMLElement) {
+  const cardRect = card.getBoundingClientRect();
   const cs = getComputedStyle(card);
   const padBottom = parseFloat(cs.paddingBottom) || 0;
-  const allowedBottom = card.clientHeight - padBottom;
+  const scaleY = card.clientHeight > 0 ? cardRect.height / card.clientHeight : 1;
+  const allowedBottom = cardRect.height - padBottom * scaleY;
   const bottom = a4LastContentBottom(card);
   const overflowY = bottom > allowedBottom + 0.5;
   const overflowX = card.scrollWidth > card.clientWidth + 0.5;
+  return {
+    titleFont: Number.parseFloat(getComputedStyle(card).getPropertyValue("--title-font")) || 10,
+    bodyFont: Number.parseFloat(getComputedStyle(card).getPropertyValue("--body-font")) || 10,
+    addFont: Number.parseFloat(getComputedStyle(card).getPropertyValue("--add-font")) || 9,
+    titlePadY: Number.parseFloat(getComputedStyle(card).getPropertyValue("--title-pad-y")) || 8,
+    titlePadX: Number.parseFloat(getComputedStyle(card).getPropertyValue("--title-pad-x")) || 40,
+    addPadY: Number.parseFloat(getComputedStyle(card).getPropertyValue("--add-pad-y")) || 8,
+    addPadX: Number.parseFloat(getComputedStyle(card).getPropertyValue("--add-pad-x")) || 12,
+    gapTitleBody: Number.parseFloat(getComputedStyle(card).getPropertyValue("--gap-title-body")) || 10,
+    gapBodyAdd: Number.parseFloat(getComputedStyle(card).getPropertyValue("--gap-body-add")) || 8,
+    gapAddItems: Number.parseFloat(getComputedStyle(card).getPropertyValue("--gap-add-items")) || 9,
+    cardPadY: Number.parseFloat(getComputedStyle(card).getPropertyValue("--a4-card-pad-y")) || 12,
+    cardPadX: Number.parseFloat(getComputedStyle(card).getPropertyValue("--a4-card-pad-x")) || 12,
+  };
+}
+
+function readFitState(card: HTMLElement): FitState {
   return {
     scrollHeight: Math.round(bottom + padBottom),
     clientHeight: card.clientHeight,
@@ -185,12 +213,94 @@ function a4FitCardIndependent(card: HTMLElement) {
 
 function isElementActuallyVisible(el: HTMLElement | null): boolean {
   if (!el) return false;
-  const rect = el.getBoundingClientRect();
-  return rect.width > 0 && rect.height > 0 && getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden";
+  return el.clientWidth > 0 && el.clientHeight > 0 && getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden";
 }
 
 function isCardMeasurable(card: HTMLElement): boolean {
   return Boolean(card && isElementActuallyVisible(card) && card.clientWidth > 0 && card.clientHeight > 0);
+}
+
+function a4GrowCardToFill(card: HTMLElement, baseState: FitState) {
+  let best = { ...baseState };
+  a4ApplyFitState(card, best);
+
+  for (let font = baseState.bodyFont; font <= 24; font += 0.25) {
+    const st = a4NormalizeTitlePadding(card, {
+      ...best,
+      titleFont: font,
+      bodyFont: font,
+      addFont: Math.max(5, font - 1),
+    });
+    a4ApplyFitState(card, st);
+    if (a4MeasureCard(card).overflow) break;
+    best = { ...st };
+  }
+
+  for (const gapTitle of [18, 22, 26, 30, 34, 38, 42]) {
+    if (gapTitle <= best.gapTitleBody) continue;
+    const st = { ...best, gapTitleBody: gapTitle, gapBodyAdd: Math.max(best.gapBodyAdd, gapTitle - 4) };
+    a4ApplyFitState(card, st);
+    if (a4MeasureCard(card).overflow) break;
+    best = { ...st };
+  }
+
+  for (const cardPad of [12, 14, 16, 18, 20, 22, 24]) {
+    if (cardPad <= best.cardPadY) continue;
+    const st = { ...best, cardPadY: cardPad, cardPadX: cardPad };
+    a4ApplyFitState(card, st);
+    if (a4MeasureCard(card).overflow) break;
+    best = { ...st };
+  }
+
+  a4ApplyFitState(card, best);
+}
+
+function a4GrowRowTogether(cards: HTMLElement[]) {
+  if (cards.length === 0) return;
+  const baseStates = cards.map((card) => readFitState(card));
+  let bestStates = baseStates.map((s) => ({ ...s }));
+
+  for (let font = Math.min(...baseStates.map((s) => s.bodyFont)); font <= 24; font += 0.25) {
+    const trial = bestStates.map((s, i) =>
+      a4NormalizeTitlePadding(cards[i], {
+        ...s,
+        titleFont: font,
+        bodyFont: font,
+        addFont: Math.max(5, font - 1),
+      }),
+    );
+    trial.forEach((st, i) => a4ApplyFitState(cards[i], st));
+    if (cards.some((card) => a4MeasureCard(card).overflow)) break;
+    bestStates = trial.map((s) => ({ ...s }));
+  }
+
+  const gapSteps = [18, 22, 26, 30, 34, 38, 42];
+  for (const gapTitle of gapSteps) {
+    const trial = bestStates.map((s) => ({
+      ...s,
+      gapTitleBody: Math.max(s.gapTitleBody, gapTitle),
+      gapBodyAdd: Math.max(s.gapBodyAdd, gapTitle - 4),
+    }));
+    trial.forEach((st, i) => a4ApplyFitState(cards[i], st));
+    if (cards.some((card) => a4MeasureCard(card).overflow)) break;
+    bestStates = trial;
+  }
+
+  bestStates.forEach((st, i) => a4ApplyFitState(cards[i], st));
+}
+
+function a4FillVerticalSpace(root: HTMLElement) {
+  root.querySelectorAll(".a4-row").forEach((row) => {
+    const cards = Array.from(row.querySelectorAll('.a4-card[data-a4-fit-card="1"]')).filter((c): c is HTMLElement =>
+      isCardMeasurable(c as HTMLElement),
+    );
+    if (cards.length === 0) return;
+    if (cards.length === 1) {
+      a4GrowCardToFill(cards[0], readFitState(cards[0]));
+      return;
+    }
+    a4GrowRowTogether(cards);
+  });
 }
 
 function normalizeRowFontSpread(root: HTMLElement) {
@@ -246,6 +356,9 @@ export function runA4DomFit(
   const results = cards.map((card) => a4FitCardIndependent(card));
   if (options.balanceRowFonts) {
     normalizeRowFontSpread(root);
+    a4FillVerticalSpace(root);
+  } else {
+    cards.forEach((card) => a4GrowCardToFill(card, readFitState(card)));
   }
   const overflowCount = results.filter((r) => r.measure.overflow).length;
   const freeTotal = results.reduce((sum, r) => sum + Math.max(0, r.measure.free), 0);

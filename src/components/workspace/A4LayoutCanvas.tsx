@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
-import { Loader2, Download } from "lucide-react";
 import type { A4AutoLayoutResult } from "@/lib/a4-layout";
 import {
   A4_LAYOUT_EXPORT_HEIGHT,
@@ -16,9 +23,12 @@ import {
 } from "@/lib/a4-layout/render";
 import { a4CardSurfaceClass, buildA4ProfileThemeStyle } from "@/lib/a4-layout/profile-theme";
 import { downloadLayoutPng } from "@/lib/download-infographic";
-import { Button } from "@/components/ui/button";
 import type { DesignProfile } from "@/lib/types";
 import "@/lib/a4-layout/a4-auto-layout.css";
+
+export interface A4LayoutCanvasHandle {
+  exportPng: () => Promise<void>;
+}
 
 interface Props {
   layout: A4AutoLayoutResult;
@@ -49,15 +59,18 @@ function typesetFormulas(root: HTMLElement) {
   });
 }
 
-export function A4LayoutCanvas({
-  layout,
-  active,
-  profile = null,
-  modeNote,
-  modeNoteClassName = "a4-layout-mode-note",
-  manualErrors,
-  exportKind = "макет",
-}: Props) {
+export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A4LayoutCanvas(
+  {
+    layout,
+    active,
+    profile = null,
+    modeNote,
+    modeNoteClassName = "a4-layout-mode-note",
+    manualErrors,
+    exportKind = "макет",
+  },
+  ref,
+) {
   const { summary, plan, settings, rowTargets, domFitOptions } = layout;
   const renderOptions = useMemo(
     () => ({ allowAddendumRight: domFitOptions?.allowAddendumRight !== false }),
@@ -68,9 +81,13 @@ export function A4LayoutCanvas({
   const frameRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [displayScale, setDisplayScale] = useState(1);
-  const [exporting, setExporting] = useState(false);
-  const [metrics, setMetrics] = useState("");
-  const [overflowText, setOverflowText] = useState("");
+
+  const runDomFit = useCallback(() => {
+    const root = rootRef.current;
+    if (!root || !active) return;
+    runA4DomFit(root, rowTargets, true, domFitOptions);
+    checkA4Overflow(root);
+  }, [active, domFitOptions, rowTargets]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -84,42 +101,30 @@ export function A4LayoutCanvas({
     };
 
     updateScale();
-    const ro = new ResizeObserver(updateScale);
+    const ro = new ResizeObserver(() => {
+      updateScale();
+      requestAnimationFrame(runDomFit);
+    });
     ro.observe(viewport);
     return () => ro.disconnect();
-  }, [settings.pageWidthPx]);
+  }, [runDomFit, settings.pageWidthPx]);
 
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
 
-    const runFit = () => {
-      const msg = runA4DomFit(root, rowTargets, active, domFitOptions);
-      setMetrics(msg);
-      const problems = checkA4Overflow(root);
-      setOverflowText(
-        problems.length ? `Переполнение осталось в отдельных фиксированных окнах:\n${problems.join("\n")}` : "",
-      );
-    };
-
     const afterTypeset = () => {
-      runFit();
+      runDomFit();
       typesetFormulas(root);
       requestAnimationFrame(() => {
-        runFit();
-        const problems = checkA4Overflow(root);
-        setOverflowText(
-          problems.length ? `Переполнение осталось в отдельных фиксированных окнах:\n${problems.join("\n")}` : "",
-        );
+        runDomFit();
       });
     };
 
     requestAnimationFrame(afterTypeset);
-  }, [layout, rowTargets, active, profile?.profileName, domFitOptions]);
+  }, [layout, rowTargets, active, profile?.profileName, domFitOptions, runDomFit, displayScale]);
 
-  const cardCount = plan.rows.reduce((sum, row) => sum + row.cards.length, 0);
-
-  const onExportPng = useCallback(async () => {
+  const exportPng = useCallback(async () => {
     const frame = frameRef.current;
     if (!frame) return;
     if (!active) {
@@ -127,7 +132,6 @@ export function A4LayoutCanvas({
       return;
     }
     try {
-      setExporting(true);
       if (rootRef.current) {
         runA4DomFit(rootRef.current, rowTargets, true, domFitOptions);
         typesetFormulas(rootRef.current);
@@ -138,53 +142,18 @@ export function A4LayoutCanvas({
       toast.success(`PNG ${A4_LAYOUT_EXPORT_WIDTH}×${A4_LAYOUT_EXPORT_HEIGHT} сохранён`);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось экспортировать PNG");
-    } finally {
-      setExporting(false);
     }
   }, [active, domFitOptions, exportKind, rowTargets, summary.topic]);
+
+  useImperativeHandle(ref, () => ({ exportPng }), [exportPng]);
 
   return (
     <div ref={rootRef} className="a4-auto-layout-root">
       {modeNote ? <div className={modeNoteClassName}>{modeNote}</div> : null}
 
-      <div className="flex justify-end mb-2">
-        <Button size="sm" variant="outline" onClick={onExportPng} disabled={exporting || !active}>
-          {exporting ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <Download className="size-3.5 mr-1" />}
-          Экспорт PNG ({A4_LAYOUT_EXPORT_WIDTH}×{A4_LAYOUT_EXPORT_HEIGHT})
-        </Button>
-      </div>
-
       {manualErrors && manualErrors.length > 0 ? (
         <div className="a4-manual-warnings">{manualErrors.join("\n")}</div>
       ) : null}
-
-      <div className="a4-summary-cards">
-        <div className="a4-metric">
-          <strong>
-            {settings.pageWidthPx}×{settings.pageHeightPx}
-          </strong>
-          <span>
-            A4 frame, px
-            {displayScale !== 1 ? ` · показано ×${displayScale.toFixed(2)}` : ""}
-          </span>
-        </div>
-        <div className="a4-metric">
-          <strong>{Math.round(rowTargets.headerHeight)}</strong>
-          <span>шапка, px</span>
-        </div>
-        <div className="a4-metric">
-          <strong>{plan.rows.length}</strong>
-          <span>рядов</span>
-        </div>
-        <div className="a4-metric">
-          <strong>{cardCount}</strong>
-          <span>карточек</span>
-        </div>
-        <div className="a4-metric">
-          <strong>{plan.verdict}</strong>
-          <span>fit по расчёту</span>
-        </div>
-      </div>
 
       <div ref={viewportRef} className="a4-poster-viewport">
         <div
@@ -265,9 +234,6 @@ export function A4LayoutCanvas({
           </div>
         </div>
       </div>
-
-      {metrics ? <div className="a4-dom-metrics">{metrics}</div> : null}
-      {overflowText ? <div className="a4-overflow-summary">{overflowText}</div> : null}
     </div>
   );
-}
+});
