@@ -231,86 +231,71 @@ function a4ApplyHeaderFitState(header: HTMLElement, state: HeaderFitState) {
   header.style.setProperty("--a4-header-pad-bottom", state.padBottom + "px");
 }
 
-function a4MeasureHeader(header: HTMLElement) {
-  const overflow = header.scrollHeight > header.clientHeight + 0.5;
+function a4HeaderContentBounds(header: HTMLElement) {
+  const headerRect = header.getBoundingClientRect();
+  const scaleY = header.clientHeight > 0 ? headerRect.height / header.clientHeight : 1;
+  let top = headerRect.bottom;
+  let bottom = headerRect.top;
+  [".a4-header-meta", ".a4-header-title", ".a4-header-summary"].forEach((selector) => {
+    header.querySelectorAll(selector).forEach((el) => {
+      const rect = (el as HTMLElement).getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        top = Math.min(top, rect.top);
+        bottom = Math.max(bottom, rect.bottom);
+      }
+    });
+  });
   return {
-    overflow,
-    free: header.clientHeight - header.scrollHeight,
+    top: (top - headerRect.top) / (scaleY || 1),
+    bottom: (bottom - headerRect.top) / (scaleY || 1),
+  };
+}
+
+function a4MeasureHeader(header: HTMLElement) {
+  const cs = getComputedStyle(header);
+  const padTop = Number.parseFloat(cs.paddingTop) || 0;
+  const padBottom = Number.parseFloat(cs.paddingBottom) || 0;
+  const { top, bottom } = a4HeaderContentBounds(header);
+  const allowedTop = padTop;
+  const allowedBottom = header.clientHeight - padBottom;
+  const overflowY = top < allowedTop - 0.5 || bottom > allowedBottom + 0.5;
+  const overflowX = header.scrollWidth > header.clientWidth + 0.5;
+  return {
+    overflow: overflowY || overflowX,
+    free: allowedBottom - bottom,
+  };
+}
+
+function headerFitStateAtTitleFont(titleFont: number): HeaderFitState {
+  const titleRatio = A4_HEADER_TITLE_LINE_BASE / A4_HEADER_TITLE_FONT_BASE;
+  const summaryRatio = A4_HEADER_SUMMARY_LINE_BASE / A4_HEADER_SUMMARY_FONT_BASE;
+  const scale = titleFont / A4_HEADER_TITLE_FONT_BASE;
+  const summaryFont = Math.max(A4_HEADER_FIT_MIN.summaryFont, A4_HEADER_SUMMARY_FONT_BASE * scale);
+  return {
+    titleFont,
+    titleLine: titleFont * titleRatio,
+    summaryFont,
+    summaryLine: summaryFont * summaryRatio,
+    padTop: 12,
+    padBottom: 16,
   };
 }
 
 function a4FitHeaderIndependent(header: HTMLElement) {
-  const titleRatio = A4_HEADER_TITLE_LINE_BASE / A4_HEADER_TITLE_FONT_BASE;
-  const summaryRatio = A4_HEADER_SUMMARY_LINE_BASE / A4_HEADER_SUMMARY_FONT_BASE;
   header.classList.remove("fit-overflow");
 
-  const standard = a4DefaultHeaderFitState();
-  a4ApplyHeaderFitState(header, standard);
+  let state = a4DefaultHeaderFitState();
+  a4ApplyHeaderFitState(header, state);
 
-  function growFrom(base: HeaderFitState): HeaderFitState {
-    let best = { ...base };
-    for (let titleFont = base.titleFont + 0.25; titleFont <= A4_HEADER_TITLE_FONT_BASE; titleFont += 0.25) {
-      const trial = { ...best, titleFont, titleLine: titleFont * titleRatio };
-      a4ApplyHeaderFitState(header, trial);
-      if (a4MeasureHeader(header).overflow) break;
-      best = trial;
-    }
-    return best;
-  }
-
-  let best: HeaderFitState | null = null;
-  if (!a4MeasureHeader(header).overflow) {
-    best = growFrom(standard);
-  } else {
-    for (let titleFont = A4_HEADER_TITLE_FONT_BASE; titleFont >= A4_HEADER_FIT_MIN.titleFont; titleFont -= 0.5) {
-      const trial = { ...standard, titleFont, titleLine: titleFont * titleRatio };
-      a4ApplyHeaderFitState(header, trial);
-      if (!a4MeasureHeader(header).overflow) {
-        best = growFrom(trial);
-        break;
-      }
-    }
-    if (!best) {
-      for (let summaryFont = A4_HEADER_SUMMARY_FONT_BASE; summaryFont >= A4_HEADER_FIT_MIN.summaryFont; summaryFont -= 0.25) {
-        const trial = {
-          ...standard,
-          summaryFont,
-          summaryLine: summaryFont * summaryRatio,
-        };
-        a4ApplyHeaderFitState(header, trial);
-        if (!a4MeasureHeader(header).overflow) {
-          best = growFrom(trial);
-          break;
-        }
-      }
-    }
-    if (!best) {
-      for (const padBottom of [14, 12, 10, 8] as const) {
-        const trial = {
-          ...standard,
-          padBottom,
-          padTop: Math.min(standard.padTop, padBottom),
-        };
-        a4ApplyHeaderFitState(header, trial);
-        if (!a4MeasureHeader(header).overflow) {
-          best = growFrom(trial);
-          break;
-        }
-      }
-    }
-    if (!best) {
-      best = {
-        titleFont: A4_HEADER_FIT_MIN.titleFont,
-        titleLine: A4_HEADER_FIT_MIN.titleFont * titleRatio,
-        summaryFont: A4_HEADER_FIT_MIN.summaryFont,
-        summaryLine: A4_HEADER_FIT_MIN.summaryFont * summaryRatio,
-        padTop: A4_HEADER_FIT_MIN.padTop,
-        padBottom: A4_HEADER_FIT_MIN.padBottom,
-      };
+  if (a4MeasureHeader(header).overflow) {
+    for (let titleFont = A4_HEADER_TITLE_FONT_BASE - 0.25; titleFont >= A4_HEADER_FIT_MIN.titleFont; titleFont -= 0.25) {
+      state = headerFitStateAtTitleFont(titleFont);
+      a4ApplyHeaderFitState(header, state);
+      if (!a4MeasureHeader(header).overflow) break;
     }
   }
 
-  a4ApplyHeaderFitState(header, best);
+  a4ApplyHeaderFitState(header, state);
   header.classList.toggle("fit-overflow", a4MeasureHeader(header).overflow);
 }
 
