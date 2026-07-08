@@ -353,24 +353,23 @@ export function estimateHeaderMetrics(summary: A4LayoutSummary, _s: A4LayoutSett
   const topPaddingPx = 12;
   const bottomPaddingPx = 16;
   const hasMeta = Boolean(summary.subject || summary.grade);
-  const metaHeightPx = hasMeta ? 22 : 0;
-  const metaGapPx = hasMeta ? 6 : 0;
+  /** Matches .a4-header-meta-row: min-height 28px + margin-bottom 6px */
+  const metaRowPx = hasMeta ? 34 : 0;
 
   const titleText = String(summary.topic || "");
   const summaryText = String(summary.summary || "");
   const usableWidth = 565 - sidePaddingPx * 2;
-  const titleCharsPerLine = Math.max(8, Math.floor(usableWidth / (titleFontPx * 0.52)));
+  const titleLines = estimateHeaderTitleLines(titleText, usableWidth, titleFontPx);
   const summaryCharsPerLine = Math.max(8, Math.floor(usableWidth / (summaryFontPx * 0.52)));
-  const titleLines = Math.max(1, Math.ceil(titleText.length / titleCharsPerLine));
   const summaryLines = summaryText ? Math.max(1, Math.ceil(summaryText.length / summaryCharsPerLine)) : 0;
 
   const height = Math.round(
     topPaddingPx +
-      metaHeightPx +
-      metaGapPx +
+      metaRowPx +
       titleLines * titleLinePx +
-      (summaryLines ? 4 + summaryLines * summaryLinePx : 0) +
-      bottomPaddingPx,
+      (summaryLines ? 6 + summaryLines * summaryLinePx : 0) +
+      bottomPaddingPx +
+      2,
   );
 
   return {
@@ -392,4 +391,32 @@ export function estimateHeaderHeight(summary: A4LayoutSummary, s: A4LayoutSettin
 
 export function metaText(summary: A4LayoutSummary): string {
   return [summary.subject, summary.grade].filter(Boolean).join(" • ");
+}
+
+/** Greedy wrap estimate for header title (uppercase, bold). */
+function estimateHeaderTitleLines(text: string, usableWidthPx: number, fontPx: number): number {
+  const charsPerLine = Math.max(6, Math.floor(usableWidthPx / (fontPx * 0.55)));
+  const tokens = String(text || "")
+    .toUpperCase()
+    .split(/(\s+|\/)/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!tokens.length) return 1;
+
+  let lines = 1;
+  let lineLen = 0;
+  for (const token of tokens) {
+    const piece = token.length;
+    if (lineLen === 0) {
+      lineLen = piece;
+      continue;
+    }
+    if (lineLen + piece <= charsPerLine) {
+      lineLen += piece;
+    } else {
+      lines += 1;
+      lineLen = piece;
+    }
+  }
+  return Math.max(1, lines);
 }

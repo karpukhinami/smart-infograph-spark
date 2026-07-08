@@ -48,6 +48,31 @@ const A4_FIT_MIN = {
   cardPadX: 12,
 };
 
+const HEADER_FIT_STYLE_PROPS = [
+  "--a4-header-title-font",
+  "--a4-header-title-line",
+  "--a4-header-summary-font",
+  "--a4-header-summary-line",
+  "--a4-header-pad-top",
+  "--a4-header-pad-bottom",
+] as const;
+
+interface HeaderFitState {
+  titleFont: number;
+  titleLine: number;
+  summaryFont: number;
+  summaryLine: number;
+  padTop: number;
+  padBottom: number;
+}
+
+const A4_HEADER_FIT_MIN = {
+  titleFont: 20,
+  summaryFont: 11,
+  padTop: 8,
+  padBottom: 10,
+};
+
 const FIT_STYLE_PROPS = [
   "--title-font",
   "--body-font",
@@ -160,25 +185,139 @@ function readFitState(card: HTMLElement): FitState {
 
 export function captureA4FitStyles(root: HTMLElement): Map<HTMLElement, Record<string, string>> {
   const snapshot = new Map<HTMLElement, Record<string, string>>();
-  root.querySelectorAll('.a4-card[data-a4-fit-card="1"]').forEach((node) => {
-    const el = node as HTMLElement;
-    const props: Record<string, string> = {};
-    FIT_STYLE_PROPS.forEach((prop) => {
-      props[prop] = el.style.getPropertyValue(prop);
+  const capture = (el: HTMLElement, props: readonly string[]) => {
+    const record: Record<string, string> = {};
+    props.forEach((prop) => {
+      record[prop] = el.style.getPropertyValue(prop);
     });
-    snapshot.set(el, props);
+    snapshot.set(el, record);
+  };
+  root.querySelectorAll('.a4-card[data-a4-fit-card="1"]').forEach((node) => {
+    capture(node as HTMLElement, FIT_STYLE_PROPS);
   });
+  const header = root.querySelector('.a4-header-card[data-a4-fit-header="1"]') as HTMLElement | null;
+  if (header) capture(header, HEADER_FIT_STYLE_PROPS);
   return snapshot;
 }
 
 export function restoreA4FitStyles(snapshot: Map<HTMLElement, Record<string, string>>) {
   snapshot.forEach((props, el) => {
-    FIT_STYLE_PROPS.forEach((prop) => {
+    const propNames = el.classList.contains("a4-header-card") ? HEADER_FIT_STYLE_PROPS : FIT_STYLE_PROPS;
+    propNames.forEach((prop) => {
       const value = props[prop];
       if (value) el.style.setProperty(prop, value);
       else el.style.removeProperty(prop);
     });
   });
+}
+
+function a4DefaultHeaderFitState(): HeaderFitState {
+  return {
+    titleFont: A4_HEADER_TITLE_FONT_BASE,
+    titleLine: A4_HEADER_TITLE_LINE_BASE,
+    summaryFont: A4_HEADER_SUMMARY_FONT_BASE,
+    summaryLine: A4_HEADER_SUMMARY_LINE_BASE,
+    padTop: 12,
+    padBottom: 16,
+  };
+}
+
+function a4ApplyHeaderFitState(header: HTMLElement, state: HeaderFitState) {
+  header.style.setProperty("--a4-header-title-font", state.titleFont + "px");
+  header.style.setProperty("--a4-header-title-line", state.titleLine + "px");
+  header.style.setProperty("--a4-header-summary-font", state.summaryFont + "px");
+  header.style.setProperty("--a4-header-summary-line", state.summaryLine + "px");
+  header.style.setProperty("--a4-header-pad-top", state.padTop + "px");
+  header.style.setProperty("--a4-header-pad-bottom", state.padBottom + "px");
+}
+
+function a4MeasureHeader(header: HTMLElement) {
+  const overflow = header.scrollHeight > header.clientHeight + 0.5;
+  return {
+    overflow,
+    free: header.clientHeight - header.scrollHeight,
+  };
+}
+
+function a4FitHeaderIndependent(header: HTMLElement) {
+  const titleRatio = A4_HEADER_TITLE_LINE_BASE / A4_HEADER_TITLE_FONT_BASE;
+  const summaryRatio = A4_HEADER_SUMMARY_LINE_BASE / A4_HEADER_SUMMARY_FONT_BASE;
+  header.classList.remove("fit-overflow");
+
+  const standard = a4DefaultHeaderFitState();
+  a4ApplyHeaderFitState(header, standard);
+
+  function growFrom(base: HeaderFitState): HeaderFitState {
+    let best = { ...base };
+    for (let titleFont = base.titleFont + 0.25; titleFont <= A4_HEADER_TITLE_FONT_BASE; titleFont += 0.25) {
+      const trial = { ...best, titleFont, titleLine: titleFont * titleRatio };
+      a4ApplyHeaderFitState(header, trial);
+      if (a4MeasureHeader(header).overflow) break;
+      best = trial;
+    }
+    return best;
+  }
+
+  let best: HeaderFitState | null = null;
+  if (!a4MeasureHeader(header).overflow) {
+    best = growFrom(standard);
+  } else {
+    for (let titleFont = A4_HEADER_TITLE_FONT_BASE; titleFont >= A4_HEADER_FIT_MIN.titleFont; titleFont -= 0.5) {
+      const trial = { ...standard, titleFont, titleLine: titleFont * titleRatio };
+      a4ApplyHeaderFitState(header, trial);
+      if (!a4MeasureHeader(header).overflow) {
+        best = growFrom(trial);
+        break;
+      }
+    }
+    if (!best) {
+      for (let summaryFont = A4_HEADER_SUMMARY_FONT_BASE; summaryFont >= A4_HEADER_FIT_MIN.summaryFont; summaryFont -= 0.25) {
+        const trial = {
+          ...standard,
+          summaryFont,
+          summaryLine: summaryFont * summaryRatio,
+        };
+        a4ApplyHeaderFitState(header, trial);
+        if (!a4MeasureHeader(header).overflow) {
+          best = growFrom(trial);
+          break;
+        }
+      }
+    }
+    if (!best) {
+      for (const padBottom of [14, 12, 10, 8] as const) {
+        const trial = {
+          ...standard,
+          padBottom,
+          padTop: Math.min(standard.padTop, padBottom),
+        };
+        a4ApplyHeaderFitState(header, trial);
+        if (!a4MeasureHeader(header).overflow) {
+          best = growFrom(trial);
+          break;
+        }
+      }
+    }
+    if (!best) {
+      best = {
+        titleFont: A4_HEADER_FIT_MIN.titleFont,
+        titleLine: A4_HEADER_FIT_MIN.titleFont * titleRatio,
+        summaryFont: A4_HEADER_FIT_MIN.summaryFont,
+        summaryLine: A4_HEADER_FIT_MIN.summaryFont * summaryRatio,
+        padTop: A4_HEADER_FIT_MIN.padTop,
+        padBottom: A4_HEADER_FIT_MIN.padBottom,
+      };
+    }
+  }
+
+  a4ApplyHeaderFitState(header, best);
+  header.classList.toggle("fit-overflow", a4MeasureHeader(header).overflow);
+}
+
+function a4FitHeader(root: HTMLElement) {
+  const header = root.querySelector('.a4-header-card[data-a4-fit-header="1"]') as HTMLElement | null;
+  if (!header || !isCardMeasurable(header)) return;
+  a4FitHeaderIndependent(header);
 }
 
 function a4NormalizeTitlePadding(card: HTMLElement, state: FitState): FitState {
@@ -379,8 +518,8 @@ function a4TightenAddendumGaps(root: HTMLElement) {
   });
 }
 
-/** Pull right-column addendum up to title-pill top; stretch it vertically; grow add font if room. */
-function a4PullAndStretchSideAddendum(card: HTMLElement, options: A4DomFitOptions) {
+/** Pull right-column addendum up to title-pill top; stretch column height. */
+function a4PullAndStretchSideAddendum(card: HTMLElement) {
   if (!card.classList.contains("split-right")) return;
 
   const titlePill = card.querySelector(".a4-title-pill") as HTMLElement | null;
@@ -402,24 +541,11 @@ function a4PullAndStretchSideAddendum(card: HTMLElement, options: A4DomFitOption
     }
   }
   card.style.setProperty("--a4-side-col-pull", appliedPull + "px");
-
-  let addFont = Number.parseFloat(getComputedStyle(card).getPropertyValue("--add-font")) || 9;
-  const bodyFont = Number.parseFloat(getComputedStyle(card).getPropertyValue("--body-font")) || 10;
-  const maxAdd = Math.min(bodyFont + 1, resolveMaxBodyFont(options));
-
-  while (addFont + 0.25 <= maxAdd) {
-    card.style.setProperty("--add-font", addFont + 0.25 + "px");
-    if (a4MeasureCard(card).overflow) {
-      card.style.setProperty("--add-font", addFont + "px");
-      return;
-    }
-    addFont += 0.25;
-  }
 }
 
-function a4PullSideAddendums(root: HTMLElement, options: A4DomFitOptions) {
+function a4PullSideAddendums(root: HTMLElement) {
   root.querySelectorAll('.a4-card[data-a4-fit-card="1"].split-right').forEach((node) => {
-    a4PullAndStretchSideAddendum(node as HTMLElement, options);
+    a4PullAndStretchSideAddendum(node as HTMLElement);
   });
 }
 
@@ -487,6 +613,7 @@ export function runA4DomFit(
     return `A4 построен, но ${cards.length - measurable.length} карточек пока не имеют реального DOM-размера.`;
   }
 
+  a4FitHeader(root);
   const results = cards.map((card) => a4FitCardIndependent(card, options));
   if (options.balanceRowFonts) {
     normalizeRowFontSpread(root);
@@ -495,7 +622,7 @@ export function runA4DomFit(
     cards.forEach((card) => a4GrowCardToFill(card, readFitState(card), options));
   }
   a4TightenAddendumGaps(root);
-  a4PullSideAddendums(root, options);
+  a4PullSideAddendums(root);
 
   const overflowCount = results.filter((r) => r.measure.overflow).length;
   const freeTotal = results.reduce((sum, r) => sum + Math.max(0, r.measure.free), 0);
@@ -504,8 +631,14 @@ export function runA4DomFit(
 }
 
 export function checkA4Overflow(root: HTMLElement): string[] {
-  const cards = Array.from(root.querySelectorAll(".a4-card")).filter((c): c is HTMLElement => isCardMeasurable(c as HTMLElement));
   const problems: string[] = [];
+  const header = root.querySelector('.a4-header-card[data-a4-fit-header="1"]') as HTMLElement | null;
+  if (header && isCardMeasurable(header) && a4MeasureHeader(header).overflow) {
+    problems.push(`шапка: overflow ${Math.ceil(header.scrollHeight - header.clientHeight)} px`);
+  }
+  const cards = Array.from(root.querySelectorAll('.a4-card[data-a4-fit-card="1"]')).filter((c): c is HTMLElement =>
+    isCardMeasurable(c as HTMLElement),
+  );
   cards.forEach((card, idx) => {
     const m = a4MeasureCard(card);
     card.classList.toggle("fit-overflow", m.overflow);
