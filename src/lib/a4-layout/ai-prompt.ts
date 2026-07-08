@@ -70,7 +70,7 @@ Do not use div, style attributes, or other class names.
 
 Lists: if the main text or an addendum is clearly a list by meaning (enumeration, steps, classification items, parallel facts), format it as a list — use <ul>/<ol>/<li> or, inside a single paragraph, bullet circles (•) with consistent punctuation at the end of each item. Do not leave list-like content as one dense paragraph.
 
-Accent span: use <span class="accent">…</span> only for a single word or short phrase (2–4 words) that must stand out pedagogically. Never wrap a whole sentence, a clause, or a large part of a sentence. Use it sparingly and only when highlighting one specific term or wording is truly important. At most one <span class="accent"> per card in total (count both content and addendum items together); if several candidates exist, keep only the single most important one.
+Accent span: use <span class="accent">…</span> only for a single word or short phrase (2–4 words) that must stand out pedagogically. Never wrap a whole sentence, a clause, or a large part of a sentence. Use it sparingly and only when highlighting one specific term or wording is truly important. AT MOST ONE <span class="accent"> per card in total (count both content and addendum items together); if several equally important candidates exist, do not highlight any of them.
 
 Do not duplicate list numbering inside <ol>/<ul> (no "1. item" inside <li>).
 
