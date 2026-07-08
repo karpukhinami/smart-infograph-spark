@@ -33,11 +33,11 @@ export const A4AutoLayoutView = forwardRef<A4LayoutCanvasHandle, Props>(function
     return buildA4ManualLayout(currentAnalysis, manualApply.template, domFitOptions);
   }, [analysis, manualApply]);
 
-  const modeNote = !manualApply
-    ? "Автоматический расчёт рядов"
-    : layout.manualUsedAutoRatios
+  const modeNote = manualApply
+    ? layout.manualUsedAutoRatios
       ? "Ручной режим (ряды как в авто)"
-      : "Ручной шаблон рядов";
+      : "Ручной шаблон рядов"
+    : undefined;
 
   return (
     <A4LayoutCanvas
@@ -46,7 +46,7 @@ export const A4AutoLayoutView = forwardRef<A4LayoutCanvasHandle, Props>(function
       active={active}
       profile={profile}
       modeNote={modeNote}
-      modeNoteClassName={manualApply ? "a4-layout-mode-note" : "a4-layout-mode-note a4-layout-mode-note-auto"}
+      modeNoteClassName="a4-layout-mode-note"
       manualErrors={layout.manualErrors}
       exportKind="авто-макет"
     />

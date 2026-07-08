@@ -23,7 +23,6 @@ import { Markdown } from "@/components/workspace/Markdown";
 import { WorkspaceContentPreview } from "@/components/workspace/WorkspaceContentPreview";
 import { A4AutoLayoutView, type ManualLayoutApply } from "@/components/workspace/A4AutoLayoutView";
 import { A4LayoutCanvas, type A4LayoutCanvasHandle } from "@/components/workspace/A4LayoutCanvas";
-import { A4_LAYOUT_EXPORT_HEIGHT, A4_LAYOUT_EXPORT_WIDTH } from "@/lib/a4-layout";
 import { WireframeView } from "@/components/workspace/WireframeView";
 import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
@@ -883,7 +882,7 @@ ${activeContent.value.content}`;
                       ) : (
                         <Download className="size-3.5 mr-1" />
                       )}
-                      Экспорт PNG ({A4_LAYOUT_EXPORT_WIDTH}×{A4_LAYOUT_EXPORT_HEIGHT})
+                      Экспорт PNG
                     </Button>
                   </div>
                   <A4AutoLayoutView
@@ -918,7 +917,7 @@ ${activeContent.value.content}`;
                       ) : (
                         <Download className="size-3.5 mr-1" />
                       )}
-                      Экспорт PNG ({A4_LAYOUT_EXPORT_WIDTH}×{A4_LAYOUT_EXPORT_HEIGHT})
+                      Экспорт PNG
                     </Button>
                   </div>
                   <A4LayoutCanvas
@@ -926,7 +925,6 @@ ${activeContent.value.content}`;
                     layout={aiLayoutCanvas}
                     active={paneMode === "wireframe"}
                     profile={activeProfile}
-                    modeNote="Технический макет (AI)"
                     exportKind="технический макет"
                   />
                   {aiLayoutResult ? (

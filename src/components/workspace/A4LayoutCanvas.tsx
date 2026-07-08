@@ -10,8 +10,6 @@ import {
 import { toast } from "sonner";
 import type { A4AutoLayoutResult } from "@/lib/a4-layout";
 import {
-  A4_LAYOUT_EXPORT_HEIGHT,
-  A4_LAYOUT_EXPORT_WIDTH,
   A4_DOM_FIT_EXPORT_OPTIONS,
   A4_DOM_FIT_SCREEN_OPTIONS,
   captureA4FitStyles,
@@ -167,7 +165,7 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
 
         const dataUrl = await exportA4LayoutPng(frame);
         downloadLayoutPng(dataUrl, exportKind, summary.topic);
-        toast.success(`PNG ${A4_LAYOUT_EXPORT_WIDTH}×${A4_LAYOUT_EXPORT_HEIGHT} сохранён`);
+        toast.success("PNG сохранён");
       } finally {
         restoreA4FitStyles(savedStyles);
         if (shell) shell.style.transform = prevTransform;

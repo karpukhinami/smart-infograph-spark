@@ -1,12 +1,13 @@
 import { toPng } from "html-to-image";
-import { computeCanvas } from "@/lib/render-spec/tokens";
 import { DEFAULT_A4_SETTINGS } from "@/lib/a4-layout/settings";
 
-const portrait = computeCanvas("portrait");
+/** Export width — long side baseline for A4 layout PNG. */
+export const A4_LAYOUT_EXPORT_WIDTH = 1200;
 
-/** Target export size — same as programmatic renderer / generated images (portrait). */
-export const A4_LAYOUT_EXPORT_WIDTH = portrait.width;
-export const A4_LAYOUT_EXPORT_HEIGHT = portrait.height;
+/** Height matching logical page aspect (595×842) at export width — no vertical crop. */
+export const A4_LAYOUT_EXPORT_HEIGHT = Math.round(
+  A4_LAYOUT_EXPORT_WIDTH * (DEFAULT_A4_SETTINGS.pageHeightPx / DEFAULT_A4_SETTINGS.pageWidthPx),
+);
 
 /** Uniform scale from logical layout px to export width (fonts scale with this). */
 export function a4LayoutExportPixelRatio(
@@ -32,14 +33,17 @@ function parseRgbBackground(el: HTMLElement): string {
   return bg && bg !== "transparent" ? bg : "#f7f8fc";
 }
 
-/** Crop / pad raster to exact export canvas (top-aligned; slight bottom crop if aspect differs). */
+/** Pad raster to exact export canvas (top-aligned; never crop). */
 function fitRasterToExportCanvas(dataUrl: string, backgroundColor: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
+      const scale = A4_LAYOUT_EXPORT_WIDTH / img.width;
+      const drawW = A4_LAYOUT_EXPORT_WIDTH;
+      const drawH = Math.round(img.height * scale);
       const canvas = document.createElement("canvas");
       canvas.width = A4_LAYOUT_EXPORT_WIDTH;
-      canvas.height = A4_LAYOUT_EXPORT_HEIGHT;
+      canvas.height = Math.max(A4_LAYOUT_EXPORT_HEIGHT, drawH);
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         reject(new Error("Canvas 2D unavailable"));
@@ -47,9 +51,6 @@ function fitRasterToExportCanvas(dataUrl: string, backgroundColor: string): Prom
       }
       ctx.fillStyle = backgroundColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const scale = A4_LAYOUT_EXPORT_WIDTH / img.width;
-      const drawW = A4_LAYOUT_EXPORT_WIDTH;
-      const drawH = Math.round(img.height * scale);
       ctx.drawImage(img, 0, 0, drawW, drawH);
       resolve(canvas.toDataURL("image/png"));
     };
