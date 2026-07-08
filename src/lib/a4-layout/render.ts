@@ -3,6 +3,13 @@ import { sanitizeAIHtml } from "@/lib/a4-layout/sanitize-ai-html";
 import type { A4LayoutSettings, A4LayoutSummary, A4RenderOptions, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
 import { asArray, escapeHtml, flattenText, textStats } from "@/lib/a4-layout/text";
 import { metaText } from "@/lib/a4-layout/estimate";
+import {
+  A4_HEADER_META_INSET_PX,
+  A4_HEADER_SUMMARY_FONT_BASE,
+  A4_HEADER_SUMMARY_LINE_BASE,
+  A4_HEADER_TITLE_FONT_BASE,
+  A4_HEADER_TITLE_LINE_BASE,
+} from "@/lib/a4-layout/dom-fit";
 
 export function a4LatexText(text: unknown): string {
   let x = String(text ?? "").trim();
@@ -196,7 +203,7 @@ export function renderA4HeaderHtml(summary: A4LayoutSummary, headerHeight: numbe
   const topic = String(summary.topic || "Без заголовка").toUpperCase();
   const summaryText = summary.summary || "";
   const meta = metaText(summary);
-  return `<article class="a4-card a4-header-card" style="--a4-header-h:${Math.round(headerHeight)}px; --a4-header-title-font:26.07px; --a4-header-summary-font:14px; --a4-header-title-line:33px; --a4-header-summary-line:18px;">
+  return `<article class="a4-card a4-header-card" style="--a4-header-h:${Math.round(headerHeight)}px; --a4-header-meta-inset:${A4_HEADER_META_INSET_PX}px; --a4-header-title-font:${A4_HEADER_TITLE_FONT_BASE}px; --a4-header-summary-font:${A4_HEADER_SUMMARY_FONT_BASE}px; --a4-header-title-line:${A4_HEADER_TITLE_LINE_BASE}px; --a4-header-summary-line:${A4_HEADER_SUMMARY_LINE_BASE}px;">
     ${meta ? `<div class="a4-header-meta">${escapeHtml(meta)}</div>` : ""}
     <div class="a4-header-main">
       <div class="a4-header-title">${escapeHtml(topic)}</div>

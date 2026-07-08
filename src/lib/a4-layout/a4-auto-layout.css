@@ -94,6 +94,7 @@
   height: var(--a4-header-h, auto);
   min-height: 0;
   max-height: none;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -120,9 +121,9 @@
 }
 
 .a4-auto-layout-root .a4-header-title {
-  font-size: var(--a4-header-title-font, 26px);
-  line-height: var(--a4-header-title-line, 33px);
-  font-weight: 700;
+  font-size: var(--a4-header-title-font, 31px);
+  line-height: var(--a4-header-title-line, 40px);
+  font-weight: 600;
   text-transform: uppercase;
   color: var(--a4-header-title, #ffffff);
   margin: 0 0 6px;
@@ -139,6 +140,9 @@
 }
 
 .a4-auto-layout-root .a4-header-meta {
+  position: absolute;
+  top: 12px;
+  right: var(--a4-header-meta-inset, 12px);
   display: inline-flex;
   align-items: center;
   min-height: 28px;
@@ -153,9 +157,8 @@
   text-transform: uppercase;
   letter-spacing: 0.02em;
   white-space: nowrap;
-  align-self: flex-end;
-  margin-top: 0;
-  margin-bottom: 6px;
+  margin: 0;
+  z-index: 1;
 }
 
 .a4-auto-layout-root .a4-title-pill {
@@ -219,6 +222,13 @@
   background: var(--a4-accent-bg, var(--a4-spot-accent, #0c71c9));
   border-radius: 4px;
   padding: 0 0.15em;
+}
+
+.a4-auto-layout-root.a4-accent-plain .a4-body .accent {
+  color: var(--a4-spot-accent, #0c71c9);
+  background: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .a4-auto-layout-root .a4-addendum-zone {

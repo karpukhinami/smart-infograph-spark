@@ -12,10 +12,8 @@ import type { A4AutoLayoutResult } from "@/lib/a4-layout";
 import {
   A4_DOM_FIT_EXPORT_OPTIONS,
   A4_DOM_FIT_SCREEN_OPTIONS,
-  captureA4FitStyles,
   checkA4Overflow,
   exportA4LayoutPng,
-  restoreA4FitStyles,
   runA4DomFit,
 } from "@/lib/a4-layout";
 import {
@@ -26,6 +24,7 @@ import {
 import { a4CardSurfaceClass, buildA4ProfileThemeStyle } from "@/lib/a4-layout/profile-theme";
 import { downloadLayoutPng } from "@/lib/download-infographic";
 import type { DesignProfile } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import "@/lib/a4-layout/a4-auto-layout.css";
 
 export interface A4LayoutCanvasHandle {
@@ -41,6 +40,8 @@ interface Props {
   manualErrors?: string[];
   /** Prefix for exported PNG filename, e.g. «авто-макет». */
   exportKind?: string;
+  /** When false, span.accent uses accent color only (no filled background). */
+  accentHighlightText?: boolean;
 }
 
 function typesetFormulas(root: HTMLElement) {
@@ -61,6 +62,19 @@ function typesetFormulas(root: HTMLElement) {
   });
 }
 
+async function typesetFormulasAndWait(root: HTMLElement, timeoutMs = 4000): Promise<void> {
+  typesetFormulas(root);
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    let pending = false;
+    root.querySelectorAll<HTMLElement>(".a4-formula p, .a4-side-formula").forEach((node) => {
+      if (node.textContent?.trim() && !node.querySelector(".katex")) pending = true;
+    });
+    if (!pending) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
 export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A4LayoutCanvas(
   {
     layout,
@@ -70,6 +84,7 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
     modeNoteClassName = "a4-layout-mode-note",
     manualErrors,
     exportKind = "макет",
+    accentHighlightText = true,
   },
   ref,
 ) {
@@ -148,39 +163,49 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
       toast.error("Откройте вкладку с макетом перед экспортом");
       return;
     }
+
+    const host = document.createElement("div");
+    host.setAttribute("aria-hidden", "true");
+    Object.assign(host.style, {
+      position: "fixed",
+      left: "-20000px",
+      top: "0",
+      width: `${settings.pageWidthPx}px`,
+      height: `${settings.pageHeightPx}px`,
+      overflow: "visible",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+
+    const wrapper = document.createElement("div");
+    wrapper.className = cn("a4-auto-layout-root", !accentHighlightText && "a4-accent-plain");
+    const clone = frame.cloneNode(true) as HTMLElement;
+    wrapper.appendChild(clone);
+    host.appendChild(wrapper);
+    document.body.appendChild(host);
+
     try {
-      const root = rootRef.current;
-      const shell = frame.parentElement;
-      if (!root) return;
+      runA4DomFit(clone, rowTargets, true, exportFitOptions);
+      await typesetFormulasAndWait(clone);
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-      const savedStyles = captureA4FitStyles(root);
-      const prevTransform = shell?.style.transform ?? "";
-
-      if (shell) shell.style.transform = "none";
-
-      try {
-        runA4DomFit(root, rowTargets, true, exportFitOptions);
-        typesetFormulas(root);
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-        const dataUrl = await exportA4LayoutPng(frame);
-        downloadLayoutPng(dataUrl, exportKind, summary.topic);
-        toast.success("PNG сохранён");
-      } finally {
-        restoreA4FitStyles(savedStyles);
-        if (shell) shell.style.transform = prevTransform;
-        runA4DomFit(root, rowTargets, true, screenFitOptions);
-        checkA4Overflow(root);
-      }
+      const dataUrl = await exportA4LayoutPng(clone);
+      downloadLayoutPng(dataUrl, exportKind, summary.topic);
+      toast.success("PNG сохранён");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось экспортировать PNG");
+    } finally {
+      document.body.removeChild(host);
     }
-  }, [active, exportFitOptions, exportKind, rowTargets, screenFitOptions, summary.topic]);
+  }, [accentHighlightText, active, exportFitOptions, exportKind, rowTargets, settings.pageHeightPx, settings.pageWidthPx, summary.topic]);
 
   useImperativeHandle(ref, () => ({ exportPng }), [exportPng]);
 
   return (
-    <div ref={rootRef} className="a4-auto-layout-root">
+    <div
+      ref={rootRef}
+      className={cn("a4-auto-layout-root", !accentHighlightText && "a4-accent-plain")}
+    >
       {modeNote ? <div className={modeNoteClassName}>{modeNote}</div> : null}
 
       {manualErrors && manualErrors.length > 0 ? (

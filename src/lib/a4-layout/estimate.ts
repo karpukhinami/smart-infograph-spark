@@ -1,4 +1,11 @@
 import { PX_WIDTH_KEYS, WIDTHS, isWideCardFraction } from "@/lib/a4-layout/constants";
+import {
+  A4_HEADER_SIDE_PADDING_PX,
+  A4_HEADER_SUMMARY_FONT_BASE,
+  A4_HEADER_SUMMARY_LINE_BASE,
+  A4_HEADER_TITLE_FONT_BASE,
+  A4_HEADER_TITLE_LINE_BASE,
+} from "@/lib/a4-layout/dom-fit";
 import type { A4LayoutSettings, A4LayoutSummary, EntityHint, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
 import { asArray, flattenText, stripHtmlTags, textStats } from "@/lib/a4-layout/text";
 
@@ -338,11 +345,11 @@ export function analyzeEntity(entity: LayoutEntity, index: number, s: A4LayoutSe
 }
 
 export function estimateHeaderMetrics(summary: A4LayoutSummary, _s: A4LayoutSettings) {
-  const titleFontPx = 26.07;
-  const titleLinePx = 33;
-  const summaryFontPx = 14;
-  const summaryLinePx = 18;
-  const sidePaddingPx = 40;
+  const titleFontPx = A4_HEADER_TITLE_FONT_BASE;
+  const titleLinePx = A4_HEADER_TITLE_LINE_BASE;
+  const summaryFontPx = A4_HEADER_SUMMARY_FONT_BASE;
+  const summaryLinePx = A4_HEADER_SUMMARY_LINE_BASE;
+  const sidePaddingPx = A4_HEADER_SIDE_PADDING_PX;
   const topPaddingPx = 12;
   const bottomPaddingPx = 12;
   const hasMeta = Boolean(summary.subject || summary.grade);
@@ -358,7 +365,12 @@ export function estimateHeaderMetrics(summary: A4LayoutSummary, _s: A4LayoutSett
   const summaryLines = summaryText ? Math.max(1, Math.ceil(summaryText.length / summaryCharsPerLine)) : 0;
 
   const height = Math.round(
-    topPaddingPx + metaHeightPx + metaGapPx + titleLines * titleLinePx + (summaryLines ? 4 + summaryLines * summaryLinePx : 0) + bottomPaddingPx,
+    topPaddingPx +
+      metaHeightPx +
+      metaGapPx +
+      titleLines * titleLinePx +
+      (summaryLines ? 4 + summaryLines * summaryLinePx : 0) +
+      bottomPaddingPx,
   );
 
   return {
@@ -368,7 +380,7 @@ export function estimateHeaderMetrics(summary: A4LayoutSummary, _s: A4LayoutSett
     sidePaddingPx,
     topPaddingPx,
     bottomPaddingPx,
-    title: { fontSizePx: titleFontPx, lineHeightPx: titleLinePx, weight: 700, lines: titleLines },
+    title: { fontSizePx: titleFontPx, lineHeightPx: titleLinePx, weight: 600, lines: titleLines },
     summary: { fontSizePx: summaryFontPx, lineHeightPx: summaryLinePx, weight: 500, lines: summaryLines },
     meta: { exists: hasMeta, fontSizePx: 12, lineHeightPx: 14, radiusPx: 14 },
   };

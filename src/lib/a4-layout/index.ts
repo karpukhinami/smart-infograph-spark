@@ -71,7 +71,7 @@ export function buildA4ManualLayout(
 
 export * from "@/lib/a4-layout/types";
 export { DEFAULT_A4_SETTINGS } from "@/lib/a4-layout/settings";
-export { runA4DomFit, checkA4Overflow, applyA4HeaderFonts, captureA4FitStyles, restoreA4FitStyles, A4_DOM_FIT_SCREEN_OPTIONS, A4_DOM_FIT_EXPORT_OPTIONS } from "@/lib/a4-layout/dom-fit";
+export { runA4DomFit, checkA4Overflow, captureA4FitStyles, restoreA4FitStyles, A4_DOM_FIT_SCREEN_OPTIONS, A4_DOM_FIT_EXPORT_OPTIONS } from "@/lib/a4-layout/dom-fit";
 export { renderA4CardInner, renderA4CardClassName, renderA4HeaderHtml } from "@/lib/a4-layout/render";
 export { parseManualRatios, layoutPlanToManualRatiosText, fractionsToRatioLine } from "@/lib/a4-layout/manual-layout";
 export { buildAIInputJSON } from "@/lib/a4-layout/ai-input";

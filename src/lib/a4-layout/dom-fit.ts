@@ -23,11 +23,12 @@ interface CardMeasure {
   free: number;
 }
 
-export const A4_HEADER_TITLE_FONT_BASE = 26.07;
+export const A4_HEADER_TITLE_FONT_BASE = 26.07 * 1.2;
 export const A4_HEADER_SUMMARY_FONT_BASE = 14;
-export const A4_HEADER_TITLE_LINE_BASE = 33;
+export const A4_HEADER_TITLE_LINE_BASE = 33 * 1.2;
 export const A4_HEADER_SUMMARY_LINE_BASE = 18;
-export const A4_BODY_FONT_BASE = 10;
+export const A4_HEADER_SIDE_PADDING_PX = 40;
+export const A4_HEADER_META_INSET_PX = 12;
 
 /** Safety ceiling only — normal fitting stops on overflow long before this. */
 const A4_FIT_GROW_CEILING = 96;
@@ -60,10 +61,6 @@ const FIT_STYLE_PROPS = [
   "--gap-add-items",
   "--a4-card-pad-y",
   "--a4-card-pad-x",
-  "--a4-header-title-font",
-  "--a4-header-summary-font",
-  "--a4-header-title-line",
-  "--a4-header-summary-line",
 ] as const;
 
 function resolveMaxBodyFont(options: A4DomFitOptions): number {
@@ -160,43 +157,9 @@ function readFitState(card: HTMLElement): FitState {
   };
 }
 
-function maxCardBodyFont(root: HTMLElement): number {
-  let max = A4_BODY_FONT_BASE;
-  root.querySelectorAll('.a4-card[data-a4-fit-card="1"]').forEach((card) => {
-    const body = Number.parseFloat(getComputedStyle(card as HTMLElement).getPropertyValue("--body-font")) || A4_BODY_FONT_BASE;
-    max = Math.max(max, body);
-  });
-  return max;
-}
-
-function setHeaderFontScale(header: HTMLElement, scale: number) {
-  header.style.setProperty("--a4-header-title-font", `${A4_HEADER_TITLE_FONT_BASE * scale}px`);
-  header.style.setProperty("--a4-header-summary-font", `${A4_HEADER_SUMMARY_FONT_BASE * scale}px`);
-  header.style.setProperty("--a4-header-title-line", `${A4_HEADER_TITLE_LINE_BASE * scale}px`);
-  header.style.setProperty("--a4-header-summary-line", `${A4_HEADER_SUMMARY_LINE_BASE * scale}px`);
-}
-
-/** Scale page header fonts proportionally to fitted card body size; shrink if header box overflows. */
-export function applyA4HeaderFonts(root: HTMLElement) {
-  const header = root.querySelector(".a4-header-card") as HTMLElement | null;
-  if (!header) return;
-
-  const maxBody = maxCardBodyFont(root);
-  let scale = maxBody / A4_BODY_FONT_BASE;
-  setHeaderFontScale(header, scale);
-
-  const main = header.querySelector(".a4-header-main") as HTMLElement | null;
-  if (!main) return;
-
-  for (let i = 0; i < 40 && main.scrollHeight > header.clientHeight - 4; i += 1) {
-    scale = Math.max(0.75, scale - 0.05);
-    setHeaderFontScale(header, scale);
-  }
-}
-
 export function captureA4FitStyles(root: HTMLElement): Map<HTMLElement, Record<string, string>> {
   const snapshot = new Map<HTMLElement, Record<string, string>>();
-  root.querySelectorAll('.a4-card[data-a4-fit-card="1"], .a4-header-card').forEach((node) => {
+  root.querySelectorAll('.a4-card[data-a4-fit-card="1"]').forEach((node) => {
     const el = node as HTMLElement;
     const props: Record<string, string> = {};
     FIT_STYLE_PROPS.forEach((prop) => {
@@ -460,7 +423,6 @@ export function runA4DomFit(
   } else {
     cards.forEach((card) => a4GrowCardToFill(card, readFitState(card), options));
   }
-  applyA4HeaderFonts(root);
 
   const overflowCount = results.filter((r) => r.measure.overflow).length;
   const freeTotal = results.reduce((sum, r) => sum + Math.max(0, r.measure.free), 0);

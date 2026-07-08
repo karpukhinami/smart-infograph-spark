@@ -63,7 +63,7 @@ export function buildA4ProfileThemeStyle(profile: DesignProfile | null | undefin
   return {
     ["--a4-bg" as string]: c.backgroundColor,
     ["--a4-header-bg" as string]: c.headerColor,
-    ["--a4-header-meta-bg" as string]: mixHex(c.headerColor, c.detailSoftColor, 0.5),
+    ["--a4-header-meta-bg" as string]: mixHex(c.headerColor, "#FFFFFF", 0.8),
     ["--a4-header-title" as string]: c.lightTextColor,
     ["--a4-header-muted" as string]: c.mutedheaderTextColor,
     ["--a4-card-core" as string]: c.primaryColor,

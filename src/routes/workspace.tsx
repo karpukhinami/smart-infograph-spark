@@ -113,6 +113,7 @@ function Workspace() {
   const [manualLayoutTemplate, setManualLayoutTemplate] = useState("");
   const [manualBalanceRowFonts, setManualBalanceRowFonts] = useState(true);
   const [manualAllowAddendumRight, setManualAllowAddendumRight] = useState(true);
+  const [manualAccentHighlightText, setManualAccentHighlightText] = useState(true);
   const [appliedManualLayout, setAppliedManualLayout] = useState<ManualLayoutApply | null>(null);
   const [autoLayoutEpoch, setAutoLayoutEpoch] = useState(0);
   const [aiLayoutResult, setAiLayoutResult] = useState<AILayoutResult | null>(null);
@@ -708,26 +709,36 @@ ${activeContent.value.content}`;
                     <code>1</code> — одна на всю ширину, <code>1:1</code> — две поровну, <code>1:2:1</code> — три в заданной пропорции.
                     Пустое поле при пересчёте — те же ряды, что в авто-макете.
                   </p>
-                  <div className="flex flex-col gap-3 pt-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <Label htmlFor="manual-balance-fonts" className="text-xs font-normal cursor-pointer">
-                        Подгонять размер шрифтов в ряду
-                      </Label>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
+                    <div className="flex items-center gap-2">
                       <Switch
                         id="manual-balance-fonts"
                         checked={manualBalanceRowFonts}
                         onCheckedChange={setManualBalanceRowFonts}
                       />
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <Label htmlFor="manual-addendum-right" className="text-xs font-normal cursor-pointer">
-                        Переносить аддендумы
+                      <Label htmlFor="manual-balance-fonts" className="text-xs font-normal cursor-pointer">
+                        Подгонять размер шрифтов в ряду
                       </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
                       <Switch
                         id="manual-addendum-right"
                         checked={manualAllowAddendumRight}
                         onCheckedChange={setManualAllowAddendumRight}
                       />
+                      <Label htmlFor="manual-addendum-right" className="text-xs font-normal cursor-pointer">
+                        Переносить аддендумы
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="manual-accent-highlight"
+                        checked={manualAccentHighlightText}
+                        onCheckedChange={setManualAccentHighlightText}
+                      />
+                      <Label htmlFor="manual-accent-highlight" className="text-xs font-normal cursor-pointer">
+                        Выделенный текст
+                      </Label>
                     </div>
                   </div>
                   <Button
@@ -892,6 +903,7 @@ ${activeContent.value.content}`;
                     active={paneMode === "auto-layout"}
                     profile={activeProfile}
                     manualApply={appliedManualLayout}
+                    accentHighlightText={manualAccentHighlightText}
                   />
                 </>
               ) : (
@@ -926,6 +938,7 @@ ${activeContent.value.content}`;
                     active={paneMode === "wireframe"}
                     profile={activeProfile}
                     exportKind="технический макет"
+                    accentHighlightText={manualAccentHighlightText}
                   />
                   {aiLayoutResult ? (
                     <details className="rounded-md border border-border bg-background/60 p-2">

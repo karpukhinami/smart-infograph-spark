@@ -17,10 +17,11 @@ interface Props {
   profile?: DesignProfile | null;
   /** When set, auto-layout tab shows manual preview (template may be empty = auto row ratios). */
   manualApply?: ManualLayoutApply | null;
+  accentHighlightText?: boolean;
 }
 
 export const A4AutoLayoutView = forwardRef<A4LayoutCanvasHandle, Props>(function A4AutoLayoutView(
-  { analysis, active, profile = null, manualApply = null },
+  { analysis, active, profile = null, manualApply = null, accentHighlightText = true },
   ref,
 ) {
   const layout = useMemo(() => {
@@ -49,6 +50,7 @@ export const A4AutoLayoutView = forwardRef<A4LayoutCanvasHandle, Props>(function
       modeNoteClassName="a4-layout-mode-note"
       manualErrors={layout.manualErrors}
       exportKind="авто-макет"
+      accentHighlightText={accentHighlightText}
     />
   );
 });
