@@ -51,7 +51,8 @@ Addendum rules by card width:
 
 Combining addendums:
 - You may merge multiple source items into fewer addendum items (maximum 4 items total).
-- When merged into one item (single or stack), you may put short pieces on one line separated by commas or semicolons if that reads better than separate lines; otherwise put each piece on its own line using <br>.
+- IMPORTANT — prefer compact combined lines when pedagogically safe: if there are more than two short formulas and/or short addendum fragments, first ask whether each piece truly needs its own line for clarity. If separate lines are not strongly necessary, merge them into ONE combined addendum item on a single line, separating pieces with commas or semicolons (e.g. short formulas like $x=0$, $y=0$, $z=0$ → one line: $x=0$, $y=0$, $z=0$). Use separate lines (<br>) only when items are long, structurally distinct, or must be read as separate steps.
+- When merged into one item (single or stack) on one line, short pieces may be comma- or semicolon-separated; when separate lines are justified, put each piece on its own line using <br>.
 - When items stay separate (row/grid), each item is its own inset; render order is left to right, then top to bottom.
 
 Relocating addendum content into main text:

@@ -16,7 +16,7 @@ import {
   exportA4LayoutPng,
   runA4DomFit,
 } from "@/lib/a4-layout";
-import { typesetA4FormulasAndWait } from "@/lib/a4-layout/katex-typeset";
+import { needsA4FormulaTypeset, refitA4BlockFormulas, typesetA4FormulasAndWait } from "@/lib/a4-layout/katex-typeset";
 import {
   renderA4CardClassName,
   renderA4CardInner,
@@ -87,10 +87,18 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
     [domFitOptions?.allowAddendumRight, domFitOptions?.balanceRowFonts],
   );
 
-  const runDomFit = useCallback(() => {
+  const runLayoutSync = useCallback(async () => {
     const root = rootRef.current;
-    if (!root || !active) return;
+    if (!root) return;
+    await typesetA4FormulasAndWait(root);
+    if (!active) return;
     runA4DomFit(root, rowTargets, true, screenFitOptions);
+    checkA4Overflow(root);
+    refitA4BlockFormulas(root);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    if (!rootRef.current || !active) return;
+    runA4DomFit(root, rowTargets, true, screenFitOptions);
+    refitA4BlockFormulas(root);
     checkA4Overflow(root);
   }, [active, rowTargets, screenFitOptions]);
 
@@ -112,19 +120,28 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
   }, [settings.pageWidthPx]);
 
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
+    let cancelled = false;
 
-    const afterTypeset = async () => {
+    const sync = async () => {
+      await runLayoutSync();
+      if (cancelled) return;
+      const root = rootRef.current;
+      if (!root || !needsA4FormulaTypeset(root)) return;
       await typesetA4FormulasAndWait(root);
-      runDomFit();
-      requestAnimationFrame(() => runDomFit());
+      if (cancelled || !active || !rootRef.current) return;
+      runA4DomFit(root, rowTargets, true, screenFitOptions);
+      refitA4BlockFormulas(root);
+      checkA4Overflow(root);
     };
 
     requestAnimationFrame(() => {
-      void afterTypeset();
+      void sync();
     });
-  }, [layout, rowTargets, active, profile?.profileName, screenFitOptions, runDomFit]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [layout, rowTargets, active, profile?.profileName, screenFitOptions, runLayoutSync]);
 
   const exportPng = useCallback(async () => {
     const frame = frameRef.current;

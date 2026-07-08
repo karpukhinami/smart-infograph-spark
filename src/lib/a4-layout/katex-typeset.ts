@@ -5,6 +5,9 @@ type KatexApi = typeof katexType;
 const INLINE_MATH_RE =
   /\$\$([\s\S]+?)\$\$|(?<!\$)\$(?!\$)((?:\\.|[^$\\])+?)\$(?!\$)|\\\(([\s\S]+?)\\\)|\\\[([\s\S]+?)\\\]/g;
 
+const INLINE_MATH_TEST_RE =
+  /\$\$[\s\S]+?\$\$|(?<!\$)\$(?!\$)(?:\\.|[^$\\])+?\$(?!\$)|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]/;
+
 const BLOCK_FORMULA_SELECTOR = ".a4-formula p, .a4-side-formula";
 const INLINE_TEXT_ROOT_SELECTOR = ".a4-body, .a4-addendum-item, .a4-header-summary";
 
@@ -28,6 +31,10 @@ export function stripLatexDelimiters(raw: string): string {
   const bracket = x.match(/^\\\[([\s\S]*?)\\\]$/);
   if (bracket) return bracket[1].trim();
   return x;
+}
+
+function textNeedsInlineTypeset(text: string): boolean {
+  return INLINE_MATH_TEST_RE.test(text);
 }
 
 function tryBreakWideFormulaAtPlus(latex: string): string {
@@ -57,6 +64,7 @@ function shrinkKatexToFit(katexEl: HTMLElement, container: HTMLElement) {
   const maxW = Math.max(0, container.clientWidth - 4);
   if (maxW <= 0) return;
 
+  katexEl.style.fontSize = "";
   let fontSize = Number.parseFloat(getComputedStyle(katexEl).fontSize) || 10;
   const baseFont = fontSize;
   const minFont = Math.max(6, baseFont * 0.55);
@@ -65,6 +73,10 @@ function shrinkKatexToFit(katexEl: HTMLElement, container: HTMLElement) {
     fontSize -= 0.5;
     katexEl.style.fontSize = `${fontSize}px`;
   }
+}
+
+export function refitA4BlockFormulas(root: HTMLElement) {
+  fitBlockKatex(root);
 }
 
 function fitBlockKatex(root: HTMLElement) {
@@ -95,11 +107,13 @@ function fitBlockKatex(root: HTMLElement) {
 
 function typesetBlockFormulas(root: HTMLElement, katex: KatexApi) {
   root.querySelectorAll<HTMLElement>(BLOCK_FORMULA_SELECTOR).forEach((node) => {
-    if (node.querySelector(".katex")) return;
     const raw = node.textContent?.trim();
     if (!raw) return;
+    if (node.querySelector(".katex") && !textNeedsInlineTypeset(raw) && !raw.includes("$")) return;
+
     const latex = stripLatexDelimiters(raw);
     node.dataset.a4LatexSource = latex;
+    node.dataset.a4KatexRetried = "";
     node.textContent = "";
     renderKatex(node, latex, true, katex);
   });
@@ -107,7 +121,7 @@ function typesetBlockFormulas(root: HTMLElement, katex: KatexApi) {
 
 function typesetInlineMathInTextNode(textNode: Text, katex: KatexApi) {
   const text = textNode.textContent || "";
-  if (!text.includes("$") && !text.includes("\\(") && !text.includes("\\[")) return;
+  if (!textNeedsInlineTypeset(text)) return;
 
   INLINE_MATH_RE.lastIndex = 0;
   if (!INLINE_MATH_RE.test(text)) return;
@@ -162,18 +176,22 @@ function typesetInlineMath(root: HTMLElement, katex: KatexApi) {
   textNodes.forEach((node) => typesetInlineMathInTextNode(node, katex));
 }
 
-function hasPendingKatex(root: HTMLElement): boolean {
+export function needsA4FormulaTypeset(root: HTMLElement): boolean {
   let pending = false;
   root.querySelectorAll<HTMLElement>(BLOCK_FORMULA_SELECTOR).forEach((node) => {
-    if (node.textContent?.trim() && !node.querySelector(".katex")) pending = true;
+    const raw = node.textContent?.trim() || "";
+    if (!raw) return;
+    if (!node.querySelector(".katex") || raw.includes("$") || textNeedsInlineTypeset(raw)) pending = true;
   });
+  if (pending) return true;
+
   root.querySelectorAll(INLINE_TEXT_ROOT_SELECTOR).forEach((container) => {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
     let current = walker.nextNode();
     while (current) {
       const text = (current as Text).textContent || "";
       const parent = (current as Text).parentElement;
-      if (parent && !parent.closest(".katex, .a4-formula, .a4-side-formula") && INLINE_MATH_RE.test(text)) {
+      if (parent && !parent.closest(".katex, .a4-formula, .a4-side-formula") && textNeedsInlineTypeset(text)) {
         pending = true;
         break;
       }
@@ -183,26 +201,25 @@ function hasPendingKatex(root: HTMLElement): boolean {
   return pending;
 }
 
+async function typesetA4FormulasSync(root: HTMLElement, katex: KatexApi) {
+  typesetBlockFormulas(root, katex);
+  typesetInlineMath(root, katex);
+  fitBlockKatex(root);
+}
+
 export function typesetA4Formulas(root: HTMLElement) {
-  void loadKatex().then((katex) => {
-    typesetBlockFormulas(root, katex);
-    typesetInlineMath(root, katex);
-    requestAnimationFrame(() => fitBlockKatex(root));
-  });
+  void loadKatex().then((katex) => typesetA4FormulasSync(root, katex));
 }
 
 export async function typesetA4FormulasAndWait(root: HTMLElement, timeoutMs = 4000): Promise<void> {
-  typesetA4Formulas(root);
+  const katex = await loadKatex();
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (!hasPendingKatex(root)) {
-      await loadKatex();
-      fitBlockKatex(root);
-      return;
-    }
+    await typesetA4FormulasSync(root, katex);
+    if (!needsA4FormulaTypeset(root)) return;
     await new Promise((r) => setTimeout(r, 50));
   }
-  fitBlockKatex(root);
+  await typesetA4FormulasSync(root, katex);
 }
 
 export async function waitForA4FormulaTypeset(root: HTMLElement, timeoutMs = 4000): Promise<void> {
