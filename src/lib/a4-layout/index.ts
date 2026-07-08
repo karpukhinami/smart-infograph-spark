@@ -35,11 +35,14 @@ function prepareHints(analysis: AnalysisJson): {
   return { summary, hints, settings };
 }
 
-export function buildA4AutoLayout(analysis: AnalysisJson): A4AutoLayoutResult {
+export function buildA4AutoLayout(
+  analysis: AnalysisJson,
+  domFitOptions: A4DomFitOptions = DEFAULT_A4_DOM_FIT_OPTIONS,
+): A4AutoLayoutResult {
   const { summary, hints, settings } = prepareHints(analysis);
   const plan = optimizeRows(hints, settings);
   const rowTargets = computeA4RowTargets(plan, settings, summary);
-  return { summary, plan, settings, rowTargets, domFitOptions: DEFAULT_A4_DOM_FIT_OPTIONS };
+  return { summary, plan, settings, rowTargets, domFitOptions };
 }
 
 export function buildA4ManualLayout(

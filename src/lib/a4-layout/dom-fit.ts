@@ -78,7 +78,7 @@ function a4DefaultFitState(font = 10): FitState {
     addPadY: 8,
     addPadX: 12,
     gapTitleBody: 18,
-    gapBodyAdd: 18,
+    gapBodyAdd: 10,
     gapAddItems: 9,
     cardPadY: 12,
     cardPadX: 12,
@@ -211,7 +211,7 @@ function a4FitCardIndependent(card: HTMLElement, options: A4DomFitOptions) {
   function growFromStandard(baseState: FitState) {
     let previous = { state: { ...baseState }, measure: a4MeasureCard(card), stage: "base" };
     for (let font = 10.25; font <= maxFont; font += 0.25) {
-      const st = a4NormalizeTitlePadding(card, { ...a4DefaultFitState(font), cardPadY: 12, cardPadX: 12, gapTitleBody: 18, gapBodyAdd: 18 });
+      const st = a4NormalizeTitlePadding(card, { ...a4DefaultFitState(font), cardPadY: 12, cardPadX: 12, gapTitleBody: 18, gapBodyAdd: 10 });
       a4ApplyFitState(card, st);
       const m = a4MeasureCard(card);
       if (m.overflow) break;
@@ -244,7 +244,7 @@ function a4FitCardIndependent(card: HTMLElement, options: A4DomFitOptions) {
 
   if (!best) {
     for (let font = 10; font >= A4_FIT_MIN.bodyFont; font -= 0.25) {
-      const st = a4NormalizeTitlePadding(card, { ...a4DefaultFitState(font), cardPadY: 12, cardPadX: 12, gapTitleBody: 18, gapBodyAdd: 18 });
+      const st = a4NormalizeTitlePadding(card, { ...a4DefaultFitState(font), cardPadY: 12, cardPadX: 12, gapTitleBody: 18, gapBodyAdd: 10 });
       a4ApplyFitState(card, st);
       const m = a4MeasureCard(card);
       if (!m.overflow) {
@@ -300,7 +300,7 @@ function a4GrowCardToFill(card: HTMLElement, baseState: FitState, options: A4Dom
 
   for (const gapTitle of [18, 22, 26, 30, 34, 38, 42]) {
     if (gapTitle <= best.gapTitleBody) continue;
-    const st = { ...best, gapTitleBody: gapTitle, gapBodyAdd: Math.max(best.gapBodyAdd, gapTitle - 4) };
+    const st = { ...best, gapTitleBody: gapTitle };
     a4ApplyFitState(card, st);
     if (a4MeasureCard(card).overflow) break;
     best = { ...st };
@@ -342,7 +342,6 @@ function a4GrowRowTogether(cards: HTMLElement[], options: A4DomFitOptions) {
     const trial = bestStates.map((s) => ({
       ...s,
       gapTitleBody: Math.max(s.gapTitleBody, gapTitle),
-      gapBodyAdd: Math.max(s.gapBodyAdd, gapTitle - 4),
     }));
     trial.forEach((st, i) => a4ApplyFitState(cards[i], st));
     if (cards.some((card) => a4MeasureCard(card).overflow)) break;
@@ -350,6 +349,26 @@ function a4GrowRowTogether(cards: HTMLElement[], options: A4DomFitOptions) {
   }
 
   bestStates.forEach((st, i) => a4ApplyFitState(cards[i], st));
+}
+
+function a4TightenAddendumGaps(root: HTMLElement) {
+  root.querySelectorAll('.a4-card[data-a4-fit-card="1"]').forEach((node) => {
+    const card = node as HTMLElement;
+    if (!card.querySelector(".a4-addendum-zone")) return;
+
+    let state = readFitState(card);
+    const minGap = A4_FIT_MIN.gapBodyAdd;
+    for (let gap = state.gapBodyAdd; gap > minGap; gap -= 2) {
+      const trial = { ...state, gapBodyAdd: gap };
+      a4ApplyFitState(card, trial);
+      if (!a4MeasureCard(card).overflow) {
+        state = trial;
+      } else {
+        break;
+      }
+    }
+    a4ApplyFitState(card, state);
+  });
 }
 
 function a4FillVerticalSpace(root: HTMLElement, options: A4DomFitOptions) {
@@ -389,7 +408,7 @@ function normalizeRowFontSpread(root: HTMLElement) {
           addPadY: 8,
           addPadX: 12,
           gapTitleBody: 18,
-          gapBodyAdd: 18,
+          gapBodyAdd: Number.parseFloat(getComputedStyle(card).getPropertyValue("--gap-body-add")) || 10,
           gapAddItems: 9,
           cardPadY: 12,
           cardPadX: 12,
@@ -423,6 +442,7 @@ export function runA4DomFit(
   } else {
     cards.forEach((card) => a4GrowCardToFill(card, readFitState(card), options));
   }
+  a4TightenAddendumGaps(root);
 
   const overflowCount = results.filter((r) => r.measure.overflow).length;
   const freeTotal = results.reduce((sum, r) => sum + Math.max(0, r.measure.free), 0);

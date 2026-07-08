@@ -67,7 +67,10 @@ You may only change formatting: bold, accent highlights, line breaks, list struc
 content must be HTML using only:
 <p>, <br>, <b>, <ul>, <ol>, <li>, <span class="accent">.
 Do not use div, style attributes, or other class names.
-Wrap the most important phrase in main content with <span class="accent">…</span> when it helps pedagogy.
+
+Lists: if the main text or an addendum is clearly a list by meaning (enumeration, steps, classification items, parallel facts), format it as a list — use <ul>/<ol>/<li> or, inside a single paragraph, bullet circles (•) with consistent punctuation at the end of each item. Do not leave list-like content as one dense paragraph.
+
+Accent span: use <span class="accent">…</span> only for a single word or short phrase (2–4 words) that must stand out pedagogically. Never wrap a whole sentence, a clause, or a large part of a sentence. Use it sparingly and only when highlighting one specific term or wording is truly important.
 
 Do not duplicate list numbering inside <ol>/<ul> (no "1. item" inside <li>).
 

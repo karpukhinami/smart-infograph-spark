@@ -118,7 +118,7 @@ function Workspace() {
   const [autoLayoutEpoch, setAutoLayoutEpoch] = useState(0);
   const [aiLayoutResult, setAiLayoutResult] = useState<AILayoutResult | null>(null);
   const autoLayoutCanvasRef = useRef<A4LayoutCanvasHandle>(null);
-  const wireframeLayoutCanvasRef = useRef<A4LayoutCanvasHandle>(null);
+  const aiLayoutCanvasRef = useRef<A4LayoutCanvasHandle>(null);
   const [layoutExporting, setLayoutExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -166,6 +166,14 @@ function Workspace() {
     manualAllowAddendumRight,
   ]);
 
+  const layoutDomFitOptions = useMemo(
+    () => ({
+      balanceRowFonts: manualBalanceRowFonts,
+      allowAddendumRight: manualAllowAddendumRight,
+    }),
+    [manualBalanceRowFonts, manualAllowAddendumRight],
+  );
+
   function onRecalculateManualLayout() {
     const contentVer = getActiveContentVersion();
     if (!contentVer?.value.analysis) {
@@ -174,8 +182,6 @@ function Workspace() {
     }
     setAppliedManualLayout({
       template: manualLayoutTemplate.trim(),
-      balanceRowFonts: manualBalanceRowFonts,
-      allowAddendumRight: manualAllowAddendumRight,
     });
     setPaneMode("auto-layout");
     toast.success(
@@ -353,7 +359,7 @@ function Workspace() {
       const raw = await callTextLLM({ model: models.brief, prompt });
       const parsed = normalizeAIResponse(raw);
       setAiLayoutResult(parsed);
-      setPaneMode("wireframe");
+      setPaneMode("ai-layout");
       toast.success("Технический макет от AI создан");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось создать технический макет");
@@ -818,7 +824,8 @@ ${activeContent.value.content}`;
             <TabsList>
               <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
               <TabsTrigger value="auto-layout" disabled={!activeContent?.value.analysis}>авто-макет</TabsTrigger>
-              <TabsTrigger value="wireframe" disabled={!activeBrief && !aiLayoutCanvas}>Каркас</TabsTrigger>
+              <TabsTrigger value="wireframe" disabled={!activeBrief}>Каркас</TabsTrigger>
+              <TabsTrigger value="ai-layout" disabled={!aiLayoutCanvas}>ИИ-макет</TabsTrigger>
               <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
 
@@ -903,6 +910,7 @@ ${activeContent.value.content}`;
                     active={paneMode === "auto-layout"}
                     profile={activeProfile}
                     manualApply={appliedManualLayout}
+                    domFitOptions={layoutDomFitOptions}
                     accentHighlightText={manualAccentHighlightText}
                   />
                 </>
@@ -912,46 +920,7 @@ ${activeContent.value.content}`;
             </TabsContent>
 
             <TabsContent value="wireframe" className="p-2 space-y-2">
-              {mode === "strict" && briefMode === "programmatic" && aiLayoutCanvas ? (
-                <>
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" onClick={onCreateAILayout} disabled={loading !== null || layoutExporting}>
-                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onExportLayout(wireframeLayoutCanvasRef)}
-                      disabled={loading !== null || layoutExporting || paneMode !== "wireframe"}
-                    >
-                      {layoutExporting ? (
-                        <Loader2 className="size-3.5 mr-1 animate-spin" />
-                      ) : (
-                        <Download className="size-3.5 mr-1" />
-                      )}
-                      Экспорт PNG
-                    </Button>
-                  </div>
-                  <A4LayoutCanvas
-                    ref={wireframeLayoutCanvasRef}
-                    layout={aiLayoutCanvas}
-                    active={paneMode === "wireframe"}
-                    profile={activeProfile}
-                    exportKind="технический макет"
-                    accentHighlightText={manualAccentHighlightText}
-                  />
-                  {aiLayoutResult ? (
-                    <details className="rounded-md border border-border bg-background/60 p-2">
-                      <summary className="cursor-pointer text-xs text-muted-foreground">
-                        Показать ответ модели (JSON)
-                      </summary>
-                      <pre className="mt-2 overflow-auto text-xs">
-                        {JSON.stringify(aiLayoutResult, null, 2)}
-                      </pre>
-                    </details>
-                  ) : null}
-                </>
-              ) : activeBrief ? (
+              {activeBrief ? (
                 <>
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="outline" onClick={() => setRefineStage("brief")} disabled={loading !== null}>
@@ -972,7 +941,52 @@ ${activeContent.value.content}`;
                   )}
                 </>
               ) : (
-                <EmptyState text="Создайте дизайн-бриф или технический макет, чтобы увидеть каркас." />
+                <EmptyState text="Создайте дизайн-бриф, чтобы увидеть каркас." />
+              )}
+            </TabsContent>
+
+            <TabsContent value="ai-layout" className="p-2 space-y-2">
+              {mode === "strict" && briefMode === "programmatic" && aiLayoutCanvas ? (
+                <>
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={onCreateAILayout} disabled={loading !== null || layoutExporting}>
+                      <RefreshCw className="size-3.5 mr-1" /> Перегенерировать
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onExportLayout(aiLayoutCanvasRef)}
+                      disabled={loading !== null || layoutExporting || paneMode !== "ai-layout"}
+                    >
+                      {layoutExporting ? (
+                        <Loader2 className="size-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <Download className="size-3.5 mr-1" />
+                      )}
+                      Экспорт PNG
+                    </Button>
+                  </div>
+                  <A4LayoutCanvas
+                    ref={aiLayoutCanvasRef}
+                    layout={aiLayoutCanvas}
+                    active={paneMode === "ai-layout"}
+                    profile={activeProfile}
+                    exportKind="технический макет"
+                    accentHighlightText={manualAccentHighlightText}
+                  />
+                  {aiLayoutResult ? (
+                    <details className="rounded-md border border-border bg-background/60 p-2">
+                      <summary className="cursor-pointer text-xs text-muted-foreground">
+                        Показать ответ модели (JSON)
+                      </summary>
+                      <pre className="mt-2 overflow-auto text-xs">
+                        {JSON.stringify(aiLayoutResult, null, 2)}
+                      </pre>
+                    </details>
+                  ) : null}
+                </>
+              ) : (
+                <EmptyState text="Создайте технический макет, чтобы увидеть ИИ-макет." />
               )}
             </TabsContent>
 

@@ -351,7 +351,7 @@ export function estimateHeaderMetrics(summary: A4LayoutSummary, _s: A4LayoutSett
   const summaryLinePx = A4_HEADER_SUMMARY_LINE_BASE;
   const sidePaddingPx = A4_HEADER_SIDE_PADDING_PX;
   const topPaddingPx = 12;
-  const bottomPaddingPx = 12;
+  const bottomPaddingPx = 16;
   const hasMeta = Boolean(summary.subject || summary.grade);
   const metaHeightPx = hasMeta ? 22 : 0;
   const metaGapPx = hasMeta ? 6 : 0;
@@ -380,7 +380,7 @@ export function estimateHeaderMetrics(summary: A4LayoutSummary, _s: A4LayoutSett
     sidePaddingPx,
     topPaddingPx,
     bottomPaddingPx,
-    title: { fontSizePx: titleFontPx, lineHeightPx: titleLinePx, weight: 600, lines: titleLines },
+    title: { fontSizePx: titleFontPx, lineHeightPx: titleLinePx, weight: 700, lines: titleLines },
     summary: { fontSizePx: summaryFontPx, lineHeightPx: summaryLinePx, weight: 500, lines: summaryLines },
     meta: { exists: hasMeta, fontSizePx: 12, lineHeightPx: 14, radiusPx: 14 },
   };
