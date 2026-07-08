@@ -1,7 +1,7 @@
 import { isWideCardFraction } from "@/lib/a4-layout/constants";
 import { sanitizeAIHtml } from "@/lib/a4-layout/sanitize-ai-html";
 import type { A4LayoutSettings, A4LayoutSummary, A4RenderOptions, LayoutEntity, WidthReport } from "@/lib/a4-layout/types";
-import { asArray, escapeHtml, flattenText, textStats } from "@/lib/a4-layout/text";
+import { asArray, escapeHtml, flattenText, formatLayoutHtmlText, normalizeLayoutBreaks, textStats } from "@/lib/a4-layout/text";
 import { metaText } from "@/lib/a4-layout/estimate";
 import {
   A4_HEADER_META_INSET_PX,
@@ -38,7 +38,7 @@ export function a4BodyHtml(entity: LayoutEntity): string {
     return `<div class="a4-body"><${tag}>${contentItems.map((item) => `<li>${escapeHtml(String(item).replace(/^\s*\d+[\.)]\s*/, ""))}</li>`).join("")}</${tag}></div>`;
   }
   const paragraphs = contentItems.join("\n\n").split(/\n{2,}/).filter(Boolean);
-  return `<div class="a4-body">${paragraphs.map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
+  return `<div class="a4-body">${paragraphs.map((p) => `<p>${formatLayoutHtmlText(p)}</p>`).join("")}</div>`;
 }
 
 function aiBodyHtml(entity: LayoutEntity): string {
@@ -48,15 +48,24 @@ function aiBodyHtml(entity: LayoutEntity): string {
   return `<div class="a4-body">${sanitizeAIHtml(html)}</div>`;
 }
 
-function a4IsLatexLike(value: string): boolean {
+function a4IsSingleLatexFormula(value: string): boolean {
   const t = String(value || "").trim();
-  return /^\$\$[\s\S]*\$\$$/.test(t) || /^\$[\s\S]*\$$/.test(t) || /^\\\([\s\S]*\\\)$/.test(t) || /^\\\[[\s\S]*\\\]$/.test(t);
+  if (!t) return false;
+  if (/<br\s*\/?>/i.test(t) || t.includes("\n")) return false;
+  const displayPairs = (t.match(/\$\$/g) || []).length;
+  if (displayPairs > 0 && displayPairs !== 2) return false;
+  return /^\$\$[\s\S]*\$\$$/.test(t) || /^\$[^$]+\$$/.test(t) || /^\\\([\s\S]*\\\)$/.test(t) || /^\\\[[\s\S]*\\\]$/.test(t);
+}
+
+function a4LatexBlockAttr(value: string): string {
+  return a4IsSingleLatexFormula(value) ? ' data-a4-latex="1"' : "";
 }
 
 function a4RenderAddendumItemContent(item: string, allowHtml = false): string {
   const text = String(item || "").trim();
-  if (a4IsLatexLike(text)) return escapeHtml(a4LatexText(text));
-  return allowHtml ? sanitizeAIHtml(text) : escapeHtml(text);
+  if (a4IsSingleLatexFormula(text)) return escapeHtml(a4LatexText(text));
+  if (allowHtml) return sanitizeAIHtml(normalizeLayoutBreaks(text));
+  return formatLayoutHtmlText(text);
 }
 
 function a4ExplicitAddendumHtml(
@@ -75,16 +84,27 @@ function a4ExplicitAddendumHtml(
   if (safeLayout === "row" && items.length > 3) safeLayout = "grid";
 
   if (safeLayout === "single") {
-    return `<div class="a4-addendum-item a4-addendum-combined"><p>${a4RenderAddendumItemContent(items.join("<br>"), allowHtml)}</p></div>`;
+    const attr = a4LatexBlockAttr(items[0] as string);
+    return `<div class="a4-addendum-item a4-addendum-combined${attr ? " a4-formula" : ""}"><p${attr}>${a4RenderAddendumItemContent(items.join("<br>"), allowHtml)}</p></div>`;
   }
 
   if (safeLayout === "stack") {
-    const content = items.map((item) => `<p>${a4RenderAddendumItemContent(item, allowHtml)}</p>`).join("");
+    const content = items
+      .map((item) => {
+        const attr = a4LatexBlockAttr(item as string);
+        return `<p${attr}>${a4RenderAddendumItemContent(item, allowHtml)}</p>`;
+      })
+      .join("");
     return `<div class="a4-addendum-item a4-addendum-combined">${content}</div>`;
   }
 
   const cls = safeLayout === "row" ? "a4-addendum-row" : "a4-addendum-grid";
-  return `<div class="${cls}">${items.map((item) => `<div class="a4-addendum-item"><p>${a4RenderAddendumItemContent(item, allowHtml)}</p></div>`).join("")}</div>`;
+  return `<div class="${cls}">${items
+    .map((item) => {
+      const attr = a4LatexBlockAttr(item as string);
+      return `<div class="a4-addendum-item${attr ? " a4-formula" : ""}"><p${attr}>${a4RenderAddendumItemContent(item, allowHtml)}</p></div>`;
+    })
+    .join("")}</div>`;
 }
 
 function a4FormulaHtml(value: unknown): string {
@@ -99,12 +119,12 @@ function a4AddendumHtml(value: unknown, fraction: number, placement: string): st
   const layout = a4ChooseAddendumLayout(items, fraction, placement);
 
   if (layout === "stack") {
-    const content = items.map((item) => `<p>${escapeHtml(item)}</p>`).join("");
+    const content = items.map((item) => `<p>${formatLayoutHtmlText(item)}</p>`).join("");
     return `<div class="a4-addendum-item a4-addendum-combined">${content}</div>`;
   }
 
   const cls = layout === "row" ? "a4-addendum-row" : "a4-addendum-grid";
-  return `<div class="${cls}">${items.map((item) => `<div class="a4-addendum-item"><p>${escapeHtml(item)}</p></div>`).join("")}</div>`;
+  return `<div class="${cls}">${items.map((item) => `<div class="a4-addendum-item"><p>${formatLayoutHtmlText(item)}</p></div>`).join("")}</div>`;
 }
 
 function a4SideFormulaAddendumHtml(formulaValue: unknown, addendumValue: unknown): string {
@@ -113,7 +133,7 @@ function a4SideFormulaAddendumHtml(formulaValue: unknown, addendumValue: unknown
   if (!formulaItems.length && !addItems.length) return "";
   const formula = formulaItems.map((v) => `<div class="a4-side-formula">${escapeHtml(a4LatexText(v))}</div>`).join("");
   const add = addItems.length
-    ? `<div class="a4-side-addendum">${addItems.map((v) => `<p>${escapeHtml(v)}</p>`).join("")}</div>`
+    ? `<div class="a4-side-addendum">${addItems.map((v) => `<p>${formatLayoutHtmlText(v)}</p>`).join("")}</div>`
     : "";
   return `<div class="a4-addendum-zone"><div class="a4-addendum-item a4-side-combined">${formula}${add}</div></div>`;
 }

@@ -8,7 +8,7 @@ const INLINE_MATH_RE =
 const INLINE_MATH_TEST_RE =
   /\$\$[\s\S]+?\$\$|(?<!\$)\$(?!\$)(?:\\.|[^$\\])+?\$(?!\$)|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]/;
 
-const BLOCK_FORMULA_SELECTOR = ".a4-formula p, .a4-side-formula";
+const BLOCK_FORMULA_SELECTOR = ".a4-formula p, .a4-side-formula, .a4-addendum-item p[data-a4-latex]";
 const INLINE_TEXT_ROOT_SELECTOR = ".a4-body, .a4-addendum-item, .a4-header-summary";
 
 let katexPromise: Promise<KatexApi> | null = null;
@@ -79,10 +79,16 @@ export function refitA4BlockFormulas(root: HTMLElement) {
   fitBlockKatex(root);
 }
 
+function formulaFitContainer(node: HTMLElement): HTMLElement {
+  return (
+    (node.closest(".a4-formula, .a4-side-formula") as HTMLElement | null) ??
+    (node.matches("p[data-a4-latex]") ? ((node.parentElement as HTMLElement | null) ?? node) : node)
+  );
+}
+
 function fitBlockKatex(root: HTMLElement) {
   root.querySelectorAll<HTMLElement>(BLOCK_FORMULA_SELECTOR).forEach((node) => {
-    const container = node.closest(".a4-formula, .a4-side-formula") as HTMLElement | null;
-    if (!container) return;
+    const container = formulaFitContainer(node);
     const katexEl = node.querySelector<HTMLElement>(".katex, .katex-display");
     if (!katexEl) return;
 
@@ -158,22 +164,24 @@ function typesetInlineMathInTextNode(textNode: Text, katex: KatexApi) {
   parent.replaceChild(frag, textNode);
 }
 
-function typesetInlineMath(root: HTMLElement, katex: KatexApi) {
-  const textNodes: Text[] = [];
-  root.querySelectorAll(INLINE_TEXT_ROOT_SELECTOR).forEach((container) => {
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-    let current = walker.nextNode();
-    while (current) {
-      const textNode = current as Text;
-      const parent = textNode.parentElement;
-      if (parent && !parent.closest(".katex, .a4-formula, .a4-side-formula")) {
-        textNodes.push(textNode);
-      }
-      current = walker.nextNode();
+function typesetInlineMathInElement(container: HTMLElement, katex: KatexApi) {
+  container.childNodes.forEach((child) => {
+    if (child.nodeType === Node.TEXT_NODE) {
+      typesetInlineMathInTextNode(child as Text, katex);
+      return;
     }
+    if (child.nodeType !== Node.ELEMENT_NODE) return;
+    const el = child as HTMLElement;
+    if (el.tagName === "BR" || el.closest(".katex, .a4-formula, .a4-side-formula, p[data-a4-latex]")) return;
+    typesetInlineMathInElement(el, katex);
   });
+}
 
-  textNodes.forEach((node) => typesetInlineMathInTextNode(node, katex));
+function typesetInlineMath(root: HTMLElement, katex: KatexApi) {
+  root.querySelectorAll(INLINE_TEXT_ROOT_SELECTOR).forEach((container) => {
+    if ((container as HTMLElement).matches?.("p[data-a4-latex]")) return;
+    typesetInlineMathInElement(container as HTMLElement, katex);
+  });
 }
 
 export function needsA4FormulaTypeset(root: HTMLElement): boolean {
@@ -191,7 +199,7 @@ export function needsA4FormulaTypeset(root: HTMLElement): boolean {
     while (current) {
       const text = (current as Text).textContent || "";
       const parent = (current as Text).parentElement;
-      if (parent && !parent.closest(".katex, .a4-formula, .a4-side-formula") && textNeedsInlineTypeset(text)) {
+      if (parent && !parent.closest(".katex, .a4-formula, .a4-side-formula, p[data-a4-latex]") && textNeedsInlineTypeset(text)) {
         pending = true;
         break;
       }

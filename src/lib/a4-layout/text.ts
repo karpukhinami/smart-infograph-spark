@@ -34,3 +34,14 @@ export function escapeHtml(s: unknown): string {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[ch] as string,
   );
 }
+
+/** Escape text but keep line breaks from <br> or newlines. */
+export function formatLayoutHtmlText(s: unknown): string {
+  const parts = String(s ?? "").split(/<br\s*\/?>|\n/gi);
+  return parts.map((part) => escapeHtml(part)).join("<br>");
+}
+
+/** Normalize escaped <br> markers from model/source text into real breaks. */
+export function normalizeLayoutBreaks(s: unknown): string {
+  return String(s ?? "").replace(/&lt;br\s*\/?&gt;/gi, "<br>");
+}
