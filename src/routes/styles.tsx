@@ -20,24 +20,26 @@ function StylesPage() {
   const reset = useSettingsStore((s) => s.resetStyles);
 
   return (
-    <div className="mx-auto max-w-5xl p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">
-          Стили инфографики — режим «{mode === "free" ? "вольный" : "строгий"}»
-        </h1>
-        <Button variant="outline" size="sm" onClick={reset}>
-          Сбросить к умолчаниям
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Стили хранятся отдельно для каждого режима. Для каждого стиля задаются общие
-        правила композиции и конкретные правила оформления отдельных элементов — они
-        подмешиваются в дизайн-бриф.
-      </p>
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-5xl p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-semibold">
+            Стили инфографики — режим «{mode === "free" ? "вольный" : "строгий"}»
+          </h1>
+          <Button variant="outline" size="sm" onClick={reset}>
+            Сбросить к умолчаниям
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Стили хранятся отдельно для каждого режима. Для каждого стиля задаются общие
+          правила композиции, конкретные правила оформления элементов и признаки стиля —
+          именно признаки используются в подборе стиля по кнопке «Определить стиль».
+        </p>
 
-      {styles.map((s) => (
-        <StyleEditor key={s.id} value={s} onChange={upsert} onToggle={toggle} />
-      ))}
+        {styles.map((s) => (
+          <StyleEditor key={s.id} value={s} onChange={upsert} onToggle={toggle} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -91,6 +93,16 @@ function StyleEditor({
           value={value.specificRules}
           onChange={(e) => onChange({ ...value, specificRules: e.target.value })}
           placeholder="При оформлении отдельных элементов руководствуйся следующими принципами…"
+        />
+      </div>
+
+      <div>
+        <Label className="text-xs">Признаки стиля (передаются в подбор стиля)</Label>
+        <Textarea
+          rows={6}
+          value={value.detectionFeatures ?? ""}
+          onChange={(e) => onChange({ ...value, detectionFeatures: e.target.value })}
+          placeholder="По каким признакам материала можно понять, что этот стиль подходит…"
         />
       </div>
     </div>
