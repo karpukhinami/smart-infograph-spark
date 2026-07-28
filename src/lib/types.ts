@@ -9,6 +9,8 @@ export interface InfographicStyle {
   generalRules: string;
   /** Specific element-level rules for this style. */
   specificRules: string;
+  /** Features used by the style-detection prompt to decide if this style fits the material. */
+  detectionFeatures: string;
 }
 
 export interface DesignProfileColors {

@@ -14,6 +14,7 @@ import promptStrictAnalysisWith from "@/data/prompts/strict/analysis-with-conten
 import promptStrictAnalysisTopic from "@/data/prompts/strict/analysis-topic-only.txt?raw";
 import promptStrictDesignBrief from "@/data/prompts/strict/design-brief.txt?raw";
 import promptStrictGeneralRules from "@/data/prompts/strict/general-rules.txt?raw";
+import promptStrictDetectStyle from "@/data/prompts/strict/detect-style.txt?raw";
 import { AI_LAYOUT_PROMPT } from "@/lib/a4-layout/ai-prompt";
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
@@ -27,6 +28,8 @@ interface PromptSet {
   generalRules: string;
   /** Strict-mode technical layout (AI A4) prompt. */
   codeBasedProduct: string;
+  /** Prompt for detecting the best-fitting infographic style. */
+  detectStyle: string;
 }
 
 interface SettingsState {
@@ -57,6 +60,7 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     designBrief: promptFreeDesignBrief,
     generalRules: promptFreeGeneralRules,
     codeBasedProduct: "",
+    detectStyle: "",
   },
   strict: {
     analysisWithContent: promptStrictAnalysisWith,
@@ -64,6 +68,7 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     designBrief: promptStrictDesignBrief,
     generalRules: promptStrictGeneralRules,
     codeBasedProduct: AI_LAYOUT_PROMPT,
+    detectStyle: promptStrictDetectStyle,
   },
 };
 
@@ -124,7 +129,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "infographic-settings",
-      version: 23,
+      version: 24,
 
       // Breaking shape change — drop persisted state from older versions.
       migrate: () => undefined as unknown as SettingsState,

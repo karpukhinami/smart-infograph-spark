@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, RefreshCw, RotateCcw, Upload, Sparkles, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Loader2, RefreshCw, RotateCcw, Upload, Sparkles, Download, Wand2 } from "lucide-react";
 import {
   useProjectStore,
   useActiveContent,
@@ -108,7 +109,8 @@ function Workspace() {
   const profiles = useSettingsStore((s) => s.profiles);
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
-  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine" | "ai-layout">(null);
+  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine" | "ai-layout" | "detect-style">(null);
+  const [detectResult, setDetectResult] = useState<{ explanation: string; styleName: string } | null>(null);
   const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
   const [manualLayoutTemplate, setManualLayoutTemplate] = useState("");
   const [manualBalanceRowFonts, setManualBalanceRowFonts] = useState(true);
@@ -250,6 +252,65 @@ function Workspace() {
     });
   }
 
+
+  // Default the workspace style selector to bento (or first enabled) once styles are known.
+  useEffect(() => {
+    if (selectedStyleId) return;
+    const bento = enabledStyles.find((s) => s.id === "modern-bento");
+    const fallback = bento?.id ?? enabledStyles[0]?.id;
+    if (fallback) setSelectedStyleId(fallback);
+  }, [selectedStyleId, enabledStyles, setSelectedStyleId]);
+
+  async function onDetectStyle() {
+    if (!prompts.detectStyle?.trim()) {
+      toast.error("Промпт подбора стиля пуст");
+      return;
+    }
+    if (enabledStyles.length === 0) {
+      toast.error("Нет активных стилей — включите хотя бы один на странице «Стили»");
+      return;
+    }
+    try {
+      setLoading("detect-style");
+      const stylesJson = JSON.stringify(
+        enabledStyles.map((s) => ({
+          id: s.id,
+          name: s.name,
+          detectionFeatures: s.detectionFeatures ?? "",
+        })),
+        null,
+        2,
+      );
+      const filled = prompts.detectStyle
+        .replaceAll("{{USER_INSTRUCTIONS}}", source.userInstructions || "(нет)")
+        .replaceAll("{{SOURCE_TEXT}}", buildSourceTextForPrompt(source.text, uploadedSourceText) || "(нет)")
+        .replaceAll("{{TOPIC}}", source.topic || "(не задана)")
+        .replaceAll("{{SUBJECT}}", source.subject || "(не задан)")
+        .replaceAll("{{GRADE}}", source.grade || "(не задан)")
+        .replaceAll("{{STYLES_JSON}}", stylesJson);
+      const imgs = attachedImages.length ? attachedImages : undefined;
+      const parsed = await callTextLLMForJson({
+        model: models.analysis,
+        prompt: filled,
+        label: "detect style",
+        schemaHint: 'Верни JSON-объект вида { "styleId": string, "explanation": string }.',
+        parse: (v) => v as { styleId: string; explanation: string },
+        images: imgs,
+      });
+      const match = enabledStyles.find((s) => s.id === parsed.styleId);
+      const fallback = enabledStyles.find((s) => s.id === "modern-bento") ?? enabledStyles[0];
+      const chosen = match ?? fallback;
+      if (chosen) setSelectedStyleId(chosen.id);
+      setDetectResult({
+        explanation: parsed.explanation || "(модель не вернула пояснение)",
+        styleName: chosen?.name ?? parsed.styleId,
+      });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось определить стиль");
+    } finally {
+      setLoading(null);
+    }
+  }
 
   async function onAnalyze() {
     try {
@@ -641,6 +702,40 @@ ${activeContent.value.content}`;
               onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }}
             />
           </div>
+
+          {/* Style detection panel */}
+          <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+            <div className="text-xs font-semibold">Стиль инфографики</div>
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedStyleId ?? ""}
+                onValueChange={setSelectedStyleId}
+              >
+                <SelectTrigger className="h-9 flex-1">
+                  <SelectValue placeholder="Выберите стиль" />
+                </SelectTrigger>
+                <SelectContent>
+                  {enabledStyles.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onDetectStyle}
+                disabled={loading !== null || !(source.topic?.trim() || hasSource)}
+              >
+                {loading === "detect-style" ? <Loader2 className="size-4 animate-spin mr-2" /> : <Wand2 className="size-4 mr-2" />}
+                Определить стиль
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              По кнопке модель анализирует исходные данные и признаки включённых стилей и предлагает подходящий.
+            </p>
+          </div>
+
+
 
 
           <PromptDisclosure
@@ -1037,6 +1132,20 @@ ${activeContent.value.content}`;
         onCancel={() => setRefineStage(null)}
         onSubmit={onRefineImage}
       />
+
+      <Dialog open={detectResult !== null} onOpenChange={(o) => { if (!o) setDetectResult(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Предложенный стиль: {detectResult?.styleName}</DialogTitle>
+            <DialogDescription className="whitespace-pre-wrap pt-2 text-sm text-foreground">
+              {detectResult?.explanation}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setDetectResult(null)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
