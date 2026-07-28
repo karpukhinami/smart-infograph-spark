@@ -253,6 +253,65 @@ function Workspace() {
   }
 
 
+  // Default the workspace style selector to bento (or first enabled) once styles are known.
+  useEffect(() => {
+    if (selectedStyleId) return;
+    const bento = enabledStyles.find((s) => s.id === "modern-bento");
+    const fallback = bento?.id ?? enabledStyles[0]?.id;
+    if (fallback) setSelectedStyleId(fallback);
+  }, [selectedStyleId, enabledStyles, setSelectedStyleId]);
+
+  async function onDetectStyle() {
+    if (!prompts.detectStyle?.trim()) {
+      toast.error("Промпт подбора стиля пуст");
+      return;
+    }
+    if (enabledStyles.length === 0) {
+      toast.error("Нет активных стилей — включите хотя бы один на странице «Стили»");
+      return;
+    }
+    try {
+      setLoading("detect-style");
+      const stylesJson = JSON.stringify(
+        enabledStyles.map((s) => ({
+          id: s.id,
+          name: s.name,
+          detectionFeatures: s.detectionFeatures ?? "",
+        })),
+        null,
+        2,
+      );
+      const filled = prompts.detectStyle
+        .replaceAll("{{USER_INSTRUCTIONS}}", source.userInstructions || "(нет)")
+        .replaceAll("{{SOURCE_TEXT}}", buildSourceTextForPrompt(source.text, uploadedSourceText) || "(нет)")
+        .replaceAll("{{TOPIC}}", source.topic || "(не задана)")
+        .replaceAll("{{SUBJECT}}", source.subject || "(не задан)")
+        .replaceAll("{{GRADE}}", source.grade || "(не задан)")
+        .replaceAll("{{STYLES_JSON}}", stylesJson);
+      const imgs = attachedImages.length ? attachedImages : undefined;
+      const parsed = await callTextLLMForJson({
+        model: models.analysis,
+        prompt: filled,
+        label: "detect style",
+        schemaHint: 'Верни JSON-объект вида { "styleId": string, "explanation": string }.',
+        parse: (v) => v as { styleId: string; explanation: string },
+        images: imgs,
+      });
+      const match = enabledStyles.find((s) => s.id === parsed.styleId);
+      const fallback = enabledStyles.find((s) => s.id === "modern-bento") ?? enabledStyles[0];
+      const chosen = match ?? fallback;
+      if (chosen) setSelectedStyleId(chosen.id);
+      setDetectResult({
+        explanation: parsed.explanation || "(модель не вернула пояснение)",
+        styleName: chosen?.name ?? parsed.styleId,
+      });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось определить стиль");
+    } finally {
+      setLoading(null);
+    }
+  }
+
   async function onAnalyze() {
     try {
       setLoading("analyze");
