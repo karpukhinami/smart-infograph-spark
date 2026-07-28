@@ -1132,6 +1132,20 @@ ${activeContent.value.content}`;
         onCancel={() => setRefineStage(null)}
         onSubmit={onRefineImage}
       />
+
+      <Dialog open={detectResult !== null} onOpenChange={(o) => { if (!o) setDetectResult(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Предложенный стиль: {detectResult?.styleName}</DialogTitle>
+            <DialogDescription className="whitespace-pre-wrap pt-2 text-sm text-foreground">
+              {detectResult?.explanation}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setDetectResult(null)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
