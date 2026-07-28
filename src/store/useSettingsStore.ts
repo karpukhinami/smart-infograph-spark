@@ -28,6 +28,8 @@ interface PromptSet {
   generalRules: string;
   /** Strict-mode technical layout (AI A4) prompt. */
   codeBasedProduct: string;
+  /** Prompt for detecting the best-fitting infographic style. */
+  detectStyle: string;
 }
 
 interface SettingsState {
