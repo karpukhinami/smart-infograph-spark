@@ -60,6 +60,7 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     designBrief: promptFreeDesignBrief,
     generalRules: promptFreeGeneralRules,
     codeBasedProduct: "",
+    detectStyle: "",
   },
   strict: {
     analysisWithContent: promptStrictAnalysisWith,
@@ -67,6 +68,7 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     designBrief: promptStrictDesignBrief,
     generalRules: promptStrictGeneralRules,
     codeBasedProduct: AI_LAYOUT_PROMPT,
+    detectStyle: promptStrictDetectStyle,
   },
 };
 
