@@ -703,6 +703,40 @@ ${activeContent.value.content}`;
             />
           </div>
 
+          {/* Style detection panel */}
+          <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+            <div className="text-xs font-semibold">Стиль инфографики</div>
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedStyleId ?? ""}
+                onValueChange={setSelectedStyleId}
+              >
+                <SelectTrigger className="h-9 flex-1">
+                  <SelectValue placeholder="Выберите стиль" />
+                </SelectTrigger>
+                <SelectContent>
+                  {enabledStyles.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onDetectStyle}
+                disabled={loading !== null || !(source.topic?.trim() || hasSource)}
+              >
+                {loading === "detect-style" ? <Loader2 className="size-4 animate-spin mr-2" /> : <Wand2 className="size-4 mr-2" />}
+                Определить стиль
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              По кнопке модель анализирует исходные данные и признаки включённых стилей и предлагает подходящий.
+            </p>
+          </div>
+
+
+
 
           <PromptDisclosure
             label={`Показать промпт анализа (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
