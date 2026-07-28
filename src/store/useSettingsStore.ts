@@ -14,6 +14,7 @@ import promptStrictAnalysisWith from "@/data/prompts/strict/analysis-with-conten
 import promptStrictAnalysisTopic from "@/data/prompts/strict/analysis-topic-only.txt?raw";
 import promptStrictDesignBrief from "@/data/prompts/strict/design-brief.txt?raw";
 import promptStrictGeneralRules from "@/data/prompts/strict/general-rules.txt?raw";
+import promptStrictDetectStyle from "@/data/prompts/strict/detect-style.txt?raw";
 import { AI_LAYOUT_PROMPT } from "@/lib/a4-layout/ai-prompt";
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
