@@ -961,7 +961,12 @@ ${activeContent.value.content}`;
                     </Button>
                   </div>
                   <div className="rounded-md border border-border p-3 bg-background">
-                    {activeContent.value.analysis ? (
+                    {activeContent.value.connection ? (
+                      <ConnectionSchemaPreview
+                        connection={activeContent.value.connection}
+                        profile={activeProfile ?? null}
+                      />
+                    ) : activeContent.value.analysis ? (
                       <WorkspaceContentPreview
                         analysis={activeContent.value.analysis}
                         profile={activeProfile ?? null}
