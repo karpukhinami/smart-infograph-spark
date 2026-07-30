@@ -695,12 +695,55 @@ ${activeContent.value.content}`;
             />
           </div>
 
+          <TooltipProvider delayDuration={150}>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="ws-sw-edu"
+                  checked={source.educationalIllustrations}
+                  onCheckedChange={(v) => setSource({ educationalIllustrations: v })}
+                />
+                <Label htmlFor="ws-sw-edu" className="text-sm font-normal cursor-pointer">
+                  Учебные иллюстрации
+                </Label>
+                {source.educationalIllustrations && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="size-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      Иллюстрации по предмету — только если необходимы. Если хотите много — отметьте «Дополнительных инструкциях».
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="ws-sw-narr"
+                  checked={source.narrativeIllustrations}
+                  onCheckedChange={(v) => setSource({ narrativeIllustrations: v })}
+                />
+                <Label htmlFor="ws-sw-narr" className="text-sm font-normal cursor-pointer">
+                  Сюжетные иллюстрации
+                </Label>
+                {source.narrativeIllustrations && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="size-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      Иллюстрации для привлечения внимания. Если хотите описать их точнее, отметьте это в «Дополнительных инструкциях».
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </div>
+          </TooltipProvider>
+
           {/* Источник: текст + файл + картинки */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">
-                Исходный материал (необязательно — без него работа пойдёт только по теме)
-              </Label>
+              <Label className="text-xs">Исходный материал (необязательно)</Label>
               <div className="flex gap-1">
                 <Button
                   type="button"
@@ -714,8 +757,8 @@ ${activeContent.value.content}`;
               </div>
             </div>
             <Textarea
-              rows={8}
-              placeholder="Введите или вставьте текст вручную. Файлы (.txt, .md, .docx, .pdf, изображения) — кнопкой «Файл»."
+              rows={6}
+              placeholder="Вставьте текст или изображение(Ctrl/Cmd + V) "
               value={source.text}
               onChange={(e) => setSource({ text: e.target.value })}
               onPaste={onPasteCapture}
@@ -729,6 +772,7 @@ ${activeContent.value.content}`;
               onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }}
             />
           </div>
+
 
           {/* Style detection panel */}
           <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
