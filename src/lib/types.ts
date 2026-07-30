@@ -214,7 +214,7 @@ export interface DesignBriefResult {
   WireframeSketch?: string;
 }
 
-export type PaneMode = "content" | "auto-layout" | "wireframe" | "ai-layout" | "image";
+export type PaneMode = "content" | "auto-layout" | "wireframe" | "ai-layout" | "mermaid" | "image";
 
 export interface Versioned<T> {
   id: string;
