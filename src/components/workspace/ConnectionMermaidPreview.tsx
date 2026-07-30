@@ -118,6 +118,85 @@ export function ConnectionMermaidPreview({ connection }: Props) {
     };
   }, [built]);
 
+  const renderCanvas = (heightClass: string) => (
+    <div className="relative h-full w-full rounded-md border border-border bg-background">
+      {!renderError && (
+        <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full border border-border bg-background/90 px-1.5 py-1 shadow-sm backdrop-blur">
+          <button
+            type="button"
+            aria-label="Уменьшить"
+            className="grid h-6 w-6 place-items-center rounded-full border border-border text-sm leading-none hover:bg-muted"
+            onClick={() => zoomByStep(1 / 1.25)}
+          >
+            −
+          </button>
+          <span className="min-w-10 text-center text-[11px] tabular-nums text-muted-foreground">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            aria-label="Увеличить"
+            className="grid h-6 w-6 place-items-center rounded-full border border-border text-sm leading-none hover:bg-muted"
+            onClick={() => zoomByStep(1.25)}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            aria-label="Сбросить масштаб"
+            className="grid h-6 w-6 place-items-center rounded-full border border-border text-xs leading-none hover:bg-muted"
+            onClick={resetView}
+          >
+            ⟲
+          </button>
+          {!fullscreen && (
+            <button
+              type="button"
+              aria-label="Развернуть на весь экран"
+              title="Развернуть на весь экран"
+              className="grid h-6 w-6 place-items-center rounded-full border border-border hover:bg-muted"
+              onClick={() => {
+                resetView();
+                setFullscreen(true);
+              }}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {renderError ? (
+        <div className="space-y-2 p-3">
+          <p className="text-xs text-destructive">Ошибка рендеринга Mermaid: {renderError}</p>
+          <pre className="overflow-auto text-xs">{built.code}</pre>
+        </div>
+      ) : (
+        <div
+          ref={viewportRef}
+          className={`relative overflow-hidden p-3 ${heightClass}`}
+          style={{ cursor: isPanning ? "grabbing" : "grab", touchAction: "none" }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
+          onDoubleClick={resetView}
+        >
+          <div
+            ref={hostRef}
+            className="[&_svg]:max-w-none"
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "top left",
+              width: "max-content",
+            }}
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
