@@ -68,6 +68,62 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
   const frameRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [displayScale, setDisplayScale] = useState(1);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+
+  const clampZoom = (z: number) => Math.min(6, Math.max(1, z));
+
+  const resetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      setZoom((prevZoom) => {
+        const next = clampZoom(prevZoom * Math.exp(-e.deltaY * 0.0015));
+        setPan((prevPan) => {
+          if (next <= 1) return { x: 0, y: 0 };
+          const k = next / prevZoom;
+          return { x: cx - k * (cx - prevPan.x), y: cy - k * (cy - prevPan.y) };
+        });
+        return next;
+      });
+    };
+
+    viewport.addEventListener("wheel", onWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (zoom <= 1) return;
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      panStart.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
+      setIsPanning(true);
+    },
+    [pan.x, pan.y, zoom],
+  );
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    const start = panStart.current;
+    if (!start) return;
+    setPan({ x: start.px + (e.clientX - start.x), y: start.py + (e.clientY - start.y) });
+  }, []);
+
+  const endPan = useCallback(() => {
+    panStart.current = null;
+    setIsPanning(false);
+  }, []);
 
   const screenFitOptions = useMemo(
     () => ({
