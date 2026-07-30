@@ -23,6 +23,7 @@ import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { WorkspaceContentPreview } from "@/components/workspace/WorkspaceContentPreview";
 import { ConnectionSchemaPreview } from "@/components/workspace/ConnectionSchemaPreview";
+import { ConnectionMermaidPreview } from "@/components/workspace/ConnectionMermaidPreview";
 import { A4AutoLayoutView, type ManualLayoutApply } from "@/components/workspace/A4AutoLayoutView";
 import { A4LayoutCanvas, type A4LayoutCanvasHandle } from "@/components/workspace/A4LayoutCanvas";
 import { WireframeView } from "@/components/workspace/WireframeView";
@@ -816,7 +817,14 @@ ${activeContent.value.content}`;
                 />
               </div>
             </div>
-            {mode === "strict" && briefMode === "programmatic" ? (
+            {mode === "strict" && briefMode === "programmatic" && activeContent.value.connection ? (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">
+                  Для стиля «схема связей» техническая визуализация строится программно из JSON (Mermaid).
+                </p>
+                <Button onClick={() => setPaneMode("mermaid")}>Построить схему связей</Button>
+              </div>
+            ) : mode === "strict" && briefMode === "programmatic" ? (
               <>
                 <div className="space-y-1.5">
                   <Label className="text-xs" htmlFor="manual-layout-template">
@@ -947,8 +955,18 @@ ${activeContent.value.content}`;
               <TabsTrigger value="auto-layout" disabled={!activeContent?.value.analysis}>авто-макет</TabsTrigger>
               <TabsTrigger value="wireframe" disabled={!activeBrief}>Каркас</TabsTrigger>
               <TabsTrigger value="ai-layout" disabled={!aiLayoutCanvas}>ИИ-макет</TabsTrigger>
+              <TabsTrigger value="mermaid" disabled={!activeContent?.value.connection}>Схема связей</TabsTrigger>
               <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="mermaid" className="p-2 space-y-2">
+              {activeContent?.value.connection ? (
+                <ConnectionMermaidPreview connection={activeContent.value.connection} />
+              ) : (
+                <EmptyState text="Схема доступна для стиля «схема связей» после анализа." />
+              )}
+            </TabsContent>
+
 
             <TabsContent value="content" className="p-2 space-y-2">
               {activeContent ? (
