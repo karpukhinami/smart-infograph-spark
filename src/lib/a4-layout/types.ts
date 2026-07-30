@@ -55,6 +55,7 @@ export interface EntityHint {
   entityType: string;
   attention: string;
   sourceEntity: LayoutEntity;
+  stats?: Record<string, unknown>;
   widthReports: WidthReport[];
   atFraction: (fraction: number) => WidthReport;
   contentLoad: string;
