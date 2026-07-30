@@ -322,7 +322,6 @@ function Workspace() {
     try {
       setLoading("analyze");
       const stylesList = enabledStyles.map((s) => `- ${s.id}: ${s.name} — ${s.shortDescription}`).join("\n");
-      const isConnectionStyle = selectedStyleId === "connection-schema";
       const template = isConnectionStyle
         ? useTopicOnlyPrompt
           ? prompts.connectionSchemaTopicOnly
