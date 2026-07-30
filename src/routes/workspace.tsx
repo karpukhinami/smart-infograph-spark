@@ -816,7 +816,14 @@ ${activeContent.value.content}`;
                 />
               </div>
             </div>
-            {mode === "strict" && briefMode === "programmatic" ? (
+            {mode === "strict" && briefMode === "programmatic" && activeContent.value.connection ? (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">
+                  Для стиля «схема связей» техническая визуализация строится программно из JSON (Mermaid).
+                </p>
+                <Button onClick={() => setPaneMode("mermaid")}>Построить схему связей</Button>
+              </div>
+            ) : mode === "strict" && briefMode === "programmatic" ? (
               <>
                 <div className="space-y-1.5">
                   <Label className="text-xs" htmlFor="manual-layout-template">
