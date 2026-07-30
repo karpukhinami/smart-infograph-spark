@@ -256,29 +256,34 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
         <div className="a4-manual-warnings">{manualErrors.join("\n")}</div>
       ) : null}
 
-      {zoom > 1 ? (
-        <div className="a4-zoom-bar">
-          <span>Масштаб: {Math.round(zoom * 100)}%</span>
-          <button type="button" onClick={resetView}>
-            Сбросить
+      <div className="a4-zoom-wrap">
+        <div className="a4-zoom-controls">
+          <button type="button" aria-label="Уменьшить" onClick={() => zoomByStep(1 / 1.25)}>
+            −
+          </button>
+          <span className="a4-zoom-value">{Math.round(zoom * 100)}%</span>
+          <button type="button" aria-label="Увеличить" onClick={() => zoomByStep(1.25)}>
+            +
+          </button>
+          <button type="button" aria-label="Сбросить масштаб" className="a4-zoom-reset" onClick={resetView}>
+            ⟲
           </button>
         </div>
-      ) : null}
 
-      <div
-        ref={viewportRef}
-        className="a4-poster-viewport"
-        style={{
-          overflow: zoom > 1 ? "hidden" : "auto",
-          cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
-          touchAction: zoom > 1 ? "none" : undefined,
-        }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endPan}
-        onPointerCancel={endPan}
-        onDoubleClick={resetView}
-      >
+        <div
+          ref={viewportRef}
+          className="a4-poster-viewport"
+          style={{
+            overflow: zoom > 1 ? "hidden" : "auto",
+            cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
+            touchAction: zoom > 1 ? "none" : undefined,
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
+          onDoubleClick={resetView}
+        >
         <div
           className="a4-poster-scale-host"
           style={{
