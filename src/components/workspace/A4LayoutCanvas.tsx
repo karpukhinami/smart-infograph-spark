@@ -80,6 +80,21 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
     setPan({ x: 0, y: 0 });
   }, []);
 
+  const zoomByStep = useCallback((factor: number) => {
+    const viewport = viewportRef.current;
+    const cx = viewport ? viewport.clientWidth / 2 : 0;
+    const cy = viewport ? viewport.clientHeight / 2 : 0;
+    setZoom((prevZoom) => {
+      const next = clampZoom(prevZoom * factor);
+      setPan((prevPan) => {
+        if (next <= 1) return { x: 0, y: 0 };
+        const k = next / prevZoom;
+        return { x: cx - k * (cx - prevPan.x), y: cy - k * (cy - prevPan.y) };
+      });
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
