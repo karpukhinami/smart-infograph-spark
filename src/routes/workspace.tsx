@@ -25,6 +25,7 @@ import { WorkspaceContentPreview } from "@/components/workspace/WorkspaceContent
 import { A4AutoLayoutView, type ManualLayoutApply } from "@/components/workspace/A4AutoLayoutView";
 import { A4LayoutCanvas, type A4LayoutCanvasHandle } from "@/components/workspace/A4LayoutCanvas";
 import { WireframeView } from "@/components/workspace/WireframeView";
+import { ProgrammaticRenderer } from "@/components/render-spec/ProgrammaticRenderer";
 import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { HelpFiles } from "@/components/workspace/HelpFiles";
