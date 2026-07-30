@@ -32,6 +32,7 @@ import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { callTextLLMForJson } from "@/lib/llm-json";
 import { buildDesignBriefPrompt, designProfileColorsAndRules, resolveDesignProfile } from "@/lib/prompt-injection";
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
+import { renderConnectionSchemaJson, validateConnectionSchemaJson } from "@/lib/connection-schema";
 import {
   buildRefineContentPrompt,
   buildRefineBriefPrompt,
