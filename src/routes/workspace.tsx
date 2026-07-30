@@ -23,6 +23,7 @@ import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { WorkspaceContentPreview } from "@/components/workspace/WorkspaceContentPreview";
 import { ConnectionSchemaPreview } from "@/components/workspace/ConnectionSchemaPreview";
+import { ConnectionMermaidPreview } from "@/components/workspace/ConnectionMermaidPreview";
 import { A4AutoLayoutView, type ManualLayoutApply } from "@/components/workspace/A4AutoLayoutView";
 import { A4LayoutCanvas, type A4LayoutCanvasHandle } from "@/components/workspace/A4LayoutCanvas";
 import { WireframeView } from "@/components/workspace/WireframeView";
