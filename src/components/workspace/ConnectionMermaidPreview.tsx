@@ -31,6 +31,7 @@ export function ConnectionMermaidPreview({ connection }: Props) {
   const [direction, setDirection] = useState<"TD" | "LR">("TD");
   const [svg, setSvg] = useState<string>("");
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
