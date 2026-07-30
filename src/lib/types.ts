@@ -148,6 +148,50 @@ export interface AnalysisJson {
   recommendedDesignProfile?: string | null;
 }
 
+/** ===== "Схема связей" (connection schema) analysis JSON ===== */
+export interface ConnectionEntity {
+  id: string;
+  title: string | null;
+  text: string | null;
+  addendum: string | string[] | null;
+  depiction: string | null;
+  /** Workspace: data URL of a generated illustration for this entity. */
+  generatedImage?: string | null;
+}
+export interface ConnectionRelation {
+  from: string;
+  to: string;
+  direction: "one_way" | "two_way" | "none";
+  label: string | null;
+}
+export interface ConnectionRegionRelation {
+  fromRegion: string;
+  toRegion: string;
+  direction: "one_way" | "two_way" | "none";
+  label: string | null;
+}
+export interface ConnectionRegion {
+  id: string;
+  number: string | null;
+  title: string | null;
+  organizationType: string;
+  anchorEntityId: string | null;
+  entities: ConnectionEntity[];
+  relations: ConnectionRelation[];
+}
+export interface ConnectionSchemaJson {
+  kind: "connection-schema";
+  sourceMode: "text" | "topic";
+  topic: string;
+  subject: string | null;
+  grade: string | null;
+  focusQuestion: string;
+  displaySubtitle: string | null;
+  regions: ConnectionRegion[];
+  regionRelations: ConnectionRegionRelation[];
+  warnings: string[];
+}
+
 export interface ContentSummary {
   /** Human-readable text shown to the user (rendered from analysis JSON in strict mode). */
   content: string;
@@ -155,8 +199,10 @@ export interface ContentSummary {
   recommendedStyle: string;
   /** Design profile name recommended by the model (UI hint only). */
   recommendedDesignProfile?: string | null;
-  /** Structured analysis JSON (strict mode). */
+  /** Structured analysis JSON (strict mode, bento styles). */
   analysis?: AnalysisJson | null;
+  /** Structured analysis JSON for the "схема связей" style. */
+  connection?: ConnectionSchemaJson | null;
 }
 
 
