@@ -885,7 +885,7 @@ ${activeContent.value.content}`;
                 <p className="text-xs text-muted-foreground">
                   Для стиля «схема связей» техническая визуализация строится программно из JSON (Mermaid).
                 </p>
-                <Button onClick={() => setPaneMode("mermaid")}>Построить схему связей</Button>
+                <Button onClick={() => setPaneMode("auto-layout")}>Построить схему связей</Button>
               </div>
             ) : mode === "strict" && briefMode === "programmatic" ? (
               <>
