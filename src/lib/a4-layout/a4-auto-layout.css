@@ -6,23 +6,52 @@
   padding: 6px 0 2px;
 }
 
-.a4-auto-layout-root .a4-zoom-bar {
+.a4-auto-layout-root .a4-zoom-wrap {
+  position: relative;
+}
+
+.a4-auto-layout-root .a4-zoom-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #d0d5dd;
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.12);
+}
+
+.a4-auto-layout-root .a4-zoom-controls button {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  color: #344054;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.a4-auto-layout-root .a4-zoom-controls button:hover {
+  background: #f2f4f7;
+}
+
+.a4-auto-layout-root .a4-zoom-value {
   font-size: 11px;
   font-weight: 600;
   color: #475467;
-  margin-bottom: 4px;
+  min-width: 34px;
+  text-align: center;
 }
 
-.a4-auto-layout-root .a4-zoom-bar button {
-  border: 1px solid #d0d5dd;
-  border-radius: 8px;
-  padding: 2px 8px;
-  background: #fff;
-  cursor: pointer;
-}
 
 .a4-auto-layout-root .a4-poster-scale-host {
   margin-inline: auto;
