@@ -62,25 +62,57 @@ export function ConnectionMermaidPreview({ connection }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
+  const [fitScale, setFitScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
 
-  const clampZoom = (z: number) => Math.min(8, Math.max(0.2, z));
+  const clampZoom = useCallback(
+    (z: number) => Math.min(8 * fitScale, Math.max(0.1 * fitScale, z)),
+    [fitScale],
+  );
+
+  /** Вписать схему по самой широкой стороне в контейнер и считать это за 100%. */
+  const fitToViewport = useCallback(() => {
+    const vp = viewportRef.current;
+    const host = hostRef.current;
+    const el = host?.querySelector("svg") as SVGSVGElement | null;
+    if (!vp || !el) return false;
+    const vb = el.viewBox?.baseVal;
+    const w = vb && vb.width ? vb.width : el.getBoundingClientRect().width;
+    const h = vb && vb.height ? vb.height : el.getBoundingClientRect().height;
+    if (!w || !h) return false;
+    el.removeAttribute("style");
+    el.setAttribute("width", String(w));
+    el.setAttribute("height", String(h));
+    const pad = 24;
+    const availW = Math.max(1, vp.clientWidth - pad);
+    const availH = Math.max(1, vp.clientHeight - pad);
+    const scale = Math.min(availW / w, availH / h);
+    setFitScale(scale);
+    setZoom(scale);
+    setPan({ x: (vp.clientWidth - w * scale) / 2, y: (vp.clientHeight - h * scale) / 2 });
+    return true;
+  }, []);
 
   const resetView = useCallback(() => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  }, []);
+    if (!fitToViewport()) {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    }
+  }, [fitToViewport]);
 
-  const zoomAt = useCallback((factor: number, cx: number, cy: number) => {
-    setZoom((prev) => {
-      const next = clampZoom(prev * factor);
-      const k = next / prev;
-      setPan((p) => ({ x: cx - k * (cx - p.x), y: cy - k * (cy - p.y) }));
-      return next;
-    });
-  }, []);
+  const zoomAt = useCallback(
+    (factor: number, cx: number, cy: number) => {
+      setZoom((prev) => {
+        const next = clampZoom(prev * factor);
+        const k = next / prev;
+        setPan((p) => ({ x: cx - k * (cx - p.x), y: cy - k * (cy - p.y) }));
+        return next;
+      });
+    },
+    [clampZoom],
+  );
 
   const zoomByStep = useCallback(
     (factor: number) => {
@@ -89,6 +121,23 @@ export function ConnectionMermaidPreview({ connection }: Props) {
     },
     [zoomAt],
   );
+
+  // Автовписывание после рендера SVG и при смене режима отображения.
+  useEffect(() => {
+    if (!svg) return;
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        fitToViewport();
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [svg, fullscreen, fitToViewport]);
+
 
   useEffect(() => {
     const vp = viewportRef.current;
