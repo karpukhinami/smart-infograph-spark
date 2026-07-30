@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConnectionSchemaJson } from "@/lib/types";
 import { buildConnectionMermaid } from "@/lib/connection-mermaid";
 import { Button } from "@/components/ui/button";
