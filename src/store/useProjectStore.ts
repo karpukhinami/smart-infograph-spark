@@ -373,6 +373,32 @@ export const useProjectStore = create<ProjectState>()(
               : x,
           ),
         })),
+      updateActiveConnectionEntity: (regionIndex, entityIndex, patch) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const conn = x.value.connection;
+            if (!conn) return x;
+            const regions = conn.regions.map((r, ri) =>
+              ri !== regionIndex
+                ? r
+                : { ...r, entities: r.entities.map((e, ei) => (ei === entityIndex ? { ...e, ...patch } : e)) },
+            );
+            const next = { ...conn, regions };
+            return { ...x, value: { ...x.value, connection: next, content: renderConnectionSchemaJson(next) } };
+          }),
+        })),
+      updateActiveConnectionRegion: (regionIndex, patch) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const conn = x.value.connection;
+            if (!conn) return x;
+            const regions = conn.regions.map((r, ri) => (ri === regionIndex ? { ...r, ...patch } : r));
+            const next = { ...conn, regions };
+            return { ...x, value: { ...x.value, connection: next, content: renderConnectionSchemaJson(next) } };
+          }),
+        })),
       setActiveContent: (id) => set({ activeContentId: id }),
 
 
