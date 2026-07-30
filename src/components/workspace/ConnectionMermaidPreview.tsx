@@ -150,16 +150,69 @@ export function ConnectionMermaidPreview({ connection }: Props) {
         </div>
       )}
 
-      <div className="w-full overflow-auto rounded-md border border-border bg-background p-3">
+      <div className="relative w-full rounded-md border border-border bg-background">
+        {!renderError && (
+          <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full border border-border bg-background/90 px-1.5 py-1 shadow-sm backdrop-blur">
+            <button
+              type="button"
+              aria-label="Уменьшить"
+              className="grid h-6 w-6 place-items-center rounded-full border border-border text-sm leading-none hover:bg-muted"
+              onClick={() => zoomByStep(1 / 1.25)}
+            >
+              −
+            </button>
+            <span className="min-w-10 text-center text-[11px] tabular-nums text-muted-foreground">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              type="button"
+              aria-label="Увеличить"
+              className="grid h-6 w-6 place-items-center rounded-full border border-border text-sm leading-none hover:bg-muted"
+              onClick={() => zoomByStep(1.25)}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              aria-label="Сбросить масштаб"
+              className="grid h-6 w-6 place-items-center rounded-full border border-border text-xs leading-none hover:bg-muted"
+              onClick={resetView}
+            >
+              ⟲
+            </button>
+          </div>
+        )}
+
         {renderError ? (
-          <div className="space-y-2">
+          <div className="space-y-2 p-3">
             <p className="text-xs text-destructive">Ошибка рендеринга Mermaid: {renderError}</p>
             <pre className="overflow-auto text-xs">{built.code}</pre>
           </div>
         ) : (
-          <div ref={hostRef} className="[&_svg]:max-w-none" dangerouslySetInnerHTML={{ __html: svg }} />
+          <div
+            ref={viewportRef}
+            className="relative h-[70vh] min-h-80 overflow-hidden p-3"
+            style={{ cursor: isPanning ? "grabbing" : "grab", touchAction: "none" }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endPan}
+            onPointerCancel={endPan}
+            onDoubleClick={resetView}
+          >
+            <div
+              ref={hostRef}
+              className="[&_svg]:max-w-none"
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: "top left",
+                width: "max-content",
+              }}
+              dangerouslySetInnerHTML={{ __html: svg }}
+            />
+          </div>
         )}
       </div>
+
 
       <details className="rounded-md border border-border bg-background/60 p-2">
         <summary className="cursor-pointer text-xs text-muted-foreground">Показать Mermaid-код</summary>
