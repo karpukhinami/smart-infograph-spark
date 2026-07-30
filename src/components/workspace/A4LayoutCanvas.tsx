@@ -364,6 +364,7 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
           </div>
         </div>
       </div>
+      </div>
     </div>
   );
 });
