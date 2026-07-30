@@ -22,7 +22,7 @@ export interface AiAddendumsSpec {
   items: string[];
 }
 
-export type LayoutEntity = AnalysisEntity & {
+export type LayoutEntity = Omit<AnalysisEntity, "attention"> & {
   attention?: string;
   contentHtml?: boolean;
   aiAddendums?: AiAddendumsSpec | null;
