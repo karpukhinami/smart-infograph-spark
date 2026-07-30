@@ -80,6 +80,21 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
     setPan({ x: 0, y: 0 });
   }, []);
 
+  const zoomByStep = useCallback((factor: number) => {
+    const viewport = viewportRef.current;
+    const cx = viewport ? viewport.clientWidth / 2 : 0;
+    const cy = viewport ? viewport.clientHeight / 2 : 0;
+    setZoom((prevZoom) => {
+      const next = clampZoom(prevZoom * factor);
+      setPan((prevPan) => {
+        if (next <= 1) return { x: 0, y: 0 };
+        const k = next / prevZoom;
+        return { x: cx - k * (cx - prevPan.x), y: cy - k * (cy - prevPan.y) };
+      });
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
@@ -256,29 +271,34 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
         <div className="a4-manual-warnings">{manualErrors.join("\n")}</div>
       ) : null}
 
-      {zoom > 1 ? (
-        <div className="a4-zoom-bar">
-          <span>Масштаб: {Math.round(zoom * 100)}%</span>
-          <button type="button" onClick={resetView}>
-            Сбросить
+      <div className="a4-zoom-wrap">
+        <div className="a4-zoom-controls">
+          <button type="button" aria-label="Уменьшить" onClick={() => zoomByStep(1 / 1.25)}>
+            −
+          </button>
+          <span className="a4-zoom-value">{Math.round(zoom * 100)}%</span>
+          <button type="button" aria-label="Увеличить" onClick={() => zoomByStep(1.25)}>
+            +
+          </button>
+          <button type="button" aria-label="Сбросить масштаб" className="a4-zoom-reset" onClick={resetView}>
+            ⟲
           </button>
         </div>
-      ) : null}
 
-      <div
-        ref={viewportRef}
-        className="a4-poster-viewport"
-        style={{
-          overflow: zoom > 1 ? "hidden" : "auto",
-          cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
-          touchAction: zoom > 1 ? "none" : undefined,
-        }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endPan}
-        onPointerCancel={endPan}
-        onDoubleClick={resetView}
-      >
+        <div
+          ref={viewportRef}
+          className="a4-poster-viewport"
+          style={{
+            overflow: zoom > 1 ? "hidden" : "auto",
+            cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
+            touchAction: zoom > 1 ? "none" : undefined,
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
+          onDoubleClick={resetView}
+        >
         <div
           className="a4-poster-scale-host"
           style={{
@@ -358,6 +378,7 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
