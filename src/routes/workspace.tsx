@@ -153,6 +153,7 @@ function Workspace() {
   );
 
   const hasSource = hasSourceMaterials(source.text, uploadedSourceText, attachedImages);
+  const isConnectionStyle = selectedStyleId === "connection-schema";
   const useTopicOnlyPrompt = !hasSource;
 
   useEffect(() => {
