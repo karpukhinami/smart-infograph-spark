@@ -11,21 +11,48 @@ interface Props {
 
 let mermaidReady: Promise<typeof import("mermaid").default> | null = null;
 
+const RELOAD_FLAG = "mermaid-chunk-reload";
+
+function isChunkLoadError(e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  return (
+    /dynamically imported module/i.test(msg) ||
+    /Importing a module script failed/i.test(msg) ||
+    /Failed to fetch/i.test(msg)
+  );
+}
+
 async function getMermaid() {
   if (!mermaidReady) {
-    mermaidReady = import("mermaid").then((m) => {
-      m.default.initialize({
+    mermaidReady = (async () => {
+      let mod: typeof import("mermaid");
+      try {
+        mod = await import("mermaid");
+      } catch (e) {
+        // Устаревший кэш после деплоя: чанк с прежним хэшем больше не существует.
+        if (isChunkLoadError(e) && typeof window !== "undefined") {
+          if (!sessionStorage.getItem(RELOAD_FLAG)) {
+            sessionStorage.setItem(RELOAD_FLAG, "1");
+            window.location.reload();
+          }
+        }
+        mermaidReady = null;
+        throw e;
+      }
+      if (typeof window !== "undefined") sessionStorage.removeItem(RELOAD_FLAG);
+      mod.default.initialize({
         startOnLoad: false,
         securityLevel: "loose",
         htmlLabels: true,
         theme: "neutral",
         flowchart: { htmlLabels: true, useMaxWidth: true, nodeSpacing: 40, rankSpacing: 60 },
       });
-      return m.default;
-    });
+      return mod.default;
+    })();
   }
   return mermaidReady;
 }
+
 
 export function ConnectionMermaidPreview({ connection }: Props) {
   const [direction, setDirection] = useState<"TD" | "LR">("TD");
@@ -169,9 +196,20 @@ export function ConnectionMermaidPreview({ connection }: Props) {
       {renderError ? (
         <div className="space-y-2 p-3">
           <p className="text-xs text-destructive">Ошибка рендеринга Mermaid: {renderError}</p>
+          {isChunkLoadError(renderError) && (
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">
+                Похоже, страница открыта со старой версией сборки. Обновите её.
+              </p>
+              <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
+                Обновить страницу
+              </Button>
+            </div>
+          )}
           <pre className="overflow-auto text-xs">{built.code}</pre>
         </div>
       ) : (
+
         <div
           ref={viewportRef}
           className={`relative overflow-hidden p-3 ${heightClass}`}
