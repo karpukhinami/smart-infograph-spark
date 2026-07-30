@@ -811,13 +811,31 @@ ${activeContent.value.content}`;
 
 
           <PromptDisclosure
-            label={`Показать промпт анализа (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
-            value={useTopicOnlyPrompt ? prompts.analysisTopicOnly : prompts.analysisWithContent}
+            label={`Показать промпт анализа${isConnectionStyle ? " — схема связей" : ""} (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
+            value={
+              isConnectionStyle
+                ? useTopicOnlyPrompt
+                  ? prompts.connectionSchemaTopicOnly
+                  : prompts.connectionSchemaWithContent
+                : useTopicOnlyPrompt
+                  ? prompts.analysisTopicOnly
+                  : prompts.analysisWithContent
+            }
             onChange={(v) =>
-              setPrompt(useTopicOnlyPrompt ? "analysisTopicOnly" : "analysisWithContent", v)
+              setPrompt(
+                isConnectionStyle
+                  ? useTopicOnlyPrompt
+                    ? "connectionSchemaTopicOnly"
+                    : "connectionSchemaWithContent"
+                  : useTopicOnlyPrompt
+                    ? "analysisTopicOnly"
+                    : "analysisWithContent",
+                v,
+              )
             }
             rightSlot={<ModelPicker kind="text" value={models.analysis} onChange={(v) => setModel("analysis", v)} />}
           />
+
 
           <div className="flex justify-start">
             <Button onClick={onAnalyze} disabled={loading !== null || !(source.topic?.trim() || hasSource)}>
