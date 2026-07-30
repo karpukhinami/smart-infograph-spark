@@ -87,6 +87,12 @@ interface ProjectState {
   addActiveAnalysisEntity: (entity: AnalysisEntity) => void;
   updateActiveAnalysisHeader: (patch: { topic?: string; subject?: string | null; grade?: string | null; summary?: string }) => void;
   replaceActiveAnalysis: (analysis: AnalysisJson) => void;
+  updateActiveConnectionEntity: (
+    regionIndex: number,
+    entityIndex: number,
+    patch: Partial<ConnectionEntity>,
+  ) => void;
+  updateActiveConnectionRegion: (regionIndex: number, patch: Partial<ConnectionRegion>) => void;
   setActiveContent: (id: string) => void;
 
 
