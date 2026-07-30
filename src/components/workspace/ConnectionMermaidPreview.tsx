@@ -196,9 +196,20 @@ export function ConnectionMermaidPreview({ connection }: Props) {
       {renderError ? (
         <div className="space-y-2 p-3">
           <p className="text-xs text-destructive">Ошибка рендеринга Mermaid: {renderError}</p>
+          {isChunkLoadError(renderError) && (
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">
+                Похоже, страница открыта со старой версией сборки. Обновите её.
+              </p>
+              <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
+                Обновить страницу
+              </Button>
+            </div>
+          )}
           <pre className="overflow-auto text-xs">{built.code}</pre>
         </div>
       ) : (
+
         <div
           ref={viewportRef}
           className={`relative overflow-hidden p-3 ${heightClass}`}
