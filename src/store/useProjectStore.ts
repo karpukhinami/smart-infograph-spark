@@ -3,6 +3,8 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   AnalysisEntity,
   AnalysisJson,
+  ConnectionEntity,
+  ConnectionRegion,
   ContentSummary,
   DesignBriefResult,
   SourceText,
@@ -17,6 +19,7 @@ import type { SimpleImageArchiveMeta } from "@/lib/google/archive-schema";
 import type { PendingArchiveFeedback } from "@/lib/image-feedback-types";
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from "@/lib/models";
 import { renderAnalysisJson } from "@/lib/analysis-render";
+import { renderConnectionSchemaJson } from "@/lib/connection-schema";
 import { createQuotaAwareSessionStorage } from "@/lib/browser-storage-quota";
 
 
