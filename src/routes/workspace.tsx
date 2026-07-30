@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, RotateCcw, Upload, Sparkles, Download, Wand2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Loader2, RefreshCw, RotateCcw, Upload, Sparkles, Download, Wand2, Info } from "lucide-react";
 import {
   useProjectStore,
   useActiveContent,
@@ -152,6 +153,7 @@ function Workspace() {
   );
 
   const hasSource = hasSourceMaterials(source.text, uploadedSourceText, attachedImages);
+  const isConnectionStyle = selectedStyleId === "connection-schema";
   const useTopicOnlyPrompt = !hasSource;
 
   useEffect(() => {
@@ -320,7 +322,6 @@ function Workspace() {
     try {
       setLoading("analyze");
       const stylesList = enabledStyles.map((s) => `- ${s.id}: ${s.name} — ${s.shortDescription}`).join("\n");
-      const isConnectionStyle = selectedStyleId === "connection-schema";
       const template = isConnectionStyle
         ? useTopicOnlyPrompt
           ? prompts.connectionSchemaTopicOnly
@@ -695,12 +696,55 @@ ${activeContent.value.content}`;
             />
           </div>
 
+          <TooltipProvider delayDuration={150}>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="ws-sw-edu"
+                  checked={source.educationalIllustrations}
+                  onCheckedChange={(v) => setSource({ educationalIllustrations: v })}
+                />
+                <Label htmlFor="ws-sw-edu" className="text-sm font-normal cursor-pointer">
+                  Учебные иллюстрации
+                </Label>
+                {source.educationalIllustrations && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="size-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      Иллюстрации по предмету — только если необходимы. Если хотите много — отметьте «Дополнительных инструкциях».
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="ws-sw-narr"
+                  checked={source.narrativeIllustrations}
+                  onCheckedChange={(v) => setSource({ narrativeIllustrations: v })}
+                />
+                <Label htmlFor="ws-sw-narr" className="text-sm font-normal cursor-pointer">
+                  Сюжетные иллюстрации
+                </Label>
+                {source.narrativeIllustrations && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="size-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      Иллюстрации для привлечения внимания. Если хотите описать их точнее, отметьте это в «Дополнительных инструкциях».
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </div>
+          </TooltipProvider>
+
           {/* Источник: текст + файл + картинки */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">
-                Исходный материал (необязательно — без него работа пойдёт только по теме)
-              </Label>
+              <Label className="text-xs">Исходный материал (необязательно)</Label>
               <div className="flex gap-1">
                 <Button
                   type="button"
@@ -714,8 +758,8 @@ ${activeContent.value.content}`;
               </div>
             </div>
             <Textarea
-              rows={8}
-              placeholder="Введите или вставьте текст вручную. Файлы (.txt, .md, .docx, .pdf, изображения) — кнопкой «Файл»."
+              rows={6}
+              placeholder="Вставьте текст или изображение(Ctrl/Cmd + V) "
               value={source.text}
               onChange={(e) => setSource({ text: e.target.value })}
               onPaste={onPasteCapture}
@@ -729,6 +773,7 @@ ${activeContent.value.content}`;
               onChange={(e) => { void onFileChosen(e.target.files); e.target.value = ""; }}
             />
           </div>
+
 
           {/* Style detection panel */}
           <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
@@ -766,13 +811,31 @@ ${activeContent.value.content}`;
 
 
           <PromptDisclosure
-            label={`Показать промпт анализа (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
-            value={useTopicOnlyPrompt ? prompts.analysisTopicOnly : prompts.analysisWithContent}
+            label={`Показать промпт анализа${isConnectionStyle ? " — схема связей" : ""} (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
+            value={
+              isConnectionStyle
+                ? useTopicOnlyPrompt
+                  ? prompts.connectionSchemaTopicOnly
+                  : prompts.connectionSchemaWithContent
+                : useTopicOnlyPrompt
+                  ? prompts.analysisTopicOnly
+                  : prompts.analysisWithContent
+            }
             onChange={(v) =>
-              setPrompt(useTopicOnlyPrompt ? "analysisTopicOnly" : "analysisWithContent", v)
+              setPrompt(
+                isConnectionStyle
+                  ? useTopicOnlyPrompt
+                    ? "connectionSchemaTopicOnly"
+                    : "connectionSchemaWithContent"
+                  : useTopicOnlyPrompt
+                    ? "analysisTopicOnly"
+                    : "analysisWithContent",
+                v,
+              )
             }
             rightSlot={<ModelPicker kind="text" value={models.analysis} onChange={(v) => setModel("analysis", v)} />}
           />
+
 
           <div className="flex justify-start">
             <Button onClick={onAnalyze} disabled={loading !== null || !(source.topic?.trim() || hasSource)}>
@@ -822,7 +885,7 @@ ${activeContent.value.content}`;
                 <p className="text-xs text-muted-foreground">
                   Для стиля «схема связей» техническая визуализация строится программно из JSON (Mermaid).
                 </p>
-                <Button onClick={() => setPaneMode("mermaid")}>Построить схему связей</Button>
+                <Button onClick={() => setPaneMode("auto-layout")}>Построить схему связей</Button>
               </div>
             ) : mode === "strict" && briefMode === "programmatic" ? (
               <>
@@ -952,20 +1015,18 @@ ${activeContent.value.content}`;
           <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as PaneMode)}>
             <TabsList>
               <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
-              <TabsTrigger value="auto-layout" disabled={!activeContent?.value.analysis}>авто-макет</TabsTrigger>
+              <TabsTrigger
+                value="auto-layout"
+                disabled={!activeContent?.value.analysis && !activeContent?.value.connection}
+              >
+                авто-макет
+              </TabsTrigger>
               <TabsTrigger value="wireframe" disabled={!activeBrief}>Каркас</TabsTrigger>
               <TabsTrigger value="ai-layout" disabled={!aiLayoutCanvas}>ИИ-макет</TabsTrigger>
-              <TabsTrigger value="mermaid" disabled={!activeContent?.value.connection}>Схема связей</TabsTrigger>
               <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="mermaid" className="p-2 space-y-2">
-              {activeContent?.value.connection ? (
-                <ConnectionMermaidPreview connection={activeContent.value.connection} />
-              ) : (
-                <EmptyState text="Схема доступна для стиля «схема связей» после анализа." />
-              )}
-            </TabsContent>
+
 
 
             <TabsContent value="content" className="p-2 space-y-2">
@@ -1021,7 +1082,10 @@ ${activeContent.value.content}`;
             </TabsContent>
 
             <TabsContent value="auto-layout" className="p-2 space-y-2">
-              {activeContent?.value.analysis ? (
+              {activeContent?.value.connection ? (
+                <ConnectionMermaidPreview connection={activeContent.value.connection} />
+              ) : activeContent?.value.analysis ? (
+
                 <>
                   <div className="flex justify-end gap-2">
                     <Button
