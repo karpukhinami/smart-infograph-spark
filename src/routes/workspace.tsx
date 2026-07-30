@@ -1015,20 +1015,18 @@ ${activeContent.value.content}`;
           <Tabs value={paneMode} onValueChange={(v) => setPaneMode(v as PaneMode)}>
             <TabsList>
               <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
-              <TabsTrigger value="auto-layout" disabled={!activeContent?.value.analysis}>авто-макет</TabsTrigger>
+              <TabsTrigger
+                value="auto-layout"
+                disabled={!activeContent?.value.analysis && !activeContent?.value.connection}
+              >
+                авто-макет
+              </TabsTrigger>
               <TabsTrigger value="wireframe" disabled={!activeBrief}>Каркас</TabsTrigger>
               <TabsTrigger value="ai-layout" disabled={!aiLayoutCanvas}>ИИ-макет</TabsTrigger>
-              <TabsTrigger value="mermaid" disabled={!activeContent?.value.connection}>Схема связей</TabsTrigger>
               <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="mermaid" className="p-2 space-y-2">
-              {activeContent?.value.connection ? (
-                <ConnectionMermaidPreview connection={activeContent.value.connection} />
-              ) : (
-                <EmptyState text="Схема доступна для стиля «схема связей» после анализа." />
-              )}
-            </TabsContent>
+
 
 
             <TabsContent value="content" className="p-2 space-y-2">
