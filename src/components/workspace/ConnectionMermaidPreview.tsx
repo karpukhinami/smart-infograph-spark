@@ -207,7 +207,7 @@ export function ConnectionMermaidPreview({ connection }: Props) {
             −
           </button>
           <span className="min-w-10 text-center text-[11px] tabular-nums text-muted-foreground">
-            {Math.round(zoom * 100)}%
+            {Math.round((zoom / (fitScale || 1)) * 100)}%
           </span>
           <button
             type="button"
