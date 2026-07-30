@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConnectionSchemaJson } from "@/lib/types";
 import { buildConnectionMermaid } from "@/lib/connection-mermaid";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Maximize2 } from "lucide-react";
 
 interface Props {
   connection: ConnectionSchemaJson;
