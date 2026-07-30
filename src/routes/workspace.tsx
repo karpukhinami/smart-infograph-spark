@@ -1082,7 +1082,10 @@ ${activeContent.value.content}`;
             </TabsContent>
 
             <TabsContent value="auto-layout" className="p-2 space-y-2">
-              {activeContent?.value.analysis ? (
+              {activeContent?.value.connection ? (
+                <ConnectionMermaidPreview connection={activeContent.value.connection} />
+              ) : activeContent?.value.analysis ? (
+
                 <>
                   <div className="flex justify-end gap-2">
                     <Button
