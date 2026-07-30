@@ -21,6 +21,7 @@ export default defineConfig({
   nitro: {
     preset: "render_com",
     // Trace instead of inlining — googleapis is huge and can OOM the bundler.
+    // @ts-expect-error traceDeps is supported by nitro but missing from the wrapper's types.
     traceDeps: ["googleapis", "sharp"],
   },
 });

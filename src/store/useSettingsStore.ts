@@ -15,6 +15,8 @@ import promptStrictAnalysisTopic from "@/data/prompts/strict/analysis-topic-only
 import promptStrictDesignBrief from "@/data/prompts/strict/design-brief.txt?raw";
 import promptStrictGeneralRules from "@/data/prompts/strict/general-rules.txt?raw";
 import promptStrictDetectStyle from "@/data/prompts/strict/detect-style.txt?raw";
+import promptStrictConnWith from "@/data/prompts/strict/connection-schema-with-content.txt?raw";
+import promptStrictConnTopic from "@/data/prompts/strict/connection-schema-topic-only.txt?raw";
 import { AI_LAYOUT_PROMPT } from "@/lib/a4-layout/ai-prompt";
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
@@ -30,6 +32,10 @@ interface PromptSet {
   codeBasedProduct: string;
   /** Prompt for detecting the best-fitting infographic style. */
   detectStyle: string;
+  /** "Схема связей": analysis with source material. */
+  connectionSchemaWithContent: string;
+  /** "Схема связей": generation from topic only. */
+  connectionSchemaTopicOnly: string;
 }
 
 interface SettingsState {
@@ -61,6 +67,8 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     generalRules: promptFreeGeneralRules,
     codeBasedProduct: "",
     detectStyle: "",
+    connectionSchemaWithContent: "",
+    connectionSchemaTopicOnly: "",
   },
   strict: {
     analysisWithContent: promptStrictAnalysisWith,
@@ -69,6 +77,8 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     generalRules: promptStrictGeneralRules,
     codeBasedProduct: AI_LAYOUT_PROMPT,
     detectStyle: promptStrictDetectStyle,
+    connectionSchemaWithContent: promptStrictConnWith,
+    connectionSchemaTopicOnly: promptStrictConnTopic,
   },
 };
 
@@ -129,7 +139,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "infographic-settings",
-      version: 24,
+      version: 25,
 
       // Breaking shape change — drop persisted state from older versions.
       migrate: () => undefined as unknown as SettingsState,

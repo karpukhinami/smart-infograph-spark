@@ -3,6 +3,8 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   AnalysisEntity,
   AnalysisJson,
+  ConnectionEntity,
+  ConnectionRegion,
   ContentSummary,
   DesignBriefResult,
   SourceText,
@@ -17,6 +19,7 @@ import type { SimpleImageArchiveMeta } from "@/lib/google/archive-schema";
 import type { PendingArchiveFeedback } from "@/lib/image-feedback-types";
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from "@/lib/models";
 import { renderAnalysisJson } from "@/lib/analysis-render";
+import { renderConnectionSchemaJson } from "@/lib/connection-schema";
 import { createQuotaAwareSessionStorage } from "@/lib/browser-storage-quota";
 
 
@@ -84,6 +87,12 @@ interface ProjectState {
   addActiveAnalysisEntity: (entity: AnalysisEntity) => void;
   updateActiveAnalysisHeader: (patch: { topic?: string; subject?: string | null; grade?: string | null; summary?: string }) => void;
   replaceActiveAnalysis: (analysis: AnalysisJson) => void;
+  updateActiveConnectionEntity: (
+    regionIndex: number,
+    entityIndex: number,
+    patch: Partial<ConnectionEntity>,
+  ) => void;
+  updateActiveConnectionRegion: (regionIndex: number, patch: Partial<ConnectionRegion>) => void;
   setActiveContent: (id: string) => void;
 
 
@@ -363,6 +372,32 @@ export const useProjectStore = create<ProjectState>()(
               ? { ...x, value: { ...x.value, analysis, content: renderAnalysisJson(analysis) } }
               : x,
           ),
+        })),
+      updateActiveConnectionEntity: (regionIndex, entityIndex, patch) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const conn = x.value.connection;
+            if (!conn) return x;
+            const regions = conn.regions.map((r, ri) =>
+              ri !== regionIndex
+                ? r
+                : { ...r, entities: r.entities.map((e, ei) => (ei === entityIndex ? { ...e, ...patch } : e)) },
+            );
+            const next = { ...conn, regions };
+            return { ...x, value: { ...x.value, connection: next, content: renderConnectionSchemaJson(next) } };
+          }),
+        })),
+      updateActiveConnectionRegion: (regionIndex, patch) =>
+        set((s) => ({
+          contentVersions: s.contentVersions.map((x) => {
+            if (x.id !== s.activeContentId) return x;
+            const conn = x.value.connection;
+            if (!conn) return x;
+            const regions = conn.regions.map((r, ri) => (ri === regionIndex ? { ...r, ...patch } : r));
+            const next = { ...conn, regions };
+            return { ...x, value: { ...x.value, connection: next, content: renderConnectionSchemaJson(next) } };
+          }),
         })),
       setActiveContent: (id) => set({ activeContentId: id }),
 

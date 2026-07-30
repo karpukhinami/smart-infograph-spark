@@ -22,7 +22,7 @@ export interface AiAddendumsSpec {
   items: string[];
 }
 
-export type LayoutEntity = AnalysisEntity & {
+export type LayoutEntity = Omit<AnalysisEntity, "attention"> & {
   attention?: string;
   contentHtml?: boolean;
   aiAddendums?: AiAddendumsSpec | null;
@@ -55,6 +55,7 @@ export interface EntityHint {
   entityType: string;
   attention: string;
   sourceEntity: LayoutEntity;
+  stats?: Record<string, unknown>;
   widthReports: WidthReport[];
   atFraction: (fraction: number) => WidthReport;
   contentLoad: string;
