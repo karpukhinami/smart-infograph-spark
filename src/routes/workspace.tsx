@@ -317,7 +317,14 @@ function Workspace() {
     try {
       setLoading("analyze");
       const stylesList = enabledStyles.map((s) => `- ${s.id}: ${s.name} — ${s.shortDescription}`).join("\n");
-      const template = useTopicOnlyPrompt ? prompts.analysisTopicOnly : prompts.analysisWithContent;
+      const isConnectionStyle = selectedStyleId === "connection-schema";
+      const template = isConnectionStyle
+        ? useTopicOnlyPrompt
+          ? prompts.connectionSchemaTopicOnly
+          : prompts.connectionSchemaWithContent
+        : useTopicOnlyPrompt
+          ? prompts.analysisTopicOnly
+          : prompts.analysisWithContent;
       const filled = template
         .replaceAll("{{USER_INSTRUCTIONS}}", source.userInstructions || "(нет)")
         .replaceAll("{{STYLES_LIST}}", stylesList || "(стилей не задано)")
@@ -328,7 +335,23 @@ function Workspace() {
 
       let summary: ContentSummary;
       const imgs = attachedImages.length ? attachedImages : undefined;
-      if (mode === "strict") {
+      if (mode === "strict" && isConnectionStyle) {
+        const connection = await callTextLLMForJson({
+          model: models.analysis,
+          prompt: filled,
+          label: "connection-schema",
+          schemaHint:
+            'Верни JSON-объект схемы связей со структурой { topic, subject, grade, focusQuestion, displaySubtitle, regions: [{ id, number, title, organizationType, anchorEntityId, entities: [{ id, title, text, addendum, depiction }], relations: [{ from, to, direction, label }] }], regionRelations: [{ fromRegion, toRegion, direction, label }] }. Все обратные слеши внутри строк должны быть удвоены.',
+          parse: validateConnectionSchemaJson,
+          images: imgs,
+        });
+        summary = {
+          content: renderConnectionSchemaJson(connection),
+          recommendedStyle: "connection-schema",
+          recommendedDesignProfile: null,
+          connection,
+        };
+      } else if (mode === "strict") {
         const analysis = await callTextLLMForJson({
           model: models.analysis,
           prompt: filled,
