@@ -256,12 +256,36 @@ export const A4LayoutCanvas = forwardRef<A4LayoutCanvasHandle, Props>(function A
         <div className="a4-manual-warnings">{manualErrors.join("\n")}</div>
       ) : null}
 
-      <div ref={viewportRef} className="a4-poster-viewport">
+      {zoom > 1 ? (
+        <div className="a4-zoom-bar">
+          <span>Масштаб: {Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={resetView}>
+            Сбросить
+          </button>
+        </div>
+      ) : null}
+
+      <div
+        ref={viewportRef}
+        className="a4-poster-viewport"
+        style={{
+          overflow: zoom > 1 ? "hidden" : "auto",
+          cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
+          touchAction: zoom > 1 ? "none" : undefined,
+        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+        onDoubleClick={resetView}
+      >
         <div
           className="a4-poster-scale-host"
           style={{
             width: Math.round(settings.pageWidthPx * displayScale),
             height: Math.round(settings.pageHeightPx * displayScale),
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: "top left",
           }}
         >
           <div
