@@ -30,6 +30,62 @@ export function ConnectionMermaidPreview({ connection }: Props) {
   const [svg, setSvg] = useState<string>("");
   const [renderError, setRenderError] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+
+  const clampZoom = (z: number) => Math.min(8, Math.max(0.2, z));
+
+  const resetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  const zoomAt = useCallback((factor: number, cx: number, cy: number) => {
+    setZoom((prev) => {
+      const next = clampZoom(prev * factor);
+      const k = next / prev;
+      setPan((p) => ({ x: cx - k * (cx - p.x), y: cy - k * (cy - p.y) }));
+      return next;
+    });
+  }, []);
+
+  const zoomByStep = useCallback(
+    (factor: number) => {
+      const vp = viewportRef.current;
+      zoomAt(factor, vp ? vp.clientWidth / 2 : 0, vp ? vp.clientHeight / 2 : 0);
+    },
+    [zoomAt],
+  );
+
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = vp.getBoundingClientRect();
+      zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - rect.left, e.clientY - rect.top);
+    };
+    vp.addEventListener("wheel", onWheel, { passive: false });
+    return () => vp.removeEventListener("wheel", onWheel);
+  }, [zoomAt, svg]);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    panStart.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
+    setIsPanning(true);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const s = panStart.current;
+    if (!s) return;
+    setPan({ x: s.px + (e.clientX - s.x), y: s.py + (e.clientY - s.y) });
+  };
+  const endPan = () => {
+    panStart.current = null;
+    setIsPanning(false);
+  };
 
   const built = useMemo(() => buildConnectionMermaid(connection, direction), [connection, direction]);
 
