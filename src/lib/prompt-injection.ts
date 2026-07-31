@@ -94,6 +94,23 @@ export function designProfileProse(profile: DesignProfile | null | undefined): s
   return lines.join("\n");
 }
 
+// English labels used ONLY inside prompt text (UI keeps Russian labels above).
+const COLOR_ROLE_LABELS_EN: Record<keyof DesignProfileColors, string> = {
+  backgroundColor: "Page background (backgroundColor)",
+  surfaceColor: "Inner card surface / inset background (surfaceColor)",
+  primaryColor: "Main palette accent (primaryColor)",
+  detailSoftColor: "Lighter pastel (detailSoftColor)",
+  detailDeepColor: "Deeper pastel (detailDeepColor)",
+  contrastSoftColor: "Contrast pastel (contrastSoftColor)",
+  inkColor: "Dark text and technical lines (inkColor)",
+  headerColor: "Header background and title plates (headerColor)",
+  lightTextColor: "Light text (lightTextColor)",
+  spotAccentColor: "Spot accent details (spotAccentColor)",
+  mutedheaderTextColor: "Secondary light text in header (mutedheaderTextColor)",
+};
+
+const PASTEL_FILL_LABEL_EN = "Unified pastel fill (detailSoftColor)";
+
 // English-only "use for" descriptions for the LAYER 1 palette block (hex codes injected at assembly time).
 const COLOR_USE_FOR: Record<keyof DesignProfileColors, string> = {
   backgroundColor: "use for the overall page / canvas background",
