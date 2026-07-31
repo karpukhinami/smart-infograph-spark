@@ -452,8 +452,10 @@ export function buildDesignBriefPrompt(opts: {
   profile: DesignProfile | null | undefined;
   userWishes: string;
   generalRules?: string;
+  /** Pass to make LAYER 1 style-aware (workspace). Omit to keep bento rules (home page). */
+  styleId?: string;
 }): string {
-  const { template, contentSummary, style, profile, userWishes, generalRules } = opts;
+  const { template, contentSummary, style, profile, userWishes, generalRules, styleId } = opts;
   return template
     .replaceAll("{{CONTENT_SUMMARY}}", contentSummary)
     .replaceAll("{{STYLE_NAME}}", style?.name ?? "")
@@ -461,7 +463,10 @@ export function buildDesignBriefPrompt(opts: {
     .replaceAll("{{STYLE_GENERAL_RULES_BLOCK}}", styleGeneralRulesBlock(style))
     .replaceAll("{{STYLE_SPECIFIC_RULES_BLOCK}}", styleSpecificRulesBlock(style))
     .replaceAll("{{DESIGN_PROFILE_PROSE}}", designProfileProse(profile))
-    .replaceAll("{{DESIGN_PROFILE_COLORS_AND_RULES}}", designProfileColorsAndRules(profile))
+    .replaceAll(
+      "{{DESIGN_PROFILE_COLORS_AND_RULES}}",
+      designProfileColorsAndRules(profile, styleId ?? BENTO_STYLE_ID),
+    )
     .replaceAll("{{USER_WISHES}}", userWishes.trim() || "(нет)")
     .replaceAll("{{GENERAL_RULES_BLOCK}}", generalRules?.trim() ?? "");
 }
