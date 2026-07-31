@@ -132,9 +132,9 @@ function colorPaletteLine(
   hex: string,
   unifiedPastel: boolean,
 ): string {
-  let roleLabel = COLOR_ROLE_LABELS.find((r) => r.key === key)?.label ?? key;
+  let roleLabel: string = COLOR_ROLE_LABELS_EN[key] ?? key;
   if (unifiedPastel && key === "detailSoftColor") {
-    roleLabel = PASTEL_FILL_LABEL;
+    roleLabel = PASTEL_FILL_LABEL_EN;
   }
   let useFor = COLOR_USE_FOR[key];
   if (unifiedPastel && key === "detailSoftColor") {
