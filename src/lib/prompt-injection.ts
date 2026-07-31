@@ -94,6 +94,23 @@ export function designProfileProse(profile: DesignProfile | null | undefined): s
   return lines.join("\n");
 }
 
+// English labels used ONLY inside prompt text (UI keeps Russian labels above).
+const COLOR_ROLE_LABELS_EN: Record<keyof DesignProfileColors, string> = {
+  backgroundColor: "Page background (backgroundColor)",
+  surfaceColor: "Inner card surface / inset background (surfaceColor)",
+  primaryColor: "Main palette accent (primaryColor)",
+  detailSoftColor: "Lighter pastel (detailSoftColor)",
+  detailDeepColor: "Deeper pastel (detailDeepColor)",
+  contrastSoftColor: "Contrast pastel (contrastSoftColor)",
+  inkColor: "Dark text and technical lines (inkColor)",
+  headerColor: "Header background and title plates (headerColor)",
+  lightTextColor: "Light text (lightTextColor)",
+  spotAccentColor: "Spot accent details (spotAccentColor)",
+  mutedheaderTextColor: "Secondary light text in header (mutedheaderTextColor)",
+};
+
+const PASTEL_FILL_LABEL_EN = "Unified pastel fill (detailSoftColor)";
+
 // English-only "use for" descriptions for the LAYER 1 palette block (hex codes injected at assembly time).
 const COLOR_USE_FOR: Record<keyof DesignProfileColors, string> = {
   backgroundColor: "use for the overall page / canvas background",
@@ -115,9 +132,9 @@ function colorPaletteLine(
   hex: string,
   unifiedPastel: boolean,
 ): string {
-  let roleLabel = COLOR_ROLE_LABELS.find((r) => r.key === key)?.label ?? key;
+  let roleLabel: string = COLOR_ROLE_LABELS_EN[key] ?? key;
   if (unifiedPastel && key === "detailSoftColor") {
-    roleLabel = PASTEL_FILL_LABEL;
+    roleLabel = PASTEL_FILL_LABEL_EN;
   }
   let useFor = COLOR_USE_FOR[key];
   if (unifiedPastel && key === "detailSoftColor") {
@@ -306,11 +323,23 @@ CARD COLORING RULES
 - Never let non-core elements visually compete with core card`;
 }
 
-export function designProfileColorsAndRules(profile: DesignProfile | null | undefined): string {
-  if (!profile) return "(design profile is not set)";
+/** English font-character names for the prompt (UI labels stay Russian). */
+const TYPO_STYLE_LABELS_EN: Record<string, string> = {
+  geometric_grotesque: "Geometric grotesque sans-serif",
+  neutral_ui_sans: "Neutral UI sans-serif",
+  soft_humanist_sans: "Soft humanist sans-serif",
+  strict_neo_grotesque: "Strict neo-grotesque sans-serif",
+  editorial_serif: "Editorial serif",
+  soft_modern_serif: "Soft modern serif",
+  display_headline: "Display headline font with clean sans-serif body",
+  tech_monospace: "Tech monospaced sans-serif",
+  readability_first: "Maximum-readability clean sans-serif",
+};
+
+/** Shared header + palette + font block, used by every style-specific builder. */
+function paletteAndFontBlock(profile: DesignProfile): string {
   const c = profile.colors;
   const typoStyle = TYPO_STYLES.find((t) => t.id === profile.typography.styleId);
-
   const lines: string[] = [];
   lines.push("LAYER 1 -- COLOR AND TYPOGRAPHY GENERAL RULES");
   lines.push("");
@@ -325,21 +354,68 @@ export function designProfileColorsAndRules(profile: DesignProfile | null | unde
     lines.push("");
     lines.push(typoStyle.prompt);
   }
-  lines.push("");
+  return lines.join("\n");
+}
 
-  // Substitute role placeholders with hex codes; if a role is missing in palette, keep the role
-  // name in plain text as a safe fallback (it stays visible only inside the prompt, never in image).
-  let body = layer1RulesTemplate();
+function fillRolePlaceholders(body: string, profile: DesignProfile): string {
+  const c = profile.colors;
+  let out = body;
   for (const { key } of COLOR_ROLE_LABELS) {
     const hex = c?.[key];
-    const replacement = hex ?? `(${key})`;
-    body = body.replaceAll(`{{${key}}}`, replacement);
+    out = out.replaceAll(`{{${key}}}`, hex ?? `(${key})`);
   }
-  const fontLabel = typoStyle?.label ?? FONT_FAMILY_PLACEHOLDER;
-  body = body.replaceAll(FONT_FAMILY_PLACEHOLDER, fontLabel);
-  lines.push(body);
+  const typoStyle = TYPO_STYLES.find((t) => t.id === profile.typography.styleId);
+  const fontLabel = typoStyle
+    ? TYPO_STYLE_LABELS_EN[typoStyle.id] ?? FONT_FAMILY_PLACEHOLDER
+    : FONT_FAMILY_PLACEHOLDER;
+  return out.replaceAll(FONT_FAMILY_PLACEHOLDER, fontLabel);
+}
 
-  return lines.join("\n");
+/** Bento-specific LAYER 1 (the historical rule set; used by the home page too). */
+function bentoColorsAndRules(profile: DesignProfile): string {
+  return [
+    paletteAndFontBlock(profile),
+    "",
+    fillRolePlaceholders(layer1RulesTemplate(), profile),
+  ].join("\n");
+}
+
+/** Minimal, style-neutral LAYER 1 for styles that do not yet have their own rule set. */
+function genericColorsAndRules(profile: DesignProfile): string {
+  const generic = `GLOBAL COLOR CONSTRAINTS
+
+- Use {{backgroundColor}} for the overall canvas background.
+
+- Use ${FONT_FAMILY_PLACEHOLDER} as the single typographic system.
+
+- Default text color is {{inkColor}}; light text on dark areas is {{lightTextColor}}.
+
+- Use {{primaryColor}} for the main semantic accent, {{spotAccentColor}} only for rare micro-accents.
+
+- Never introduce colors outside the palette above.
+
+- Never output HEX codes or technical role names in the final visible design.`;
+  return [paletteAndFontBlock(profile), "", fillRolePlaceholders(generic, profile)].join("\n");
+}
+
+/** Per-style LAYER 1 builders. Add a new entry when a style gets its own colour rules. */
+const LAYER1_BUILDERS: Record<string, (p: DesignProfile) => string> = {
+  "modern-bento": bentoColorsAndRules,
+};
+
+export const BENTO_STYLE_ID = "modern-bento";
+
+/**
+ * LAYER 1 text. `styleId` defaults to bento so the home page (which is bento-only)
+ * keeps its exact historical output; the workspace passes the selected style id.
+ */
+export function designProfileColorsAndRules(
+  profile: DesignProfile | null | undefined,
+  styleId: string = BENTO_STYLE_ID,
+): string {
+  if (!profile) return "(design profile is not set)";
+  const build = LAYER1_BUILDERS[styleId] ?? genericColorsAndRules;
+  return build(profile);
 }
 
 /** Resolve design profile by name, falling back to the first profile in the list. */
@@ -376,8 +452,10 @@ export function buildDesignBriefPrompt(opts: {
   profile: DesignProfile | null | undefined;
   userWishes: string;
   generalRules?: string;
+  /** Pass to make LAYER 1 style-aware (workspace). Omit to keep bento rules (home page). */
+  styleId?: string;
 }): string {
-  const { template, contentSummary, style, profile, userWishes, generalRules } = opts;
+  const { template, contentSummary, style, profile, userWishes, generalRules, styleId } = opts;
   return template
     .replaceAll("{{CONTENT_SUMMARY}}", contentSummary)
     .replaceAll("{{STYLE_NAME}}", style?.name ?? "")
@@ -385,7 +463,10 @@ export function buildDesignBriefPrompt(opts: {
     .replaceAll("{{STYLE_GENERAL_RULES_BLOCK}}", styleGeneralRulesBlock(style))
     .replaceAll("{{STYLE_SPECIFIC_RULES_BLOCK}}", styleSpecificRulesBlock(style))
     .replaceAll("{{DESIGN_PROFILE_PROSE}}", designProfileProse(profile))
-    .replaceAll("{{DESIGN_PROFILE_COLORS_AND_RULES}}", designProfileColorsAndRules(profile))
+    .replaceAll(
+      "{{DESIGN_PROFILE_COLORS_AND_RULES}}",
+      designProfileColorsAndRules(profile, styleId ?? BENTO_STYLE_ID),
+    )
     .replaceAll("{{USER_WISHES}}", userWishes.trim() || "(нет)")
     .replaceAll("{{GENERAL_RULES_BLOCK}}", generalRules?.trim() ?? "");
 }

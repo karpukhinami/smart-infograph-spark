@@ -409,6 +409,7 @@ function Workspace() {
         profile: activeProfile,
         userWishes,
         generalRules: prompts.generalRules,
+        styleId: activeStyle?.id,
       });
       const parsed = await callTextLLMForJson({
         model: models.brief,
@@ -421,7 +422,7 @@ function Workspace() {
         throw new Error("В ответе модели не хватает полей");
       }
       if (mode === "strict") {
-        const layer1 = designProfileColorsAndRules(activeProfile);
+        const layer1 = designProfileColorsAndRules(activeProfile, activeStyle?.id);
         parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
       }
       pushBrief(parsed);
@@ -607,6 +608,7 @@ ${activeContent.value.content}`;
         profile: activeProfile,
         userWishes: combinedWishes,
         generalRules: prompts.generalRules,
+        styleId: activeStyle?.id,
       });
       const parsed = await callTextLLMForJson({
         model: models.brief,
@@ -619,7 +621,7 @@ ${activeContent.value.content}`;
         throw new Error("В ответе модели не хватает полей");
       }
       if (mode === "strict") {
-        const layer1 = designProfileColorsAndRules(activeProfile);
+        const layer1 = designProfileColorsAndRules(activeProfile, activeStyle?.id);
         parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
       }
       pushBrief(parsed);
