@@ -45,7 +45,7 @@ async function getMermaid() {
         securityLevel: "loose",
         htmlLabels: true,
         theme: "neutral",
-        flowchart: { htmlLabels: true, useMaxWidth: true, nodeSpacing: 40, rankSpacing: 60 },
+        flowchart: { htmlLabels: true, useMaxWidth: false, nodeSpacing: 40, rankSpacing: 60 },
       });
       return mod.default;
     })();
@@ -78,11 +78,29 @@ export function ConnectionMermaidPreview({ connection }: Props) {
     const host = hostRef.current;
     const el = host?.querySelector("svg") as SVGSVGElement | null;
     if (!vp || !el) return false;
-    const vb = el.viewBox?.baseVal;
-    const w = vb && vb.width ? vb.width : el.getBoundingClientRect().width;
-    const h = vb && vb.height ? vb.height : el.getBoundingClientRect().height;
+
+    // Реальные границы содержимого: mermaid часто оставляет viewBox шире контента
+    // и style="max-width:…", из-за чего вписывание считалось по «пустому» размеру.
+    let w = 0;
+    let h = 0;
+    try {
+      const bb = (el as SVGGraphicsElement).getBBox();
+      if (bb.width > 0 && bb.height > 0) {
+        w = Math.ceil(bb.width);
+        h = Math.ceil(bb.height);
+        el.setAttribute("viewBox", `${bb.x} ${bb.y} ${bb.width} ${bb.height}`);
+      }
+    } catch {
+      /* getBBox недоступен, если SVG ещё не в layout */
+    }
+    if (!w || !h) {
+      const vb = el.viewBox?.baseVal;
+      w = vb && vb.width ? vb.width : el.getBoundingClientRect().width;
+      h = vb && vb.height ? vb.height : el.getBoundingClientRect().height;
+    }
     if (!w || !h) return false;
     el.removeAttribute("style");
+    el.setAttribute("preserveAspectRatio", "xMidYMid meet");
     el.setAttribute("width", String(w));
     el.setAttribute("height", String(h));
     const pad = 24;
@@ -125,6 +143,7 @@ export function ConnectionMermaidPreview({ connection }: Props) {
   // Автовписывание после рендера SVG и при смене режима отображения.
   useEffect(() => {
     if (!svg) return;
+    const vp = viewportRef.current;
     let raf1 = 0;
     let raf2 = 0;
     raf1 = requestAnimationFrame(() => {
@@ -132,11 +151,23 @@ export function ConnectionMermaidPreview({ connection }: Props) {
         fitToViewport();
       });
     });
+    // Контейнер может получить финальные размеры позже (диалог, вкладки).
+    let ro: ResizeObserver | null = null;
+    let fitted = false;
+    if (vp && typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => {
+        if (fitted) return;
+        if (vp.clientWidth > 0 && vp.clientHeight > 0) fitted = fitToViewport();
+      });
+      ro.observe(vp);
+    }
     return () => {
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
+      ro?.disconnect();
     };
   }, [svg, fullscreen, fitToViewport]);
+
 
 
   useEffect(() => {
