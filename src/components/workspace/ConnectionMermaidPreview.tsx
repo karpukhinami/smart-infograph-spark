@@ -45,7 +45,7 @@ async function getMermaid() {
         securityLevel: "loose",
         htmlLabels: true,
         theme: "neutral",
-        flowchart: { htmlLabels: true, useMaxWidth: true, nodeSpacing: 40, rankSpacing: 60 },
+        flowchart: { htmlLabels: true, useMaxWidth: false, nodeSpacing: 40, rankSpacing: 60 },
       });
       return mod.default;
     })();
