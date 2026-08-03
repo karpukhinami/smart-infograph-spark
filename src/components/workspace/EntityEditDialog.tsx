@@ -88,15 +88,15 @@ export function EntityEditDialog({ open, entity, isNew = false, profile = null, 
       setVisualDescription("");
       return;
     }
-    setSectionId(entity.sectionId ?? "");
-    setTitle(entity.title ?? "");
+    setSectionId((entity.sectionId as AnalysisSectionId) ?? "");
+    setTitle(asText(entity.title));
     setContent(asText(entity.content));
     setFormula(asText(entity.formula));
     setAddendum(asText(entity.cardAddendum));
     const att = normalizeAttention(entity.attention);
     setAttention(att);
-    setIcon(entity.icon ?? "");
-    setVisualDescription(entity.visual?.description ?? "");
+    setIcon(asText(entity.icon));
+    setVisualDescription(asText(entity.visual?.description));
   }, [entity, open]);
 
   const validationError = useMemo(() => {
