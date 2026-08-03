@@ -319,10 +319,10 @@ function RegionDialog({
 
   useEffect(() => {
     if (!open || !region) return;
-    setTitle(region.title ?? "");
-    setNumber(region.number ?? "");
-    setAnchor(region.anchorEntityId ?? "__none__");
-    setOrgType(region.organizationType);
+    setTitle(asText(region.title));
+    setNumber(asText(region.number));
+    setAnchor(asText(region.anchorEntityId) || "__none__");
+    setOrgType(asText(region.organizationType));
   }, [open, region]);
 
   return (
