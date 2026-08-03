@@ -201,6 +201,48 @@ export function renderConnectionSchemaJson(a: ConnectionSchemaJson): string {
   return parts.join("\n\n");
 }
 
+// --- LaTeX normalization for the design-brief input (connection style only) ---
+// Bento feeds the brief a Markdown summary, where formulas already carry $...$
+// delimiters and single backslashes. The connection style feeds raw JSON, so the
+// same two guarantees have to be reproduced here, otherwise the image model sees
+// `\\frac` / undelimited LaTeX and renders it as visible technical syntax.
+
+const LATEX_COMMAND_RE =
+  /\\(frac|dfrac|tfrac|sqrt|left|right|text|mathrm|mathbb|cdot|times|div|pm|mp|sum|prod|int|lim|log|ln|sin|cos|tan|cot|vec|overline|underline|hat|bar|begin|end|alpha|beta|gamma|delta|Delta|epsilon|varepsilon|theta|lambda|mu|nu|pi|rho|sigma|tau|phi|varphi|chi|psi|omega|Omega|Sigma|Pi|infty|approx|neq|leq|geq|le|ge|ll|gg|equiv|propto|partial|nabla|angle|perp|parallel|in|notin|subset|supset|cup|cap|forall|exists|Rightarrow|rightarrow|leftarrow|leftrightarrow|to|circ|deg|%|,|;|!)/;
+
+/** Whole string is a bare formula (LaTeX commands or math-only) without $ delimiters. */
+function isBareFormula(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.includes("$")) return false;
+  if (LATEX_COMMAND_RE.test(t)) return true;
+  return /^[A-Za-z0-9\s()[\]{}^_+\-*/=<>.,:;|'"·×÷±≤≥≈≠°%]+$/.test(t) && /[=^_]/.test(t);
+}
+
+/** Wrap bare formulas in $...$, mirroring the bento renderFormula behaviour. */
+function normalizeLatexValue<T>(value: T): T {
+  if (typeof value === "string") {
+    return (isBareFormula(value) ? `$${value.trim()}$` : value) as unknown as T;
+  }
+  if (Array.isArray(value)) return value.map((v) => normalizeLatexValue(v)) as unknown as T;
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = normalizeLatexValue(v);
+    }
+    return out as unknown as T;
+  }
+  return value;
+}
+
+/**
+ * Un-double the backslashes JSON.stringify introduces, so LaTeX appears in the
+ * prompt exactly as it does in the bento Markdown summary ($\frac{a}{b}$, not
+ * $\\frac{a}{b}$). Line breaks stay encoded as \n.
+ */
+function singleBackslashLatex(json: string): string {
+  return json.replace(/\\\\/g, "\\");
+}
+
 /**
  * Compact raw-JSON view of the connection schema for the design-brief prompt.
  * The brief prompt references raw field names (organizationType, anchorEntityId,
@@ -231,5 +273,6 @@ export function connectionSchemaForBrief(a: ConnectionSchemaJson): string {
     })),
     regionRelations: a.regionRelations,
   };
-  return JSON.stringify(clean, null, 2);
+  return singleBackslashLatex(JSON.stringify(normalizeLatexValue(clean), null, 2));
 }
+
