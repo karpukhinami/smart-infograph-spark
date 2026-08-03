@@ -398,12 +398,86 @@ function genericColorsAndRules(profile: DesignProfile): string {
   return [paletteAndFontBlock(profile), "", fillRolePlaceholders(generic, profile)].join("\n");
 }
 
+/** LAYER 1 for the "схема связей" style: same palette/font block, own drawing rules. */
+function connectionColorsAndRules(profile: DesignProfile): string {
+  const rules = `GENERAL DRAWING RULES FOR RELATIONSHIP INFOGRAPHICS
+
+Use the full canvas efficiently. Preserve comfortable outer margins and clear spacing, but do not leave large accidental empty areas that have no compositional or semantic purpose.
+
+Keep every region visually coherent and spatially distinct. Do not interleave entities from different regions. Do not place parts of one region inside another region or allow one region to visually absorb another unless this is explicitly required by the content structure.
+
+Balance the regions according to their actual complexity and amount of content. Regions do not have to be equal in size, but their relative sizes must appear intentional.
+
+Maintain a consistent visual language across the entire infographic: coordinated entity shapes, border weights, corner treatment, typography, illustration style, line style, and level of detail.
+
+Use only colors from the provided palette.
+
+Use ${FONT_FAMILY_PLACEHOLDER} as the single typographic system.
+
+Use {{backgroundColor}} for the main canvas.
+
+Use {{inkColor}} as the default color for educational text, entity outlines, relation lines, arrowheads, markers, and relation labels.
+
+Use {{primaryColor}} for the main structural emphasis, such as an anchor entity, a central node, or the principal route. Do not apply it to every entity.
+
+Use {{detailSoftColor}} and {{detailDeepColor}} for ordinary entities, branches, levels, or parallel groups. Assign them according to structure; do not alternate colors mechanically.
+
+Use {{contrastSoftColor}} only for a meaningful contrast, such as a result, condition, exception, alternative route, or opposing element.
+
+Use {{surfaceColor}} for small secondary areas, addendums, relation-label backgrounds, or compact content placed beside a marker.
+
+Use {{headerColor}} and {{lightTextColor}} primarily for the title area or a rare dark structural accent.
+
+Ensure sufficient contrast between text, lines, and backgrounds. Do not place light text on a light fill or dark text on a dark fill.
+
+Relation lines must remain clearly readable. They must not pass through entity cards, visible text, depictions, addendums, or relation labels.
+
+Minimize line crossings by adjusting entity positions and line routes. If a crossing cannot be avoided, make the crossing visually unambiguous and use one consistent crossing convention throughout the infographic.
+
+Do not allow unrelated relation lines to overlap for long distances. Shared line segments are allowed only when they intentionally represent one common route.
+
+Arrowheads must be clearly visible, proportional to the line weight, and separated from text and card borders. Direction must be immediately understandable.
+
+Place every relation label close to the line or branch it describes. Do not place labels at intersections or in positions where they may be associated with another relation. Use a small {{surfaceColor}} background when needed for readability.
+
+Internal relations and relations between regions must follow the same overall graphic language. Relations between regions may use one consistent additional distinction, such as greater line weight, stronger contrast, or a dedicated palette color.
+
+A connector between an addendum and its parent entity is not a semantic relation. It must be thinner than relation lines, must not have an arrowhead, and must not have a label.
+
+The image generation model may adjust exact spacing, line curvature, and minor proportions to achieve a balanced composition, but it must preserve all regions, entities, directions, labels, visible texts, and semantic relationships specified in the prompt.
+
+Never output HEX codes or technical color role names in the final visible design.
+
+LATEX AND MATHEMATICAL NOTATION
+
+Treat any mathematical expression enclosed in $...$ or $$...$$ as LaTeX source code that describes a mathematical formula.
+
+Render the formula as properly typeset mathematical notation. Do not reproduce the dollar-sign delimiters as visible characters.
+
+Do not display LaTeX command syntax such as backslashes, command names, or structural braces. For example, render $\\frac{a}{b}$ as a fraction, not as the visible text \\frac{a}{b}.
+
+If backslashes are doubled because the prompt is encoded as JSON, interpret them as escaped LaTeX commands and render the intended formula.
+
+Preserve the mathematical content exactly. Do not simplify, solve, translate, expand, or rewrite the formula. Preserve all variables, numbers, operators, inequalities, superscripts, subscripts, fractions, roots, brackets, and other mathematical symbols.
+
+Render formulas enclosed in $...$ as inline mathematics when they occur inside a sentence or short text line.
+
+Render formulas enclosed in $$...$$ as display mathematics on a separate line or in a visually distinct formula area.
+
+If a field contains only a formula, treat the formula as the main visible content of that element. Center or align it according to the element's layout rules, while preserving the specified visual hierarchy.
+
+Dollar signs, escaped backslashes, and LaTeX structural braces are technical markup and must never appear on the final image unless they are explicitly part of the mathematical content.`;
+  return [paletteAndFontBlock(profile), "", fillRolePlaceholders(rules, profile)].join("\n");
+}
+
 /** Per-style LAYER 1 builders. Add a new entry when a style gets its own colour rules. */
 const LAYER1_BUILDERS: Record<string, (p: DesignProfile) => string> = {
   "modern-bento": bentoColorsAndRules,
+  "connection-schema": connectionColorsAndRules,
 };
 
 export const BENTO_STYLE_ID = "modern-bento";
+export const CONNECTION_STYLE_ID = "connection-schema";
 
 /**
  * LAYER 1 text. `styleId` defaults to bento so the home page (which is bento-only)
