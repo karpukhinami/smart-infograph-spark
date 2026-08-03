@@ -32,8 +32,15 @@ function arrowOf(direction: string): string {
   return "→";
 }
 
+function asText(v: unknown): string {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.filter((x) => x != null).map((x) => String(x)).join("\n");
+  return String(v);
+}
+
 /** Balance check for $...$ and markdown backticks, mirrors the bento editor rules. */
-function validateMarkup(value: string): string | null {
+function validateMarkup(input: unknown): string | null {
+  const value = asText(input);
   const dollars = (value.match(/(?<!\\)\$/g) ?? []).length;
   if (dollars % 2 !== 0) return "Непарное количество символов $ (LaTeX)";
   const ticks = (value.match(/`/g) ?? []).length;
