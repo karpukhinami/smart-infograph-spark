@@ -17,6 +17,7 @@ import promptStrictGeneralRules from "@/data/prompts/strict/general-rules.txt?ra
 import promptStrictDetectStyle from "@/data/prompts/strict/detect-style.txt?raw";
 import promptStrictConnWith from "@/data/prompts/strict/connection-schema-with-content.txt?raw";
 import promptStrictConnTopic from "@/data/prompts/strict/connection-schema-topic-only.txt?raw";
+import promptConnDesignBrief from "@/data/prompts/simple/design-brief-connection.txt?raw";
 import { AI_LAYOUT_PROMPT } from "@/lib/a4-layout/ai-prompt";
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
@@ -36,6 +37,8 @@ interface PromptSet {
   connectionSchemaWithContent: string;
   /** "Схема связей": generation from topic only. */
   connectionSchemaTopicOnly: string;
+  /** "Схема связей": design-brief prompt (image prompt only, no wireframe). */
+  connectionSchemaDesignBrief: string;
 }
 
 interface SettingsState {
@@ -69,6 +72,7 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     detectStyle: "",
     connectionSchemaWithContent: "",
     connectionSchemaTopicOnly: "",
+    connectionSchemaDesignBrief: "",
   },
   strict: {
     analysisWithContent: promptStrictAnalysisWith,
@@ -79,6 +83,7 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     detectStyle: promptStrictDetectStyle,
     connectionSchemaWithContent: promptStrictConnWith,
     connectionSchemaTopicOnly: promptStrictConnTopic,
+    connectionSchemaDesignBrief: promptConnDesignBrief,
   },
 };
 
