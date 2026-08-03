@@ -402,8 +402,9 @@ function Workspace() {
     if (!activeStyle) { toast.error("Сначала выберите стиль"); return; }
     try {
       setLoading("brief");
+      const isConnBrief = activeStyle?.id === "connection-schema";
       const filled = buildDesignBriefPrompt({
-        template: prompts.designBrief,
+        template: isConnBrief ? prompts.connectionSchemaDesignBrief : prompts.designBrief,
         contentSummary: activeContent.value.content,
         style: activeStyle,
         profile: activeProfile,
@@ -415,10 +416,18 @@ function Workspace() {
         model: models.brief,
         prompt: filled,
         label: "design brief",
-        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
+        schemaHint: isConnBrief
+          ? 'Верни JSON-объект формы { "PromptForImageGeneration": string }. Все обратные слеши внутри строк должны быть удвоены (\\\\frac, \\\\sqrt и т.п.).'
+          : 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
         parse: (value) => value as DesignBriefResult,
       });
-      if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
+      if (!parsed.PromptForImageGeneration) {
+        throw new Error("В ответе модели не хватает полей");
+      }
+      if (isConnBrief) {
+        // This style has no wireframe stage — keep an empty placeholder.
+        parsed.WireframeSketch = parsed.WireframeSketch ?? "";
+      } else if (!parsed.WireframeDescription && !parsed.WireframeSketch) {
         throw new Error("В ответе модели не хватает полей");
       }
       if (mode === "strict") {
@@ -601,8 +610,9 @@ ${activeContent.value.content}`;
       const combinedWishes = userWishes.trim()
         ? `${userText}\n\n(предыдущие пожелания: ${userWishes.trim()})`
         : userText;
+      const isConnRebuild = activeStyle?.id === "connection-schema";
       const filled = buildDesignBriefPrompt({
-        template: prompts.designBrief,
+        template: isConnRebuild ? prompts.connectionSchemaDesignBrief : prompts.designBrief,
         contentSummary: activeContent.value.content,
         style: activeStyle,
         profile: activeProfile,
@@ -614,10 +624,17 @@ ${activeContent.value.content}`;
         model: models.brief,
         prompt: filled,
         label: "design brief rebuild",
-        schemaHint: 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
+        schemaHint: isConnRebuild
+          ? 'Верни JSON-объект формы { "PromptForImageGeneration": string }.'
+          : 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
         parse: (value) => value as DesignBriefResult,
       });
-      if (!parsed.PromptForImageGeneration || (!parsed.WireframeDescription && !parsed.WireframeSketch)) {
+      if (!parsed.PromptForImageGeneration) {
+        throw new Error("В ответе модели не хватает полей");
+      }
+      if (isConnRebuild) {
+        parsed.WireframeSketch = parsed.WireframeSketch ?? "";
+      } else if (!parsed.WireframeDescription && !parsed.WireframeSketch) {
         throw new Error("В ответе модели не хватает полей");
       }
       if (mode === "strict") {
@@ -967,8 +984,8 @@ ${activeContent.value.content}`;
               <>
                 <PromptDisclosure
                   label="Показать промпт дизайн-брифа"
-                  value={prompts.designBrief}
-                  onChange={(v) => setPrompt("designBrief", v)}
+                  value={isConnectionStyle ? prompts.connectionSchemaDesignBrief : prompts.designBrief}
+                  onChange={(v) => setPrompt(isConnectionStyle ? "connectionSchemaDesignBrief" : "designBrief", v)}
                   rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
                 />
                 <div>
