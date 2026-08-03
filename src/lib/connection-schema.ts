@@ -200,3 +200,36 @@ export function renderConnectionSchemaJson(a: ConnectionSchemaJson): string {
 
   return parts.join("\n\n");
 }
+
+/**
+ * Compact raw-JSON view of the connection schema for the design-brief prompt.
+ * The brief prompt references raw field names (organizationType, anchorEntityId,
+ * direction, displaySubtitle = null, …), so it needs the JSON, not the Markdown.
+ * Generated base64 previews are stripped — they must never reach the LLM.
+ */
+export function connectionSchemaForBrief(a: ConnectionSchemaJson): string {
+  const clean = {
+    topic: a.topic,
+    subject: a.subject,
+    grade: a.grade,
+    focusQuestion: a.focusQuestion,
+    displaySubtitle: a.displaySubtitle,
+    regions: a.regions.map((r) => ({
+      id: r.id,
+      number: r.number,
+      title: r.title,
+      organizationType: r.organizationType,
+      anchorEntityId: r.anchorEntityId,
+      entities: r.entities.map((e) => ({
+        id: e.id,
+        title: e.title,
+        text: e.text,
+        addendum: e.addendum,
+        depiction: e.depiction,
+      })),
+      relations: r.relations,
+    })),
+    regionRelations: a.regionRelations,
+  };
+  return JSON.stringify(clean, null, 2);
+}
