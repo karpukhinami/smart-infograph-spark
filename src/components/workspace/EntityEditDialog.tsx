@@ -122,7 +122,7 @@ export function EntityEditDialog({ open, entity, isNew = false, profile = null, 
   const handleSave = () => {
     if (!canSave) return;
     const visDescT = visualDescription.trim();
-    const prevDesc = entity?.visual?.description?.trim() ?? "";
+    const prevDesc = asText(entity?.visual?.description).trim();
     let visual: AnalysisEntity["visual"] = null;
     if (visDescT !== "") {
       visual = {
