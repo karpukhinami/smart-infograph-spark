@@ -235,10 +235,10 @@ function EntityDialog({
 
   useEffect(() => {
     if (!open || !entity) return;
-    setTitle(entity.title ?? "");
-    setText(entity.text ?? "");
+    setTitle(asText(entity.title));
+    setText(asText(entity.text));
     setAddendum(asAddendumLines(entity.addendum).join("\n"));
-    setDepiction(entity.depiction ?? "");
+    setDepiction(asText(entity.depiction));
     setError(null);
   }, [open, entity]);
 
