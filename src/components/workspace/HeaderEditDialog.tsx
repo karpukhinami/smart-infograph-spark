@@ -19,7 +19,14 @@ interface Props {
   onSave: (patch: HeaderValues) => void;
 }
 
-function checkBalance(text: string): string | null {
+function asText(v: unknown): string {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.filter((x) => x != null).map((x) => String(x)).join("\n");
+  return String(v);
+}
+
+function checkBalance(input: unknown): string | null {
+  const text = asText(input);
   if (!text) return null;
   const cleaned = text.replace(/\\\$/g, "");
   const doubleDollarCount = (cleaned.match(/\$\$/g) ?? []).length;
@@ -33,9 +40,9 @@ function checkBalance(text: string): string | null {
 }
 
 // Treat "Другое" as empty for editing/display
-function displayValue(v: string | null | undefined): string {
-  if (!v) return "";
-  return v.trim().toLowerCase() === "другое" ? "" : v;
+function displayValue(v: unknown): string {
+  const s = asText(v);
+  return s.trim().toLowerCase() === "другое" ? "" : s;
 }
 
 export function HeaderEditDialog({ open, value, onClose, onSave }: Props) {
@@ -46,10 +53,10 @@ export function HeaderEditDialog({ open, value, onClose, onSave }: Props) {
 
   useEffect(() => {
     if (!value) return;
-    setTopic(value.topic ?? "");
+    setTopic(asText(value.topic));
     setSubject(displayValue(value.subject));
     setGrade(displayValue(value.grade));
-    setSummary(value.summary ?? "");
+    setSummary(asText(value.summary));
   }, [value]);
 
   const validationError = useMemo(() => {

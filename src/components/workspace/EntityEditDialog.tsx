@@ -88,15 +88,15 @@ export function EntityEditDialog({ open, entity, isNew = false, profile = null, 
       setVisualDescription("");
       return;
     }
-    setSectionId(entity.sectionId ?? "");
-    setTitle(entity.title ?? "");
+    setSectionId((entity.sectionId as AnalysisSectionId) ?? "");
+    setTitle(asText(entity.title));
     setContent(asText(entity.content));
     setFormula(asText(entity.formula));
     setAddendum(asText(entity.cardAddendum));
     const att = normalizeAttention(entity.attention);
     setAttention(att);
-    setIcon(entity.icon ?? "");
-    setVisualDescription(entity.visual?.description ?? "");
+    setIcon(asText(entity.icon));
+    setVisualDescription(asText(entity.visual?.description));
   }, [entity, open]);
 
   const validationError = useMemo(() => {
@@ -122,7 +122,7 @@ export function EntityEditDialog({ open, entity, isNew = false, profile = null, 
   const handleSave = () => {
     if (!canSave) return;
     const visDescT = visualDescription.trim();
-    const prevDesc = entity?.visual?.description?.trim() ?? "";
+    const prevDesc = asText(entity?.visual?.description).trim();
     let visual: AnalysisEntity["visual"] = null;
     if (visDescT !== "") {
       visual = {

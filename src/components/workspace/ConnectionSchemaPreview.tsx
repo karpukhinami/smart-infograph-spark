@@ -32,8 +32,15 @@ function arrowOf(direction: string): string {
   return "→";
 }
 
+function asText(v: unknown): string {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.filter((x) => x != null).map((x) => String(x)).join("\n");
+  return String(v);
+}
+
 /** Balance check for $...$ and markdown backticks, mirrors the bento editor rules. */
-function validateMarkup(value: string): string | null {
+function validateMarkup(input: unknown): string | null {
+  const value = asText(input);
   const dollars = (value.match(/(?<!\\)\$/g) ?? []).length;
   if (dollars % 2 !== 0) return "Непарное количество символов $ (LaTeX)";
   const ticks = (value.match(/`/g) ?? []).length;
@@ -228,10 +235,10 @@ function EntityDialog({
 
   useEffect(() => {
     if (!open || !entity) return;
-    setTitle(entity.title ?? "");
-    setText(entity.text ?? "");
+    setTitle(asText(entity.title));
+    setText(asText(entity.text));
     setAddendum(asAddendumLines(entity.addendum).join("\n"));
-    setDepiction(entity.depiction ?? "");
+    setDepiction(asText(entity.depiction));
     setError(null);
   }, [open, entity]);
 
@@ -312,10 +319,10 @@ function RegionDialog({
 
   useEffect(() => {
     if (!open || !region) return;
-    setTitle(region.title ?? "");
-    setNumber(region.number ?? "");
-    setAnchor(region.anchorEntityId ?? "__none__");
-    setOrgType(region.organizationType);
+    setTitle(asText(region.title));
+    setNumber(asText(region.number));
+    setAnchor(asText(region.anchorEntityId) || "__none__");
+    setOrgType(asText(region.organizationType));
   }, [open, region]);
 
   return (

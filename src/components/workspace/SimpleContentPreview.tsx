@@ -19,12 +19,12 @@ interface Props {
   renderCardToolbarExtra?: (index: number, entity: AnalysisEntity) => ReactNode;
 }
 
-function isOther(v: string | null | undefined): boolean {
-  return !!v && v.trim().toLowerCase() === "другое";
+function isOther(v: unknown): boolean {
+  return v != null && String(v).trim().toLowerCase() === "другое";
 }
-function displayMeta(v: string | null | undefined): string | null {
-  if (!v) return null;
-  return isOther(v) ? null : v;
+function displayMeta(v: unknown): string | null {
+  if (v == null || String(v).trim() === "") return null;
+  return isOther(v) ? null : String(v);
 }
 
 function asLines(v: string | string[] | null | undefined): string[] {
@@ -446,10 +446,11 @@ function EntityCard({
 }
 
 
-function wrapMath(s: string): string {
-  const t = s.trim();
-  if (!t) return s;
-  if (/\$.+\$/.test(t)) return s;
+function wrapMath(s: unknown): string {
+  const raw = s == null ? "" : String(s);
+  const t = raw.trim();
+  if (!t) return raw;
+  if (/\$.+\$/.test(t)) return raw;
   return `$${t}$`;
 }
 
