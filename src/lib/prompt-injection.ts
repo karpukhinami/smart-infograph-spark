@@ -467,7 +467,11 @@ Render formulas enclosed in $$...$$ as display mathematics on a separate line or
 If a field contains only a formula, treat the formula as the main visible content of that element. Center or align it according to the element's layout rules, while preserving the specified visual hierarchy.
 
 Dollar signs, escaped backslashes, and LaTeX structural braces are technical markup and must never appear on the final image unless they are explicitly part of the mathematical content.`;
-  return [paletteAndFontBlock(profile), "", fillRolePlaceholders(rules, profile)].join("\n");
+  const pastelRule = pastelColorsUnified(profile.colors)
+    ? "Use {{detailSoftColor}} as the single pastel fill for ordinary entities, branches, levels, or parallel groups. Assign it according to structure; do not invent a second pastel and do not alternate colors mechanically."
+    : "Use {{detailSoftColor}} and {{detailDeepColor}} for ordinary entities, branches, levels, or parallel groups. Assign them according to structure; do not alternate colors mechanically.";
+  const body = rules.replaceAll("{{PASTEL_RULE}}", pastelRule);
+  return [paletteAndFontBlock(profile), "", fillRolePlaceholders(body, profile)].join("\n");
 }
 
 /** Per-style LAYER 1 builders. Add a new entry when a style gets its own colour rules. */
