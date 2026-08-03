@@ -420,7 +420,7 @@ Use {{inkColor}} as the default color for educational text, entity outlines, rel
 
 Use {{primaryColor}} for the main structural emphasis, such as an anchor entity, a central node, or the principal route. Do not apply it to every entity.
 
-Use {{detailSoftColor}} and {{detailDeepColor}} for ordinary entities, branches, levels, or parallel groups. Assign them according to structure; do not alternate colors mechanically.
+{{PASTEL_RULE}}
 
 Use {{contrastSoftColor}} only for a meaningful contrast, such as a result, condition, exception, alternative route, or opposing element.
 
