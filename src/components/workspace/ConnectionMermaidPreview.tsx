@@ -143,6 +143,7 @@ export function ConnectionMermaidPreview({ connection }: Props) {
   // Автовписывание после рендера SVG и при смене режима отображения.
   useEffect(() => {
     if (!svg) return;
+    const vp = viewportRef.current;
     let raf1 = 0;
     let raf2 = 0;
     raf1 = requestAnimationFrame(() => {
@@ -150,11 +151,23 @@ export function ConnectionMermaidPreview({ connection }: Props) {
         fitToViewport();
       });
     });
+    // Контейнер может получить финальные размеры позже (диалог, вкладки).
+    let ro: ResizeObserver | null = null;
+    let fitted = false;
+    if (vp && typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => {
+        if (fitted) return;
+        if (vp.clientWidth > 0 && vp.clientHeight > 0) fitted = fitToViewport();
+      });
+      ro.observe(vp);
+    }
     return () => {
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
+      ro?.disconnect();
     };
   }, [svg, fullscreen, fitToViewport]);
+
 
 
   useEffect(() => {
