@@ -78,11 +78,29 @@ export function ConnectionMermaidPreview({ connection }: Props) {
     const host = hostRef.current;
     const el = host?.querySelector("svg") as SVGSVGElement | null;
     if (!vp || !el) return false;
-    const vb = el.viewBox?.baseVal;
-    const w = vb && vb.width ? vb.width : el.getBoundingClientRect().width;
-    const h = vb && vb.height ? vb.height : el.getBoundingClientRect().height;
+
+    // Реальные границы содержимого: mermaid часто оставляет viewBox шире контента
+    // и style="max-width:…", из-за чего вписывание считалось по «пустому» размеру.
+    let w = 0;
+    let h = 0;
+    try {
+      const bb = (el as SVGGraphicsElement).getBBox();
+      if (bb.width > 0 && bb.height > 0) {
+        w = Math.ceil(bb.width);
+        h = Math.ceil(bb.height);
+        el.setAttribute("viewBox", `${bb.x} ${bb.y} ${bb.width} ${bb.height}`);
+      }
+    } catch {
+      /* getBBox недоступен, если SVG ещё не в layout */
+    }
+    if (!w || !h) {
+      const vb = el.viewBox?.baseVal;
+      w = vb && vb.width ? vb.width : el.getBoundingClientRect().width;
+      h = vb && vb.height ? vb.height : el.getBoundingClientRect().height;
+    }
     if (!w || !h) return false;
     el.removeAttribute("style");
+    el.setAttribute("preserveAspectRatio", "xMidYMid meet");
     el.setAttribute("width", String(w));
     el.setAttribute("height", String(h));
     const pad = 24;
