@@ -35,7 +35,7 @@ import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { callTextLLMForJson } from "@/lib/llm-json";
 import { buildDesignBriefPrompt, designProfileColorsAndRules, resolveDesignProfile } from "@/lib/prompt-injection";
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
-import { renderConnectionSchemaJson, validateConnectionSchemaJson } from "@/lib/connection-schema";
+import { connectionSchemaForBrief, renderConnectionSchemaJson, validateConnectionSchemaJson } from "@/lib/connection-schema";
 import {
   buildRefineContentPrompt,
   buildRefineBriefPrompt,
@@ -403,9 +403,14 @@ function Workspace() {
     try {
       setLoading("brief");
       const isConnBrief = activeStyle?.id === "connection-schema";
+      const connection = activeContent.value.connection;
+      if (isConnBrief && !connection) {
+        throw new Error("Для стиля «схема связей» нужен анализ этого же стиля на шаге 1");
+      }
       const filled = buildDesignBriefPrompt({
         template: isConnBrief ? prompts.connectionSchemaDesignBrief : prompts.designBrief,
-        contentSummary: activeContent.value.content,
+        contentSummary:
+          isConnBrief && connection ? connectionSchemaForBrief(connection) : activeContent.value.content,
         style: activeStyle,
         profile: activeProfile,
         userWishes,
@@ -435,7 +440,7 @@ function Workspace() {
         parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
       }
       pushBrief(parsed);
-      setPaneMode("wireframe");
+      setPaneMode(isConnBrief ? "content" : "wireframe");
       toast.success("Дизайн-бриф создан");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось создать бриф");
@@ -611,9 +616,13 @@ ${activeContent.value.content}`;
         ? `${userText}\n\n(предыдущие пожелания: ${userWishes.trim()})`
         : userText;
       const isConnRebuild = activeStyle?.id === "connection-schema";
+      const connectionForRebuild = activeContent.value.connection;
       const filled = buildDesignBriefPrompt({
         template: isConnRebuild ? prompts.connectionSchemaDesignBrief : prompts.designBrief,
-        contentSummary: activeContent.value.content,
+        contentSummary:
+          isConnRebuild && connectionForRebuild
+            ? connectionSchemaForBrief(connectionForRebuild)
+            : activeContent.value.content,
         style: activeStyle,
         profile: activeProfile,
         userWishes: combinedWishes,
@@ -1040,7 +1049,15 @@ ${activeContent.value.content}`;
               >
                 авто-макет
               </TabsTrigger>
-              <TabsTrigger value="wireframe" disabled={!activeBrief}>Каркас</TabsTrigger>
+              <TabsTrigger
+                value="wireframe"
+                disabled={
+                  !activeBrief ||
+                  (!activeBrief.value.WireframeSketch && !activeBrief.value.WireframeDescription)
+                }
+              >
+                Каркас
+              </TabsTrigger>
               <TabsTrigger value="ai-layout" disabled={!aiLayoutCanvas}>ИИ-макет</TabsTrigger>
               <TabsTrigger value="image" disabled={!activeImage}>Итоговое изображение</TabsTrigger>
             </TabsList>
