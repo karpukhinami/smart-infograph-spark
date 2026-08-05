@@ -340,25 +340,24 @@ function singleBackslashLatex(json: string): string {
 
 /**
  * Compact raw-JSON view of the connection schema for the design-brief prompt.
- * The brief prompt references raw field names (organizationType, anchorEntityId,
+ * The brief prompt references raw field names (organizationType, core,
  * direction, displaySubtitle = null, …), so it needs the JSON, not the Markdown.
  * Generated base64 previews are stripped — they must never reach the LLM.
+ * Legacy fields (number, anchorEntityId) are dropped: the current prompt describes
+ * the region entry point through `core`, so passing an extra anchor would duplicate it.
  */
 export function connectionSchemaForBrief(a: ConnectionSchemaJson): string {
   const clean = {
     topic: a.topic,
-    subject: a.subject,
-    grade: a.grade,
+    subject: a.subject ?? null,
+    grade: a.grade ?? null,
     focusQuestion: a.focusQuestion,
     displaySubtitle: a.displaySubtitle,
     regions: a.regions.map((r) => ({
       id: r.id,
-      ...(r.number ? { number: r.number } : {}),
       title: r.title,
       organizationType: r.organizationType,
-      core: r.core,
-      // Kept for the design-brief prompt, which references a single entry point.
-      anchorEntityId: regionAnchorId(r),
+      core: r.core ?? { type: "single_entity", entityIdSequences: coreSequences(r) },
       entities: r.entities.map((e) => ({
         id: e.id,
         title: e.title,
