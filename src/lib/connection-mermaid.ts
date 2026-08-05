@@ -1,9 +1,11 @@
 import type {
   ConnectionEntity,
   ConnectionRegion,
+  ConnectionRelation,
   ConnectionSchemaJson,
 } from "@/lib/types";
-import { asAddendumLines } from "@/lib/connection-schema";
+import { asAddendumLines, coreEntityIds, regionAnchorId } from "@/lib/connection-schema";
+
 
 export interface MermaidBuildResult {
   code: string;
