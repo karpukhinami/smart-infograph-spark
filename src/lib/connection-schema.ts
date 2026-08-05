@@ -1,4 +1,6 @@
 import type {
+  ConnectionCore,
+  ConnectionCoreType,
   ConnectionEntity,
   ConnectionRegion,
   ConnectionRelation,
@@ -8,6 +10,7 @@ import type {
 
 export const ORGANIZATION_TYPE_LABELS: Record<string, string> = {
   linear_path: "Линейная последовательность",
+  timeline: "Хронология / таймлайн",
   branching_tree: "Дерево / классификация",
   hub_and_spoke: "Центр и лучи",
   converging_diverging_flow: "Схождение / расхождение",
@@ -15,6 +18,15 @@ export const ORGANIZATION_TYPE_LABELS: Record<string, string> = {
   cycle: "Цикл",
   algorithmic_flowchart: "Блок-схема алгоритма",
 };
+
+export const CORE_TYPE_LABELS: Record<string, string> = {
+  single_entity: "Одна центральная сущность",
+  linear_route: "Линейный маршрут",
+  cyclic_route: "Циклический маршрут",
+  hub: "Центр и лучи",
+};
+
+const CORE_TYPES = new Set(["single_entity", "linear_route", "cyclic_route", "hub"]);
 
 const DIRECTIONS = new Set(["one_way", "two_way", "none"]);
 
@@ -38,9 +50,64 @@ export function asAddendumLines(v: string | string[] | null | undefined): string
   return Array.isArray(v) ? v.filter((s) => String(s).trim() !== "").map(String) : [String(v)];
 }
 
+/** Flat list of entity ids that belong to the region core, in order. */
+export function coreEntityIds(region: ConnectionRegion): string[] {
+  const ids = (region.core?.entityIdSequences ?? []).flat().filter(Boolean);
+  return Array.from(new Set(ids));
+}
+
+/** Single entry point of a region: first core entity, then legacy anchor. */
+export function regionAnchorId(region: ConnectionRegion): string | null {
+  const first = coreEntityIds(region)[0];
+  if (first) return first;
+  return region.anchorEntityId ?? null;
+}
+
 function normalizeDirection(v: unknown): ConnectionRelation["direction"] {
   const s = String(v ?? "").trim();
   return (DIRECTIONS.has(s) ? s : "one_way") as ConnectionRelation["direction"];
+}
+
+/** Validate + normalize the region `core` object; unknown ids are dropped. */
+function normalizeCore(
+  raw: unknown,
+  ids: Set<string>,
+  rid: string,
+  warnings: string[],
+): ConnectionCore | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const rawType = String(o.type ?? "").trim();
+  const type = (CORE_TYPES.has(rawType) ? rawType : "") as ConnectionCoreType | "";
+  if (!type) warnings.push(`Регион ${rid}: неизвестный core.type «${rawType || "—"}»`);
+
+  const seqRaw = Array.isArray(o.entityIdSequences) ? o.entityIdSequences : [];
+  const seen = new Set<string>();
+  const sequences: string[][] = seqRaw
+    .map((seq) => {
+      const list = Array.isArray(seq) ? seq : [seq];
+      return list
+        .map((x) => str(x))
+        .filter((x): x is string => {
+          if (!x) return false;
+          if (!ids.has(x)) {
+            warnings.push(`Регион ${rid}: core ссылается на несуществующую сущность ${x}`);
+            return false;
+          }
+          if (seen.has(x)) {
+            warnings.push(`Регион ${rid}: сущность ${x} указана в core несколько раз`);
+            return false;
+          }
+          seen.add(x);
+          return true;
+        });
+    })
+    .filter((seq) => seq.length > 0);
+
+  if (!sequences.length) return null;
+  const finalType: ConnectionCoreType =
+    type || (sequences[0].length === 1 ? "single_entity" : "linear_route");
+  return { type: finalType, entityIdSequences: sequences };
 }
 
 /** Validate + normalize the "connection schema" analysis JSON returned by the model. */
@@ -62,17 +129,22 @@ export function validateConnectionSchemaJson(raw: unknown): ConnectionSchemaJson
         id = `${id}-${ri + 1}${ei + 1}`;
       }
       seenEntityIds.add(id);
-      return {
+      const entity: ConnectionEntity = {
         id,
         title: str(e.title),
         text: str(e.text),
-        addendum: strOrArray(e.addendum),
         depiction: str(e.depiction),
         generatedImage:
           typeof e.generatedImage === "string" && e.generatedImage.startsWith("data:image/")
             ? e.generatedImage
             : null,
       };
+      const addendum = strOrArray(e.addendum);
+      if (addendum) entity.addendum = addendum;
+      if (!entity.title && !entity.text && !entity.depiction) {
+        warnings.push(`Сущность ${id}: не заполнено ни одно из полей title, text, depiction`);
+      }
+      return entity;
     });
 
     const ids = new Set(entities.map((e) => e.id));
@@ -90,21 +162,32 @@ export function validateConnectionSchemaJson(raw: unknown): ConnectionSchemaJson
         return ok;
       });
 
+    const core = normalizeCore(r.core, ids, rid, warnings);
+
+    // Legacy field: kept in sync with core so older consumers keep working.
     let anchorEntityId = str(r.anchorEntityId);
     if (anchorEntityId && !ids.has(anchorEntityId)) {
       warnings.push(`Якорь ${anchorEntityId} не найден среди сущностей региона ${rid}`);
       anchorEntityId = null;
     }
+    const coreFirst = core?.entityIdSequences[0]?.[0] ?? null;
+    if (!anchorEntityId) anchorEntityId = coreFirst;
 
-    return {
+    const region: ConnectionRegion = {
       id: rid,
-      number: str(r.number),
       title: str(r.title),
       organizationType: str(r.organizationType) ?? "linear_path",
+      core,
       anchorEntityId,
       entities,
       relations,
     };
+    const number = str(r.number);
+    if (number) region.number = number;
+    if (!core && entities.length) {
+      warnings.push(`Регион ${rid}: отсутствует core — структура определена только связями`);
+    }
+    return region;
   });
 
   const regionIds = new Set(regions.map((r) => r.id));
@@ -133,6 +216,7 @@ export function validateConnectionSchemaJson(raw: unknown): ConnectionSchemaJson
   };
 }
 
+
 function arrow(direction: ConnectionRelation["direction"]): string {
   if (direction === "two_way") return "↔";
   if (direction === "none") return "—";
@@ -158,9 +242,19 @@ export function renderConnectionSchemaJson(a: ConnectionSchemaJson): string {
     const orgLabel = ORGANIZATION_TYPE_LABELS[r.organizationType] ?? r.organizationType;
     parts.push(`\n---\n\n## 🗺 Регион ${num}${r.title ?? ""} _(${orgLabel})_`);
 
+    const coreIds = coreEntityIds(r);
+    if (r.core) {
+      const byId = new Map(r.entities.map((e) => [e.id, e]));
+      const coreLabel = CORE_TYPE_LABELS[r.core.type] ?? r.core.type;
+      const routes = r.core.entityIdSequences
+        .map((seq) => seq.map((id) => entityLabel(byId.get(id), id)).join(" → "))
+        .join(" / ");
+      parts.push(`**⚓ Ядро региона** _(${coreLabel})_: ${routes}`);
+    }
+
     r.entities.forEach((e) => {
-      const isAnchor = r.anchorEntityId === e.id;
-      const head = `#### ${isAnchor ? "⚓ " : ""}${e.title ?? e.id}`;
+      const isCore = coreIds.includes(e.id);
+      const head = `#### ${isCore ? "⚓ " : ""}${e.title ?? e.id}`;
       const chunk: string[] = [head];
       if (e.text) chunk.push(e.text);
       const add = asAddendumLines(e.addendum);
@@ -168,6 +262,7 @@ export function renderConnectionSchemaJson(a: ConnectionSchemaJson): string {
       if (e.depiction) chunk.push(`🖼 _Изображение:_ ${e.depiction}`);
       parts.push(chunk.join("\n\n"));
     });
+
 
     if (r.relations.length) {
       const byId = new Map(r.entities.map((e) => [e.id, e]));
@@ -258,19 +353,22 @@ export function connectionSchemaForBrief(a: ConnectionSchemaJson): string {
     displaySubtitle: a.displaySubtitle,
     regions: a.regions.map((r) => ({
       id: r.id,
-      number: r.number,
+      ...(r.number ? { number: r.number } : {}),
       title: r.title,
       organizationType: r.organizationType,
-      anchorEntityId: r.anchorEntityId,
+      core: r.core,
+      // Kept for the design-brief prompt, which references a single entry point.
+      anchorEntityId: regionAnchorId(r),
       entities: r.entities.map((e) => ({
         id: e.id,
         title: e.title,
         text: e.text,
-        addendum: e.addendum,
+        ...(e.addendum ? { addendum: e.addendum } : {}),
         depiction: e.depiction,
       })),
       relations: r.relations,
     })),
+
     regionRelations: a.regionRelations,
   };
   return singleBackslashLatex(JSON.stringify(normalizeLatexValue(clean), null, 2));

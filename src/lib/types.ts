@@ -153,7 +153,8 @@ export interface ConnectionEntity {
   id: string;
   title: string | null;
   text: string | null;
-  addendum: string | string[] | null;
+  /** Legacy field (older prompt versions); kept for backward compatibility. */
+  addendum?: string | string[] | null;
   depiction: string | null;
   /** Workspace: data URL of a generated illustration for this entity. */
   generatedImage?: string | null;
@@ -170,15 +171,28 @@ export interface ConnectionRegionRelation {
   direction: "one_way" | "two_way" | "none";
   label: string | null;
 }
+export type ConnectionCoreType = "single_entity" | "linear_route" | "cyclic_route" | "hub";
+/** Core of a region: which entities form its main structure and in which order. */
+export interface ConnectionCore {
+  type: ConnectionCoreType;
+  entityIdSequences: string[][];
+}
 export interface ConnectionRegion {
   id: string;
-  number: string | null;
+  /** Legacy field (older prompt versions); kept for backward compatibility. */
+  number?: string | null;
   title: string | null;
   organizationType: string;
-  anchorEntityId: string | null;
+  core: ConnectionCore | null;
+  /**
+   * Legacy field (older prompt versions). Derived from `core` when absent, so
+   * downstream consumers (Mermaid, design brief) keep a single entry point.
+   */
+  anchorEntityId?: string | null;
   entities: ConnectionEntity[];
   relations: ConnectionRelation[];
 }
+
 export interface ConnectionSchemaJson {
   kind: "connection-schema";
   sourceMode: "text" | "topic";

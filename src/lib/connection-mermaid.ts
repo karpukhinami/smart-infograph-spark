@@ -1,9 +1,11 @@
 import type {
   ConnectionEntity,
   ConnectionRegion,
+  ConnectionRelation,
   ConnectionSchemaJson,
 } from "@/lib/types";
-import { asAddendumLines } from "@/lib/connection-schema";
+import { asAddendumLines, coreEntityIds, regionAnchorId } from "@/lib/connection-schema";
+
 
 export interface MermaidBuildResult {
   code: string;
@@ -66,12 +68,42 @@ function subgraphTitle(r: ConnectionRegion): string {
 
 function anchorFor(r: ConnectionRegion, warnings: string[]): ConnectionEntity | null {
   if (!r.entities.length) return null;
-  if (r.anchorEntityId) {
-    const found = r.entities.find((e) => e.id === r.anchorEntityId);
+  const anchorId = regionAnchorId(r);
+  if (anchorId) {
+    const found = r.entities.find((e) => e.id === anchorId);
     if (found) return found;
-    warnings.push(`Регион ${r.id}: якорь «${r.anchorEntityId}» не найден, взята первая сущность по ID`);
+    warnings.push(`Регион ${r.id}: якорь «${anchorId}» не найден, взята первая сущность по ID`);
   }
   return [...r.entities].sort((a, b) => naturalCompare(a.id, b.id))[0];
+}
+
+/**
+ * Relations implied by the region core (linear/cyclic route, hub) that the model
+ * did not list explicitly. Keeps the diagram connected for the new schema.
+ */
+function implicitCoreRelations(r: ConnectionRegion, existing: ConnectionRelation[]): ConnectionRelation[] {
+  const core = r.core;
+  if (!core) return [];
+  const has = new Set(existing.map((rel) => `${rel.from}|${rel.to}`));
+  const hasEither = (a: string, b: string) => has.has(`${a}|${b}`) || has.has(`${b}|${a}`);
+  const out: ConnectionRelation[] = [];
+  const add = (from: string, to: string) => {
+    if (from === to || hasEither(from, to)) return;
+    has.add(`${from}|${to}`);
+    out.push({ from, to, direction: "one_way", label: null });
+  };
+
+  for (const seq of core.entityIdSequences) {
+    if (seq.length < 2) continue;
+    if (core.type === "hub") {
+      const [center, ...spokes] = seq;
+      spokes.forEach((s) => add(center, s));
+      continue;
+    }
+    for (let i = 0; i < seq.length - 1; i += 1) add(seq[i], seq[i + 1]);
+    if (core.type === "cyclic_route") add(seq[seq.length - 1], seq[0]);
+  }
+  return out;
 }
 
 function arrow(direction: string, label: string | null): string {
@@ -80,6 +112,7 @@ function arrow(direction: string, label: string | null): string {
   if (direction === "none") return `---${l}`;
   return `-->${l}`;
 }
+
 
 /** Build a Mermaid flowchart for the connection-schema JSON. */
 export function buildConnectionMermaid(
@@ -127,19 +160,34 @@ export function buildConnectionMermaid(
     lines.push("  end");
   });
 
-  // --- internal relations ---
+  // --- core highlighting ---
+  const coreNodeIds = regions.flatMap((r) =>
+    coreEntityIds(r)
+      .map((id) => nodeIdByEntity.get(id))
+      .filter((x): x is string => Boolean(x)),
+  );
+  if (coreNodeIds.length) {
+    lines.push("  classDef coreNode fill:#fff7ed,stroke:#f97316,stroke-width:2.5px,font-weight:bold");
+    lines.push(`  class ${coreNodeIds.join(",")} coreNode`);
+  }
+
+  // --- internal relations (explicit + implied by core) ---
   let edgeIndex = 0;
   regions.forEach((r) => {
     const ids = new Set(r.entities.map((e) => e.id));
-    r.relations.forEach((rel) => {
+    const valid = r.relations.filter((rel) => {
       if (!ids.has(rel.from) || !ids.has(rel.to)) {
         errors.push(`Связь пропущена (нет сущности в регионе ${r.id}): ${rel.from} → ${rel.to}`);
-        return;
+        return false;
       }
+      return true;
+    });
+    [...valid, ...implicitCoreRelations(r, valid)].forEach((rel) => {
       lines.push(`  ${nodeIdByEntity.get(rel.from)} ${arrow(rel.direction, rel.label)} ${nodeIdByEntity.get(rel.to)}`);
       edgeIndex += 1;
     });
   });
+
 
   // --- cross-region relations ---
   const regionById = new Map(regions.map((r) => [r.id, r]));

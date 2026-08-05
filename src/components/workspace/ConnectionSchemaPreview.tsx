@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { Anchor, ImageIcon, Pencil } from "lucide-react";
-import type { ConnectionEntity, ConnectionSchemaJson, DesignProfile } from "@/lib/types";
-import { ORGANIZATION_TYPE_LABELS, asAddendumLines } from "@/lib/connection-schema";
+import type { ConnectionEntity, ConnectionSchemaJson, DesignProfile, ConnectionCoreType } from "@/lib/types";
+import {
+  ORGANIZATION_TYPE_LABELS,
+  CORE_TYPE_LABELS,
+  asAddendumLines,
+  coreEntityIds,
+} from "@/lib/connection-schema";
+
 import { Markdown } from "@/components/workspace/Markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +91,8 @@ export function ConnectionSchemaPreview({ connection, profile, editable = true }
 
       {connection.regions.map((region, ri) => {
         const byId = new Map(region.entities.map((e) => [e.id, e]));
+        const coreIds = coreEntityIds(region);
+        const label = (id: string) => byId.get(id)?.title || byId.get(id)?.text || id;
         return (
           <div key={region.id} className="rounded-xl border-2 border-dashed border-muted-foreground/40 p-3 space-y-3">
             <div className="flex items-start justify-between gap-2">
@@ -96,6 +104,19 @@ export function ConnectionSchemaPreview({ connection, profile, editable = true }
                 <div className="text-[11px] text-muted-foreground">
                   {ORGANIZATION_TYPE_LABELS[region.organizationType] ?? region.organizationType}
                 </div>
+                {region.core && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                    <Anchor className="size-3" />
+                    <span className="font-medium">
+                      {CORE_TYPE_LABELS[region.core.type] ?? region.core.type}:
+                    </span>
+                    <span>
+                      {region.core.entityIdSequences
+                        .map((seq) => seq.map((id) => asText(label(id))).join(" → "))
+                        .join("  /  ")}
+                    </span>
+                  </div>
+                )}
               </div>
               {editable && (
                 <Button size="sm" variant="ghost" onClick={() => setRegionEdit(ri)}>
@@ -106,8 +127,9 @@ export function ConnectionSchemaPreview({ connection, profile, editable = true }
 
             <div className="space-y-2">
               {region.entities.map((e, ei) => {
-                const isAnchor = region.anchorEntityId === e.id;
+                const isAnchor = coreIds.includes(e.id);
                 const add = asAddendumLines(e.addendum);
+
                 return (
                   <div
                     key={e.id}
@@ -129,7 +151,7 @@ export function ConnectionSchemaPreview({ connection, profile, editable = true }
                   >
                     {isAnchor && (
                       <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-medium shadow">
-                        <Anchor className="size-3" /> Якорь
+                        <Anchor className="size-3" /> Ядро
                       </span>
                     )}
                     {e.title && (
@@ -313,17 +335,42 @@ function RegionDialog({
   onSave: (patch: Partial<ConnectionSchemaJson["regions"][number]>) => void;
 }) {
   const [title, setTitle] = useState("");
-  const [number, setNumber] = useState("");
-  const [anchor, setAnchor] = useState("");
   const [orgType, setOrgType] = useState("");
+  const [coreType, setCoreType] = useState("__none__");
+  const [coreSeq, setCoreSeq] = useState("");
 
   useEffect(() => {
     if (!open || !region) return;
     setTitle(asText(region.title));
-    setNumber(asText(region.number));
-    setAnchor(asText(region.anchorEntityId) || "__none__");
     setOrgType(asText(region.organizationType));
+    setCoreType(region.core ? region.core.type : "__none__");
+    setCoreSeq((region.core?.entityIdSequences ?? []).map((seq) => seq.join(", ")).join("\n"));
   }, [open, region]);
+
+  const knownIds = new Set((region?.entities ?? []).map((e) => e.id));
+
+  function submit() {
+    if (coreType === "__none__") {
+      onSave({ title: title.trim() || null, organizationType: orgType, core: null, anchorEntityId: null });
+      return;
+    }
+    const sequences = coreSeq
+      .split("\n")
+      .map((line) =>
+        line
+          .split(/[,;]/)
+          .map((s) => s.trim())
+          .filter((s) => s && knownIds.has(s)),
+      )
+      .filter((seq) => seq.length > 0);
+    const core = sequences.length ? { type: coreType as ConnectionCoreType, entityIdSequences: sequences } : null;
+    onSave({
+      title: title.trim() || null,
+      organizationType: orgType,
+      core,
+      anchorEntityId: core?.entityIdSequences[0]?.[0] ?? null,
+    });
+  }
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -337,10 +384,6 @@ function RegionDialog({
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Номер (необязательно)</Label>
-            <Input value={number} onChange={(e) => setNumber(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
             <Label className="text-xs">Тип организации</Label>
             <Select value={orgType} onValueChange={setOrgType}>
               <SelectTrigger><SelectValue placeholder="Выберите тип" /></SelectTrigger>
@@ -352,34 +395,35 @@ function RegionDialog({
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Якорная сущность</Label>
-            <Select value={anchor} onValueChange={setAnchor}>
-              <SelectTrigger><SelectValue placeholder="Не задана" /></SelectTrigger>
+            <Label className="text-xs">Тип ядра</Label>
+            <Select value={coreType} onValueChange={setCoreType}>
+              <SelectTrigger><SelectValue placeholder="Не задано" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Не задана</SelectItem>
-                {(region?.entities ?? []).map((e) => (
-                  <SelectItem key={e.id} value={e.id}>{e.title || e.text || e.id}</SelectItem>
+                <SelectItem value="__none__">Не задано</SelectItem>
+                {Object.entries(CORE_TYPE_LABELS).map(([id, label]) => (
+                  <SelectItem key={id} value={id}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+          {coreType !== "__none__" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                Сущности ядра по порядку (id через запятую, каждая строка — отдельный маршрут)
+              </Label>
+              <Textarea rows={2} value={coreSeq} onChange={(e) => setCoreSeq(e.target.value)} />
+              <p className="text-[11px] text-muted-foreground">
+                Доступные id: {(region?.entities ?? []).map((e) => e.id).join(", ") || "—"}
+              </p>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Отмена</Button>
-          <Button
-            onClick={() =>
-              onSave({
-                title: title.trim() || null,
-                number: number.trim() || null,
-                organizationType: orgType,
-                anchorEntityId: anchor === "__none__" ? null : anchor,
-              })
-            }
-          >
-            Сохранить
-          </Button>
+          <Button onClick={submit}>Сохранить</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
