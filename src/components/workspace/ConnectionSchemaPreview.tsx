@@ -151,7 +151,7 @@ export function ConnectionSchemaPreview({ connection, profile, editable = true }
                   >
                     {isAnchor && (
                       <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-medium shadow">
-                        <Anchor className="size-3" /> Якорь
+                        <Anchor className="size-3" /> Ядро
                       </span>
                     )}
                     {e.title && (
