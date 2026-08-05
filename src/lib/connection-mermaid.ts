@@ -160,19 +160,34 @@ export function buildConnectionMermaid(
     lines.push("  end");
   });
 
-  // --- internal relations ---
+  // --- core highlighting ---
+  const coreNodeIds = regions.flatMap((r) =>
+    coreEntityIds(r)
+      .map((id) => nodeIdByEntity.get(id))
+      .filter((x): x is string => Boolean(x)),
+  );
+  if (coreNodeIds.length) {
+    lines.push("  classDef coreNode fill:#fff7ed,stroke:#f97316,stroke-width:2.5px,font-weight:bold");
+    lines.push(`  class ${coreNodeIds.join(",")} coreNode`);
+  }
+
+  // --- internal relations (explicit + implied by core) ---
   let edgeIndex = 0;
   regions.forEach((r) => {
     const ids = new Set(r.entities.map((e) => e.id));
-    r.relations.forEach((rel) => {
+    const valid = r.relations.filter((rel) => {
       if (!ids.has(rel.from) || !ids.has(rel.to)) {
         errors.push(`Связь пропущена (нет сущности в регионе ${r.id}): ${rel.from} → ${rel.to}`);
-        return;
+        return false;
       }
+      return true;
+    });
+    [...valid, ...implicitCoreRelations(r, valid)].forEach((rel) => {
       lines.push(`  ${nodeIdByEntity.get(rel.from)} ${arrow(rel.direction, rel.label)} ${nodeIdByEntity.get(rel.to)}`);
       edgeIndex += 1;
     });
   });
+
 
   // --- cross-region relations ---
   const regionById = new Map(regions.map((r) => [r.id, r]));
