@@ -349,8 +349,9 @@ function singleBackslashLatex(json: string): string {
 export function connectionSchemaForBrief(a: ConnectionSchemaJson): string {
   const clean = {
     topic: a.topic,
-    subject: a.subject ?? null,
-    grade: a.grade ?? null,
+    // Blank subject/grade become null so the prompt can skip the meta pill.
+    subject: String(a.subject ?? "").trim() || null,
+    grade: String(a.grade ?? "").trim() || null,
     focusQuestion: a.focusQuestion,
     displaySubtitle: a.displaySubtitle,
     regions: a.regions.map((r) => ({
