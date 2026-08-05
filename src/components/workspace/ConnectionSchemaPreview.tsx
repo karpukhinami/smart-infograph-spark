@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { Anchor, ImageIcon, Pencil } from "lucide-react";
-import type { ConnectionEntity, ConnectionSchemaJson, DesignProfile } from "@/lib/types";
-import { ORGANIZATION_TYPE_LABELS, asAddendumLines } from "@/lib/connection-schema";
+import type { ConnectionEntity, ConnectionSchemaJson, DesignProfile, ConnectionCoreType } from "@/lib/types";
+import {
+  ORGANIZATION_TYPE_LABELS,
+  CORE_TYPE_LABELS,
+  asAddendumLines,
+  coreEntityIds,
+} from "@/lib/connection-schema";
+
 import { Markdown } from "@/components/workspace/Markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
