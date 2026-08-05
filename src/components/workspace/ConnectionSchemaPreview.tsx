@@ -335,17 +335,42 @@ function RegionDialog({
   onSave: (patch: Partial<ConnectionSchemaJson["regions"][number]>) => void;
 }) {
   const [title, setTitle] = useState("");
-  const [number, setNumber] = useState("");
-  const [anchor, setAnchor] = useState("");
   const [orgType, setOrgType] = useState("");
+  const [coreType, setCoreType] = useState("__none__");
+  const [coreSeq, setCoreSeq] = useState("");
 
   useEffect(() => {
     if (!open || !region) return;
     setTitle(asText(region.title));
-    setNumber(asText(region.number));
-    setAnchor(asText(region.anchorEntityId) || "__none__");
     setOrgType(asText(region.organizationType));
+    setCoreType(region.core ? region.core.type : "__none__");
+    setCoreSeq((region.core?.entityIdSequences ?? []).map((seq) => seq.join(", ")).join("\n"));
   }, [open, region]);
+
+  const knownIds = new Set((region?.entities ?? []).map((e) => e.id));
+
+  function submit() {
+    if (coreType === "__none__") {
+      onSave({ title: title.trim() || null, organizationType: orgType, core: null, anchorEntityId: null });
+      return;
+    }
+    const sequences = coreSeq
+      .split("\n")
+      .map((line) =>
+        line
+          .split(/[,;]/)
+          .map((s) => s.trim())
+          .filter((s) => s && knownIds.has(s)),
+      )
+      .filter((seq) => seq.length > 0);
+    const core = sequences.length ? { type: coreType as ConnectionCoreType, entityIdSequences: sequences } : null;
+    onSave({
+      title: title.trim() || null,
+      organizationType: orgType,
+      core,
+      anchorEntityId: core?.entityIdSequences[0]?.[0] ?? null,
+    });
+  }
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -359,10 +384,6 @@ function RegionDialog({
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Номер (необязательно)</Label>
-            <Input value={number} onChange={(e) => setNumber(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
             <Label className="text-xs">Тип организации</Label>
             <Select value={orgType} onValueChange={setOrgType}>
               <SelectTrigger><SelectValue placeholder="Выберите тип" /></SelectTrigger>
@@ -374,34 +395,35 @@ function RegionDialog({
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Якорная сущность</Label>
-            <Select value={anchor} onValueChange={setAnchor}>
-              <SelectTrigger><SelectValue placeholder="Не задана" /></SelectTrigger>
+            <Label className="text-xs">Тип ядра</Label>
+            <Select value={coreType} onValueChange={setCoreType}>
+              <SelectTrigger><SelectValue placeholder="Не задано" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Не задана</SelectItem>
-                {(region?.entities ?? []).map((e) => (
-                  <SelectItem key={e.id} value={e.id}>{e.title || e.text || e.id}</SelectItem>
+                <SelectItem value="__none__">Не задано</SelectItem>
+                {Object.entries(CORE_TYPE_LABELS).map(([id, label]) => (
+                  <SelectItem key={id} value={id}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+          {coreType !== "__none__" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                Сущности ядра по порядку (id через запятую, каждая строка — отдельный маршрут)
+              </Label>
+              <Textarea rows={2} value={coreSeq} onChange={(e) => setCoreSeq(e.target.value)} />
+              <p className="text-[11px] text-muted-foreground">
+                Доступные id: {(region?.entities ?? []).map((e) => e.id).join(", ") || "—"}
+              </p>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Отмена</Button>
-          <Button
-            onClick={() =>
-              onSave({
-                title: title.trim() || null,
-                number: number.trim() || null,
-                organizationType: orgType,
-                anchorEntityId: anchor === "__none__" ? null : anchor,
-              })
-            }
-          >
-            Сохранить
-          </Button>
+          <Button onClick={submit}>Сохранить</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
