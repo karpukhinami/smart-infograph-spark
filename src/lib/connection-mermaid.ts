@@ -68,12 +68,42 @@ function subgraphTitle(r: ConnectionRegion): string {
 
 function anchorFor(r: ConnectionRegion, warnings: string[]): ConnectionEntity | null {
   if (!r.entities.length) return null;
-  if (r.anchorEntityId) {
-    const found = r.entities.find((e) => e.id === r.anchorEntityId);
+  const anchorId = regionAnchorId(r);
+  if (anchorId) {
+    const found = r.entities.find((e) => e.id === anchorId);
     if (found) return found;
-    warnings.push(`Регион ${r.id}: якорь «${r.anchorEntityId}» не найден, взята первая сущность по ID`);
+    warnings.push(`Регион ${r.id}: якорь «${anchorId}» не найден, взята первая сущность по ID`);
   }
   return [...r.entities].sort((a, b) => naturalCompare(a.id, b.id))[0];
+}
+
+/**
+ * Relations implied by the region core (linear/cyclic route, hub) that the model
+ * did not list explicitly. Keeps the diagram connected for the new schema.
+ */
+function implicitCoreRelations(r: ConnectionRegion, existing: ConnectionRelation[]): ConnectionRelation[] {
+  const core = r.core;
+  if (!core) return [];
+  const has = new Set(existing.map((rel) => `${rel.from}|${rel.to}`));
+  const hasEither = (a: string, b: string) => has.has(`${a}|${b}`) || has.has(`${b}|${a}`);
+  const out: ConnectionRelation[] = [];
+  const add = (from: string, to: string) => {
+    if (from === to || hasEither(from, to)) return;
+    has.add(`${from}|${to}`);
+    out.push({ from, to, direction: "one_way", label: null });
+  };
+
+  for (const seq of core.entityIdSequences) {
+    if (seq.length < 2) continue;
+    if (core.type === "hub") {
+      const [center, ...spokes] = seq;
+      spokes.forEach((s) => add(center, s));
+      continue;
+    }
+    for (let i = 0; i < seq.length - 1; i += 1) add(seq[i], seq[i + 1]);
+    if (core.type === "cyclic_route") add(seq[seq.length - 1], seq[0]);
+  }
+  return out;
 }
 
 function arrow(direction: string, label: string | null): string {
@@ -82,6 +112,7 @@ function arrow(direction: string, label: string | null): string {
   if (direction === "none") return `---${l}`;
   return `-->${l}`;
 }
+
 
 /** Build a Mermaid flowchart for the connection-schema JSON. */
 export function buildConnectionMermaid(
