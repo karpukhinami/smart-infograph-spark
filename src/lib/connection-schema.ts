@@ -357,7 +357,10 @@ export function connectionSchemaForBrief(a: ConnectionSchemaJson): string {
       id: r.id,
       title: r.title,
       organizationType: r.organizationType,
-      core: r.core ?? { type: "single_entity", entityIdSequences: coreSequences(r) },
+      core: r.core ?? {
+        type: "single_entity",
+        entityIdSequences: regionAnchorId(r) ? [[regionAnchorId(r) as string]] : [],
+      },
       entities: r.entities.map((e) => ({
         id: e.id,
         title: e.title,
