@@ -91,6 +91,8 @@ export function ConnectionSchemaPreview({ connection, profile, editable = true }
 
       {connection.regions.map((region, ri) => {
         const byId = new Map(region.entities.map((e) => [e.id, e]));
+        const coreIds = coreEntityIds(region);
+        const label = (id: string) => byId.get(id)?.title || byId.get(id)?.text || id;
         return (
           <div key={region.id} className="rounded-xl border-2 border-dashed border-muted-foreground/40 p-3 space-y-3">
             <div className="flex items-start justify-between gap-2">
@@ -102,6 +104,19 @@ export function ConnectionSchemaPreview({ connection, profile, editable = true }
                 <div className="text-[11px] text-muted-foreground">
                   {ORGANIZATION_TYPE_LABELS[region.organizationType] ?? region.organizationType}
                 </div>
+                {region.core && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                    <Anchor className="size-3" />
+                    <span className="font-medium">
+                      {CORE_TYPE_LABELS[region.core.type] ?? region.core.type}:
+                    </span>
+                    <span>
+                      {region.core.entityIdSequences
+                        .map((seq) => seq.map((id) => asText(label(id))).join(" → "))
+                        .join("  /  ")}
+                    </span>
+                  </div>
+                )}
               </div>
               {editable && (
                 <Button size="sm" variant="ghost" onClick={() => setRegionEdit(ri)}>
@@ -112,8 +127,9 @@ export function ConnectionSchemaPreview({ connection, profile, editable = true }
 
             <div className="space-y-2">
               {region.entities.map((e, ei) => {
-                const isAnchor = region.anchorEntityId === e.id;
+                const isAnchor = coreIds.includes(e.id);
                 const add = asAddendumLines(e.addendum);
+
                 return (
                   <div
                     key={e.id}
