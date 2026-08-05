@@ -345,7 +345,8 @@ function Workspace() {
           prompt: filled,
           label: "connection-schema",
           schemaHint:
-            'Верни JSON-объект схемы связей со структурой { topic, subject, grade, focusQuestion, displaySubtitle, regions: [{ id, number, title, organizationType, anchorEntityId, entities: [{ id, title, text, addendum, depiction }], relations: [{ from, to, direction, label }] }], regionRelations: [{ fromRegion, toRegion, direction, label }] }. Все обратные слеши внутри строк должны быть удвоены.',
+            'Верни JSON-объект схемы связей со структурой { topic, subject, grade, focusQuestion, displaySubtitle, regions: [{ id, title, organizationType, entities: [{ id, title, text, depiction }], core: { type, entityIdSequences: [[string]] }, relations: [{ from, to, direction, label }] }], regionRelations: [{ fromRegion, toRegion, direction, label }] }. Все обратные слеши внутри строк должны быть удвоены (\\\\frac), кавычки внутри строк экранированы (\\"), переводы строк записаны как \\n. Никаких других полей не добавляй.',
+
           parse: validateConnectionSchemaJson,
           images: imgs,
         });
