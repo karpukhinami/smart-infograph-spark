@@ -909,6 +909,15 @@ ${activeContent.value.content}`;
                 />
               </div>
             </div>
+            <div>
+              <Label className="text-xs">Дополнительные пожелания к дизайну</Label>
+              <Textarea
+                rows={3}
+                value={userWishes}
+                onChange={(e) => setUserWishes(e.target.value)}
+                placeholder="Чем подкорректировать дизайн и следующую генерацию…"
+              />
+            </div>
             {mode === "strict" && briefMode === "programmatic" && activeContent.value.connection ? (
               <div className="space-y-1.5">
                 <p className="text-xs text-muted-foreground">
