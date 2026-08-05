@@ -242,9 +242,19 @@ export function renderConnectionSchemaJson(a: ConnectionSchemaJson): string {
     const orgLabel = ORGANIZATION_TYPE_LABELS[r.organizationType] ?? r.organizationType;
     parts.push(`\n---\n\n## 🗺 Регион ${num}${r.title ?? ""} _(${orgLabel})_`);
 
+    const coreIds = coreEntityIds(r);
+    if (r.core) {
+      const byId = new Map(r.entities.map((e) => [e.id, e]));
+      const coreLabel = CORE_TYPE_LABELS[r.core.type] ?? r.core.type;
+      const routes = r.core.entityIdSequences
+        .map((seq) => seq.map((id) => entityLabel(byId.get(id), id)).join(" → "))
+        .join(" / ");
+      parts.push(`**⚓ Ядро региона** _(${coreLabel})_: ${routes}`);
+    }
+
     r.entities.forEach((e) => {
-      const isAnchor = r.anchorEntityId === e.id;
-      const head = `#### ${isAnchor ? "⚓ " : ""}${e.title ?? e.id}`;
+      const isCore = coreIds.includes(e.id);
+      const head = `#### ${isCore ? "⚓ " : ""}${e.title ?? e.id}`;
       const chunk: string[] = [head];
       if (e.text) chunk.push(e.text);
       const add = asAddendumLines(e.addendum);
@@ -252,6 +262,7 @@ export function renderConnectionSchemaJson(a: ConnectionSchemaJson): string {
       if (e.depiction) chunk.push(`🖼 _Изображение:_ ${e.depiction}`);
       parts.push(chunk.join("\n\n"));
     });
+
 
     if (r.relations.length) {
       const byId = new Map(r.entities.map((e) => [e.id, e]));
