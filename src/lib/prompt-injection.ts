@@ -418,7 +418,7 @@ Use {{backgroundColor}} for the main canvas.
 
 Use {{inkColor}} as the default color for educational text, entity outlines, relation lines, arrowheads, markers, and relation labels.
 
-Use {{primaryColor}} for the main structural emphasis, such as an anchor entity, a central node, or the principal route. Do not apply it to every entity.
+Use {{primaryColor}} for the main structural emphasis, such as the core entities of a region, a central core node, or the principal core route. Do not apply it to every entity.
 
 {{PASTEL_RULE}}
 
@@ -437,6 +437,8 @@ Minimize line crossings by adjusting entity positions and line routes. If a cros
 Do not allow unrelated relation lines to overlap for long distances. Shared line segments are allowed only when they intentionally represent one common route.
 
 Arrowheads must be clearly visible, proportional to the line weight, and separated from text and card borders. Direction must be immediately understandable.
+
+A relation with direction none must look exactly like every other relation — same line style, weight, color, and label treatment — but without arrowheads on either end.
 
 Place every relation label close to the line or branch it describes. Do not place labels at intersections or in positions where they may be associated with another relation. Use a small {{surfaceColor}} background when needed for readability.
 
