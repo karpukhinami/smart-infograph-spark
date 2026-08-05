@@ -353,19 +353,22 @@ export function connectionSchemaForBrief(a: ConnectionSchemaJson): string {
     displaySubtitle: a.displaySubtitle,
     regions: a.regions.map((r) => ({
       id: r.id,
-      number: r.number,
+      ...(r.number ? { number: r.number } : {}),
       title: r.title,
       organizationType: r.organizationType,
-      anchorEntityId: r.anchorEntityId,
+      core: r.core,
+      // Kept for the design-brief prompt, which references a single entry point.
+      anchorEntityId: regionAnchorId(r),
       entities: r.entities.map((e) => ({
         id: e.id,
         title: e.title,
         text: e.text,
-        addendum: e.addendum,
+        ...(e.addendum ? { addendum: e.addendum } : {}),
         depiction: e.depiction,
       })),
       relations: r.relations,
     })),
+
     regionRelations: a.regionRelations,
   };
   return singleBackslashLatex(JSON.stringify(normalizeLatexValue(clean), null, 2));
