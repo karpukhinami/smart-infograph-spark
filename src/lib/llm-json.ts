@@ -6,6 +6,7 @@ const RECOVERABLE_JSON_ERROR_PATTERNS = [
   "unterminated string",
   "unexpected token",
   "expected ',' or '}'",
+  "expected double-quoted property name",
   "expected property name",
   "property names must be double-quoted",
   "invalid escape",
@@ -15,6 +16,7 @@ const RECOVERABLE_JSON_ERROR_PATTERNS = [
 
 function isRecoverableJsonError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
+  if (error instanceof SyntaxError) return true;
   const message = error.message.toLowerCase();
   return RECOVERABLE_JSON_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
 }

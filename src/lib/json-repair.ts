@@ -1,3 +1,5 @@
+import { jsonrepair } from "jsonrepair";
+
 const VALID_JSON_ESCAPES = new Set(["\"", "\\", "/", "b", "f", "n", "r", "t", "u"]);
 
 function normalizeWrapper(raw: string): string {
@@ -88,6 +90,8 @@ function isTruncatedJson(text: string): boolean {
   const s = text.trim();
   if (!s) return false;
 
+  if (/\.\.\.$|\u2026$|\[truncated\]/i.test(s)) return true;
+
   let inString = false;
   let escaped = false;
   const stack: string[] = [];
@@ -117,7 +121,15 @@ function isTruncatedJson(text: string): boolean {
     if (ch === "}" || ch === "]") stack.pop();
   }
 
-  return inString || escaped || stack.length > 0 || /[,:\\]$/.test(s) || /\.\.\.$|\u2026$|\[truncated\]/i.test(s);
+  const last = s.at(-1);
+  const hasCompleteOuterBoundary =
+    (s.startsWith("{") && last === "}") || (s.startsWith("[") && last === "]");
+
+  // A misplaced quote can confuse the lightweight scanner even when the
+  // response has a complete outer boundary. Let the repair passes handle it.
+  if (hasCompleteOuterBoundary) return false;
+
+  return inString || escaped || stack.length > 0 || /[,:\\]$/.test(s);
 }
 
 function removeTrailingCommas(text: string): string {
@@ -274,8 +286,13 @@ export function extractJson<T = unknown>(raw: string): T {
 
   const candidate = findJsonCandidate(normalized) ?? normalized;
 
-  if (isTruncatedJson(candidate)) {
-    throw new Error("Truncated JSON output from model");
+  const repairedByLibrary: string[] = [];
+  for (const source of [candidate, normalized]) {
+    try {
+      repairedByLibrary.push(jsonrepair(source));
+    } catch {
+      // Keep trying the targeted local repairs below.
+    }
   }
 
   const attempts = [
@@ -287,6 +304,7 @@ export function extractJson<T = unknown>(raw: string): T {
     removeTrailingCommas(repairJsonText(candidate)),
     structuralRepair(repairJsonText(candidate)),
     repairJsonText(structuralRepair(candidate)),
+    ...repairedByLibrary,
   ];
 
 
@@ -297,6 +315,10 @@ export function extractJson<T = unknown>(raw: string): T {
     } catch (error) {
       lastError = error;
     }
+  }
+
+  if (isTruncatedJson(candidate)) {
+    throw new Error("Truncated JSON output from model");
   }
 
   throw lastError instanceof Error ? lastError : new Error("Failed to parse JSON response");
