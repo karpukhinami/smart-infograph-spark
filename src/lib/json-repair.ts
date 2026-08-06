@@ -124,6 +124,70 @@ function removeTrailingCommas(text: string): string {
   return text.replace(/,(\s*[}\]])/g, "$1");
 }
 
+/** Splits text into string / non-string segments so structural fixes skip string contents. */
+function mapOutsideStrings(text: string, fix: (chunk: string) => string): string {
+  let out = "";
+  let buffer = "";
+  let i = 0;
+
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === '"') {
+      out += fix(buffer);
+      buffer = "";
+      let str = '"';
+      i += 1;
+      let escaped = false;
+      while (i < text.length) {
+        const c = text[i];
+        str += c;
+        i += 1;
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (c === "\\") {
+          escaped = true;
+          continue;
+        }
+        if (c === '"') break;
+      }
+      out += str;
+      continue;
+    }
+    buffer += ch;
+    i += 1;
+  }
+  return out + fix(buffer);
+}
+
+/** Strips // and /* *\/ comments that models sometimes add outside strings. */
+function removeComments(text: string): string {
+  return mapOutsideStrings(text, (chunk) =>
+    chunk.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n\r]*/g, ""),
+  );
+}
+
+/** Quotes bare object keys: { key: 1 } -> { "key": 1 } */
+function quoteBareKeys(text: string): string {
+  return mapOutsideStrings(text, (chunk) =>
+    chunk.replace(/([{,]\s*)([A-Za-z_$][\w$-]*)(\s*:)/g, '$1"$2"$3'),
+  );
+}
+
+/** Converts single-quoted keys/values to double-quoted ones. */
+function normalizeSingleQuotes(text: string): string {
+  return text.replace(/'((?:[^'\\]|\\.)*)'(\s*[:,}\]\n\r])/g, (_m, inner: string, tail: string) => {
+    const escaped = inner.replace(/\\'/g, "'").replace(/"/g, '\\"');
+    return `"${escaped}"${tail}`;
+  });
+}
+
+function structuralRepair(text: string): string {
+  return removeTrailingCommas(quoteBareKeys(removeComments(normalizeSingleQuotes(text))));
+}
+
+
 function repairJsonText(text: string): string {
   let out = "";
   let inString = false;
