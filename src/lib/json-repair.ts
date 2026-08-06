@@ -282,9 +282,13 @@ export function extractJson<T = unknown>(raw: string): T {
     normalized,
     candidate,
     removeTrailingCommas(candidate),
+    structuralRepair(candidate),
     repairJsonText(candidate),
     removeTrailingCommas(repairJsonText(candidate)),
+    structuralRepair(repairJsonText(candidate)),
+    repairJsonText(structuralRepair(candidate)),
   ];
+
 
   let lastError: unknown;
   for (const attempt of [...new Set(attempts)]) {
