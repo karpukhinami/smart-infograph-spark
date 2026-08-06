@@ -408,7 +408,7 @@ Keep every region visually coherent and spatially distinct. Do not interleave en
 
 Balance the regions according to their actual complexity and amount of content. Regions do not have to be equal in size, but their relative sizes must appear intentional.
 
-Maintain a consistent visual language across the entire infographic: coordinated entity shapes, border weights, corner treatment, typography, illustration style, line style, and level of detail.
+Maintain a consistent visual language across the entire infographic: coordinated entity shapes, border weights, corner treatment, typography, illustration style, connection style, and level of detail.
 
 Use only colors from the provided palette.
 
@@ -416,39 +416,51 @@ Use ${FONT_FAMILY_PLACEHOLDER} as the single typographic system.
 
 Use {{backgroundColor}} for the main canvas.
 
-Use {{inkColor}} as the default color for educational text, entity outlines, relation lines, arrowheads, markers, and relation labels.
+Use {{inkColor}} as the default color for educational text, entity outlines, connections, arrowheads, markers, and relation labels.
 
-Use {{primaryColor}} for the main structural emphasis, such as the core entities of a region, a central core node, or the principal core route. Do not apply it to every entity.
+Use {{primaryColor}} for the main structural emphasis, such as the core entities of a region, a central core entity, a root entity, or the main route. Do not apply it to every entity.
 
 {{PASTEL_RULE}}
 
 Use {{contrastSoftColor}} only for a meaningful contrast, such as a result, condition, exception, alternative route, or opposing element.
 
-Use {{surfaceColor}} for small secondary areas, addendums, relation-label backgrounds, or compact content placed beside a marker.
+Use {{surfaceColor}} for small secondary areas, relation-label backgrounds, or compact content placed beside a marker.
 
 Use {{headerColor}} and {{lightTextColor}} primarily for the title area or a rare dark structural accent.
 
-Ensure sufficient contrast between text, lines, and backgrounds. Do not place light text on a light fill or dark text on a dark fill.
+Ensure sufficient contrast between text, connections, and backgrounds. Do not place light text on a light fill or dark text on a dark fill.
 
-Relation lines must remain clearly readable. They must not pass through entity cards, visible text, depictions, addendums, or relation labels.
+Connections may be realized as lines, ribbons, routes, arrows, or connectors. Do not assume that every relation is a thin line by default; follow the visualization decisions of the design brief.
 
-Minimize line crossings by adjusting entity positions and line routes. If a crossing cannot be avoided, make the crossing visually unambiguous and use one consistent crossing convention throughout the infographic.
+Connections must remain clearly readable. They must not pass through entity cards, visible text, depictions, or relation labels.
 
-Do not allow unrelated relation lines to overlap for long distances. Shared line segments are allowed only when they intentionally represent one common route.
+Minimize crossings by adjusting entity positions and connection paths. If a crossing cannot be avoided, make the crossing visually unambiguous and use one consistent crossing convention throughout the infographic.
 
-Arrowheads must be clearly visible, proportional to the line weight, and separated from text and card borders. Direction must be immediately understandable.
+Do not allow unrelated connection paths to overlap for long distances. Shared segments are allowed only when they intentionally represent one common route.
 
-A relation with direction none must look exactly like every other relation — same line style, weight, color, and label treatment — but without arrowheads on either end.
+Arrowheads must be clearly visible, proportional to the width of the connection they belong to, and separated from text and card borders. Direction must be immediately understandable.
 
-Place every relation label close to the line or branch it describes. Do not place labels at intersections or in positions where they may be associated with another relation. Use a small {{surfaceColor}} background when needed for readability.
+RIBBON-BASED MAIN ROUTES
 
-Internal relations and relations between regions must follow the same overall graphic language. Relations between regions may use one consistent additional distinction, such as greater line weight, stronger contrast, or a dedicated palette color.
+When the design brief specifies a main route as a ribbon, band, or highway, render it as one continuous solid filled shape with a clearly visible width, not as a stroked line with increased thickness. Preserve a consistent width along straight sections and broad rounded turns. Integrate directional arrowheads into the ribbon silhouette rather than attaching unrelated thin-line arrowheads.
 
-A connector between an addendum and its parent entity is not a semantic relation. It must be thinner than relation lines, must not have an arrowhead, and must not have a label.
+CONNECTION CONSISTENCY
 
-The image generation model may adjust exact spacing, line curvature, and minor proportions to achieve a balanced composition, but it must preserve all regions, entities, directions, labels, visible texts, and semantic relationships specified in the prompt.
+All directed connections within one infographic must belong to the same visual family. Main structural, local, and inter-region connections may differ in width, scale, contrast, or color intensity, but their geometry and arrowhead character must remain visually consistent. If the design uses a ribbon system, weaker directed connections may be narrow versions of it. Non-semantic attachments of cards to route nodes may remain simple thin stems without arrowheads.
 
-Never output HEX codes or technical color role names in the final visible design.
+Use one consistent arrowhead geometry throughout the infographic. Arrowheads may differ in scale when connection widths differ, but they must not change into unrelated shapes between regions or relation classes. For a ribbon main route the arrowhead must be built into its silhouette; a narrower connection uses a geometrically related arrowhead.
+
+A relation with direction none follows the visual style of its own relation class — main structural, local, or inter-region — but has no arrowhead.
+
+Place every relation label close to the connection or branch it describes. Do not place labels at intersections or in positions where they may be associated with another relation. Use a small {{surfaceColor}} background when needed for readability.
+
+Internal relations and relations between regions must follow the same overall graphic language. Relations between regions may use one consistent additional distinction, such as greater width, stronger contrast, or a dedicated palette color.
+
+The image generation model may adjust exact spacing, path curvature, and minor proportions to achieve a balanced composition, but it must preserve all regions, entities, directions, labels, visible texts, and semantic relationships specified in the prompt.
+
+Hex codes, palette-role names, field names, IDs, organization-type names, direction values, and other technical instructions are never visible text.
+
+Treat a hex code placed near visible-text instructions only as a color specification. Never render it as part of a label, title, card, or meta pill.
 
 LATEX AND MATHEMATICAL NOTATION
 
