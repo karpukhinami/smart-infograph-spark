@@ -341,8 +341,10 @@ function Workspace() {
         : useTopicOnlyPrompt
           ? prompts.analysisTopicOnly
           : prompts.analysisWithContent;
+      const wishes = source.userInstructions || "(нет)";
       const filled = template
-        .replaceAll("{{USER_INSTRUCTIONS}}", source.userInstructions || "(нет)")
+        .replaceAll("{{USER_INSTRUCTIONS}}", wishes)
+        .replaceAll("{{USER_WISHES}}", wishes)
         .replaceAll("{{STYLES_LIST}}", stylesList || "(стилей не задано)")
         .replaceAll("{{SOURCE_TEXT}}", buildSourceTextForPrompt(source.text, uploadedSourceText) || "")
         .replaceAll("{{TOPIC}}", source.topic || "")
@@ -381,7 +383,7 @@ function Workspace() {
           prompt: filled,
           label: "concept-art",
           schemaHint:
-            'Верни JSON-объект вида { "sourceMode": "text"|"topic", "centralConcept": string, "abstractionLevel": "low"|"medium"|"high"|"very_high", "visualInterpretations": [{ "interpretationType": string, "ideaAndRationale": string, "imageDescription": string }] }. Все обратные слеши внутри строк удваивай, кавычки экранируй, переводы строк записывай как \\n. Никаких других полей не добавляй.',
+            'Верни JSON-объект вида { "sourceMode": "text"|"topic", "topic": string, "subject": string|null, "grade": string|null, "centralConcept": string, "conceptDefinition"?: string, "abstractionLevel": "low"|"medium"|"high"|"very_high", "visualInterpretations": [{ "interpretationType": string, "ideaAndRationale": string, "imageDescription": string }] }. Все обратные слеши внутри строк удваивай, кавычки экранируй, переводы строк записывай как \\n. Никаких других полей не добавляй.',
           parse: validateConceptArtJson,
           images: imgs,
         });
