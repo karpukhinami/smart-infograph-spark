@@ -314,7 +314,7 @@ function isBareFormula(text: string): boolean {
 }
 
 /** Wrap bare formulas in $...$, mirroring the bento renderFormula behaviour. */
-function normalizeLatexValue<T>(value: T): T {
+export function normalizeLatexValue<T>(value: T): T {
   if (typeof value === "string") {
     return (isBareFormula(value) ? `$${value.trim()}$` : value) as unknown as T;
   }
@@ -334,7 +334,7 @@ function normalizeLatexValue<T>(value: T): T {
  * prompt exactly as it does in the bento Markdown summary ($\frac{a}{b}$, not
  * $\\frac{a}{b}$). Line breaks stay encoded as \n.
  */
-function singleBackslashLatex(json: string): string {
+export function singleBackslashLatex(json: string): string {
   return json.replace(/\\\\/g, "\\");
 }
 
