@@ -488,14 +488,23 @@ Dollar signs, escaped backslashes, and LaTeX structural braces are technical mar
   return [paletteAndFontBlock(profile), "", fillRolePlaceholders(body, profile)].join("\n");
 }
 
+/**
+ * Concept art: only the palette and typography block, no additional drawing rules.
+ */
+function conceptArtColorsAndRules(profile: DesignProfile): string {
+  return paletteAndFontBlock(profile);
+}
+
 /** Per-style LAYER 1 builders. Add a new entry when a style gets its own colour rules. */
 const LAYER1_BUILDERS: Record<string, (p: DesignProfile) => string> = {
   "modern-bento": bentoColorsAndRules,
   "connection-schema": connectionColorsAndRules,
+  "concept-art": conceptArtColorsAndRules,
 };
 
 export const BENTO_STYLE_ID = "modern-bento";
 export const CONNECTION_STYLE_ID = "connection-schema";
+export const CONCEPT_ART_STYLE_ID = "concept-art";
 
 /**
  * LAYER 1 text. `styleId` defaults to bento so the home page (which is bento-only)
