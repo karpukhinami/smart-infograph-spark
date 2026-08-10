@@ -417,6 +417,7 @@
 Структура:
 
 {
+  "sourceMode": "topic",
   "centralConcept": "...",
   "conceptDefinition": "...",
   "abstractionLevel": "low | medium | high | very_high",
