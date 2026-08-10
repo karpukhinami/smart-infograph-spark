@@ -151,16 +151,19 @@ export function renderConceptArtJson(a: ConceptArtJson): string {
 }
 
 /**
- * Compact raw-JSON view of the concept art for the design-brief prompt.
- * LaTeX gets the same treatment as in the connection style: bare formulas are
- * wrapped in $...$ and backslashes are single, as in the bento Markdown summary.
+ * Compact JSON view of the concept art for the design-brief prompt.
+ * Same pipeline as connectionSchemaForBrief: strip UI-only fields, normalize
+ * bare LaTeX into $...$, pretty-print JSON, then un-double backslashes so
+ * formulas reach the brief model as $\frac{a}{b}$, not $\\frac{a}{b}$.
+ * Not the Markdown preview — the brief prompt needs raw field names
+ * (centralConcept, interpretationType, imageDescription, …).
  */
 export function conceptArtForBrief(a: ConceptArtJson): string {
   const clean = {
     sourceMode: a.sourceMode,
-    topic: a.topic || null,
-    subject: a.subject,
-    grade: a.grade,
+    topic: String(a.topic ?? "").trim() || null,
+    subject: String(a.subject ?? "").trim() || null,
+    grade: String(a.grade ?? "").trim() || null,
     centralConcept: a.centralConcept,
     conceptDefinition: a.conceptDefinition,
     abstractionLevel: a.abstractionLevel,

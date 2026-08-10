@@ -50,6 +50,7 @@ import {
 } from "@/lib/refine-prompts";
 // recognize-image prompt no longer used: images are passed multimodally to the analysis model.
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
+import conceptArtRenderingRulesText from "@/data/prompts/concept-art-rendering-rules.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
 import {
   buildA4AILayout,
@@ -487,10 +488,16 @@ function Workspace() {
       } else if (!parsed.WireframeDescription && !parsed.WireframeSketch) {
         throw new Error("В ответе модели не хватает полей");
       }
-      // Concept art sends only the model's own prompt to the image model — no LAYER 1 block.
-      if (mode === "strict" && activeStyle?.id !== CONCEPT_ART_STYLE_ID) {
-        const layer1 = designProfileColorsAndRules(activeProfile, activeStyle?.id);
-        parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
+      // Prepend the style-specific front matter that the image model must see before
+      // PromptForImageGeneration (LAYER 1 / palette for bento & connection-schema;
+      // static rendering-strictness rules for concept-art). Execution bans are appended later.
+      if (mode === "strict") {
+        if (activeStyle?.id === CONCEPT_ART_STYLE_ID) {
+          parsed.PromptForImageGeneration = `${conceptArtRenderingRulesText.trim()}\n\n${parsed.PromptForImageGeneration}`;
+        } else {
+          const layer1 = designProfileColorsAndRules(activeProfile, activeStyle?.id);
+          parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
+        }
       }
       pushBrief(parsed);
       setPaneMode(noWireframe ? "content" : "wireframe");
@@ -708,9 +715,13 @@ ${activeContent.value.content}`;
       } else if (!parsed.WireframeDescription && !parsed.WireframeSketch) {
         throw new Error("В ответе модели не хватает полей");
       }
-      if (mode === "strict" && activeStyle?.id !== CONCEPT_ART_STYLE_ID) {
-        const layer1 = designProfileColorsAndRules(activeProfile, activeStyle?.id);
-        parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
+      if (mode === "strict") {
+        if (activeStyle?.id === CONCEPT_ART_STYLE_ID) {
+          parsed.PromptForImageGeneration = `${conceptArtRenderingRulesText.trim()}\n\n${parsed.PromptForImageGeneration}`;
+        } else {
+          const layer1 = designProfileColorsAndRules(activeProfile, activeStyle?.id);
+          parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
+        }
       }
       pushBrief(parsed);
       const dataUrl = await callImageLLM({ model: models.image, prompt: buildFinalImagePrompt(parsed.PromptForImageGeneration) });
