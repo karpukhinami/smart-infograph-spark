@@ -206,6 +206,27 @@ export interface ConnectionSchemaJson {
   warnings: string[];
 }
 
+/** ===== "Концепт-арт" (concept art) analysis JSON ===== */
+export type ConceptArtAbstractionLevel = "low" | "medium" | "high" | "very_high";
+
+export interface ConceptArtInterpretation {
+  interpretationType: string;
+  ideaAndRationale: string;
+  imageDescription: string;
+}
+
+export interface ConceptArtJson {
+  kind: "concept-art";
+  sourceMode: "text" | "topic";
+  topic: string;
+  subject: string | null;
+  grade: string | null;
+  centralConcept: string;
+  abstractionLevel: ConceptArtAbstractionLevel | null;
+  visualInterpretations: ConceptArtInterpretation[];
+  warnings: string[];
+}
+
 export interface ContentSummary {
   /** Human-readable text shown to the user (rendered from analysis JSON in strict mode). */
   content: string;
@@ -217,7 +238,10 @@ export interface ContentSummary {
   analysis?: AnalysisJson | null;
   /** Structured analysis JSON for the "схема связей" style. */
   connection?: ConnectionSchemaJson | null;
+  /** Structured analysis JSON for the "концепт-арт" style. */
+  conceptArt?: ConceptArtJson | null;
 }
+
 
 
 export interface DesignBriefResult {
