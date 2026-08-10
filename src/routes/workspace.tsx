@@ -24,6 +24,7 @@ import { PromptDisclosure } from "@/components/workspace/PromptDisclosure";
 import { Markdown } from "@/components/workspace/Markdown";
 import { WorkspaceContentPreview } from "@/components/workspace/WorkspaceContentPreview";
 import { ConnectionSchemaPreview } from "@/components/workspace/ConnectionSchemaPreview";
+import { ConceptArtPreview } from "@/components/workspace/ConceptArtPreview";
 import { ConnectionMermaidPreview } from "@/components/workspace/ConnectionMermaidPreview";
 import { A4AutoLayoutView, type ManualLayoutApply } from "@/components/workspace/A4AutoLayoutView";
 import { A4LayoutCanvas, type A4LayoutCanvasHandle } from "@/components/workspace/A4LayoutCanvas";
@@ -36,6 +37,7 @@ import { callTextLLMForJson } from "@/lib/llm-json";
 import { buildDesignBriefPrompt, designProfileColorsAndRules, resolveDesignProfile } from "@/lib/prompt-injection";
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
 import { connectionSchemaForBrief, renderConnectionSchemaJson, validateConnectionSchemaJson } from "@/lib/connection-schema";
+import { conceptArtForBrief, renderConceptArtJson, validateConceptArtJson } from "@/lib/concept-art";
 import {
   buildRefineContentPrompt,
   buildRefineBriefPrompt,
@@ -154,6 +156,7 @@ function Workspace() {
 
   const hasSource = hasSourceMaterials(source.text, uploadedSourceText, attachedImages);
   const isConnectionStyle = selectedStyleId === "connection-schema";
+  const isConceptArtStyle = selectedStyleId === "concept-art";
   const useTopicOnlyPrompt = !hasSource;
 
   useEffect(() => {
@@ -326,6 +329,10 @@ function Workspace() {
         ? useTopicOnlyPrompt
           ? prompts.connectionSchemaTopicOnly
           : prompts.connectionSchemaWithContent
+        : isConceptArtStyle
+          ? useTopicOnlyPrompt
+            ? prompts.conceptArtTopicOnly
+            : prompts.conceptArtWithContent
         : useTopicOnlyPrompt
           ? prompts.analysisTopicOnly
           : prompts.analysisWithContent;
@@ -355,6 +362,29 @@ function Workspace() {
           recommendedStyle: "connection-schema",
           recommendedDesignProfile: null,
           connection,
+        };
+      } else if (mode === "strict" && isConceptArtStyle) {
+        if (!filled.trim()) {
+          throw new Error(
+            useTopicOnlyPrompt
+              ? "Промпт «концепт-арт» по теме пока не заполнен"
+              : "Промпт «концепт-арт» пока не заполнен",
+          );
+        }
+        const conceptArt = await callTextLLMForJson({
+          model: models.analysis,
+          prompt: filled,
+          label: "concept-art",
+          schemaHint:
+            'Верни JSON-объект вида { "sourceMode": "text"|"topic", "centralConcept": string, "abstractionLevel": "low"|"medium"|"high"|"very_high", "visualInterpretations": [{ "interpretationType": string, "ideaAndRationale": string, "imageDescription": string }] }. Все обратные слеши внутри строк удваивай, кавычки экранируй, переводы строк записывай как \\n. Никаких других полей не добавляй.',
+          parse: validateConceptArtJson,
+          images: imgs,
+        });
+        summary = {
+          content: renderConceptArtJson(conceptArt),
+          recommendedStyle: "concept-art",
+          recommendedDesignProfile: null,
+          conceptArt,
         };
       } else if (mode === "strict") {
         const analysis = await callTextLLMForJson({
@@ -404,14 +434,28 @@ function Workspace() {
     try {
       setLoading("brief");
       const isConnBrief = activeStyle?.id === "connection-schema";
+      const isConceptBrief = activeStyle?.id === "concept-art";
+      const noWireframe = isConnBrief || isConceptBrief;
       const connection = activeContent.value.connection;
+      const conceptArt = activeContent.value.conceptArt;
       if (isConnBrief && !connection) {
         throw new Error("Для стиля «схема связей» нужен анализ этого же стиля на шаге 1");
       }
+      if (isConceptBrief && !conceptArt) {
+        throw new Error("Для стиля «концепт-арт» нужен анализ этого же стиля на шаге 1");
+      }
       const filled = buildDesignBriefPrompt({
-        template: isConnBrief ? prompts.connectionSchemaDesignBrief : prompts.designBrief,
+        template: isConnBrief
+          ? prompts.connectionSchemaDesignBrief
+          : isConceptBrief
+            ? prompts.conceptArtDesignBrief
+            : prompts.designBrief,
         contentSummary:
-          isConnBrief && connection ? connectionSchemaForBrief(connection) : activeContent.value.content,
+          isConnBrief && connection
+            ? connectionSchemaForBrief(connection)
+            : isConceptBrief && conceptArt
+              ? conceptArtForBrief(conceptArt)
+              : activeContent.value.content,
         style: activeStyle,
         profile: activeProfile,
         userWishes,
@@ -422,7 +466,7 @@ function Workspace() {
         model: models.brief,
         prompt: filled,
         label: "design brief",
-        schemaHint: isConnBrief
+        schemaHint: noWireframe
           ? 'Верни JSON-объект формы { "PromptForImageGeneration": string }. Все обратные слеши внутри строк должны быть удвоены (\\\\frac, \\\\sqrt и т.п.).'
           : 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
         parse: (value) => value as DesignBriefResult,
@@ -430,8 +474,8 @@ function Workspace() {
       if (!parsed.PromptForImageGeneration) {
         throw new Error("В ответе модели не хватает полей");
       }
-      if (isConnBrief) {
-        // This style has no wireframe stage — keep an empty placeholder.
+      if (noWireframe) {
+        // These styles have no wireframe stage — keep an empty placeholder.
         parsed.WireframeSketch = parsed.WireframeSketch ?? "";
       } else if (!parsed.WireframeDescription && !parsed.WireframeSketch) {
         throw new Error("В ответе модели не хватает полей");
@@ -441,7 +485,7 @@ function Workspace() {
         parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
       }
       pushBrief(parsed);
-      setPaneMode(isConnBrief ? "content" : "wireframe");
+      setPaneMode(noWireframe ? "content" : "wireframe");
       toast.success("Дизайн-бриф создан");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось создать бриф");
@@ -617,13 +661,22 @@ ${activeContent.value.content}`;
         ? `${userText}\n\n(предыдущие пожелания: ${userWishes.trim()})`
         : userText;
       const isConnRebuild = activeStyle?.id === "connection-schema";
+      const isConceptRebuild = activeStyle?.id === "concept-art";
+      const noWireframeRebuild = isConnRebuild || isConceptRebuild;
       const connectionForRebuild = activeContent.value.connection;
+      const conceptArtForRebuild = activeContent.value.conceptArt;
       const filled = buildDesignBriefPrompt({
-        template: isConnRebuild ? prompts.connectionSchemaDesignBrief : prompts.designBrief,
+        template: isConnRebuild
+          ? prompts.connectionSchemaDesignBrief
+          : isConceptRebuild
+            ? prompts.conceptArtDesignBrief
+            : prompts.designBrief,
         contentSummary:
           isConnRebuild && connectionForRebuild
             ? connectionSchemaForBrief(connectionForRebuild)
-            : activeContent.value.content,
+            : isConceptRebuild && conceptArtForRebuild
+              ? conceptArtForBrief(conceptArtForRebuild)
+              : activeContent.value.content,
         style: activeStyle,
         profile: activeProfile,
         userWishes: combinedWishes,
@@ -634,7 +687,7 @@ ${activeContent.value.content}`;
         model: models.brief,
         prompt: filled,
         label: "design brief rebuild",
-        schemaHint: isConnRebuild
+        schemaHint: noWireframeRebuild
           ? 'Верни JSON-объект формы { "PromptForImageGeneration": string }.'
           : 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
         parse: (value) => value as DesignBriefResult,
@@ -642,7 +695,7 @@ ${activeContent.value.content}`;
       if (!parsed.PromptForImageGeneration) {
         throw new Error("В ответе модели не хватает полей");
       }
-      if (isConnRebuild) {
+      if (noWireframeRebuild) {
         parsed.WireframeSketch = parsed.WireframeSketch ?? "";
       } else if (!parsed.WireframeDescription && !parsed.WireframeSketch) {
         throw new Error("В ответе модели не хватает полей");
@@ -840,15 +893,19 @@ ${activeContent.value.content}`;
 
 
           <PromptDisclosure
-            label={`Показать промпт анализа${isConnectionStyle ? " — схема связей" : ""} (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
+            label={`Показать промпт анализа${isConnectionStyle ? " — схема связей" : isConceptArtStyle ? " — концепт-арт" : ""} (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
             value={
               isConnectionStyle
                 ? useTopicOnlyPrompt
                   ? prompts.connectionSchemaTopicOnly
                   : prompts.connectionSchemaWithContent
-                : useTopicOnlyPrompt
-                  ? prompts.analysisTopicOnly
-                  : prompts.analysisWithContent
+                : isConceptArtStyle
+                  ? useTopicOnlyPrompt
+                    ? prompts.conceptArtTopicOnly
+                    : prompts.conceptArtWithContent
+                  : useTopicOnlyPrompt
+                    ? prompts.analysisTopicOnly
+                    : prompts.analysisWithContent
             }
             onChange={(v) =>
               setPrompt(
@@ -856,9 +913,13 @@ ${activeContent.value.content}`;
                   ? useTopicOnlyPrompt
                     ? "connectionSchemaTopicOnly"
                     : "connectionSchemaWithContent"
-                  : useTopicOnlyPrompt
-                    ? "analysisTopicOnly"
-                    : "analysisWithContent",
+                  : isConceptArtStyle
+                    ? useTopicOnlyPrompt
+                      ? "conceptArtTopicOnly"
+                      : "conceptArtWithContent"
+                    : useTopicOnlyPrompt
+                      ? "analysisTopicOnly"
+                      : "analysisWithContent",
                 v,
               )
             }
@@ -925,7 +986,7 @@ ${activeContent.value.content}`;
                 </p>
                 <Button onClick={() => setPaneMode("auto-layout")}>Построить схему связей</Button>
               </div>
-            ) : mode === "strict" && briefMode === "programmatic" ? (
+            ) : mode === "strict" && briefMode === "programmatic" && !activeContent.value.conceptArt ? (
               <>
                 <div className="space-y-1.5">
                   <Label className="text-xs" htmlFor="manual-layout-template">
@@ -1002,9 +1063,24 @@ ${activeContent.value.content}`;
             ) : (
               <>
                 <PromptDisclosure
-                  label="Показать промпт дизайн-брифа"
-                  value={isConnectionStyle ? prompts.connectionSchemaDesignBrief : prompts.designBrief}
-                  onChange={(v) => setPrompt(isConnectionStyle ? "connectionSchemaDesignBrief" : "designBrief", v)}
+                  label={`Показать промпт дизайн-брифа${isConnectionStyle ? " — схема связей" : isConceptArtStyle ? " — концепт-арт" : ""}`}
+                  value={
+                    isConnectionStyle
+                      ? prompts.connectionSchemaDesignBrief
+                      : isConceptArtStyle
+                        ? prompts.conceptArtDesignBrief
+                        : prompts.designBrief
+                  }
+                  onChange={(v) =>
+                    setPrompt(
+                      isConnectionStyle
+                        ? "connectionSchemaDesignBrief"
+                        : isConceptArtStyle
+                          ? "conceptArtDesignBrief"
+                          : "designBrief",
+                      v,
+                    )
+                  }
                   rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
                 />
                 <div>
@@ -1087,7 +1163,12 @@ ${activeContent.value.content}`;
                     </Button>
                   </div>
                   <div className="rounded-md border border-border p-3 bg-background">
-                    {activeContent.value.connection ? (
+                    {activeContent.value.conceptArt ? (
+                      <ConceptArtPreview
+                        conceptArt={activeContent.value.conceptArt}
+                        profile={activeProfile ?? null}
+                      />
+                    ) : activeContent.value.connection ? (
                       <ConnectionSchemaPreview
                         connection={activeContent.value.connection}
                         profile={activeProfile ?? null}
