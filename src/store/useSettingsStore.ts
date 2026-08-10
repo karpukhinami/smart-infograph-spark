@@ -159,7 +159,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "infographic-settings",
-      version: 28,
+      version: 29,
 
       // Breaking shape change — drop persisted state from older versions.
       migrate: () => undefined as unknown as SettingsState,
