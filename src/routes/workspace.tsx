@@ -34,7 +34,12 @@ import { RefineDialog } from "@/components/workspace/RefineDialog";
 import { callTextLLM, callImageLLM } from "@/lib/llm-client";
 import { HelpFiles } from "@/components/workspace/HelpFiles";
 import { callTextLLMForJson } from "@/lib/llm-json";
-import { buildDesignBriefPrompt, designProfileColorsAndRules, resolveDesignProfile } from "@/lib/prompt-injection";
+import {
+  buildDesignBriefPrompt,
+  CONCEPT_ART_STYLE_ID,
+  designProfileColorsAndRules,
+  resolveDesignProfile,
+} from "@/lib/prompt-injection";
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
 import { connectionSchemaForBrief, renderConnectionSchemaJson, validateConnectionSchemaJson } from "@/lib/connection-schema";
 import { conceptArtForBrief, renderConceptArtJson, validateConceptArtJson } from "@/lib/concept-art";
@@ -480,7 +485,8 @@ function Workspace() {
       } else if (!parsed.WireframeDescription && !parsed.WireframeSketch) {
         throw new Error("В ответе модели не хватает полей");
       }
-      if (mode === "strict") {
+      // Concept art sends only the model's own prompt to the image model — no LAYER 1 block.
+      if (mode === "strict" && activeStyle?.id !== CONCEPT_ART_STYLE_ID) {
         const layer1 = designProfileColorsAndRules(activeProfile, activeStyle?.id);
         parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
       }
@@ -700,7 +706,7 @@ ${activeContent.value.content}`;
       } else if (!parsed.WireframeDescription && !parsed.WireframeSketch) {
         throw new Error("В ответе модели не хватает полей");
       }
-      if (mode === "strict") {
+      if (mode === "strict" && activeStyle?.id !== CONCEPT_ART_STYLE_ID) {
         const layer1 = designProfileColorsAndRules(activeProfile, activeStyle?.id);
         parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
       }
