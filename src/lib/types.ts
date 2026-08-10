@@ -222,6 +222,7 @@ export interface ConceptArtJson {
   subject: string | null;
   grade: string | null;
   centralConcept: string;
+  conceptDefinition: string | null;
   abstractionLevel: ConceptArtAbstractionLevel | null;
   visualInterpretations: ConceptArtInterpretation[];
   warnings: string[];

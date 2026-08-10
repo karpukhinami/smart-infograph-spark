@@ -106,6 +106,7 @@ export function validateConceptArtJson(raw: unknown): ConceptArtJson {
   });
 
   const centralConcept = str(o.centralConcept ?? o.concept);
+  const conceptDefinition = str(o.conceptDefinition ?? o.definition);
   if (!centralConcept) warnings.push("Не указана центральная концепция (centralConcept)");
 
   const extra = Array.isArray(o.warnings) ? (o.warnings as unknown[]).map((w) => String(w)) : [];
@@ -117,6 +118,7 @@ export function validateConceptArtJson(raw: unknown): ConceptArtJson {
     subject: str(o.subject),
     grade: str(o.grade),
     centralConcept: centralConcept ?? "",
+    conceptDefinition,
     abstractionLevel: normalizeLevel(o.abstractionLevel ?? o.level, warnings),
     visualInterpretations,
     warnings: [...extra, ...warnings],
@@ -129,6 +131,7 @@ export function renderConceptArtJson(a: ConceptArtJson): string {
   parts.push(`# ${a.centralConcept || a.topic || "Центральная концепция не указана"}`);
   const meta = [a.subject, a.grade].filter(Boolean).join(" · ");
   if (meta) parts.push(`*${meta}*`);
+  if (a.conceptDefinition) parts.push(`**Определение концепции:**\n\n${a.conceptDefinition}`);
   if (a.abstractionLevel) {
     parts.push(`> **Уровень абстракции:** ${ABSTRACTION_LEVEL_LABELS[a.abstractionLevel]}`);
   }
@@ -159,6 +162,7 @@ export function conceptArtForBrief(a: ConceptArtJson): string {
     subject: a.subject,
     grade: a.grade,
     centralConcept: a.centralConcept,
+    conceptDefinition: a.conceptDefinition,
     abstractionLevel: a.abstractionLevel,
     visualInterpretations: a.visualInterpretations.map((v) => ({
       interpretationType: v.interpretationType,

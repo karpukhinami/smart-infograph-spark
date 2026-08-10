@@ -51,6 +51,18 @@ export function ConceptArtPreview({ conceptArt, profile }: Props) {
         )}
       </div>
 
+      {conceptArt.conceptDefinition && (
+        <div
+          className="rounded-xl border p-3"
+          style={{ background: c.surfaceColor, borderColor: c.detailSoftColor }}
+        >
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide opacity-70">
+            Определение концепции
+          </div>
+          <Markdown>{conceptArt.conceptDefinition}</Markdown>
+        </div>
+      )}
+
       {conceptArt.visualInterpretations.map((v, i) => (
         <div
           key={i}
