@@ -18,6 +18,9 @@ import promptStrictDetectStyle from "@/data/prompts/strict/detect-style.txt?raw"
 import promptStrictConnWith from "@/data/prompts/strict/connection-schema-with-content.txt?raw";
 import promptStrictConnTopic from "@/data/prompts/strict/connection-schema-topic-only.txt?raw";
 import promptConnDesignBrief from "@/data/prompts/simple/design-brief-connection.txt?raw";
+import promptStrictConceptWith from "@/data/prompts/strict/concept-art-with-content.txt?raw";
+import promptStrictConceptTopic from "@/data/prompts/strict/concept-art-topic-only.txt?raw";
+import promptConceptDesignBrief from "@/data/prompts/simple/design-brief-concept-art.txt?raw";
 import { AI_LAYOUT_PROMPT } from "@/lib/a4-layout/ai-prompt";
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
@@ -39,6 +42,12 @@ interface PromptSet {
   connectionSchemaTopicOnly: string;
   /** "Схема связей": design-brief prompt (image prompt only, no wireframe). */
   connectionSchemaDesignBrief: string;
+  /** "Концепт-арт": analysis with source material. */
+  conceptArtWithContent: string;
+  /** "Концепт-арт": generation from topic only. */
+  conceptArtTopicOnly: string;
+  /** "Концепт-арт": design-brief prompt (image prompt only, no wireframe). */
+  conceptArtDesignBrief: string;
 }
 
 interface SettingsState {
@@ -73,6 +82,9 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     connectionSchemaWithContent: "",
     connectionSchemaTopicOnly: "",
     connectionSchemaDesignBrief: "",
+    conceptArtWithContent: "",
+    conceptArtTopicOnly: "",
+    conceptArtDesignBrief: "",
   },
   strict: {
     analysisWithContent: promptStrictAnalysisWith,
@@ -84,6 +96,9 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     connectionSchemaWithContent: promptStrictConnWith,
     connectionSchemaTopicOnly: promptStrictConnTopic,
     connectionSchemaDesignBrief: promptConnDesignBrief,
+    conceptArtWithContent: promptStrictConceptWith,
+    conceptArtTopicOnly: promptStrictConceptTopic,
+    conceptArtDesignBrief: promptConceptDesignBrief,
   },
 };
 
@@ -144,7 +159,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "infographic-settings",
-      version: 27,
+      version: 28,
 
       // Breaking shape change — drop persisted state from older versions.
       migrate: () => undefined as unknown as SettingsState,
