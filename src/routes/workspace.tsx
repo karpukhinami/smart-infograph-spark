@@ -789,13 +789,32 @@ ${activeContent.value.content}`;
 
           <div>
             <Label className="text-xs">Дополнительные инструкции</Label>
-            <Textarea
-              rows={3}
-              value={source.userInstructions}
-              onChange={(e) => setSource({ userInstructions: e.target.value })}
-              placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
-            />
+            <div className="flex items-start gap-2">
+              <Textarea
+                className="flex-1"
+                rows={3}
+                value={source.userInstructions}
+                onChange={(e) => setSource({ userInstructions: e.target.value })}
+                placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-auto w-28 shrink-0 whitespace-normal py-2 text-xs leading-tight"
+                onClick={onComposeText}
+                disabled={
+                  loading !== null ||
+                  !(source.topic?.trim() || source.userInstructions?.trim())
+                }
+              >
+                {loading === "compose-text" ? (
+                  <Loader2 className="size-4 animate-spin mr-1" />
+                ) : null}
+                <span>Сочинить<br />текст</span>
+              </Button>
+            </div>
           </div>
+
 
           <TooltipProvider delayDuration={150}>
             <div className="flex flex-wrap items-center gap-6">
