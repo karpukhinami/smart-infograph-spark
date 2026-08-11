@@ -436,6 +436,41 @@ function Workspace() {
     }
   }
 
+  /** Workspace-only: asks the analysis model to write a textbook-style source text. */
+  async function onComposeText() {
+    const topic = source.topic?.trim() ?? "";
+    const instructions = source.userInstructions?.trim() ?? "";
+    if (!topic && !instructions) return;
+    const prompt = buildComposeTextPrompt({
+      topic,
+      subject: source.subject,
+      grade: source.grade,
+      instructions,
+    });
+    try {
+      setLoading("compose-text");
+      let text = "";
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const raw = await callTextLLM({ model: models.analysis, prompt });
+          text = normalizeComposedText(raw);
+          if (text) break;
+          lastError = new Error("Модель вернула пустой текст");
+        } catch (e) {
+          lastError = e;
+        }
+      }
+      if (!text) throw lastError ?? new Error("Модель вернула пустой текст");
+      setSource({ text });
+      toast.success("Текст сочинён и подставлен в «Исходный материал»");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось сочинить текст");
+    } finally {
+      setLoading(null);
+    }
+  }
+
   async function onCreateBrief() {
     if (!activeContent) return;
     if (!activeStyle) { toast.error("Сначала выберите стиль"); return; }
