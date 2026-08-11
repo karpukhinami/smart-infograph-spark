@@ -122,7 +122,7 @@ function Workspace() {
   const profiles = useSettingsStore((s) => s.profiles);
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
-  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine" | "ai-layout" | "detect-style">(null);
+  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine" | "ai-layout" | "detect-style" | "compose-text">(null);
   const [detectResult, setDetectResult] = useState<{ explanation: string; styleName: string } | null>(null);
   const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
   const [manualLayoutTemplate, setManualLayoutTemplate] = useState("");
