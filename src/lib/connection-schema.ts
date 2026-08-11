@@ -110,6 +110,25 @@ function normalizeCore(
   return { type: finalType, entityIdSequences: sequences };
 }
 
+/**
+ * Feature flag: drop labels on relations whose BOTH endpoints belong to the
+ * region core. Set to false to disable this post-processing entirely.
+ */
+export const STRIP_CORE_RELATION_LABELS = true;
+
+/**
+ * Clear `label` on core↔core relations only. Relations touching non-core
+ * entities keep their labels. No relations are added or removed.
+ */
+export function stripCoreRelationLabels(region: ConnectionRegion): void {
+  if (!STRIP_CORE_RELATION_LABELS) return;
+  const core = new Set(coreEntityIds(region));
+  if (core.size < 2) return;
+  for (const rel of region.relations) {
+    if (core.has(rel.from) && core.has(rel.to)) rel.label = null;
+  }
+}
+
 /** Validate + normalize the "connection schema" analysis JSON returned by the model. */
 export function validateConnectionSchemaJson(raw: unknown): ConnectionSchemaJson {
   if (!raw || typeof raw !== "object") throw new Error("Ответ модели не является объектом");
