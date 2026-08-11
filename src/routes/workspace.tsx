@@ -62,6 +62,7 @@ import { toPng } from "html-to-image";
 import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
 import { importSourceFiles, SOURCE_FILE_ACCEPT } from "@/lib/source-file-import";
 import { buildSourceTextForPrompt, hasSourceMaterials } from "@/lib/source-material";
+import { buildComposeTextPrompt, normalizeComposedText } from "@/lib/workspace/compose-text";
 
 
 export const Route = createFileRoute("/workspace")({
