@@ -206,6 +206,7 @@ export function validateConnectionSchemaJson(raw: unknown): ConnectionSchemaJson
     if (!core && entities.length) {
       warnings.push(`Регион ${rid}: отсутствует core — структура определена только связями`);
     }
+    stripCoreRelationLabels(region);
     return region;
   });
 
