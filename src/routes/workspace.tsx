@@ -62,6 +62,7 @@ import { toPng } from "html-to-image";
 import { ProfileSelect } from "@/components/design-profile/ProfileSelect";
 import { importSourceFiles, SOURCE_FILE_ACCEPT } from "@/lib/source-file-import";
 import { buildSourceTextForPrompt, hasSourceMaterials } from "@/lib/source-material";
+import { buildComposeTextPrompt, normalizeComposedText } from "@/lib/workspace/compose-text";
 
 
 export const Route = createFileRoute("/workspace")({
@@ -122,7 +123,7 @@ function Workspace() {
   const profiles = useSettingsStore((s) => s.profiles);
 
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
-  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine" | "ai-layout" | "detect-style">(null);
+  const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine" | "ai-layout" | "detect-style" | "compose-text">(null);
   const [detectResult, setDetectResult] = useState<{ explanation: string; styleName: string } | null>(null);
   const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
   const [manualLayoutTemplate, setManualLayoutTemplate] = useState("");
@@ -431,6 +432,41 @@ function Workspace() {
       toast.success("Контент проанализирован");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Не удалось выполнить анализ");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  /** Workspace-only: asks the analysis model to write a textbook-style source text. */
+  async function onComposeText() {
+    const topic = source.topic?.trim() ?? "";
+    const instructions = source.userInstructions?.trim() ?? "";
+    if (!topic && !instructions) return;
+    const prompt = buildComposeTextPrompt({
+      topic,
+      subject: source.subject,
+      grade: source.grade,
+      instructions,
+    });
+    try {
+      setLoading("compose-text");
+      let text = "";
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const raw = await callTextLLM({ model: models.analysis, prompt });
+          text = normalizeComposedText(raw);
+          if (text) break;
+          lastError = new Error("Модель вернула пустой текст");
+        } catch (e) {
+          lastError = e;
+        }
+      }
+      if (!text) throw lastError ?? new Error("Модель вернула пустой текст");
+      setSource({ text });
+      toast.success("Текст сочинён и подставлен в «Исходный материал»");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Не удалось сочинить текст");
     } finally {
       setLoading(null);
     }
@@ -789,13 +825,32 @@ ${activeContent.value.content}`;
 
           <div>
             <Label className="text-xs">Дополнительные инструкции</Label>
-            <Textarea
-              rows={3}
-              value={source.userInstructions}
-              onChange={(e) => setSource({ userInstructions: e.target.value })}
-              placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
-            />
+            <div className="flex items-start gap-2">
+              <Textarea
+                className="flex-1"
+                rows={3}
+                value={source.userInstructions}
+                onChange={(e) => setSource({ userInstructions: e.target.value })}
+                placeholder="На что сделать акцент, что пропустить, особенности аудитории…"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-auto w-28 shrink-0 whitespace-normal py-2 text-xs leading-tight"
+                onClick={onComposeText}
+                disabled={
+                  loading !== null ||
+                  !(source.topic?.trim() || source.userInstructions?.trim())
+                }
+              >
+                {loading === "compose-text" ? (
+                  <Loader2 className="size-4 animate-spin mr-1" />
+                ) : null}
+                <span>Сочинить<br />текст</span>
+              </Button>
+            </div>
           </div>
+
 
           <TooltipProvider delayDuration={150}>
             <div className="flex flex-wrap items-center gap-6">
