@@ -8,6 +8,17 @@ interface ReqBody {
   /** Card visual only — OpenRouter image size/aspect (omitted for full infographic). */
   resolution?: string;
   aspect_ratio?: string;
+  /** Reference images (data URLs or https URLs) sent alongside the prompt. */
+  images?: string[];
+}
+
+/** Chat-shaped user content: plain text, or text + attached reference images. */
+function userContent(body: ReqBody): unknown {
+  if (!body.images?.length) return body.prompt;
+  return [
+    { type: "text", text: body.prompt },
+    ...body.images.map((url) => ({ type: "image_url", image_url: { url } })),
+  ];
 }
 
 const OPENROUTER_TIMEOUT_MS = 180_000;
@@ -102,7 +113,7 @@ export const Route = createFileRoute("/api/generate-image")({
                 headers: openRouterHeaders(),
                 body: JSON.stringify({
                   model: upstreamModel,
-                  messages: [{ role: "user", content: body.prompt }],
+                  messages: [{ role: "user", content: userContent(body) }],
                   modalities: ["image", "text"],
                   usage: { include: true },
                 }),
@@ -240,7 +251,7 @@ export const Route = createFileRoute("/api/generate-image")({
         const upstreamBody = isGemini
           ? {
               model: upstreamModel,
-              messages: [{ role: "user", content: body.prompt }],
+              messages: [{ role: "user", content: userContent(body) }],
               modalities: ["image", "text"],
             }
           : {
