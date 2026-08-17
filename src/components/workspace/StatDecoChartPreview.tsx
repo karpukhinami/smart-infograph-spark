@@ -7,6 +7,13 @@ import { buildStatDecoOption } from "@/lib/stat-deco/echarts-option";
 import { setStatDecoChartPng } from "@/lib/stat-deco/chart-image";
 import { downloadLayoutPng } from "@/lib/download-infographic";
 
+interface EchartsLike {
+  setOption: (option: unknown, notMerge: boolean) => void;
+  resize: () => void;
+  dispose: () => void;
+  getDataURL: (opts: { type: string; pixelRatio: number; backgroundColor?: string }) => string;
+}
+
 interface Props {
   statDeco: StatDecoJson;
   profile?: DesignProfile | null;
@@ -21,8 +28,7 @@ interface Props {
  */
 export function StatDecoChartPreview({ statDeco, profile = null, active }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chartRef = useRef<any>(null);
+  const chartRef = useRef<EchartsLike | null>(null);
   const [ready, setReady] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -34,8 +40,7 @@ export function StatDecoChartPreview({ statDeco, profile = null, active }: Props
   useEffect(() => {
     if (!active || error) return;
     let disposed = false;
-    let chart: { setOption: (o: unknown, b: boolean) => void; resize: () => void; dispose: () => void } | null =
-      null;
+    let chart: EchartsLike | null = null;
 
     (async () => {
       const echarts = await import("echarts");
@@ -43,7 +48,7 @@ export function StatDecoChartPreview({ statDeco, profile = null, active }: Props
       chart = echarts.init(hostRef.current, undefined, {
         renderer: "canvas",
         devicePixelRatio: 2,
-      }) as unknown as typeof chart;
+      }) as unknown as EchartsLike;
       chartRef.current = chart;
       chart?.setOption(option, true);
       setReady(true);
