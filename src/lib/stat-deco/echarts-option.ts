@@ -85,10 +85,23 @@ export function buildStatDecoOption(
     data: categories,
     axisLine: { lineStyle: { color: theme.ink } },
     axisTick: { show: false },
-    axisLabel: { color: theme.ink, fontSize: 13, fontFamily, hideOverlap: true },
+    axisLabel: {
+      color: theme.ink,
+      fontSize: 13,
+      fontFamily,
+      // Every category must be labelled: never drop or hide labels.
+      interval: 0,
+      hideOverlap: false,
+      // Long names wrap onto several lines instead of being truncated.
+      overflow: "break" as const,
+      width: Math.max(56, Math.floor(760 / Math.max(categories.length, 1))),
+      lineHeight: 15,
+      margin: 10,
+    },
     // Reference charts intentionally omit the measuring grid.
     splitLine: { show: false },
   });
+
 
   const valueAxis = (max: number | undefined) => ({
     type: "value" as const,
@@ -220,16 +233,25 @@ export function buildStatDecoOption(
               center: ["50%", "54%"],
               padAngle: SLICE_GAP_DEG[r.sliceGap ?? "none"],
               avoidLabelOverlap: true,
+              minAngle: 2,
               itemStyle: { borderColor: theme.background, borderWidth: 0 },
               label: {
                 show: showValues,
                 color: theme.ink,
                 fontSize: 13,
                 fontFamily,
+                // Full category names: wrap instead of the default ellipsis.
+                overflow: "break",
+                width: 150,
+                lineHeight: 16,
+                bleedMargin: 2,
+                edgeDistance: 6,
                 formatter: (p: { name: string; value: number }) =>
                   `${p.name} · ${formatNum(Number(p.value))}`,
               },
-              labelLine: { show: showValues, lineStyle: { color: theme.ink } },
+              labelLine: { show: showValues, length: 12, length2: 14, lineStyle: { color: theme.ink } },
+              labelLayout: { hideOverlap: false },
+
               data: categories.map((name, i) => ({
                 name,
                 value: values[i] ?? 0,
@@ -550,32 +572,33 @@ function legendFor(
 }
 
 /**
- * Pseudo-3D look. The prototype drew three SVG faces (front / top / side);
- * with a chart library we approximate the same restrained volume using a
- * vertical gradient plus a lighter cap and a soft shadow — no perspective
- * distortion.
+ * Restrained "volume" look. Instead of a hard offset dark block (which read as
+ * a misaligned second bar), the bar is shaded across its width like a cylinder
+ * and lifted with a soft, low-contrast shadow.
  */
 function volume3d(color: string, volume: boolean, horizontal: boolean) {
   if (!volume) return { color, borderRadius: 2 };
   return {
-    borderRadius: 2,
+    borderRadius: 3,
     color: {
       type: "linear" as const,
-      x: horizontal ? 0 : 0,
-      y: horizontal ? 0 : 0,
+      // Light falls across the bar's short side: horizontally for vertical bars.
+      x: 0,
+      y: 0,
       x2: horizontal ? 0 : 1,
       y2: horizontal ? 1 : 0,
       colorStops: [
-        { offset: 0, color: lighten(color, 0.16) },
-        { offset: 0.5, color },
-        { offset: 1, color: darken(color, 0.18) },
+        { offset: 0, color: lighten(color, 0.2) },
+        { offset: 0.35, color: lighten(color, 0.06) },
+        { offset: 1, color: darken(color, 0.14) },
       ],
     },
-    shadowColor: darken(color, 0.35),
-    shadowBlur: 0,
-    shadowOffsetX: horizontal ? 0 : 4,
-    shadowOffsetY: horizontal ? 4 : -4,
+    shadowColor: darken(color, 0.3),
+    shadowBlur: 10,
+    shadowOffsetX: horizontal ? 0 : 2,
+    shadowOffsetY: horizontal ? 2 : 2,
   };
+
 }
 
 /** Per-series color, or per-category colors when there is only one series. */
