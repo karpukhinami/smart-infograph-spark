@@ -3,9 +3,62 @@
 @import "tw-animate-css";
 @import "katex/dist/katex.min.css";
 
+/* --- SB Sans Text (фирменный шрифт) --- */
+@font-face {
+  font-family: "SB Sans Text";
+  src: url("/__l5e/assets-v1/9d7cd7ba-2736-48ac-80df-305a154a98aa/SBSansText-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SB Sans Text";
+  src: url("/__l5e/assets-v1/69cfd01d-5f11-4e5c-b902-2ed497ca5209/SBSansText-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SB Sans Text";
+  src: url("/__l5e/assets-v1/f0ec35e8-f806-429e-ad59-f753c63ebb39/SBSansText-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SB Sans Text";
+  src: url("/__l5e/assets-v1/4a58d1e2-f66f-4597-9653-3109a5d4110a/SBSansText-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SB Sans Text";
+  src: url("/__l5e/assets-v1/1cd473ad-2f78-4b31-83f5-d24c7eba5aba/SBSansText-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SB Sans Text";
+  src: url("/__l5e/assets-v1/70ac29e0-fbc9-4c7e-a455-6e432a7e241a/SBSansText-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SB Sans Text";
+  src: url("/__l5e/assets-v1/6dc529f3-eded-47e9-86ec-6156b3e92ac5/SBSansText-BoldItalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --font-sans: "SB Sans Text", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "SB Sans Text", ui-serif, serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -105,6 +158,7 @@
 
 @layer base {
   * { border-color: var(--color-border); }
+  html, body { font-family: "SB Sans Text", ui-sans-serif, system-ui, sans-serif; }
   body { background-color: var(--color-background); color: var(--color-foreground); }
 }
 

@@ -56,7 +56,7 @@ export function buildStatDecoOption(
   const theme = statDecoTheme(profile);
   const r = json.rendering;
   const showValues = r.showValues !== false;
-  const fontFamily = "inherit";
+  const fontFamily = '"SB Sans Text", ui-sans-serif, system-ui, sans-serif';
 
   const base: EChartsOption = {
     backgroundColor: theme.background,
