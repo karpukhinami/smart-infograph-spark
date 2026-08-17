@@ -75,6 +75,17 @@ function normalizeChartType(v: unknown, warnings: string[]): StatDecoChartType {
   return "bar";
 }
 
+/**
+ * Cells like «—», «-», «н/д» mean "no value" in source tables. In a numeric
+ * column they are treated as zeros so the chart geometry stays continuous.
+ */
+const DASH_PLACEHOLDERS = new Set(["-", "–", "—", "―", "‒", "−", "н/д", "нд", "n/a", "na", "нет данных", "нет", "?"]);
+
+function isDashPlaceholder(v: unknown): boolean {
+  if (typeof v !== "string") return false;
+  return DASH_PLACEHOLDERS.has(v.trim().toLowerCase().replace(/\s+/g, " "));
+}
+
 /** Column-oriented data: first cell is the header, the rest are values. */
 function normalizeColumns(raw: unknown, warnings: string[]): StatDecoColumn[] {
   const src = Array.isArray(raw) ? raw : [];
@@ -85,16 +96,29 @@ function normalizeColumns(raw: unknown, warnings: string[]): StatDecoColumn[] {
       return;
     }
     const header = str(col[0]) ?? `Столбец ${i + 1}`;
+    const body = col.slice(1);
+    const hasNumbers = body.some((cell) => num(cell) !== null);
+    const dashCount = body.filter((cell) => isDashPlaceholder(cell)).length;
     const values: StatDecoColumn = [header];
-    for (let j = 1; j < col.length; j += 1) {
-      const cell = col[j];
+    for (let j = 0; j < body.length; j += 1) {
+      const cell = body[j];
       const n = num(cell);
-      values.push(n !== null ? n : (str(cell) ?? null));
+      if (n !== null) {
+        values.push(n);
+      } else if (hasNumbers && isDashPlaceholder(cell)) {
+        values.push(0);
+      } else {
+        values.push(str(cell) ?? null);
+      }
+    }
+    if (hasNumbers && dashCount > 0) {
+      warnings.push(`Столбец «${header}»: прочерки (${dashCount}) заменены нулями`);
     }
     columns.push(values);
   });
   return columns;
 }
+
 
 function normalizeMapping(raw: unknown): StatDecoMapping {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
