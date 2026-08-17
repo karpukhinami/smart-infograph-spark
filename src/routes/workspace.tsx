@@ -40,6 +40,7 @@ import {
   buildDesignBriefPrompt,
   CONCEPT_ART_STYLE_ID,
   designProfileColorsAndRules,
+  simplePaletteBlock,
   resolveDesignProfile,
 } from "@/lib/prompt-injection";
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
@@ -54,6 +55,7 @@ import {
 // recognize-image prompt no longer used: images are passed multimodally to the analysis model.
 import executionRulesText from "@/data/prompts/execution-rules.txt?raw";
 import conceptArtRenderingRulesText from "@/data/prompts/concept-art-rendering-rules.txt?raw";
+import statDecoRenderingRulesText from "@/data/prompts/stat-deco-rendering-rules.txt?raw";
 import type { ContentSummary, DesignBriefResult, InfographicStyle, PaneMode } from "@/lib/types";
 import {
   buildA4AILayout,
@@ -559,6 +561,11 @@ function Workspace() {
       if (mode === "strict") {
         if (activeStyle?.id === CONCEPT_ART_STYLE_ID) {
           parsed.PromptForImageGeneration = `${conceptArtRenderingRulesText.trim()}\n\n${parsed.PromptForImageGeneration}`;
+        } else if (activeStyle?.id === STAT_DECO_STYLE_ID) {
+          const palette = simplePaletteBlock(activeProfile).trim();
+          parsed.PromptForImageGeneration = [statDecoRenderingRulesText.trim(), palette, parsed.PromptForImageGeneration]
+            .filter((x) => x.length > 0)
+            .join("\n\n");
         } else {
           const layer1 = designProfileColorsAndRules(activeProfile, activeStyle?.id);
           parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
@@ -783,6 +790,11 @@ ${activeContent.value.content}`;
       if (mode === "strict") {
         if (activeStyle?.id === CONCEPT_ART_STYLE_ID) {
           parsed.PromptForImageGeneration = `${conceptArtRenderingRulesText.trim()}\n\n${parsed.PromptForImageGeneration}`;
+        } else if (activeStyle?.id === STAT_DECO_STYLE_ID) {
+          const palette = simplePaletteBlock(activeProfile).trim();
+          parsed.PromptForImageGeneration = [statDecoRenderingRulesText.trim(), palette, parsed.PromptForImageGeneration]
+            .filter((x) => x.length > 0)
+            .join("\n\n");
         } else {
           const layer1 = designProfileColorsAndRules(activeProfile, activeStyle?.id);
           parsed.PromptForImageGeneration = `${layer1}\n\n${parsed.PromptForImageGeneration}`;
