@@ -233,16 +233,25 @@ export function buildStatDecoOption(
               center: ["50%", "54%"],
               padAngle: SLICE_GAP_DEG[r.sliceGap ?? "none"],
               avoidLabelOverlap: true,
+              minAngle: 2,
               itemStyle: { borderColor: theme.background, borderWidth: 0 },
               label: {
                 show: showValues,
                 color: theme.ink,
                 fontSize: 13,
                 fontFamily,
+                // Full category names: wrap instead of the default ellipsis.
+                overflow: "break",
+                width: 150,
+                lineHeight: 16,
+                bleedMargin: 2,
+                edgeDistance: 6,
                 formatter: (p: { name: string; value: number }) =>
                   `${p.name} · ${formatNum(Number(p.value))}`,
               },
-              labelLine: { show: showValues, lineStyle: { color: theme.ink } },
+              labelLine: { show: showValues, length: 12, length2: 14, lineStyle: { color: theme.ink } },
+              labelLayout: { hideOverlap: false },
+
               data: categories.map((name, i) => ({
                 name,
                 value: values[i] ?? 0,
