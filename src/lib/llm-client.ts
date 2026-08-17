@@ -86,6 +86,8 @@ export async function callImageLLM(opts: {
   prompt: string;
   resolution?: string;
   aspect_ratio?: string;
+  /** Reference images (data URLs or https URLs) attached to the drawing request. */
+  images?: string[];
 }): Promise<string> {
   const res = await fetch("/api/generate-image", {
     method: "POST",

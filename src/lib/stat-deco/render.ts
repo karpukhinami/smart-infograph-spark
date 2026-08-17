@@ -1,6 +1,7 @@
 /** Human-readable Markdown rendering of the stat-deco JSON (Контент). */
 import type { StatDecoJson } from "@/lib/types";
 import { formatNum } from "./data";
+import { normalizeLatexValue, singleBackslashLatex } from "@/lib/connection-schema";
 
 export const CHART_TYPE_LABELS: Record<StatDecoJson["chartType"], string> = {
   bar: "Столбчатая диаграмма",
@@ -62,4 +63,15 @@ export function renderStatDecoJson(json: StatDecoJson): string {
     json.warnings.forEach((w) => parts.push(`- ${w}`));
   }
   return parts.join("\n\n");
+}
+
+/**
+ * Content summary for the design-brief model.
+ *
+ * The stat-deco brief prompt references raw JSON field names (chartType, data,
+ * mapping, rendering, illustrationPlan.elementInstructions[].target, …), so the
+ * brief model must receive the JSON itself, not the Markdown preview.
+ */
+export function statDecoForBrief(json: StatDecoJson): string {
+  return singleBackslashLatex(JSON.stringify(normalizeLatexValue(json), null, 2));
 }

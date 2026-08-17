@@ -46,7 +46,14 @@ import {
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
 import { connectionSchemaForBrief, renderConnectionSchemaJson, validateConnectionSchemaJson } from "@/lib/connection-schema";
 import { conceptArtForBrief, renderConceptArtJson, validateConceptArtJson } from "@/lib/concept-art";
-import { renderStatDecoJson, STAT_DECO_STYLE_ID, validateStatDecoJson } from "@/lib/stat-deco";
+import {
+  renderStatDecoChartPng,
+  renderStatDecoJson,
+  statDecoForBrief,
+  STAT_DECO_STYLE_ID,
+  validateStatDecoJson,
+} from "@/lib/stat-deco";
+import { getStatDecoChartPng } from "@/lib/stat-deco/chart-image";
 import {
   buildRefineContentPrompt,
   buildRefineBriefPrompt,
@@ -510,27 +517,41 @@ function Workspace() {
       setLoading("brief");
       const isConnBrief = activeStyle?.id === "connection-schema";
       const isConceptBrief = activeStyle?.id === "concept-art";
-      const noWireframe = isConnBrief || isConceptBrief;
+      const isStatDecoBrief = activeStyle?.id === STAT_DECO_STYLE_ID;
+      const noWireframe = isConnBrief || isConceptBrief || isStatDecoBrief;
       const connection = activeContent.value.connection;
       const conceptArt = activeContent.value.conceptArt;
+      const statDeco = activeContent.value.statDeco;
       if (isConnBrief && !connection) {
         throw new Error("Для стиля «схема связей» нужен анализ этого же стиля на шаге 1");
       }
       if (isConceptBrief && !conceptArt) {
         throw new Error("Для стиля «концепт-арт» нужен анализ этого же стиля на шаге 1");
       }
+      if (isStatDecoBrief && !statDeco) {
+        throw new Error("Для стиля «стат-деко» нужен анализ этого же стиля на шаге 1");
+      }
+      // The programmatically drawn chart is the visual reference for both the
+      // brief model and the drawing model.
+      const chartPng = isStatDecoBrief && statDeco
+        ? await renderStatDecoChartPng(statDeco, activeProfile ?? null)
+        : null;
       const filled = buildDesignBriefPrompt({
         template: isConnBrief
           ? prompts.connectionSchemaDesignBrief
           : isConceptBrief
             ? prompts.conceptArtDesignBrief
-            : prompts.designBrief,
+            : isStatDecoBrief
+              ? prompts.statDecoDesignBrief
+              : prompts.designBrief,
         contentSummary:
           isConnBrief && connection
             ? connectionSchemaForBrief(connection)
             : isConceptBrief && conceptArt
               ? conceptArtForBrief(conceptArt)
-              : activeContent.value.content,
+              : isStatDecoBrief && statDeco
+                ? statDecoForBrief(statDeco)
+                : activeContent.value.content,
         style: activeStyle,
         profile: activeProfile,
         userWishes,
@@ -541,6 +562,7 @@ function Workspace() {
         model: models.brief,
         prompt: filled,
         label: "design brief",
+        images: chartPng ? [chartPng] : undefined,
         schemaHint: noWireframe
           ? 'Верни JSON-объект формы { "PromptForImageGeneration": string }. Все обратные слеши внутри строк должны быть удвоены (\\\\frac, \\\\sqrt и т.п.).'
           : 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
@@ -604,6 +626,13 @@ function Workspace() {
     }
   }
 
+  /** Reference images attached to the drawing request (stat-deco chart PNG). */
+  function finalImageAttachments(): string[] | undefined {
+    if (activeStyle?.id !== STAT_DECO_STYLE_ID) return undefined;
+    const png = getStatDecoChartPng();
+    return png ? [png] : undefined;
+  }
+
   function buildFinalImagePrompt(basePrompt: string): string {
     const wishes = userWishes.trim();
     const head = wishes ? `${wishes}\n\n${basePrompt}` : basePrompt;
@@ -615,7 +644,11 @@ function Workspace() {
     try {
       setLoading("image");
       const prompt = buildFinalImagePrompt(activeBrief.value.PromptForImageGeneration);
-      const dataUrl = await callImageLLM({ model: models.image, prompt });
+      const dataUrl = await callImageLLM({
+        model: models.image,
+        prompt,
+        images: finalImageAttachments(),
+      });
       pushImage(dataUrl);
       setPaneMode("image");
       toast.success("Изображение сгенерировано");
@@ -730,7 +763,11 @@ ${activeContent.value.content}`;
         };
         pushBrief(next);
         // Now generate the image with the patched prompt.
-        const dataUrl = await callImageLLM({ model: models.image, prompt: buildFinalImagePrompt(decision.newPrompt) });
+        const dataUrl = await callImageLLM({
+          model: models.image,
+          prompt: buildFinalImagePrompt(decision.newPrompt),
+          images: finalImageAttachments(),
+        });
         pushImage(dataUrl);
         setPaneMode("image");
         setRefineStage(null);
@@ -749,21 +786,30 @@ ${activeContent.value.content}`;
         : userText;
       const isConnRebuild = activeStyle?.id === "connection-schema";
       const isConceptRebuild = activeStyle?.id === "concept-art";
-      const noWireframeRebuild = isConnRebuild || isConceptRebuild;
+      const isStatDecoRebuild = activeStyle?.id === STAT_DECO_STYLE_ID;
+      const noWireframeRebuild = isConnRebuild || isConceptRebuild || isStatDecoRebuild;
       const connectionForRebuild = activeContent.value.connection;
       const conceptArtForRebuild = activeContent.value.conceptArt;
+      const statDecoForRebuild = activeContent.value.statDeco;
+      const chartPngForRebuild = isStatDecoRebuild && statDecoForRebuild
+        ? await renderStatDecoChartPng(statDecoForRebuild, activeProfile ?? null)
+        : null;
       const filled = buildDesignBriefPrompt({
         template: isConnRebuild
           ? prompts.connectionSchemaDesignBrief
           : isConceptRebuild
             ? prompts.conceptArtDesignBrief
-            : prompts.designBrief,
+            : isStatDecoRebuild
+              ? prompts.statDecoDesignBrief
+              : prompts.designBrief,
         contentSummary:
           isConnRebuild && connectionForRebuild
             ? connectionSchemaForBrief(connectionForRebuild)
             : isConceptRebuild && conceptArtForRebuild
               ? conceptArtForBrief(conceptArtForRebuild)
-              : activeContent.value.content,
+              : isStatDecoRebuild && statDecoForRebuild
+                ? statDecoForBrief(statDecoForRebuild)
+                : activeContent.value.content,
         style: activeStyle,
         profile: activeProfile,
         userWishes: combinedWishes,
@@ -774,6 +820,7 @@ ${activeContent.value.content}`;
         model: models.brief,
         prompt: filled,
         label: "design brief rebuild",
+        images: chartPngForRebuild ? [chartPngForRebuild] : undefined,
         schemaHint: noWireframeRebuild
           ? 'Верни JSON-объект формы { "PromptForImageGeneration": string }.'
           : 'Верни JSON-объект формы { "PromptForImageGeneration": string, "WireframeSketch": string } или { "PromptForImageGeneration": string, "WireframeDescription": object }.',
@@ -801,7 +848,11 @@ ${activeContent.value.content}`;
         }
       }
       pushBrief(parsed);
-      const dataUrl = await callImageLLM({ model: models.image, prompt: buildFinalImagePrompt(parsed.PromptForImageGeneration) });
+      const dataUrl = await callImageLLM({
+        model: models.image,
+        prompt: buildFinalImagePrompt(parsed.PromptForImageGeneration),
+        images: finalImageAttachments(),
+      });
       pushImage(dataUrl);
       setPaneMode("image");
       setRefineStage(null);
