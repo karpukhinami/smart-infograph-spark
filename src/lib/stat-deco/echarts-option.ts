@@ -41,6 +41,8 @@ function axisMaxWithHeadroom(values: number[], headroom: keyof typeof HEADROOM =
   return Math.ceil((max / (1 - fraction)) * 100) / 100;
 }
 
+type SeriesList = NonNullable<EChartsOption["series"]>;
+
 export interface StatDecoOptionResult {
   option: EChartsOption;
   /** Filled when the data cannot produce a meaningful chart. */
@@ -106,7 +108,7 @@ export function buildStatDecoOption(
       const widthFraction = BAR_WIDTH[r.barWidth ?? "medium"];
       const perBar = series.length > 1 && !stacked ? widthFraction / series.length : widthFraction;
       const totals = categories.map((_, i) =>
-        series.reduce((acc, s) => acc + (s.values[i] ?? 0), 0),
+        series.reduce<number>((acc, s) => acc + (s.values[i] ?? 0), 0),
       );
       const horizontal = r.orientation === "horizontal";
 
@@ -143,7 +145,7 @@ export function buildStatDecoOption(
           legend: legendFor(series, theme),
           xAxis: horizontal ? valueAxis(vMax) : catAxis(categories),
           yAxis: horizontal ? catAxis(categories) : valueAxis(vMax),
-          series: echSeries,
+          series: echSeries as SeriesList,
         },
       };
     }
@@ -158,7 +160,7 @@ export function buildStatDecoOption(
       const normalize = r.seriesLayout === "stacked100";
       const colors = resolveColors(theme, r.colorMode, Math.max(series.length, 1));
       const radius = POINT_RADIUS[r.pointSize ?? (isArea ? "none" : "medium")];
-      const totals = categories.map((_, i) => series.reduce((a, s) => a + (s.values[i] ?? 0), 0));
+      const totals = categories.map((_, i) => series.reduce<number>((a, s) => a + (s.values[i] ?? 0), 0));
 
       const echSeries = series.map((s, si) => ({
         type: "line" as const,
@@ -193,7 +195,7 @@ export function buildStatDecoOption(
           legend: legendFor(series, theme),
           xAxis: { ...catAxis(categories), boundaryGap: false },
           yAxis: valueAxis(vMax),
-          series: echSeries,
+          series: echSeries as SeriesList,
         },
       };
     }
@@ -206,12 +208,12 @@ export function buildStatDecoOption(
       const colors = resolveColors(theme, r.colorMode ?? "different", categories.length);
       const outer = PIE_RADIUS[r.chartSize ?? "medium"];
       const hole = INNER_HOLE[r.innerHole ?? "none"];
-      const total = values.reduce((a, v) => a + (v ?? 0), 0);
+      const total = values.reduce<number>((a, v) => a + (v ?? 0), 0);
       return {
         option: {
           ...base,
           grid: undefined,
-          series: [
+          series: ([
             {
               type: "pie",
               radius: [`${Math.round(outer * hole * 100)}%`, `${Math.round(outer * 100)}%`],
@@ -234,7 +236,7 @@ export function buildStatDecoOption(
                 itemStyle: { color: colors[i] },
               })),
             },
-          ],
+          ] as SeriesList),
           graphic:
             hole > 0 && showValues
               ? [
@@ -282,7 +284,7 @@ export function buildStatDecoOption(
             axisLabel: { color: theme.ink, fontFamily },
             splitLine: { show: false },
           },
-          series: [
+          series: ([
             {
               type: "scatter",
               symbolSize: (val: unknown, params: { dataIndex: number }) => {
@@ -301,7 +303,7 @@ export function buildStatDecoOption(
                 itemStyle: { color: single ? theme.primary : colors[i] },
               })),
             },
-          ],
+          ] as SeriesList),
         },
       };
     }
@@ -319,7 +321,7 @@ export function buildStatDecoOption(
           ...base,
           xAxis: catAxis(labels),
           yAxis: valueAxis(axisMaxWithHeadroom(counts, r.headroom ?? "medium")),
-          series: [
+          series: ([
             {
               type: "bar",
               // Histogram bins touch each other.
@@ -329,7 +331,7 @@ export function buildStatDecoOption(
               label: { ...labelStyle, position: "top" as const },
               data: counts,
             },
-          ],
+          ] as SeriesList),
         },
       };
     }
@@ -366,7 +368,7 @@ export function buildStatDecoOption(
             areaStyle: { color: colors[si], opacity: 0.22 },
             label: { ...labelStyle },
             data: [{ value: s.values.map((v) => v ?? 0), name: s.name }],
-          })),
+          })) as SeriesList,
         },
       };
     }
@@ -381,7 +383,7 @@ export function buildStatDecoOption(
         option: {
           ...base,
           grid: undefined,
-          series: [
+          series: ([
             {
               type: "funnel",
               // Row order is meaningful and must be preserved.
@@ -405,7 +407,7 @@ export function buildStatDecoOption(
                 itemStyle: { color: colors[i], borderWidth: 0 },
               })),
             },
-          ],
+          ] as SeriesList),
         },
       };
     }
@@ -419,7 +421,7 @@ export function buildStatDecoOption(
         option: {
           ...base,
           grid: undefined,
-          series: [
+          series: ([
             {
               type: "treemap",
               top: 68,
@@ -439,7 +441,7 @@ export function buildStatDecoOption(
               },
               data: nodes.map((n, i) => ({ ...n, itemStyle: { color: colors[i] } })),
             },
-          ],
+          ] as SeriesList),
         },
       };
     }
@@ -482,7 +484,7 @@ export function buildStatDecoOption(
           ...base,
           xAxis: horizontal ? valueAxis(vMax) : catAxis(names),
           yAxis: horizontal ? catAxis(names) : valueAxis(vMax),
-          series,
+          series: series as SeriesList,
         },
       };
     }
@@ -506,7 +508,7 @@ export function buildStatDecoOption(
           ...base,
           xAxis: horizontal ? valueAxis(vMax) : catAxis(names),
           yAxis: horizontal ? catAxis(names) : valueAxis(vMax),
-          series: [
+          series: ([
             {
               type: "boxplot",
               data: boxes,
@@ -518,7 +520,7 @@ export function buildStatDecoOption(
               itemStyle: { color: theme.spot },
               data: outliers,
             },
-          ],
+          ] as SeriesList),
         },
       };
     }
