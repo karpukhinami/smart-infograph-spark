@@ -495,6 +495,52 @@ function conceptArtColorsAndRules(profile: DesignProfile): string {
   return paletteAndFontBlock(profile);
 }
 
+/**
+ * Lightweight palette block for the image model of the "стат-деко" style:
+ * no role-based drawing rules, just drawing colors vs technical colors + font.
+ */
+export function simplePaletteBlock(profile: DesignProfile | null | undefined): string {
+  if (!profile) return "";
+  const c = profile.colors;
+  const typoStyle = TYPO_STYLES.find((t) => t.id === profile.typography.styleId);
+  const lines: string[] = [];
+  lines.push("COLOR PALETTE BASICS");
+  lines.push("");
+  lines.push("Drawing colors — use these for the chart, its data elements and the illustration:");
+  if (c?.spotAccentColor) {
+    lines.push(
+      `- ${c.spotAccentColor} — MAIN bright color. Use it for whatever must attract attention first: the key data element, the main figure, the central emphasis.`,
+    );
+  }
+  if (c?.primaryColor) {
+    lines.push(
+      `- ${c.primaryColor} — SECOND bright color. Use it for the next most important element or for the second level of emphasis.`,
+    );
+  }
+  const extras = [c?.detailSoftColor, c?.detailDeepColor, c?.contrastSoftColor, c?.headerColor]
+    .filter((x): x is string => !!x)
+    .filter((hex, i, arr) => arr.findIndex((y) => normalizeHex(y) === normalizeHex(hex)) === i);
+  if (extras.length) {
+    lines.push(
+      `- Supporting colors, use freely for the remaining data elements, fills and illustrative shapes: ${extras.join(", ")}.`,
+    );
+  }
+  lines.push("");
+  lines.push("Technical colors:");
+  if (c?.backgroundColor) lines.push(`- ${c.backgroundColor} — page background.`);
+  if (c?.surfaceColor) lines.push(`- ${c.surfaceColor} — light inner surfaces and plates behind text or formulas.`);
+  if (c?.inkColor) lines.push(`- ${c.inkColor} — dark text, labels, numbers, axes and thin technical lines.`);
+  if (c?.lightTextColor) lines.push(`- ${c.lightTextColor} — text placed on dark or saturated areas.`);
+  if (c?.mutedheaderTextColor) lines.push(`- ${c.mutedheaderTextColor} — secondary and muted text.`);
+  lines.push("");
+  lines.push("Stay within these colors, except where a natural or conventional color of a depicted object is required for recognizability. Never print HEX codes or role names on the image.");
+  if (typoStyle) {
+    lines.push("");
+    lines.push(typoStyle.prompt);
+  }
+  return lines.join("\n");
+}
+
 /** Per-style LAYER 1 builders. Add a new entry when a style gets its own colour rules. */
 const LAYER1_BUILDERS: Record<string, (p: DesignProfile) => string> = {
   "modern-bento": bentoColorsAndRules,
@@ -505,6 +551,7 @@ const LAYER1_BUILDERS: Record<string, (p: DesignProfile) => string> = {
 export const BENTO_STYLE_ID = "modern-bento";
 export const CONNECTION_STYLE_ID = "connection-schema";
 export const CONCEPT_ART_STYLE_ID = "concept-art";
+
 
 /**
  * LAYER 1 text. `styleId` defaults to bento so the home page (which is bento-only)
