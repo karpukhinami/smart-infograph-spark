@@ -26,6 +26,8 @@ import { WorkspaceContentPreview } from "@/components/workspace/WorkspaceContent
 import { ConnectionSchemaPreview } from "@/components/workspace/ConnectionSchemaPreview";
 import { ConceptArtPreview } from "@/components/workspace/ConceptArtPreview";
 import { ConnectionMermaidPreview } from "@/components/workspace/ConnectionMermaidPreview";
+import { StatDecoContentPreview } from "@/components/workspace/StatDecoContentPreview";
+import { StatDecoChartPreview } from "@/components/workspace/StatDecoChartPreview";
 import { A4AutoLayoutView, type ManualLayoutApply } from "@/components/workspace/A4AutoLayoutView";
 import { A4LayoutCanvas, type A4LayoutCanvasHandle } from "@/components/workspace/A4LayoutCanvas";
 import { WireframeView } from "@/components/workspace/WireframeView";
@@ -43,6 +45,7 @@ import {
 import { renderAnalysisJson, validateAnalysisJson } from "@/lib/analysis-render";
 import { connectionSchemaForBrief, renderConnectionSchemaJson, validateConnectionSchemaJson } from "@/lib/connection-schema";
 import { conceptArtForBrief, renderConceptArtJson, validateConceptArtJson } from "@/lib/concept-art";
+import { renderStatDecoJson, STAT_DECO_STYLE_ID, validateStatDecoJson } from "@/lib/stat-deco";
 import {
   buildRefineContentPrompt,
   buildRefineBriefPrompt,
@@ -125,6 +128,8 @@ function Workspace() {
   const [paneMode, setPaneMode] = useState<PaneMode>("content");
   const [loading, setLoading] = useState<null | "analyze" | "brief" | "image" | "recognize" | "refine" | "ai-layout" | "detect-style" | "compose-text">(null);
   const [detectResult, setDetectResult] = useState<{ explanation: string; styleName: string } | null>(null);
+  // "Стат-деко" cannot be generated from a topic alone — it needs real data.
+  const [statDecoNoDataOpen, setStatDecoNoDataOpen] = useState(false);
   const [refineStage, setRefineStage] = useState<null | "content" | "brief" | "image">(null);
   const [manualLayoutTemplate, setManualLayoutTemplate] = useState("");
   const [manualBalanceRowFonts, setManualBalanceRowFonts] = useState(true);
@@ -164,6 +169,7 @@ function Workspace() {
   const hasSource = hasSourceMaterials(source.text, uploadedSourceText, attachedImages);
   const isConnectionStyle = selectedStyleId === "connection-schema";
   const isConceptArtStyle = selectedStyleId === "concept-art";
+  const isStatDecoStyle = selectedStyleId === STAT_DECO_STYLE_ID;
   const useTopicOnlyPrompt = !hasSource;
 
   useEffect(() => {
@@ -329,10 +335,16 @@ function Workspace() {
   }
 
   async function onAnalyze() {
+    if (isStatDecoStyle && !hasSource) {
+      setStatDecoNoDataOpen(true);
+      return;
+    }
     try {
       setLoading("analyze");
       const stylesList = enabledStyles.map((s) => `- ${s.id}: ${s.name} — ${s.shortDescription}`).join("\n");
-      const template = isConnectionStyle
+      const template = isStatDecoStyle
+        ? prompts.statDecoWithContent
+        : isConnectionStyle
         ? useTopicOnlyPrompt
           ? prompts.connectionSchemaTopicOnly
           : prompts.connectionSchemaWithContent
@@ -371,6 +383,23 @@ function Workspace() {
           recommendedStyle: "connection-schema",
           recommendedDesignProfile: null,
           connection,
+        };
+      } else if (mode === "strict" && isStatDecoStyle) {
+        if (!filled.trim()) throw new Error("Промпт «стат-деко» пока не заполнен");
+        const statDeco = await callTextLLMForJson({
+          model: models.analysis,
+          prompt: filled,
+          label: "stat-deco",
+          schemaHint:
+            'Верни JSON-объект вида { "chartType": string, "title": string, "summary": string, "dataStatus": { "canRender": boolean, "reason": string }, "data": { "columns": [[header, ...values]] }, "mapping": {}, "rendering": {}, "illustrationPlan": { "visualIntent": string, "overallTreatment": string, "elementInstructions": [{ "target": string, "instruction": string }] } }. Первый элемент каждого столбца — его название, остальные — значения.',
+          parse: validateStatDecoJson,
+          images: imgs,
+        });
+        summary = {
+          content: renderStatDecoJson(statDeco),
+          recommendedStyle: STAT_DECO_STYLE_ID,
+          recommendedDesignProfile: null,
+          statDeco,
         };
       } else if (mode === "strict" && isConceptArtStyle) {
         if (!filled.trim()) {
@@ -967,9 +996,15 @@ ${activeContent.value.content}`;
 
 
           <PromptDisclosure
-            label={`Показать промпт анализа${isConnectionStyle ? " — схема связей" : isConceptArtStyle ? " — концепт-арт" : ""} (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`}
+            label={
+              isStatDecoStyle
+                ? "Показать промпт анализа — стат-деко (только с источником)"
+                : `Показать промпт анализа${isConnectionStyle ? " — схема связей" : isConceptArtStyle ? " — концепт-арт" : ""} (${useTopicOnlyPrompt ? "только по теме" : "с источником"})`
+            }
             value={
-              isConnectionStyle
+              isStatDecoStyle
+                ? prompts.statDecoWithContent
+                : isConnectionStyle
                 ? useTopicOnlyPrompt
                   ? prompts.connectionSchemaTopicOnly
                   : prompts.connectionSchemaWithContent
@@ -983,7 +1018,9 @@ ${activeContent.value.content}`;
             }
             onChange={(v) =>
               setPrompt(
-                isConnectionStyle
+                isStatDecoStyle
+                  ? "statDecoWithContent"
+                  : isConnectionStyle
                   ? useTopicOnlyPrompt
                     ? "connectionSchemaTopicOnly"
                     : "connectionSchemaWithContent"
@@ -1205,7 +1242,11 @@ ${activeContent.value.content}`;
               <TabsTrigger value="content" disabled={!activeContent}>Контент</TabsTrigger>
               <TabsTrigger
                 value="auto-layout"
-                disabled={!activeContent?.value.analysis && !activeContent?.value.connection}
+                disabled={
+                  !activeContent?.value.analysis &&
+                  !activeContent?.value.connection &&
+                  !activeContent?.value.statDeco
+                }
               >
                 авто-макет
               </TabsTrigger>
@@ -1237,7 +1278,12 @@ ${activeContent.value.content}`;
                     </Button>
                   </div>
                   <div className="rounded-md border border-border p-3 bg-background">
-                    {activeContent.value.conceptArt ? (
+                    {activeContent.value.statDeco ? (
+                      <StatDecoContentPreview
+                        statDeco={activeContent.value.statDeco}
+                        profile={activeProfile ?? null}
+                      />
+                    ) : activeContent.value.conceptArt ? (
                       <ConceptArtPreview
                         conceptArt={activeContent.value.conceptArt}
                         profile={activeProfile ?? null}
@@ -1283,7 +1329,13 @@ ${activeContent.value.content}`;
             </TabsContent>
 
             <TabsContent value="auto-layout" className="p-2 space-y-2">
-              {activeContent?.value.connection ? (
+              {activeContent?.value.statDeco ? (
+                <StatDecoChartPreview
+                  statDeco={activeContent.value.statDeco}
+                  profile={activeProfile ?? null}
+                  active={paneMode === "auto-layout"}
+                />
+              ) : activeContent?.value.connection ? (
                 <ConnectionMermaidPreview connection={activeContent.value.connection} />
               ) : activeContent?.value.analysis ? (
 
@@ -1460,6 +1512,23 @@ ${activeContent.value.content}`;
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={statDecoNoDataOpen} onOpenChange={setStatDecoNoDataOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Нужен исходный материал</DialogTitle>
+            <DialogDescription className="pt-2 text-sm text-foreground">
+              Стиль «стат-деко» строит диаграмму по конкретным статистическим данным, поэтому
+              работать только по теме он не может. Добавьте исходный материал с числовыми данными
+              (текстом или файлом) и повторите анализ.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setStatDecoNoDataOpen(false)}>Понятно</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

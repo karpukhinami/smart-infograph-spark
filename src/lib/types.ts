@@ -228,6 +228,89 @@ export interface ConceptArtJson {
   warnings: string[];
 }
 
+/** ===== "Стат-деко" (stat-deco) analysis JSON ===== */
+export type StatDecoChartType =
+  | "bar"
+  | "line"
+  | "area"
+  | "pie"
+  | "scatter"
+  | "histogram"
+  | "radar"
+  | "funnel"
+  | "treemap"
+  | "waterfall"
+  | "boxplot";
+
+export type StatDecoColorMode = "same" | "similar" | "different";
+
+/** Column-oriented data table: first element of each column is its header. */
+export type StatDecoColumn = Array<string | number | null>;
+
+export interface StatDecoDataStatus {
+  canRender: boolean;
+  reason: string;
+}
+
+/** Column-index mapping; used only where column roles are not positional. */
+export interface StatDecoMapping {
+  label?: number;
+  category?: number;
+  value?: number;
+  type?: number;
+  parent?: number;
+  x?: number;
+  y?: number;
+  size?: number;
+}
+
+/** Categorical rendering hints chosen by the model (never pixels/percentages). */
+export interface StatDecoRendering {
+  orientation?: "vertical" | "horizontal";
+  seriesLayout?: "grouped" | "stacked" | "stacked100" | "overlay";
+  barWidth?: "narrow" | "medium" | "wide";
+  categoryGap?: "narrow" | "medium" | "wide";
+  seriesGap?: "narrow" | "medium" | "wide";
+  volume?: boolean;
+  headroom?: "small" | "medium" | "large";
+  showValues?: boolean;
+  colorMode?: StatDecoColorMode;
+  chartSize?: "small" | "medium" | "large";
+  sliceGap?: "none" | "narrow" | "medium" | "wide";
+  innerHole?: "none" | "small" | "medium" | "large";
+  lineWidth?: "thin" | "medium" | "thick";
+  lineShape?: "straight" | "smooth";
+  pointSize?: "none" | "small" | "medium" | "large";
+}
+
+export interface StatDecoElementInstruction {
+  target: string;
+  instruction: string;
+}
+
+export interface StatDecoIllustrationPlan {
+  visualIntent: string;
+  overallTreatment: string;
+  elementInstructions: StatDecoElementInstruction[];
+}
+
+export interface StatDecoJson {
+  kind: "stat-deco";
+  sourceMode: "text";
+  topic: string;
+  subject: string | null;
+  grade: string | null;
+  chartType: StatDecoChartType;
+  title: string;
+  summary: string;
+  dataStatus: StatDecoDataStatus;
+  data: { columns: StatDecoColumn[] };
+  mapping: StatDecoMapping;
+  rendering: StatDecoRendering;
+  illustrationPlan: StatDecoIllustrationPlan;
+  warnings: string[];
+}
+
 export interface ContentSummary {
   /** Human-readable text shown to the user (rendered from analysis JSON in strict mode). */
   content: string;
@@ -241,7 +324,10 @@ export interface ContentSummary {
   connection?: ConnectionSchemaJson | null;
   /** Structured analysis JSON for the "концепт-арт" style. */
   conceptArt?: ConceptArtJson | null;
+  /** Structured analysis JSON for the "стат-деко" style. */
+  statDeco?: StatDecoJson | null;
 }
+
 
 
 
