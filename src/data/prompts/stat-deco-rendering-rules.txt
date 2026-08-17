@@ -7,6 +7,11 @@ Labels, numerical values, proportional areas, quantities, chart geometry, data p
 Artistic treatment may enrich and transform the visual appearance, but must never alter the data, quantitative relationships, or conceptual structure described in the design brief.
 
 
+ATTACHED REFERENCE IMAGE
+
+When an image is attached, treat it as the primary reference for the chart's geometry, layout, proportions, and color harmony. Before inventing your own composition, study the attached image first: mirror its chart structure, spatial arrangement, and the overall color mood, then adapt them to the design brief and palette. The attached image is a starting point, not a strict template — refine and stylize it, but do not discard its geometric and chromatic decisions without reason.
+
+
 VISUAL STYLE
 
 Use a handcrafted digital educational editorial illustration style with a contemporary mid-century-inspired character.
