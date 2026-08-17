@@ -572,32 +572,33 @@ function legendFor(
 }
 
 /**
- * Pseudo-3D look. The prototype drew three SVG faces (front / top / side);
- * with a chart library we approximate the same restrained volume using a
- * vertical gradient plus a lighter cap and a soft shadow — no perspective
- * distortion.
+ * Restrained "volume" look. Instead of a hard offset dark block (which read as
+ * a misaligned second bar), the bar is shaded across its width like a cylinder
+ * and lifted with a soft, low-contrast shadow.
  */
 function volume3d(color: string, volume: boolean, horizontal: boolean) {
   if (!volume) return { color, borderRadius: 2 };
   return {
-    borderRadius: 2,
+    borderRadius: 3,
     color: {
       type: "linear" as const,
-      x: horizontal ? 0 : 0,
-      y: horizontal ? 0 : 0,
+      // Light falls across the bar's short side: horizontally for vertical bars.
+      x: 0,
+      y: 0,
       x2: horizontal ? 0 : 1,
       y2: horizontal ? 1 : 0,
       colorStops: [
-        { offset: 0, color: lighten(color, 0.16) },
-        { offset: 0.5, color },
-        { offset: 1, color: darken(color, 0.18) },
+        { offset: 0, color: lighten(color, 0.2) },
+        { offset: 0.35, color: lighten(color, 0.06) },
+        { offset: 1, color: darken(color, 0.14) },
       ],
     },
-    shadowColor: darken(color, 0.35),
-    shadowBlur: 0,
-    shadowOffsetX: horizontal ? 0 : 4,
-    shadowOffsetY: horizontal ? 4 : -4,
+    shadowColor: darken(color, 0.3),
+    shadowBlur: 10,
+    shadowOffsetX: horizontal ? 0 : 2,
+    shadowOffsetY: horizontal ? 2 : 2,
   };
+
 }
 
 /** Per-series color, or per-category colors when there is only one series. */
