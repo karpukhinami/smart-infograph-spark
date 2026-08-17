@@ -158,7 +158,10 @@
 
 @layer base {
   * { border-color: var(--color-border); }
+  html, body { font-family: "SB Sans Text", ui-sans-serif, system-ui, sans-serif; }
   body { background-color: var(--color-background); color: var(--color-foreground); }
+  /* КаТеХ оставляем на собственных математических шрифтах */
+  .katex, .katex * { font-family: revert; }
 }
 
 .markdown-body h1 { font-size: 1.6rem; font-weight: 700; margin: 0.6em 0 0.3em; }
