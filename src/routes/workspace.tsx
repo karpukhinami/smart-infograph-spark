@@ -1237,13 +1237,15 @@ ${activeContent.value.content}`;
             ) : (
               <>
                 <PromptDisclosure
-                  label={`Показать промпт дизайн-брифа${isConnectionStyle ? " — схема связей" : isConceptArtStyle ? " — концепт-арт" : ""}`}
+                  label={`Показать промпт дизайн-брифа${isConnectionStyle ? " — схема связей" : isConceptArtStyle ? " — концепт-арт" : isStatDecoStyle ? " — стат-деко" : ""}`}
                   value={
                     isConnectionStyle
                       ? prompts.connectionSchemaDesignBrief
                       : isConceptArtStyle
                         ? prompts.conceptArtDesignBrief
-                        : prompts.designBrief
+                        : isStatDecoStyle
+                          ? prompts.statDecoDesignBrief
+                          : prompts.designBrief
                   }
                   onChange={(v) =>
                     setPrompt(
@@ -1251,10 +1253,13 @@ ${activeContent.value.content}`;
                         ? "connectionSchemaDesignBrief"
                         : isConceptArtStyle
                           ? "conceptArtDesignBrief"
-                          : "designBrief",
+                          : isStatDecoStyle
+                            ? "statDecoDesignBrief"
+                            : "designBrief",
                       v,
                     )
                   }
+
                   rightSlot={<ModelPicker kind="text" value={models.brief} onChange={(v) => setModel("brief", v)} />}
                 />
                 <div>
