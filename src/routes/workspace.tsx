@@ -1512,6 +1512,23 @@ ${activeContent.value.content}`;
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={statDecoNoDataOpen} onOpenChange={setStatDecoNoDataOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Нужен исходный материал</DialogTitle>
+            <DialogDescription className="pt-2 text-sm text-foreground">
+              Стиль «стат-деко» строит диаграмму по конкретным статистическим данным, поэтому
+              работать только по теме он не может. Добавьте исходный материал с числовыми данными
+              (текстом или файлом) и повторите анализ.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setStatDecoNoDataOpen(false)}>Понятно</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
