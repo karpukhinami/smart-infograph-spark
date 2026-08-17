@@ -85,10 +85,23 @@ export function buildStatDecoOption(
     data: categories,
     axisLine: { lineStyle: { color: theme.ink } },
     axisTick: { show: false },
-    axisLabel: { color: theme.ink, fontSize: 13, fontFamily, hideOverlap: true },
+    axisLabel: {
+      color: theme.ink,
+      fontSize: 13,
+      fontFamily,
+      // Every category must be labelled: never drop or hide labels.
+      interval: 0,
+      hideOverlap: false,
+      // Long names wrap onto several lines instead of being truncated.
+      overflow: "break" as const,
+      width: Math.max(56, Math.floor(760 / Math.max(categories.length, 1))),
+      lineHeight: 15,
+      margin: 10,
+    },
     // Reference charts intentionally omit the measuring grid.
     splitLine: { show: false },
   });
+
 
   const valueAxis = (max: number | undefined) => ({
     type: "value" as const,
