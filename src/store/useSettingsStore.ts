@@ -21,6 +21,8 @@ import promptConnDesignBrief from "@/data/prompts/simple/design-brief-connection
 import promptStrictConceptWith from "@/data/prompts/strict/concept-art-with-content.txt?raw";
 import promptStrictConceptTopic from "@/data/prompts/strict/concept-art-topic-only.txt?raw";
 import promptConceptDesignBrief from "@/data/prompts/simple/design-brief-concept-art.txt?raw";
+import promptStrictStatDecoWith from "@/data/prompts/strict/stat-deco-with-content.txt?raw";
+import promptStatDecoDesignBrief from "@/data/prompts/simple/design-brief-stat-deco.txt?raw";
 import { AI_LAYOUT_PROMPT } from "@/lib/a4-layout/ai-prompt";
 
 import type { AppMode, DesignProfile, InfographicStyle } from "@/lib/types";
@@ -48,6 +50,10 @@ interface PromptSet {
   conceptArtTopicOnly: string;
   /** "Концепт-арт": design-brief prompt (image prompt only, no wireframe). */
   conceptArtDesignBrief: string;
+  /** "Стат-деко": analysis with source material (no topic-only mode for this style). */
+  statDecoWithContent: string;
+  /** "Стат-деко": design-brief prompt. */
+  statDecoDesignBrief: string;
 }
 
 interface SettingsState {
@@ -85,6 +91,8 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     conceptArtWithContent: "",
     conceptArtTopicOnly: "",
     conceptArtDesignBrief: "",
+    statDecoWithContent: "",
+    statDecoDesignBrief: "",
   },
   strict: {
     analysisWithContent: promptStrictAnalysisWith,
@@ -99,6 +107,8 @@ const initialPrompts: Record<AppMode, PromptSet> = {
     conceptArtWithContent: promptStrictConceptWith,
     conceptArtTopicOnly: promptStrictConceptTopic,
     conceptArtDesignBrief: promptConceptDesignBrief,
+    statDecoWithContent: promptStrictStatDecoWith,
+    statDecoDesignBrief: promptStatDecoDesignBrief,
   },
 };
 
@@ -159,7 +169,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "infographic-settings",
-      version: 30,
+      version: 31,
 
       // Breaking shape change — drop persisted state from older versions.
       migrate: () => undefined as unknown as SettingsState,
