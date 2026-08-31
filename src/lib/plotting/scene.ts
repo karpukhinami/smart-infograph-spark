@@ -1,5 +1,5 @@
 /** Создание, значения по умолчанию и построение сцены. */
-import { buildGraph, parseAnchors, type PlotBounds } from "./build";
+import { buildGraph, parseAnchors, piecewiseValueAt, type PlotBounds } from "./build";
 import { evaluateNumber, exactDisplay, makeMathValue } from "./math-expr";
 import { resolveGeometry } from "./render";
 import { intersectGraphs, pointsOnGraphAtX } from "./solve";
