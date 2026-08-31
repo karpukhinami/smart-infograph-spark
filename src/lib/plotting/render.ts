@@ -30,7 +30,9 @@ export interface PlotGeometry {
   canvasRight: number;
   canvasTop: number;
   canvasBottom: number;
-  /** Кончики стрелок осей. */
+  /** Начала и кончики стрелок осей. */
+  axisStartX: number;
+  axisStartY: number;
   axisEndX: number;
   axisEndY: number;
 
@@ -88,19 +90,26 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const leadX = xMin > -1e-12 ? Math.max(14, appearance.arrowSize * 1.4) : 0;
   const leadY = yMin > -1e-12 ? Math.max(14, appearance.arrowSize * 1.4) : 0;
 
-  const left = canvasLeft + leadX;
+  let left = canvasLeft + leadX;
   let right = canvasRight;
   let top = canvasTop;
-  const bottom = canvasBottom - leadY;
+  let bottom = canvasBottom - leadY;
 
   // Равный масштаб по обеим осям: клетки сетки квадратные, более длинная ось
-  // занимает всю доступную сторону изображения, вторая ужимается пропорционально.
+  // занимает всю доступную сторону изображения, вторая ужимается пропорционально,
+  // а оставшийся запас распределяется поровну — сцена остаётся по центру.
   let effCanvasRight = canvasRight;
   let effCanvasTop = canvasTop;
   if (appearance.equalScale !== false) {
     const scale = Math.min((right - left) / (xMax - xMin), (bottom - top) / (yMax - yMin));
-    right = left + scale * (xMax - xMin);
-    top = bottom - scale * (yMax - yMin);
+    const newWidth = scale * (xMax - xMin);
+    const newHeight = scale * (yMax - yMin);
+    const slackX = (right - left - newWidth) / 2;
+    const slackY = (bottom - top - newHeight) / 2;
+    left += slackX;
+    right = left + newWidth;
+    bottom -= slackY;
+    top = bottom - newHeight;
     effCanvasRight = right;
     effCanvasTop = top;
   }
@@ -118,13 +127,17 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const yAxisX = sx(Math.min(Math.max(0, xMin), xMax));
 
 
+  // Оси выходят за математическую область на одинаковый технический вылет
+  // со всех четырёх сторон, чтобы стрелки не «висели» несимметрично.
   const arrowLead = Math.round(appearance.arrowSize * 1.6);
   return {
     xMin, xMax, yMin, yMax, xStep, yStep, gridStepX, gridStepY,
     left, right, top, bottom,
     canvasLeft, canvasRight: effCanvasRight, canvasTop: effCanvasTop, canvasBottom,
-    axisEndX: effCanvasRight + arrowLead,
-    axisEndY: effCanvasTop - arrowLead,
+    axisStartX: Math.max(appearance.padding, left - arrowLead),
+    axisStartY: Math.min(appearance.height - appearance.padding, bottom + arrowLead),
+    axisEndX: right + arrowLead,
+    axisEndY: top - arrowLead,
     sx, sy, xAxisY, yAxisX,
   };
 
@@ -188,11 +201,13 @@ export function renderPlotSvg(
     )}" height="${round(geometry.bottom - geometry.top)}"/></clipPath></defs>`,
   );
 
+  // Рамка — по краю всего изображения, а не вокруг математической области.
   if (a.frame) {
+    const inset = a.frameWidth / 2;
     parts.push(
-      `<rect x="${round(geometry.canvasLeft)}" y="${round(geometry.canvasTop)}" width="${round(
-        geometry.canvasRight - geometry.canvasLeft,
-      )}" height="${round(geometry.canvasBottom - geometry.canvasTop)}" fill="none" stroke="${a.frameColor}" stroke-width="${a.frameWidth}"/>`,
+      `<rect x="${round(inset)}" y="${round(inset)}" width="${round(a.width - a.frameWidth)}" height="${round(
+        a.height - a.frameWidth,
+      )}" fill="none" stroke="${a.frameColor}" stroke-width="${a.frameWidth}"/>`,
     );
   }
 
@@ -221,9 +236,9 @@ export function renderPlotSvg(
   // Оси со стрелками: линия продолжается в техническое поле.
   const arrow = a.arrowSize;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
-  const xStart = geometry.canvasLeft;
+  const xStart = geometry.axisStartX;
   const xEnd = geometry.axisEndX;
-  const yStart = a.height - a.padding;
+  const yStart = geometry.axisStartY;
   const yEnd = geometry.axisEndY;
 
   parts.push(
