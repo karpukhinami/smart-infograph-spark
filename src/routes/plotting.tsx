@@ -123,9 +123,10 @@ function PlottingPage() {
             </Card>
           </div>
 
-          <div className="lg:sticky lg:top-6 lg:self-start">
+          <div className="lg:min-h-0 lg:self-start lg:overflow-y-auto">
             <PlotPreview />
           </div>
+
         </div>
       </div>
     </div>
