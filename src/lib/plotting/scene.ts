@@ -1,5 +1,5 @@
 /** Создание, значения по умолчанию и построение сцены. */
-import { buildGraph, parseAnchors, piecewiseValueAt, type PlotBounds } from "./build";
+import { buildGraph, parseAnchors, piecewiseValuesAt, type PlotBounds } from "./build";
 import { evaluateNumber, exactDisplay, makeMathValue } from "./math-expr";
 import { resolveGeometry } from "./render";
 import { intersectGraphs, pointsOnGraphAtX } from "./solve";
@@ -221,18 +221,23 @@ export function buildPoint(point: ScenePoint, scene: PlotScene, bounds: PlotBoun
     const x = evaluateNumber(point.math.x);
     if (graph.math.kind === "piecewise") {
       const vars = { x: scene.xAxis.name.trim() || "x" };
-      const y = piecewiseValueAt(graph.math, vars, x);
-      return [
-        {
-          x,
-          y,
-          displayX: valueDisplay(point.math.x, x),
-          displayY: exactDisplay(y),
-          show: keepShow(0),
-          style: keepStyle(0),
-        },
-      ];
+      const candidates = piecewiseValuesAt(graph.math, vars, x);
+      // На разрыве сначала идёт та ветвь, которая совпадает с выбранным видом точки:
+      // «выколотая» — со стороны строгого неравенства, закрашенная — нестрогого.
+      const wantOpen = point.style.open;
+      const ordered = [...candidates].sort(
+        (a, b) => Number(b.open === wantOpen) - Number(a.open === wantOpen),
+      );
+      return ordered.map((item, index) => ({
+        x,
+        y: item.y,
+        displayX: valueDisplay(point.math.x, x),
+        displayY: exactDisplay(item.y),
+        show: keepShow(index),
+        style: { ...(keepStyle(index) ?? {}), open: item.open },
+      }));
     }
+
     const found = pointsOnGraphAtX(graph.built, x);
     if (!found.length) throw new Error("В этой координате график не определён.");
 

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import katex from "katex";
+import { expressionLatex } from "@/lib/plotting/math-expr";
 import { ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -113,26 +115,10 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
             {math.kind === "piecewise" && (
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Участки</Label>
-                <div className="relative flex items-center gap-1 pl-[1.85rem]">
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 font-medium italic">
-                    {yName} =
-                  </span>
-                  <svg
-                    viewBox="0 0 10 100"
-                    preserveAspectRatio="none"
-                    className="absolute inset-y-0 left-[1.5rem] h-full w-3 text-foreground"
-                    aria-hidden
-                  >
-                    <path
-                      d="M9 1 C4.5 1 6.5 40 1 50 C6.5 60 4.5 99 9 99"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  </svg>
-                  <div className="min-w-0 flex-1 space-y-1.5 pl-3">
-
+                <div className="flex items-stretch gap-2">
+                  <span className="shrink-0 self-center font-medium italic">{yName} =</span>
+                  <CurlyBrace />
+                  <div className="min-w-0 flex-1 space-y-2">
                     {math.pieces.map((piece, index) => {
                       const patch = (value: Partial<typeof piece>) =>
                         updateGraphMath(graph.id, {
@@ -141,67 +127,70 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
                           ),
                         });
                       return (
-                        <div key={index} className="flex items-center gap-1">
-                          <Input
-                            value={piece.expression}
-                            placeholder="формула"
-                            spellCheck={false}
-                            className="h-8 min-w-0 flex-1 font-mono text-xs"
-                            onChange={(event) => patch({ expression: event.target.value })}
-                          />
-                          <span className="shrink-0 text-xs text-muted-foreground">при</span>
-                          <Input
-                            value={piece.from}
-                            placeholder="-∞"
-                            className="h-8 w-14 shrink-0 border-primary/40 bg-primary/5 px-1.5 text-center font-mono text-xs"
-                            onChange={(event) => patch({ from: event.target.value })}
-                          />
-                          <Select
-                            value={piece.includeFrom ? "inclusive" : "strict"}
-                            onValueChange={(value) => patch({ includeFrom: value === "inclusive" })}
-                          >
-                            <SelectTrigger className="h-8 w-9 shrink-0 justify-center border-primary/40 bg-primary/10 px-0 text-sm text-primary [&>svg]:hidden">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="strict">&lt;</SelectItem>
-                              <SelectItem value="inclusive">≤</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <span className="shrink-0 italic">{xName}</span>
-                          <Select
-                            value={piece.includeTo ? "inclusive" : "strict"}
-                            onValueChange={(value) => patch({ includeTo: value === "inclusive" })}
-                          >
-                            <SelectTrigger className="h-8 w-9 shrink-0 justify-center border-primary/40 bg-primary/10 px-0 text-sm text-primary [&>svg]:hidden">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="strict">&lt;</SelectItem>
-                              <SelectItem value="inclusive">≤</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            value={piece.to}
-                            placeholder="+∞"
-                            className="h-8 w-14 shrink-0 border-primary/40 bg-primary/5 px-1.5 text-center font-mono text-xs"
-                            onChange={(event) => patch({ to: event.target.value })}
-                          />
-                          {math.pieces.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="size-7 shrink-0 text-muted-foreground"
-                              onClick={() =>
-                                updateGraphMath(graph.id, {
-                                  pieces: math.pieces.filter((_item, position) => position !== index),
-                                })
-                              }
+                        <div key={index} className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={piece.expression}
+                              placeholder="формула"
+                              spellCheck={false}
+                              className="h-8 min-w-0 flex-1 font-mono text-xs"
+                              onChange={(event) => patch({ expression: event.target.value })}
+                            />
+                            <span className="shrink-0 text-xs text-muted-foreground">при</span>
+                            <Input
+                              value={piece.from}
+                              placeholder="-∞"
+                              className="h-8 w-14 shrink-0 border-primary/40 bg-primary/5 px-1.5 text-center font-mono text-xs"
+                              onChange={(event) => patch({ from: event.target.value })}
+                            />
+                            <Select
+                              value={piece.includeFrom ? "inclusive" : "strict"}
+                              onValueChange={(value) => patch({ includeFrom: value === "inclusive" })}
                             >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          )}
+                              <SelectTrigger className="h-8 w-9 shrink-0 justify-center border-primary/40 bg-primary/10 px-0 text-sm text-primary [&>svg]:hidden">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="strict">&lt;</SelectItem>
+                                <SelectItem value="inclusive">≤</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <span className="shrink-0 italic">{xName}</span>
+                            <Select
+                              value={piece.includeTo ? "inclusive" : "strict"}
+                              onValueChange={(value) => patch({ includeTo: value === "inclusive" })}
+                            >
+                              <SelectTrigger className="h-8 w-9 shrink-0 justify-center border-primary/40 bg-primary/10 px-0 text-sm text-primary [&>svg]:hidden">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="strict">&lt;</SelectItem>
+                                <SelectItem value="inclusive">≤</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              value={piece.to}
+                              placeholder="+∞"
+                              className="h-8 w-14 shrink-0 border-primary/40 bg-primary/5 px-1.5 text-center font-mono text-xs"
+                              onChange={(event) => patch({ to: event.target.value })}
+                            />
+                            {math.pieces.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 shrink-0 text-muted-foreground"
+                                onClick={() =>
+                                  updateGraphMath(graph.id, {
+                                    pieces: math.pieces.filter((_item, position) => position !== index),
+                                  })
+                                }
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <PiecePreview expression={piece.expression} variables={[xName]} />
                         </div>
                       );
                     })}
@@ -223,8 +212,8 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
                   + Участок
                 </Button>
               </div>
-
             )}
+
 
 
             {math.kind === "qualitative" && (
@@ -372,5 +361,68 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
         </Collapsible>
       </CardContent>
     </Card>
+  );
+}
+
+/** Настоящая типографская фигурная скобка, растянутая по высоте блока участков. */
+function CurlyBrace() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const update = () => setHeight(node.clientHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    if (node.parentElement) observer.observe(node.parentElement);
+    return () => observer.disconnect();
+  }, []);
+
+  const base = 40;
+  return (
+    <div ref={ref} className="relative w-3 shrink-0 self-stretch overflow-visible">
+      <span
+        aria-hidden
+        className="absolute left-0 top-1/2 select-none font-serif leading-none text-foreground"
+        style={{
+          fontSize: `${base}px`,
+          transform: `translateY(-50%) scaleY(${height ? Math.max(height / (base * 0.95), 0.6) : 1})`,
+          transformOrigin: "center",
+        }}
+      >
+        {"{"}
+      </span>
+    </div>
+  );
+}
+
+/** Отдельная строка с математическим видом формулы участка. */
+function PiecePreview({ expression, variables }: { expression: string; variables: string[] }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const preview = useMemo(() => {
+    const text = expression.trim();
+    if (!text) return null;
+    try {
+      return katex.renderToString(expressionLatex(text, variables), {
+        throwOnError: false,
+        displayMode: false,
+      });
+    } catch {
+      return null;
+    }
+  }, [expression, variables]);
+
+  if (!expression.trim()) return null;
+  if (!mounted || !preview) {
+    return <p className="px-2 text-xs text-destructive">Не удалось разобрать формулу</p>;
+  }
+  return (
+    <div
+      className="rounded-md border border-border bg-muted/40 px-2 py-1 text-sm"
+      dangerouslySetInnerHTML={{ __html: preview }}
+    />
   );
 }
