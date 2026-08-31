@@ -114,7 +114,7 @@ export function qualitativeEvaluator(
   };
 
   /** Вторая производная крайнего участка в его конце (численно). */
-  function curvatureAt(index: 0 | typeof last): number {
+  function curvatureAt(index: number): number {
     const neighbour = index === 0 ? 1 : last - 1;
     const h = Math.abs(anchors[neighbour].x - anchors[index].x) / 20 || 1e-3;
     const x0 = anchors[index].x;
@@ -126,7 +126,7 @@ export function qualitativeEvaluator(
   }
 
   const curvatureStart = extend === "curve" ? curvatureAt(0) : 0;
-  const curvatureEnd = extend === "curve" ? curvatureAt(last as 0) : 0;
+  const curvatureEnd = extend === "curve" ? curvatureAt(last) : 0;
 
   return (x) => {
     if (x <= anchors[0].x) {
