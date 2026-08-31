@@ -30,6 +30,10 @@ export interface PlotGeometry {
   canvasRight: number;
   canvasTop: number;
   canvasBottom: number;
+  /** Кончики стрелок осей. */
+  axisEndX: number;
+  axisEndY: number;
+
   sx: (value: number) => number;
   sy: (value: number) => number;
   xAxisY: number;
@@ -114,12 +118,16 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const yAxisX = sx(Math.min(Math.max(0, xMin), xMax));
 
 
+  const arrowLead = Math.round(appearance.arrowSize * 1.6);
   return {
     xMin, xMax, yMin, yMax, xStep, yStep, gridStepX, gridStepY,
     left, right, top, bottom,
-    canvasLeft, canvasRight, canvasTop, canvasBottom,
+    canvasLeft, canvasRight: effCanvasRight, canvasTop: effCanvasTop, canvasBottom,
+    axisEndX: effCanvasRight + arrowLead,
+    axisEndY: effCanvasTop - arrowLead,
     sx, sy, xAxisY, yAxisX,
   };
+
 }
 
 function escapeText(value: string): string {
