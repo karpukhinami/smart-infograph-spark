@@ -202,24 +202,25 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
                         </div>
                       );
                     })}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        updateGraphMath(graph.id, {
-                          pieces: [
-                            ...math.pieces,
-                            { expression: "", from: "", to: "", includeFrom: true, includeTo: false },
-                          ],
-                        })
-                      }
-                    >
-                      + Участок
-                    </Button>
                   </div>
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    updateGraphMath(graph.id, {
+                      pieces: [
+                        ...math.pieces,
+                        { expression: "", from: "", to: "", includeFrom: true, includeTo: false },
+                      ],
+                    })
+                  }
+                >
+                  + Участок
+                </Button>
               </div>
+
             )}
 
 
