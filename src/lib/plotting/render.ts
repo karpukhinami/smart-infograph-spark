@@ -30,7 +30,9 @@ export interface PlotGeometry {
   canvasRight: number;
   canvasTop: number;
   canvasBottom: number;
-  /** Кончики стрелок осей. */
+  /** Начала и кончики стрелок осей. */
+  axisStartX: number;
+  axisStartY: number;
   axisEndX: number;
   axisEndY: number;
 
