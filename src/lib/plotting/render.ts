@@ -353,7 +353,7 @@ export function renderPlotSvg(
     pointParts.push(
       `<circle cx="${round(px)}" cy="${round(py)}" r="${a.pointRadius}" fill="${
         point.open ? "#FFFFFF" : point.color
-      }" stroke="${point.color}" stroke-width="${Math.max(1.4, a.pointRadius * 0.5)}"/>`,
+      }" stroke="${point.color}" stroke-width="2"/>`,
     );
     // Буквенная метка — курсивом, координаты (числа) — прямым начертанием.
     const captionParts: string[] = [];
@@ -361,9 +361,9 @@ export function renderPlotSvg(
     if (point.coords) captionParts.push(`<tspan font-style="normal">${escapeText(point.coords)}</tspan>`);
     if (captionParts.length) {
       pointParts.push(
-        `<text x="${round(px + a.pointRadius + 4)}" y="${round(py - a.pointRadius - 4)}" font-family="${escapeText(
+        `<text x="${round(px)}" y="${round(py - a.pointRadius - 8)}" text-anchor="middle" font-family="${escapeText(
           a.pointLabelFontFamily,
-        )}" font-size="${a.pointLabelFontSize}" fill="${a.labelColor}">${captionParts.join(" ")}</text>`,
+        )}" font-size="${a.pointLabelFontSize}" fill="${point.color}">${captionParts.join(" ")}</text>`,
       );
     }
   }
