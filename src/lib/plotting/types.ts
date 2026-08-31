@@ -64,7 +64,10 @@ export interface GridSpec {
 export interface PlotAppearance {
   width: number;
   height: number;
+  /** Равный масштаб по осям: клетки сетки квадратные. */
+  equalScale: boolean;
   padding: number;
+
   axisWidth: number;
   axisColor: string;
   arrowSize: number;
