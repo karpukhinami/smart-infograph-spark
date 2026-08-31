@@ -185,17 +185,7 @@ export function renderPlotSvg(
     )}" height="${round(geometry.bottom - geometry.top)}"/></clipPath></defs>`,
   );
 
-  // Рамка — по краю всего изображения, а не вокруг математической области.
-  if (a.frame) {
-    const inset = a.frameWidth / 2;
-    parts.push(
-      `<rect x="${round(inset)}" y="${round(inset)}" width="${round(a.width - a.frameWidth)}" height="${round(
-        a.height - a.frameWidth,
-      )}" fill="none" stroke="${a.frameColor}" stroke-width="${a.frameWidth}"/>`,
-    );
-  }
-
-  // Сетка — только внутри математической области.
+  // Сетка — по всей математической области (как в TikZ-прототипе).
   if (scene.grid.visible) {
     const vertical = tickValues(geometry.xMin, geometry.xMax, geometry.gridStepX);
     const horizontal = tickValues(geometry.yMin, geometry.yMax, geometry.gridStepY);
@@ -217,8 +207,9 @@ export function renderPlotSvg(
     );
   }
 
-  // Оси со стрелками: линия продолжается в техническое поле.
+  // Оси со стрелками: от края области до края, кончик стрелки лежит на границе.
   const arrow = a.arrowSize;
+  const arrowHalf = arrow * 0.45;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
   const xStart = geometry.axisStartX;
   const xEnd = geometry.axisEndX;
@@ -226,15 +217,16 @@ export function renderPlotSvg(
   const yEnd = geometry.axisEndY;
 
   parts.push(
-    `<line x1="${round(xStart)}" y1="${round(geometry.xAxisY)}" x2="${round(xEnd)}" y2="${round(geometry.xAxisY)}" ${axisStyle}/>`,
+    `<line x1="${round(xStart)}" y1="${round(geometry.xAxisY)}" x2="${round(xEnd - arrow)}" y2="${round(geometry.xAxisY)}" ${axisStyle}/>`,
     `<polygon points="${round(xEnd)},${round(geometry.xAxisY)} ${round(xEnd - arrow)},${round(
-      geometry.xAxisY - arrow * 0.45,
-    )} ${round(xEnd - arrow)},${round(geometry.xAxisY + arrow * 0.45)}" fill="${a.axisColor}"/>`,
-    `<line x1="${round(geometry.yAxisX)}" y1="${round(yStart)}" x2="${round(geometry.yAxisX)}" y2="${round(yEnd)}" ${axisStyle}/>`,
-    `<polygon points="${round(geometry.yAxisX)},${round(yEnd)} ${round(geometry.yAxisX - arrow * 0.45)},${round(
+      geometry.xAxisY - arrowHalf,
+    )} ${round(xEnd - arrow)},${round(geometry.xAxisY + arrowHalf)}" fill="${a.axisColor}"/>`,
+    `<line x1="${round(geometry.yAxisX)}" y1="${round(yStart)}" x2="${round(geometry.yAxisX)}" y2="${round(yEnd + arrow)}" ${axisStyle}/>`,
+    `<polygon points="${round(geometry.yAxisX)},${round(yEnd)} ${round(geometry.yAxisX - arrowHalf)},${round(
       yEnd + arrow,
-    )} ${round(geometry.yAxisX + arrow * 0.45)},${round(yEnd + arrow)}" fill="${a.axisColor}"/>`,
+    )} ${round(geometry.yAxisX + arrowHalf)},${round(yEnd + arrow)}" fill="${a.axisColor}"/>`,
   );
+
 
   // Засечки и подписи.
   const labelStyle = `font-family="${escapeText(a.labelFontFamily)}" font-size="${a.labelFontSize}" fill="${a.labelColor}"`;
