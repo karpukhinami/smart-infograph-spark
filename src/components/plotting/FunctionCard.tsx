@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -314,9 +315,19 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
                 >
                   + Опорная точка
                 </Button>
+                <div className="flex items-center justify-between rounded-md border border-border px-2 py-1.5">
+                  <Label className="text-xs">Гладко продолжать за крайними точками</Label>
+                  <Switch
+                    checked={math.extendEnds !== false}
+                    onCheckedChange={(checked) =>
+                      updateGraphMath(graph.id, { extendEnds: checked })
+                    }
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Опорные точки задают форму кривой и сами не рисуются. Видимые точки добавляются в
-                  разделе «Точки».
+                  Опорные точки задают форму кривой и сами не рисуются. При продолжении кривая
+                  доходит до краёв области, сохраняя наклон и кривизну крайнего участка. Видимые
+                  точки добавляются в разделе «Точки».
                 </p>
               </div>
             )}

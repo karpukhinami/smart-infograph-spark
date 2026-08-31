@@ -173,12 +173,15 @@ export function buildGraph(
     }
     case "qualitative": {
       const anchors = parseAnchors(math);
-      const evaluator = qualitativeEvaluator(anchors);
+      const extendEnds = math.extendEnds !== false;
+      const evaluator = qualitativeEvaluator(anchors, extendEnds ? "curve" : "linear");
       const sorted = [...anchors].sort((a, b) => a.x - b.x);
+      // При гладком продолжении кривая идёт до краёв области построения,
+      // иначе обрывается на крайних опорных точках.
       const domain = resolveDomain(
         math,
-        Math.max(sorted[0].x, bounds.xMin),
-        Math.min(sorted[sorted.length - 1].x, bounds.xMax),
+        extendEnds ? bounds.xMin : Math.max(sorted[0].x, bounds.xMin),
+        extendEnds ? bounds.xMax : Math.min(sorted[sorted.length - 1].x, bounds.xMax),
       );
       return { segments: sampleFunction(evaluator, domain.from, domain.to, bounds), anchors, domain };
     }

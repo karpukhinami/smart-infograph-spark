@@ -75,8 +75,18 @@ function hermite(
   );
 }
 
-/** Готовая функция формы кривой по опорным точкам. */
-export function qualitativeEvaluator(rawAnchors: Anchor[]): (x: number) => number {
+/**
+ * Готовая функция формы кривой по опорным точкам.
+ *
+ * `extend: "curve"` (по умолчанию) продолжает кривую за крайними опорными
+ * точками гладко: сохраняется не только наклон, но и кривизна крайнего участка,
+ * поэтому за точкой-экстремумом кривая не превращается в горизонтальный луч.
+ * `extend: "linear"` — прямолинейное продолжение по касательной.
+ */
+export function qualitativeEvaluator(
+  rawAnchors: Anchor[],
+  extend: "curve" | "linear" = "curve",
+): (x: number) => number {
   const anchors = [...rawAnchors].sort((a, b) => a.x - b.x);
   if (anchors.length < 2) throw new Error("Нужно минимум 2 опорные точки.");
   const onlyPlainPair =
@@ -87,15 +97,9 @@ export function qualitativeEvaluator(rawAnchors: Anchor[]): (x: number) => numbe
     return (x) => a.y + slope * (x - a.x);
   }
   const derivatives = tangents(anchors);
-  return (x) => {
-    if (x <= anchors[0].x) {
-      const slope = derivatives[0];
-      return anchors[0].y + slope * (x - anchors[0].x);
-    }
-    const last = anchors.length - 1;
-    if (x >= anchors[last].x) {
-      return anchors[last].y + derivatives[last] * (x - anchors[last].x);
-    }
+  const last = anchors.length - 1;
+
+  const inner = (x: number): number => {
     let i = 0;
     while (i < last && x > anchors[i + 1].x) i++;
     return hermite(
@@ -107,5 +111,32 @@ export function qualitativeEvaluator(rawAnchors: Anchor[]): (x: number) => numbe
       derivatives[i],
       derivatives[i + 1],
     );
+  };
+
+  /** Вторая производная крайнего участка в его конце (численно). */
+  function curvatureAt(index: number): number {
+    const neighbour = index === 0 ? 1 : last - 1;
+    const h = Math.abs(anchors[neighbour].x - anchors[index].x) / 20 || 1e-3;
+    const x0 = anchors[index].x;
+    const sign = index === 0 ? 1 : -1;
+    const f0 = anchors[index].y;
+    const f1 = inner(x0 + sign * h);
+    const f2 = inner(x0 + sign * 2 * h);
+    return (f2 - 2 * f1 + f0) / (h * h);
+  }
+
+  const curvatureStart = extend === "curve" ? curvatureAt(0) : 0;
+  const curvatureEnd = extend === "curve" ? curvatureAt(last) : 0;
+
+  return (x) => {
+    if (x <= anchors[0].x) {
+      const dx = x - anchors[0].x;
+      return anchors[0].y + derivatives[0] * dx + 0.5 * curvatureStart * dx * dx;
+    }
+    if (x >= anchors[last].x) {
+      const dx = x - anchors[last].x;
+      return anchors[last].y + derivatives[last] * dx + 0.5 * curvatureEnd * dx * dx;
+    }
+    return inner(x);
   };
 }

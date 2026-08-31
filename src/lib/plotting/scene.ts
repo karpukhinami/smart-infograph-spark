@@ -102,6 +102,7 @@ export function createGraph(index: number, kind: GraphKind = "explicit"): SceneG
         { x: "", y: "", kind: "plain" },
         { x: "", y: "", kind: "plain" },
       ],
+      extendEnds: true,
       domainFrom: "",
       domainTo: "",
     },
@@ -177,6 +178,7 @@ function valueDisplay(raw: string, value: number): string {
 export function buildPoint(point: ScenePoint, scene: PlotScene, bounds: PlotBounds): PointSolution[] {
   const previous = point.built ?? [];
   const keepShow = (index: number) => previous[index]?.show ?? true;
+  const keepStyle = (index: number) => previous[index]?.style;
   const inside = (x: number, y: number) =>
     x >= bounds.xMin - 1e-9 && x <= bounds.xMax + 1e-9 && y >= bounds.yMin - 1e-9 && y <= bounds.yMax + 1e-9;
 
@@ -191,6 +193,7 @@ export function buildPoint(point: ScenePoint, scene: PlotScene, bounds: PlotBoun
         displayX: valueDisplay(point.math.x, x),
         displayY: valueDisplay(point.math.y, y),
         show: keepShow(0),
+        style: keepStyle(0),
       },
     ];
   }
@@ -210,6 +213,7 @@ export function buildPoint(point: ScenePoint, scene: PlotScene, bounds: PlotBoun
           displayX: exactDisplay(anchor.x),
           displayY: exactDisplay(anchor.y),
           show: keepShow(0),
+          style: keepStyle(0),
         },
       ];
     }
@@ -223,6 +227,7 @@ export function buildPoint(point: ScenePoint, scene: PlotScene, bounds: PlotBoun
       displayX: valueDisplay(point.math.x, item.x),
       displayY: exactDisplay(item.y),
       show: keepShow(index),
+      style: keepStyle(index),
     }));
   }
 
@@ -239,6 +244,7 @@ export function buildPoint(point: ScenePoint, scene: PlotScene, bounds: PlotBoun
     displayX: exactDisplay(hit.x),
     displayY: exactDisplay(hit.y),
     show: keepShow(index),
+    style: keepStyle(index),
   }));
 }
 
@@ -307,17 +313,20 @@ export function scenePoints(scene: PlotScene): RenderPoint[] {
     if (!point.built || !point.style.visible) continue;
     for (const solution of point.built) {
       if (!solution.show) continue;
+      // Индивидуальные настройки решения перекрывают общие настройки точки.
+      const style = { ...point.style, ...(solution.style ?? {}) };
+      if (!style.visible) continue;
       result.push({
         x: solution.x,
         y: solution.y,
-        color: point.style.color,
-        open: point.style.open,
-        label: point.style.label.trim(),
-        coords: point.style.showCoords ? `(${solution.displayX}; ${solution.displayY})` : null,
-        projectX: point.style.projectX,
-        projectY: point.style.projectY,
-        labelProjectionX: point.style.labelProjectionX ? solution.displayX : null,
-        labelProjectionY: point.style.labelProjectionY ? solution.displayY : null,
+        color: style.color,
+        open: style.open,
+        label: (style.label ?? "").trim(),
+        coords: style.showCoords ? `(${solution.displayX}; ${solution.displayY})` : null,
+        projectX: style.projectX,
+        projectY: style.projectY,
+        labelProjectionX: style.labelProjectionX ? solution.displayX : null,
+        labelProjectionY: style.labelProjectionY ? solution.displayY : null,
       });
     }
   }
