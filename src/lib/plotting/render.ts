@@ -85,9 +85,21 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const leadY = yMin > -1e-12 ? Math.max(14, appearance.arrowSize * 1.4) : 0;
 
   const left = canvasLeft + leadX;
-  const right = canvasRight;
-  const top = canvasTop;
+  let right = canvasRight;
+  let top = canvasTop;
   const bottom = canvasBottom - leadY;
+
+  // Равный масштаб по обеим осям: клетки сетки квадратные, более длинная ось
+  // занимает всю доступную сторону изображения, вторая ужимается пропорционально.
+  let effCanvasRight = canvasRight;
+  let effCanvasTop = canvasTop;
+  if (appearance.equalScale !== false) {
+    const scale = Math.min((right - left) / (xMax - xMin), (bottom - top) / (yMax - yMin));
+    right = left + scale * (xMax - xMin);
+    top = bottom - scale * (yMax - yMin);
+    effCanvasRight = right;
+    effCanvasTop = top;
+  }
 
   const sx = (value: number) => left + ((value - xMin) / (xMax - xMin)) * (right - left);
   const sy = (value: number) => bottom - ((value - yMin) / (yMax - yMin)) * (bottom - top);
@@ -100,6 +112,7 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   // Ось остаётся видимой, даже если ноль вне диапазона.
   const xAxisY = sy(Math.min(Math.max(0, yMin), yMax));
   const yAxisX = sx(Math.min(Math.max(0, xMin), xMax));
+
 
   return {
     xMin, xMax, yMin, yMax, xStep, yStep, gridStepX, gridStepY,
