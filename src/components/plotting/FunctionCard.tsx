@@ -113,71 +113,66 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
             {math.kind === "piecewise" && (
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Участки</Label>
-                <div className="flex gap-2">
-                  <div className="flex shrink-0 items-stretch gap-1">
-                    <span className="self-center font-medium italic">{yName} =</span>
-                    <span
-                      className="w-3 rounded-l-md border-y-2 border-l-2 border-border"
-                      aria-hidden
+                <div className="flex items-stretch gap-1">
+                  <span className="self-center shrink-0 font-medium italic">{yName} =</span>
+                  <svg
+                    viewBox="0 0 10 100"
+                    preserveAspectRatio="none"
+                    className="w-3 shrink-0 self-stretch text-foreground"
+                    aria-hidden
+                  >
+                    <path
+                      d="M9 1 C4.5 1 6.5 40 1 50 C6.5 60 4.5 99 9 99"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
                     />
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    {math.pieces.map((piece, index) => (
-                      <div key={index} className="space-y-2 rounded-md border border-border p-2">
-                        <MathInput
-                          value={piece.expression}
-                          onChange={(value) =>
-                            updateGraphMath(graph.id, {
-                              pieces: math.pieces.map((item, position) =>
-                                position === index ? { ...item, expression: value } : item,
-                              ),
-                            })
-                          }
-                          variables={[xName]}
-                          placeholder="формула участка"
-                          showHint={false}
-                        />
-                        <div className="flex flex-wrap items-center gap-1.5">
+                  </svg>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    {math.pieces.map((piece, index) => {
+                      const patch = (value: Partial<typeof piece>) =>
+                        updateGraphMath(graph.id, {
+                          pieces: math.pieces.map((item, position) =>
+                            position === index ? { ...item, ...value } : item,
+                          ),
+                        });
+                      return (
+                        <div key={index} className="flex items-center gap-1">
+                          <Input
+                            value={piece.expression}
+                            placeholder="формула"
+                            spellCheck={false}
+                            className="h-8 min-w-0 flex-1 font-mono text-xs"
+                            onChange={(event) => patch({ expression: event.target.value })}
+                          />
+                          <span className="shrink-0 text-xs text-muted-foreground">при</span>
                           <Input
                             value={piece.from}
                             placeholder="-∞"
-                            className="w-20 font-mono text-xs"
-                            onChange={(event) =>
-                              updateGraphMath(graph.id, {
-                                pieces: math.pieces.map((item, position) =>
-                                  position === index ? { ...item, from: event.target.value } : item,
-                                ),
-                              })
-                            }
+                            className="h-8 w-14 shrink-0 border-primary/40 bg-primary/5 px-1.5 text-center font-mono text-xs"
+                            onChange={(event) => patch({ from: event.target.value })}
                           />
                           <Select
                             value={piece.includeFrom ? "inclusive" : "strict"}
-                            onValueChange={(value) =>
-                              updateGraphMath(graph.id, {
-                                pieces: math.pieces.map((item, position) =>
-                                  position === index ? { ...item, includeFrom: value === "inclusive" } : item,
-                                ),
-                              })
-                            }
+                            onValueChange={(value) => patch({ includeFrom: value === "inclusive" })}
                           >
-                            <SelectTrigger className="w-16"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-8 w-9 shrink-0 justify-center border-primary/40 bg-primary/10 px-0 text-sm text-primary [&>svg]:hidden">
+                              <SelectValue />
+                            </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="strict">&lt;</SelectItem>
                               <SelectItem value="inclusive">≤</SelectItem>
                             </SelectContent>
                           </Select>
-                          <span className="italic">{xName}</span>
+                          <span className="shrink-0 italic">{xName}</span>
                           <Select
                             value={piece.includeTo ? "inclusive" : "strict"}
-                            onValueChange={(value) =>
-                              updateGraphMath(graph.id, {
-                                pieces: math.pieces.map((item, position) =>
-                                  position === index ? { ...item, includeTo: value === "inclusive" } : item,
-                                ),
-                              })
-                            }
+                            onValueChange={(value) => patch({ includeTo: value === "inclusive" })}
                           >
-                            <SelectTrigger className="w-16"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-8 w-9 shrink-0 justify-center border-primary/40 bg-primary/10 px-0 text-sm text-primary [&>svg]:hidden">
+                              <SelectValue />
+                            </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="strict">&lt;</SelectItem>
                               <SelectItem value="inclusive">≤</SelectItem>
@@ -186,21 +181,15 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
                           <Input
                             value={piece.to}
                             placeholder="+∞"
-                            className="w-20 font-mono text-xs"
-                            onChange={(event) =>
-                              updateGraphMath(graph.id, {
-                                pieces: math.pieces.map((item, position) =>
-                                  position === index ? { ...item, to: event.target.value } : item,
-                                ),
-                              })
-                            }
+                            className="h-8 w-14 shrink-0 border-primary/40 bg-primary/5 px-1.5 text-center font-mono text-xs"
+                            onChange={(event) => patch({ to: event.target.value })}
                           />
                           {math.pieces.length > 1 && (
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="size-8 text-muted-foreground"
+                              className="size-7 shrink-0 text-muted-foreground"
                               onClick={() =>
                                 updateGraphMath(graph.id, {
                                   pieces: math.pieces.filter((_item, position) => position !== index),
@@ -211,8 +200,8 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
                             </Button>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <Button
                       type="button"
                       variant="outline"
@@ -232,6 +221,7 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
                 </div>
               </div>
             )}
+
 
             {math.kind === "qualitative" && (
               <div className="space-y-2">
