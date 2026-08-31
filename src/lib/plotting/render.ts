@@ -157,8 +157,11 @@ export function markValues(axis: AxisSpec, min: number, max: number, step: numbe
         return [];
       }
     case "all":
-    default:
-      return tickValues(min, max, step);
+    default: {
+      // Последнюю засечку не ставим: под рамкой не должно быть ни штриха, ни подписи.
+      const values = tickValues(min, max, step);
+      return values.length > 1 ? values.slice(0, -1) : values;
+    }
   }
 }
 
@@ -208,8 +211,9 @@ export function renderPlotSvg(
   }
 
   // Оси со стрелками: от края области до края, кончик стрелки лежит на границе.
+  // Равнобедренный треугольник: высота вдоль оси = arrowSize, основание = arrowSize / 2.
   const arrow = a.arrowSize;
-  const arrowHalf = arrow * 0.45;
+  const arrowHalf = arrow * 0.25;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
   const xStart = geometry.axisStartX;
   const xEnd = geometry.axisEndX;
@@ -250,7 +254,7 @@ export function renderPlotSvg(
     labels.push(
       `<text x="${round(offsetX)}" y="${round(geometry.xAxisY + a.tickSize + a.labelFontSize)}" text-anchor="${
         isZero ? "end" : "middle"
-      }" ${labelStyle}>${escapeText(text)}</text>`,
+      }" font-style="normal" ${labelStyle}>${escapeText(text)}</text>`,
     );
   }
   for (const value of yMarks) {
@@ -266,7 +270,7 @@ export function renderPlotSvg(
     }
     const text = displayNumber(value, scene.yAxis.labelFormat);
     labels.push(
-      `<text x="${round(geometry.yAxisX - a.tickSize - 4)}" y="${round(y + a.labelFontSize * 0.35)}" text-anchor="end" ${labelStyle}>${escapeText(
+      `<text x="${round(geometry.yAxisX - a.tickSize - 4)}" y="${round(y + a.labelFontSize * 0.35)}" text-anchor="end" font-style="normal" ${labelStyle}>${escapeText(
         text,
       )}</text>`,
     );
@@ -347,12 +351,15 @@ export function renderPlotSvg(
         point.open ? "#FFFFFF" : point.color
       }" stroke="${point.color}" stroke-width="${Math.max(1.4, a.pointRadius * 0.5)}"/>`,
     );
-    const caption = [point.label, point.coords].filter(Boolean).join(" ");
-    if (caption) {
+    // Буквенная метка — курсивом, координаты (числа) — прямым начертанием.
+    const captionParts: string[] = [];
+    if (point.label) captionParts.push(`<tspan font-style="italic">${escapeText(point.label)}</tspan>`);
+    if (point.coords) captionParts.push(`<tspan font-style="normal">${escapeText(point.coords)}</tspan>`);
+    if (captionParts.length) {
       pointParts.push(
         `<text x="${round(px + a.pointRadius + 4)}" y="${round(py - a.pointRadius - 4)}" font-family="${escapeText(
           a.pointLabelFontFamily,
-        )}" font-size="${a.pointLabelFontSize}" fill="${a.labelColor}">${escapeText(caption)}</text>`,
+        )}" font-size="${a.pointLabelFontSize}" fill="${a.labelColor}">${captionParts.join(" ")}</text>`,
       );
     }
   }
