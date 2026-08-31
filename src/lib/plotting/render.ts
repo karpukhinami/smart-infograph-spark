@@ -229,9 +229,9 @@ export function renderPlotSvg(
   // Оси со стрелками: линия продолжается в техническое поле.
   const arrow = a.arrowSize;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
-  const xStart = geometry.canvasLeft;
+  const xStart = geometry.axisStartX;
   const xEnd = geometry.axisEndX;
-  const yStart = a.height - a.padding;
+  const yStart = geometry.axisStartY;
   const yEnd = geometry.axisEndY;
 
   parts.push(
