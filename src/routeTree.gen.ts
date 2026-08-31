@@ -13,6 +13,7 @@ import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as View_allRouteImport } from './routes/view_all'
 import { Route as StylesRouteImport } from './routes/styles'
 import { Route as PromptsRouteImport } from './routes/prompts'
+import { Route as PlottingRouteImport } from './routes/plotting'
 import { Route as DesignProfilesRouteImport } from './routes/design-profiles'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiLlmRouteImport } from './routes/api/llm'
@@ -40,6 +41,11 @@ const StylesRoute = StylesRouteImport.update({
 const PromptsRoute = PromptsRouteImport.update({
   id: '/prompts',
   path: '/prompts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlottingRoute = PlottingRouteImport.update({
+  id: '/plotting',
+  path: '/plotting',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesignProfilesRoute = DesignProfilesRouteImport.update({
@@ -86,6 +92,7 @@ const ApiArchiveFeedbackRoute = ApiArchiveFeedbackRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/design-profiles': typeof DesignProfilesRoute
+  '/plotting': typeof PlottingRoute
   '/prompts': typeof PromptsRoute
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/design-profiles': typeof DesignProfilesRoute
+  '/plotting': typeof PlottingRoute
   '/prompts': typeof PromptsRoute
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/design-profiles': typeof DesignProfilesRoute
+  '/plotting': typeof PlottingRoute
   '/prompts': typeof PromptsRoute
   '/styles': typeof StylesRoute
   '/view_all': typeof View_allRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/design-profiles'
+    | '/plotting'
     | '/prompts'
     | '/styles'
     | '/view_all'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/design-profiles'
+    | '/plotting'
     | '/prompts'
     | '/styles'
     | '/view_all'
@@ -159,6 +170,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/design-profiles'
+    | '/plotting'
     | '/prompts'
     | '/styles'
     | '/view_all'
@@ -174,6 +186,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DesignProfilesRoute: typeof DesignProfilesRoute
+  PlottingRoute: typeof PlottingRoute
   PromptsRoute: typeof PromptsRoute
   StylesRoute: typeof StylesRoute
   View_allRoute: typeof View_allRoute
@@ -214,6 +227,13 @@ declare module '@tanstack/react-router' {
       path: '/prompts'
       fullPath: '/prompts'
       preLoaderRoute: typeof PromptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plotting': {
+      id: '/plotting'
+      path: '/plotting'
+      fullPath: '/plotting'
+      preLoaderRoute: typeof PlottingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/design-profiles': {
@@ -278,6 +298,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DesignProfilesRoute: DesignProfilesRoute,
+  PlottingRoute: PlottingRoute,
   PromptsRoute: PromptsRoute,
   StylesRoute: StylesRoute,
   View_allRoute: View_allRoute,
