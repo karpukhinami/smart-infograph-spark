@@ -273,15 +273,24 @@ export function renderPlotSvg(
   }
   parts.push(ticks.join(""), labels.join(""));
 
-  // Названия осей: горизонтальная — снизу, вертикальная — слева.
+  // Названия осей: внутри области у кончиков стрелок (как в TikZ-прототипе).
+  const xNameY = Math.min(
+    geometry.bottom - 6,
+    Math.max(geometry.top + a.labelFontSize + 2, geometry.xAxisY + a.labelFontSize * 1.8),
+  );
+  const yNameX = Math.min(
+    geometry.right - 8,
+    Math.max(geometry.left + 8, geometry.yAxisX - a.labelFontSize * 0.6),
+  );
   parts.push(
-    `<text x="${round(xEnd)}" y="${round(Math.min(geometry.xAxisY + a.labelFontSize * 2.4, a.height - 4))}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
+    `<text x="${round(xEnd - 10)}" y="${round(xNameY)}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
       axisLabelText(scene.xAxis),
     )}</text>`,
-    `<text x="${round(Math.max(geometry.yAxisX - a.labelFontSize * 2.2, a.labelFontSize * 0.6))}" y="${round(
-      yEnd + a.labelFontSize,
-    )}" text-anchor="start" font-style="italic" ${labelStyle}>${escapeText(axisLabelText(scene.yAxis))}</text>`,
+    `<text x="${round(yNameX)}" y="${round(yEnd + a.labelFontSize + 4)}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
+      axisLabelText(scene.yAxis),
+    )}</text>`,
   );
+
 
   // Графики (клипуются по математической области).
   const curveParts: string[] = [];
