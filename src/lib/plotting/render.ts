@@ -254,7 +254,7 @@ export function renderPlotSvg(
     labels.push(
       `<text x="${round(offsetX)}" y="${round(geometry.xAxisY + a.tickSize + a.labelFontSize)}" text-anchor="${
         isZero ? "end" : "middle"
-      }" ${labelStyle}>${escapeText(text)}</text>`,
+      }" font-style="normal" ${labelStyle}>${escapeText(text)}</text>`,
     );
   }
   for (const value of yMarks) {
@@ -270,7 +270,7 @@ export function renderPlotSvg(
     }
     const text = displayNumber(value, scene.yAxis.labelFormat);
     labels.push(
-      `<text x="${round(geometry.yAxisX - a.tickSize - 4)}" y="${round(y + a.labelFontSize * 0.35)}" text-anchor="end" ${labelStyle}>${escapeText(
+      `<text x="${round(geometry.yAxisX - a.tickSize - 4)}" y="${round(y + a.labelFontSize * 0.35)}" text-anchor="end" font-style="normal" ${labelStyle}>${escapeText(
         text,
       )}</text>`,
     );
@@ -351,12 +351,15 @@ export function renderPlotSvg(
         point.open ? "#FFFFFF" : point.color
       }" stroke="${point.color}" stroke-width="${Math.max(1.4, a.pointRadius * 0.5)}"/>`,
     );
-    const caption = [point.label, point.coords].filter(Boolean).join(" ");
-    if (caption) {
+    // Буквенная метка — курсивом, координаты (числа) — прямым начертанием.
+    const captionParts: string[] = [];
+    if (point.label) captionParts.push(`<tspan font-style="italic">${escapeText(point.label)}</tspan>`);
+    if (point.coords) captionParts.push(`<tspan font-style="normal">${escapeText(point.coords)}</tspan>`);
+    if (captionParts.length) {
       pointParts.push(
         `<text x="${round(px + a.pointRadius + 4)}" y="${round(py - a.pointRadius - 4)}" font-family="${escapeText(
           a.pointLabelFontFamily,
-        )}" font-size="${a.pointLabelFontSize}" fill="${a.labelColor}">${escapeText(caption)}</text>`,
+        )}" font-size="${a.pointLabelFontSize}" fill="${a.labelColor}">${captionParts.join(" ")}</text>`,
       );
     }
   }
