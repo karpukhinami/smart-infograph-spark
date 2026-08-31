@@ -214,10 +214,10 @@ export function renderPlotSvg(
   }
 
   // Оси со стрелками: от края области до края, кончик стрелки лежит на границе.
-  // Равнобедренный треугольник: высота вдоль оси = arrowSize, основание = 0.75 * высоты
-  // (более узкое основание визуально «съедается» толщиной самой оси).
+  // Равнобедренный треугольник: высота вдоль оси = arrowSize, основание = 0.45 * высоты
+  // (узкая «игла», как на классических учебных чертежах).
   const arrow = a.arrowSize;
-  const arrowHalf = arrow * 0.375;
+  const arrowHalf = arrow * 0.225;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
   const xStart = geometry.axisStartX;
   const xEnd = geometry.axisEndX;
