@@ -113,12 +113,14 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
             {math.kind === "piecewise" && (
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Участки</Label>
-                <div className="flex items-stretch gap-1">
-                  <span className="self-center shrink-0 font-medium italic">{yName} =</span>
+                <div className="relative flex items-center gap-1 pl-[1.85rem]">
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 font-medium italic">
+                    {yName} =
+                  </span>
                   <svg
                     viewBox="0 0 10 100"
                     preserveAspectRatio="none"
-                    className="w-3 shrink-0 self-stretch text-foreground"
+                    className="absolute inset-y-0 left-[1.5rem] h-full w-3 text-foreground"
                     aria-hidden
                   >
                     <path
@@ -129,7 +131,8 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
                       vectorEffect="non-scaling-stroke"
                     />
                   </svg>
-                  <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="min-w-0 flex-1 space-y-1.5 pl-3">
+
                     {math.pieces.map((piece, index) => {
                       const patch = (value: Partial<typeof piece>) =>
                         updateGraphMath(graph.id, {
