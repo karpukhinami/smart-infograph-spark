@@ -157,8 +157,11 @@ export function markValues(axis: AxisSpec, min: number, max: number, step: numbe
         return [];
       }
     case "all":
-    default:
-      return tickValues(min, max, step);
+    default: {
+      // Последнюю засечку не ставим: под рамкой не должно быть ни штриха, ни подписи.
+      const values = tickValues(min, max, step);
+      return values.length > 1 ? values.slice(0, -1) : values;
+    }
   }
 }
 
