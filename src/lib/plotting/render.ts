@@ -158,9 +158,12 @@ export function markValues(axis: AxisSpec, min: number, max: number, step: numbe
       }
     case "all":
     default: {
-      // Последнюю засечку не ставим: под рамкой не должно быть ни штриха, ни подписи.
-      const values = tickValues(min, max, step);
-      return values.length > 1 ? values.slice(0, -1) : values;
+      // Крайние засечки не ставим: у самой рамки не должно быть ни штриха, ни подписи.
+      const edge = (max - min) * 1e-6;
+      const values = tickValues(min, max, step).filter(
+        (value) => value > min + edge && value < max - edge,
+      );
+      return values;
     }
   }
 }
@@ -211,9 +214,10 @@ export function renderPlotSvg(
   }
 
   // Оси со стрелками: от края области до края, кончик стрелки лежит на границе.
-  // Равнобедренный треугольник: высота вдоль оси = arrowSize, основание = arrowSize / 2.
+  // Равнобедренный треугольник: высота вдоль оси = arrowSize, основание = 0.75 * высоты
+  // (более узкое основание визуально «съедается» толщиной самой оси).
   const arrow = a.arrowSize;
-  const arrowHalf = arrow * 0.25;
+  const arrowHalf = arrow * 0.375;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
   const xStart = geometry.axisStartX;
   const xEnd = geometry.axisEndX;
