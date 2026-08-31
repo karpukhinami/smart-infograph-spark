@@ -281,14 +281,14 @@ export function renderPlotSvg(
   }
   parts.push(ticks.join(""), labels.join(""));
 
-  // Названия осей: внутри области у кончиков стрелок (как в TikZ-прототипе).
+  // Названия осей: внутри рабочей области у кончиков стрелок.
   const xNameY = Math.min(
-    geometry.bottom - 6,
-    Math.max(geometry.top + a.labelFontSize + 2, geometry.xAxisY + a.labelFontSize * 1.8),
+    geometry.bottom - 4,
+    Math.max(geometry.top + a.labelFontSize + 2, geometry.xAxisY + a.labelFontSize + 4),
   );
   const yNameX = Math.min(
     geometry.right - 8,
-    Math.max(geometry.left + 8, geometry.yAxisX - a.labelFontSize * 0.6),
+    Math.max(geometry.left + 8, geometry.yAxisX - 12),
   );
   parts.push(
     `<text x="${round(xEnd - 10)}" y="${round(xNameY)}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
