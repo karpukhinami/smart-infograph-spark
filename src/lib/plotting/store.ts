@@ -48,6 +48,7 @@ interface PlotStore {
   updatePointMath: (id: string, patch: Partial<PointMath>) => void;
   updatePointStyle: (id: string, patch: Partial<PointStyle>) => void;
   togglePointSolution: (id: string, index: number, show: boolean) => void;
+  updateSolutionStyle: (id: string, index: number, patch: Partial<PointStyle>) => void;
   removePoint: (id: string) => void;
   addCustomColor: (color: string) => void;
   buildGraph: (id: string) => void;
@@ -182,6 +183,25 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
                 ...point,
                 built: point.built.map((solution, position) =>
                   position === index ? { ...solution, show } : solution,
+                ),
+              }
+            : point,
+        ),
+      },
+    })),
+
+  updateSolutionStyle: (id, index, patch) =>
+    set((state) => ({
+      scene: {
+        ...state.scene,
+        points: state.scene.points.map((point) =>
+          point.id === id && point.built
+            ? {
+                ...point,
+                built: point.built.map((solution, position) =>
+                  position === index
+                    ? { ...solution, style: { ...(solution.style ?? {}), ...patch } }
+                    : solution,
                 ),
               }
             : point,
