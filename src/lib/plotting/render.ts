@@ -222,9 +222,10 @@ export function renderPlotSvg(
   const arrow = a.arrowSize;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
   const xStart = geometry.canvasLeft;
-  const xEnd = a.width - a.padding;
+  const xEnd = geometry.axisEndX;
   const yStart = a.height - a.padding;
-  const yEnd = geometry.canvasTop;
+  const yEnd = geometry.axisEndY;
+
   parts.push(
     `<line x1="${round(xStart)}" y1="${round(geometry.xAxisY)}" x2="${round(xEnd)}" y2="${round(geometry.xAxisY)}" ${axisStyle}/>`,
     `<polygon points="${round(xEnd)},${round(geometry.xAxisY)} ${round(xEnd - arrow)},${round(
