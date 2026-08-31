@@ -35,7 +35,7 @@ export const DEFAULT_APPEARANCE: PlotAppearance = {
 
   axisWidth: 2.4,
   axisColor: "#1A2236",
-  arrowSize: 20,
+  arrowSize: 12,
   gridWidth: 1,
   gridColor: "#D8DEEA",
   frame: true,
