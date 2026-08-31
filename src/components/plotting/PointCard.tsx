@@ -18,7 +18,7 @@ import {
 import { ColorSwatches } from "./ColorSwatches";
 import { usePlotStore } from "@/lib/plotting/store";
 import { graphSummary } from "@/lib/plotting/scene";
-import type { PointMode, ScenePoint } from "@/lib/plotting/types";
+import type { PointMode, PointStyle, ScenePoint } from "@/lib/plotting/types";
 
 const MODES: Array<{ value: PointMode; label: string }> = [
   { value: "plane", label: "на плоскости" },
@@ -26,11 +26,104 @@ const MODES: Array<{ value: PointMode; label: string }> = [
   { value: "intersection", label: "на пересечении" },
 ];
 
+/** Полный набор опций оформления точки (общий для точки и отдельных решений). */
+function StyleFields({
+  style,
+  onChange,
+  customColors,
+  onAddCustomColor,
+}: {
+  style: PointStyle;
+  onChange: (patch: Partial<PointStyle>) => void;
+  customColors: string[];
+  onAddCustomColor: (color: string) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center justify-between rounded-md border border-border px-2 py-1.5">
+          <Label className="text-xs">Выколотая</Label>
+          <Switch checked={style.open} onCheckedChange={(checked) => onChange({ open: checked })} />
+        </div>
+        <div className="flex items-center justify-between rounded-md border border-border px-2 py-1.5">
+          <Label className="text-xs">Показывать точку</Label>
+          <Switch
+            checked={style.visible}
+            onCheckedChange={(checked) => onChange({ visible: checked })}
+          />
+        </div>
+        <div className="flex items-center justify-between rounded-md border border-border px-2 py-1.5">
+          <Label className="text-xs">Показать координаты</Label>
+          <Switch
+            checked={style.showCoords}
+            onCheckedChange={(checked) => onChange({ showCoords: checked })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[11px] text-muted-foreground">Подпись</Label>
+          <Input
+            value={style.label}
+            placeholder="например A"
+            className="h-8 text-xs"
+            onChange={(event) => onChange({ label: event.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2 rounded-md border border-border p-2">
+        <Label className="text-xs text-muted-foreground">Проекции на оси</Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs">Перпендикуляр к горизонтальной оси</Label>
+          <Switch
+            checked={style.projectX}
+            onCheckedChange={(checked) => onChange({ projectX: checked })}
+          />
+        </div>
+        {style.projectX && (
+          <div className="flex items-center justify-between pl-3">
+            <Label className="text-xs text-muted-foreground">подписать основание</Label>
+            <Switch
+              checked={style.labelProjectionX}
+              onCheckedChange={(checked) => onChange({ labelProjectionX: checked })}
+            />
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <Label className="text-xs">Перпендикуляр к вертикальной оси</Label>
+          <Switch
+            checked={style.projectY}
+            onCheckedChange={(checked) => onChange({ projectY: checked })}
+          />
+        </div>
+        {style.projectY && (
+          <div className="flex items-center justify-between pl-3">
+            <Label className="text-xs text-muted-foreground">подписать основание</Label>
+            <Switch
+              checked={style.labelProjectionY}
+              onCheckedChange={(checked) => onChange({ labelProjectionY: checked })}
+            />
+          </div>
+        )}
+      </div>
+
+      <ColorSwatches
+        value={style.color}
+        onChange={(color) => onChange({ color })}
+        customColors={customColors}
+        onAddCustomColor={onAddCustomColor}
+        label="Цвет точки"
+      />
+    </div>
+  );
+}
+
 export function PointCard({ point }: { point: ScenePoint }) {
   const [open, setOpen] = useState(true);
+  const [openSolution, setOpenSolution] = useState<number | null>(null);
   const scene = usePlotStore((state) => state.scene);
   const updatePointMath = usePlotStore((state) => state.updatePointMath);
   const updatePointStyle = usePlotStore((state) => state.updatePointStyle);
+  const updateSolutionStyle = usePlotStore((state) => state.updateSolutionStyle);
   const togglePointSolution = usePlotStore((state) => state.togglePointSolution);
   const removePoint = usePlotStore((state) => state.removePoint);
   const buildPoint = usePlotStore((state) => state.buildPoint);
@@ -42,9 +135,11 @@ export function PointCard({ point }: { point: ScenePoint }) {
   const selectedGraph = scene.graphs.find((graph) => graph.id === math.graphId);
   const anchorOptions =
     selectedGraph && selectedGraph.math.kind === "qualitative" ? selectedGraph.math.anchors : [];
+  const solutions = point.built ?? [];
+  const multi = solutions.length > 1;
 
-  const summary = point.built?.length
-    ? point.built
+  const summary = solutions.length
+    ? solutions
         .filter((solution) => solution.show)
         .map((solution) => `(${solution.displayX}; ${solution.displayY})`)
         .join(", ")
@@ -173,124 +268,104 @@ export function PointCard({ point }: { point: ScenePoint }) {
             )}
 
             {math.mode === "intersection" && (
-              <div className="grid grid-cols-2 gap-2">
-                {(["graphId", "graphIdB"] as const).map((key, index) => (
-                  <div key={key} className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">
-                      {index === 0 ? "Первый график" : "Второй график"}
-                    </Label>
-                    <Select
-                      value={math[key] ?? ""}
-                      onValueChange={(value) => updatePointMath(point.id, { [key]: value })}
-                    >
-                      <SelectTrigger><SelectValue placeholder="выберите" /></SelectTrigger>
-                      <SelectContent>
-                        {scene.graphs.map((graph) => (
-                          <SelectItem key={graph.id} value={graph.id}>
-                            Функция {graph.index}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {(["graphId", "graphIdB"] as const).map((key, index) => (
+                    <div key={key} className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">
+                        {index === 0 ? "Первый график" : "Второй график"}
+                      </Label>
+                      <Select
+                        value={math[key] ?? ""}
+                        onValueChange={(value) => updatePointMath(point.id, { [key]: value })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="выберите" /></SelectTrigger>
+                        <SelectContent>
+                          {scene.graphs.map((graph) => (
+                            <SelectItem key={graph.id} value={graph.id}>
+                              Функция {graph.index}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => buildPoint(point.id)}
+                >
+                  Рассчитать пересечения
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  После расчёта каждую найденную точку можно настроить отдельно.
+                </p>
               </div>
             )}
 
-            {point.built && point.built.length > 1 && (
-              <div className="space-y-1.5 rounded-md border border-border p-2">
-                <Label className="text-xs text-muted-foreground">Найденные точки</Label>
-                {point.built.map((solution, index) => (
-                  <div key={index} className="flex items-center justify-between text-sm">
-                    <span className="font-mono text-xs">
-                      ({solution.displayX}; {solution.displayY})
-                    </span>
-                    <Switch
-                      checked={solution.show}
-                      onCheckedChange={(checked) => togglePointSolution(point.id, index, checked)}
-                    />
-                  </div>
-                ))}
+            {multi && (
+              <div className="space-y-2 rounded-md border border-border p-2">
+                <Label className="text-xs text-muted-foreground">
+                  Найденные точки: {solutions.length}
+                </Label>
+                {solutions.map((solution, index) => {
+                  const merged = { ...point.style, ...(solution.style ?? {}) } as PointStyle;
+                  const expanded = openSolution === index;
+                  return (
+                    <div key={index} className="rounded-md border border-border">
+                      <div className="flex items-center gap-2 px-2 py-1.5">
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                          onClick={() => setOpenSolution(expanded ? null : index)}
+                        >
+                          <ChevronDown
+                            className={`size-3.5 shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`}
+                          />
+                          <span className="truncate font-mono text-xs">
+                            ({solution.displayX}; {solution.displayY})
+                          </span>
+                        </button>
+                        <span
+                          className="size-3.5 shrink-0 rounded-full border border-border"
+                          style={{ backgroundColor: merged.color }}
+                        />
+                        <Switch
+                          checked={solution.show}
+                          onCheckedChange={(checked) => togglePointSolution(point.id, index, checked)}
+                        />
+                      </div>
+                      {expanded && (
+                        <div className="border-t border-border p-2">
+                          <StyleFields
+                            style={merged}
+                            onChange={(patch) => updateSolutionStyle(point.id, index, patch)}
+                            customColors={scene.customColors}
+                            onAddCustomColor={addCustomColor}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
             <Separator />
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex items-center justify-between rounded-md border border-border px-2 py-1.5">
-                <Label className="text-xs">Выколотая</Label>
-                <Switch
-                  checked={point.style.open}
-                  onCheckedChange={(checked) => updatePointStyle(point.id, { open: checked })}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-md border border-border px-2 py-1.5">
-                <Label className="text-xs">Показывать точку</Label>
-                <Switch
-                  checked={point.style.visible}
-                  onCheckedChange={(checked) => updatePointStyle(point.id, { visible: checked })}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-md border border-border px-2 py-1.5">
-                <Label className="text-xs">Показать координаты</Label>
-                <Switch
-                  checked={point.style.showCoords}
-                  onCheckedChange={(checked) => updatePointStyle(point.id, { showCoords: checked })}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">Подпись</Label>
-                <Input
-                  value={point.style.label}
-                  placeholder="например A"
-                  className="h-8 text-xs"
-                  onChange={(event) => updatePointStyle(point.id, { label: event.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2 rounded-md border border-border p-2">
-              <Label className="text-xs text-muted-foreground">Проекции на оси</Label>
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Перпендикуляр к горизонтальной оси</Label>
-                <Switch
-                  checked={point.style.projectX}
-                  onCheckedChange={(checked) => updatePointStyle(point.id, { projectX: checked })}
-                />
-              </div>
-              {point.style.projectX && (
-                <div className="flex items-center justify-between pl-3">
-                  <Label className="text-xs text-muted-foreground">подписать основание</Label>
-                  <Switch
-                    checked={point.style.labelProjectionX}
-                    onCheckedChange={(checked) => updatePointStyle(point.id, { labelProjectionX: checked })}
-                  />
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Перпендикуляр к вертикальной оси</Label>
-                <Switch
-                  checked={point.style.projectY}
-                  onCheckedChange={(checked) => updatePointStyle(point.id, { projectY: checked })}
-                />
-              </div>
-              {point.style.projectY && (
-                <div className="flex items-center justify-between pl-3">
-                  <Label className="text-xs text-muted-foreground">подписать основание</Label>
-                  <Switch
-                    checked={point.style.labelProjectionY}
-                    onCheckedChange={(checked) => updatePointStyle(point.id, { labelProjectionY: checked })}
-                  />
-                </div>
-              )}
-            </div>
-
-            <ColorSwatches
-              value={point.style.color}
-              onChange={(color) => updatePointStyle(point.id, { color })}
+            {multi && (
+              <Label className="text-xs text-muted-foreground">
+                Общие настройки (применяются ко всем найденным точкам)
+              </Label>
+            )}
+            <StyleFields
+              style={point.style}
+              onChange={(patch) => updatePointStyle(point.id, patch)}
               customColors={scene.customColors}
               onAddCustomColor={addCustomColor}
-              label="Цвет точки"
             />
 
             {point.error && <p className="text-xs text-destructive">{point.error}</p>}
