@@ -120,13 +120,17 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const yAxisX = sx(Math.min(Math.max(0, xMin), xMax));
 
 
+  // Оси выходят за математическую область на одинаковый технический вылет
+  // со всех четырёх сторон, чтобы стрелки не «висели» несимметрично.
   const arrowLead = Math.round(appearance.arrowSize * 1.6);
   return {
     xMin, xMax, yMin, yMax, xStep, yStep, gridStepX, gridStepY,
     left, right, top, bottom,
     canvasLeft, canvasRight: effCanvasRight, canvasTop: effCanvasTop, canvasBottom,
-    axisEndX: effCanvasRight + arrowLead,
-    axisEndY: effCanvasTop - arrowLead,
+    axisStartX: Math.max(appearance.padding, left - arrowLead),
+    axisStartY: Math.min(appearance.height - appearance.padding, bottom + arrowLead),
+    axisEndX: right + arrowLead,
+    axisEndY: top - arrowLead,
     sx, sy, xAxisY, yAxisX,
   };
 
