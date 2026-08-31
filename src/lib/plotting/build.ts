@@ -209,3 +209,47 @@ export function buildGraph(
       throw new Error("Неизвестный тип задания графика.");
   }
 }
+
+/**
+ * Значение кусочно-заданной функции в точке с учётом строгости неравенств.
+ * На стыке участков берётся та сторона, где неравенство нестрогое;
+ * если строгие обе — функция в точке не определена.
+ */
+export function piecewiseValueAt(
+  math: GraphMath,
+  vars: { x: string },
+  x: number,
+): number {
+  const parsed = math.pieces.map((piece, index) => {
+    if (!piece.expression.trim()) throw new Error(`Участок ${index + 1}: введите формулу.`);
+    return {
+      piece,
+      from: piece.from.trim() ? parseBound(piece.from) : -Infinity,
+      to: piece.to.trim() ? parseBound(piece.to) : Infinity,
+    };
+  });
+
+  const strictlyInside = parsed.filter((item) => x > item.from && x < item.to);
+  const onInclusiveEdge = parsed.filter(
+    (item) =>
+      (Math.abs(x - item.from) < 1e-9 && item.piece.includeFrom) ||
+      (Math.abs(x - item.to) < 1e-9 && item.piece.includeTo),
+  );
+  const onAnyEdge = parsed.filter(
+    (item) => Math.abs(x - item.from) < 1e-9 || Math.abs(x - item.to) < 1e-9,
+  );
+
+  const chosen = strictlyInside[0] ?? onInclusiveEdge[0];
+  if (!chosen) {
+    if (onAnyEdge.length) {
+      throw new Error(
+        "В этой точке функция не определена: на стыке участков оба неравенства строгие.",
+      );
+    }
+    throw new Error("В этой координате график не определён.");
+  }
+  const fn = compileExpression(chosen.piece.expression, [vars.x]);
+  const y = fn({ [vars.x]: x });
+  if (!Number.isFinite(y)) throw new Error("В этой координате график не определён.");
+  return y;
+}
