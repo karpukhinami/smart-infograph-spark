@@ -188,6 +188,8 @@ export interface PointSolution {
   displayX: string;
   displayY: string;
   show: boolean;
+  /** Индивидуальное оформление этого решения (перекрывает style точки). */
+  style?: Partial<PointStyle>;
 }
 
 export interface ScenePoint {
