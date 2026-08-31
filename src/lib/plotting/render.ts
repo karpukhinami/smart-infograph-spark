@@ -208,8 +208,9 @@ export function renderPlotSvg(
   }
 
   // Оси со стрелками: от края области до края, кончик стрелки лежит на границе.
+  // Равнобедренный треугольник: высота вдоль оси = arrowSize, основание = arrowSize / 2.
   const arrow = a.arrowSize;
-  const arrowHalf = arrow * 0.45;
+  const arrowHalf = arrow * 0.25;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
   const xStart = geometry.axisStartX;
   const xEnd = geometry.axisEndX;
