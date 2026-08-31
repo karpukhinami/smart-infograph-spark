@@ -90,19 +90,26 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const leadX = xMin > -1e-12 ? Math.max(14, appearance.arrowSize * 1.4) : 0;
   const leadY = yMin > -1e-12 ? Math.max(14, appearance.arrowSize * 1.4) : 0;
 
-  const left = canvasLeft + leadX;
+  let left = canvasLeft + leadX;
   let right = canvasRight;
   let top = canvasTop;
-  const bottom = canvasBottom - leadY;
+  let bottom = canvasBottom - leadY;
 
   // Равный масштаб по обеим осям: клетки сетки квадратные, более длинная ось
-  // занимает всю доступную сторону изображения, вторая ужимается пропорционально.
+  // занимает всю доступную сторону изображения, вторая ужимается пропорционально,
+  // а оставшийся запас распределяется поровну — сцена остаётся по центру.
   let effCanvasRight = canvasRight;
   let effCanvasTop = canvasTop;
   if (appearance.equalScale !== false) {
     const scale = Math.min((right - left) / (xMax - xMin), (bottom - top) / (yMax - yMin));
-    right = left + scale * (xMax - xMin);
-    top = bottom - scale * (yMax - yMin);
+    const newWidth = scale * (xMax - xMin);
+    const newHeight = scale * (yMax - yMin);
+    const slackX = (right - left - newWidth) / 2;
+    const slackY = (bottom - top - newHeight) / 2;
+    left += slackX;
+    right = left + newWidth;
+    bottom -= slackY;
+    top = bottom - newHeight;
     effCanvasRight = right;
     effCanvasTop = top;
   }
