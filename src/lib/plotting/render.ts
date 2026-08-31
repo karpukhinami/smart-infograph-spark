@@ -79,27 +79,16 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   if (!(xMax > xMin) || !(yMax > yMin)) return null;
 
   const appearance = scene.appearance;
-  const pad = appearance.padding;
-  const labelSpace = Math.round(appearance.labelFontSize * 1.6);
-  const canvasLeft = pad + labelSpace;
-  const canvasRight = appearance.width - pad - Math.round(appearance.arrowSize * 1.6);
-  const canvasTop = pad + Math.round(appearance.arrowSize * 1.6);
-  const canvasBottom = appearance.height - pad - labelSpace;
+  const pad = Math.max(0, appearance.padding);
 
-  // Технический пустой участок до начала сетки, если шкала не начинается с нуля.
-  const leadX = xMin > -1e-12 ? Math.max(14, appearance.arrowSize * 1.4) : 0;
-  const leadY = yMin > -1e-12 ? Math.max(14, appearance.arrowSize * 1.4) : 0;
+  // Математическая область = внутренний прямоугольник полотна (как в TikZ-прототипе):
+  // рамка, сетка и оси используют ровно эти границы.
+  let left = pad;
+  let right = appearance.width - pad;
+  let top = pad;
+  let bottom = appearance.height - pad;
 
-  let left = canvasLeft + leadX;
-  let right = canvasRight;
-  let top = canvasTop;
-  let bottom = canvasBottom - leadY;
-
-  // Равный масштаб по обеим осям: клетки сетки квадратные, более длинная ось
-  // занимает всю доступную сторону изображения, вторая ужимается пропорционально,
-  // а оставшийся запас распределяется поровну — сцена остаётся по центру.
-  let effCanvasRight = canvasRight;
-  let effCanvasTop = canvasTop;
+  // Равный масштаб по обеим осям: клетки сетки квадратные, сцена остаётся по центру.
   if (appearance.equalScale !== false) {
     const scale = Math.min((right - left) / (xMax - xMin), (bottom - top) / (yMax - yMin));
     const newWidth = scale * (xMax - xMin);
@@ -108,10 +97,8 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
     const slackY = (bottom - top - newHeight) / 2;
     left += slackX;
     right = left + newWidth;
-    bottom -= slackY;
-    top = bottom - newHeight;
-    effCanvasRight = right;
-    effCanvasTop = top;
+    top += slackY;
+    bottom = top + newHeight;
   }
 
   const sx = (value: number) => left + ((value - xMin) / (xMax - xMin)) * (right - left);
@@ -126,22 +113,19 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const xAxisY = sy(Math.min(Math.max(0, yMin), yMax));
   const yAxisX = sx(Math.min(Math.max(0, xMin), xMax));
 
-
-  // Оси выходят за математическую область на одинаковый технический вылет
-  // со всех четырёх сторон, чтобы стрелки не «висели» несимметрично.
-  const arrowLead = Math.round(appearance.arrowSize * 1.6);
   return {
     xMin, xMax, yMin, yMax, xStep, yStep, gridStepX, gridStepY,
     left, right, top, bottom,
-    canvasLeft, canvasRight: effCanvasRight, canvasTop: effCanvasTop, canvasBottom,
-    axisStartX: Math.max(appearance.padding, left - arrowLead),
-    axisStartY: Math.min(appearance.height - appearance.padding, bottom + arrowLead),
-    axisEndX: right + arrowLead,
-    axisEndY: top - arrowLead,
+    canvasLeft: left, canvasRight: right, canvasTop: top, canvasBottom: bottom,
+    // Оси идут от края области до края: кончик стрелки лежит на границе.
+    axisStartX: left,
+    axisStartY: bottom,
+    axisEndX: right,
+    axisEndY: top,
     sx, sy, xAxisY, yAxisX,
   };
-
 }
+
 
 function escapeText(value: string): string {
   return String(value ?? "")
