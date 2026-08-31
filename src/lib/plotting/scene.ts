@@ -234,7 +234,7 @@ export function buildPoint(point: ScenePoint, scene: PlotScene, bounds: PlotBoun
         displayX: valueDisplay(point.math.x, x),
         displayY: exactDisplay(item.y),
         show: keepShow(index),
-        style: { open: item.open, ...(keepStyle(index) ?? {}) },
+        style: { ...(keepStyle(index) ?? {}), open: item.open },
       }));
     }
 
