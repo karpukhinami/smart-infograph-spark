@@ -15,42 +15,40 @@ import type {
   ScenePoint,
 } from "./types";
 
-/** Готовая палитра: хорошо различима на белом фоне и между собой. */
+/** Стандартная палитра чертежей (номер colorGroup = позиция в списке). */
 export const PLOT_PALETTE = [
-  "#1A2236",
   "#19ADFF",
-  "#E5484D",
-  "#0E9F6E",
-  "#F5A524",
-  "#7C5CFF",
-  "#C026D3",
-  "#0B7285",
+  "#FFA84A",
+  "#FF78F8",
+  "#4A7BFF",
+  "#FF8800",
+  "#D438FF",
 ];
 
 export const DEFAULT_APPEARANCE: PlotAppearance = {
   width: 720,
   height: 720,
-  equalScale: true,
+  equalScale: false,
   padding: 16,
 
-  axisWidth: 2.4,
+  axisWidth: 3,
   axisColor: "#1A2236",
-  arrowSize: 12,
+  arrowSize: 24,
   gridWidth: 1,
-  gridColor: "#D8DEEA",
+  gridColor: "#CAD1E0",
   frame: true,
   frameWidth: 2,
   frameColor: "#CAD1E0",
   tickWidth: 2,
   tickSize: 6,
 
-  labelFontFamily: "SB Sans Text, system-ui, sans-serif",
-  labelFontSize: 14,
+  labelFontFamily: "SB Sans Text, KaTeX_Main, system-ui, sans-serif",
+  labelFontSize: 22,
   labelColor: "#1A2236",
-  graphWidth: 2.2,
-  pointRadius: 4,
-  pointLabelFontSize: 14,
-  pointLabelFontFamily: "SB Sans Text, system-ui, sans-serif",
+  graphWidth: 3,
+  pointRadius: 6,
+  pointLabelFontSize: 32,
+  pointLabelFontFamily: "SB Sans Text, KaTeX_Main, system-ui, sans-serif",
   projectionWidth: 1.2,
   projectionColor: "#8A93A6",
 };

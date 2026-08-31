@@ -234,7 +234,7 @@ export function renderPlotSvg(
 
   // Засечки и подписи.
   const labelStyle = `font-family="${escapeText(a.labelFontFamily)}" font-size="${a.labelFontSize}" fill="${a.labelColor}"`;
-  const tickStyle = `stroke="${a.axisColor}" stroke-width="${a.tickWidth}"`;
+  const tickStyle = `stroke="${a.axisColor}" stroke-width="${a.tickWidth}" stroke-linecap="round"`;
   const xMarks = markValues(scene.xAxis, geometry.xMin, geometry.xMax, geometry.xStep);
   const yMarks = markValues(scene.yAxis, geometry.yMin, geometry.yMax, geometry.yStep);
   const ticks: string[] = [];
@@ -250,9 +250,13 @@ export function renderPlotSvg(
       );
     }
     const text = displayNumber(value, scene.xAxis.labelFormat);
-    const offsetX = isZero ? x - a.labelFontSize * 0.5 : x;
+    // Ноль на плоскости — снизу-слева от пересечения осей.
+    const offsetX = isZero ? x - 7 : x;
+    const baseline = isZero
+      ? geometry.xAxisY + a.labelFontSize
+      : geometry.xAxisY + a.tickSize + a.labelFontSize + 3;
     labels.push(
-      `<text x="${round(offsetX)}" y="${round(geometry.xAxisY + a.tickSize + a.labelFontSize)}" text-anchor="${
+      `<text x="${round(offsetX)}" y="${round(baseline)}" text-anchor="${
         isZero ? "end" : "middle"
       }" font-style="normal" ${labelStyle}>${escapeText(text)}</text>`,
     );
@@ -270,21 +274,21 @@ export function renderPlotSvg(
     }
     const text = displayNumber(value, scene.yAxis.labelFormat);
     labels.push(
-      `<text x="${round(geometry.yAxisX - a.tickSize - 4)}" y="${round(y + a.labelFontSize * 0.35)}" text-anchor="end" font-style="normal" ${labelStyle}>${escapeText(
+      `<text x="${round(geometry.yAxisX - a.tickSize - 7)}" y="${round(y + a.labelFontSize * 0.35)}" text-anchor="end" font-style="normal" ${labelStyle}>${escapeText(
         text,
       )}</text>`,
     );
   }
   parts.push(ticks.join(""), labels.join(""));
 
-  // Названия осей: внутри области у кончиков стрелок (как в TikZ-прототипе).
+  // Названия осей: внутри рабочей области у кончиков стрелок.
   const xNameY = Math.min(
-    geometry.bottom - 6,
-    Math.max(geometry.top + a.labelFontSize + 2, geometry.xAxisY + a.labelFontSize * 1.8),
+    geometry.bottom - 4,
+    Math.max(geometry.top + a.labelFontSize + 2, geometry.xAxisY + a.labelFontSize + 4),
   );
   const yNameX = Math.min(
     geometry.right - 8,
-    Math.max(geometry.left + 8, geometry.yAxisX - a.labelFontSize * 0.6),
+    Math.max(geometry.left + 8, geometry.yAxisX - 12),
   );
   parts.push(
     `<text x="${round(xEnd - 10)}" y="${round(xNameY)}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
@@ -349,7 +353,7 @@ export function renderPlotSvg(
     pointParts.push(
       `<circle cx="${round(px)}" cy="${round(py)}" r="${a.pointRadius}" fill="${
         point.open ? "#FFFFFF" : point.color
-      }" stroke="${point.color}" stroke-width="${Math.max(1.4, a.pointRadius * 0.5)}"/>`,
+      }" stroke="${point.color}" stroke-width="2"/>`,
     );
     // Буквенная метка — курсивом, координаты (числа) — прямым начертанием.
     const captionParts: string[] = [];
@@ -357,9 +361,9 @@ export function renderPlotSvg(
     if (point.coords) captionParts.push(`<tspan font-style="normal">${escapeText(point.coords)}</tspan>`);
     if (captionParts.length) {
       pointParts.push(
-        `<text x="${round(px + a.pointRadius + 4)}" y="${round(py - a.pointRadius - 4)}" font-family="${escapeText(
+        `<text x="${round(px)}" y="${round(py - a.pointRadius - 8)}" text-anchor="middle" font-family="${escapeText(
           a.pointLabelFontFamily,
-        )}" font-size="${a.pointLabelFontSize}" fill="${a.labelColor}">${captionParts.join(" ")}</text>`,
+        )}" font-size="${a.pointLabelFontSize}" fill="${point.color}">${captionParts.join(" ")}</text>`,
       );
     }
   }
