@@ -30,7 +30,9 @@ export const PLOT_PALETTE = [
 export const DEFAULT_APPEARANCE: PlotAppearance = {
   width: 720,
   height: 520,
+  equalScale: true,
   padding: 18,
+
   axisWidth: 1.6,
   axisColor: "#1A2236",
   arrowSize: 10,

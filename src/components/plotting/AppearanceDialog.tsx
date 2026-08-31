@@ -110,12 +110,20 @@ export function AppearanceDialog() {
 
         <div className="grid gap-3">
           <div className="flex items-center justify-between rounded-md border border-border p-3">
+            <Label className="text-sm">Квадратная сетка (равный масштаб осей)</Label>
+            <Switch
+              checked={appearance.equalScale !== false}
+              onCheckedChange={(checked) => updateAppearance({ equalScale: checked })}
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-md border border-border p-3">
             <Label className="text-sm">Рамка вокруг чертежа</Label>
             <Switch
               checked={appearance.frame}
               onCheckedChange={(checked) => updateAppearance({ frame: checked })}
             />
           </div>
+
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Шрифт подписей шкалы</Label>
             <Input

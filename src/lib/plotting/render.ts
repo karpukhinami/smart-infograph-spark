@@ -30,6 +30,10 @@ export interface PlotGeometry {
   canvasRight: number;
   canvasTop: number;
   canvasBottom: number;
+  /** Кончики стрелок осей. */
+  axisEndX: number;
+  axisEndY: number;
+
   sx: (value: number) => number;
   sy: (value: number) => number;
   xAxisY: number;
@@ -85,9 +89,21 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const leadY = yMin > -1e-12 ? Math.max(14, appearance.arrowSize * 1.4) : 0;
 
   const left = canvasLeft + leadX;
-  const right = canvasRight;
-  const top = canvasTop;
+  let right = canvasRight;
+  let top = canvasTop;
   const bottom = canvasBottom - leadY;
+
+  // Равный масштаб по обеим осям: клетки сетки квадратные, более длинная ось
+  // занимает всю доступную сторону изображения, вторая ужимается пропорционально.
+  let effCanvasRight = canvasRight;
+  let effCanvasTop = canvasTop;
+  if (appearance.equalScale !== false) {
+    const scale = Math.min((right - left) / (xMax - xMin), (bottom - top) / (yMax - yMin));
+    right = left + scale * (xMax - xMin);
+    top = bottom - scale * (yMax - yMin);
+    effCanvasRight = right;
+    effCanvasTop = top;
+  }
 
   const sx = (value: number) => left + ((value - xMin) / (xMax - xMin)) * (right - left);
   const sy = (value: number) => bottom - ((value - yMin) / (yMax - yMin)) * (bottom - top);
@@ -101,12 +117,17 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const xAxisY = sy(Math.min(Math.max(0, yMin), yMax));
   const yAxisX = sx(Math.min(Math.max(0, xMin), xMax));
 
+
+  const arrowLead = Math.round(appearance.arrowSize * 1.6);
   return {
     xMin, xMax, yMin, yMax, xStep, yStep, gridStepX, gridStepY,
     left, right, top, bottom,
-    canvasLeft, canvasRight, canvasTop, canvasBottom,
+    canvasLeft, canvasRight: effCanvasRight, canvasTop: effCanvasTop, canvasBottom,
+    axisEndX: effCanvasRight + arrowLead,
+    axisEndY: effCanvasTop - arrowLead,
     sx, sy, xAxisY, yAxisX,
   };
+
 }
 
 function escapeText(value: string): string {
@@ -201,9 +222,10 @@ export function renderPlotSvg(
   const arrow = a.arrowSize;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
   const xStart = geometry.canvasLeft;
-  const xEnd = a.width - a.padding;
+  const xEnd = geometry.axisEndX;
   const yStart = a.height - a.padding;
-  const yEnd = geometry.canvasTop;
+  const yEnd = geometry.axisEndY;
+
   parts.push(
     `<line x1="${round(xStart)}" y1="${round(geometry.xAxisY)}" x2="${round(xEnd)}" y2="${round(geometry.xAxisY)}" ${axisStyle}/>`,
     `<polygon points="${round(xEnd)},${round(geometry.xAxisY)} ${round(xEnd - arrow)},${round(
