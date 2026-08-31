@@ -215,11 +215,11 @@ export function buildGraph(
  * На стыке участков берётся та сторона, где неравенство нестрогое;
  * если строгие обе — функция в точке не определена.
  */
-export function piecewiseValueAt(
+export function piecewiseValuesAt(
   math: GraphMath,
   vars: { x: string },
   x: number,
-): number {
+): Array<{ y: number; open: boolean }> {
   const parsed = math.pieces.map((piece, index) => {
     if (!piece.expression.trim()) throw new Error(`Участок ${index + 1}: введите формулу.`);
     return {
@@ -229,27 +229,27 @@ export function piecewiseValueAt(
     };
   });
 
-  const strictlyInside = parsed.filter((item) => x > item.from && x < item.to);
-  const onInclusiveEdge = parsed.filter(
-    (item) =>
-      (Math.abs(x - item.from) < 1e-9 && item.piece.includeFrom) ||
-      (Math.abs(x - item.to) < 1e-9 && item.piece.includeTo),
-  );
-  const onAnyEdge = parsed.filter(
-    (item) => Math.abs(x - item.from) < 1e-9 || Math.abs(x - item.to) < 1e-9,
-  );
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+  const candidates: Array<{ y: number; open: boolean }> = [];
 
-  const chosen = strictlyInside[0] ?? onInclusiveEdge[0];
-  if (!chosen) {
-    if (onAnyEdge.length) {
-      throw new Error(
-        "В этой точке функция не определена: на стыке участков оба неравенства строгие.",
-      );
+  for (const item of parsed) {
+    let open: boolean | null = null;
+    if (x > item.from && x < item.to) open = false;
+    else if (near(x, item.from)) open = !item.piece.includeFrom;
+    else if (near(x, item.to)) open = !item.piece.includeTo;
+    if (open === null) continue;
+    const fn = compileExpression(item.piece.expression, [vars.x]);
+    const y = fn({ [vars.x]: x });
+    if (!Number.isFinite(y)) continue;
+    const same = candidates.find((c) => near(c.y, y));
+    if (same) {
+      if (!open) same.open = false;
+      continue;
     }
-    throw new Error("В этой координате график не определён.");
+    candidates.push({ y, open });
   }
-  const fn = compileExpression(chosen.piece.expression, [vars.x]);
-  const y = fn({ [vars.x]: x });
-  if (!Number.isFinite(y)) throw new Error("В этой координате график не определён.");
-  return y;
+
+  if (!candidates.length) throw new Error("В этой координате график не определён.");
+  return candidates;
 }
+
