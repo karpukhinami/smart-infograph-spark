@@ -44,8 +44,9 @@ function PlottingPage() {
   const resetScene = usePlotStore((state) => state.resetScene);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-[1400px] space-y-4 p-4 lg:p-6">
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col gap-4 p-4 lg:p-6">
+
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Plotting</h1>
@@ -81,8 +82,9 @@ function PlottingPage() {
           </TabsList>
         </Tabs>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-4">
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-2 lg:overflow-hidden">
+          <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
+
             <AxesSection />
 
             <Card>
