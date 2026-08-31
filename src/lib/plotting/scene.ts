@@ -219,8 +219,23 @@ export function buildPoint(point: ScenePoint, scene: PlotScene, bounds: PlotBoun
     }
     if (!point.math.x.trim()) throw new Error("Введите координату по горизонтальной оси.");
     const x = evaluateNumber(point.math.x);
+    if (graph.math.kind === "piecewise") {
+      const vars = { x: scene.xAxis.name.trim() || "x" };
+      const y = piecewiseValueAt(graph.math, vars, x);
+      return [
+        {
+          x,
+          y,
+          displayX: valueDisplay(point.math.x, x),
+          displayY: exactDisplay(y),
+          show: keepShow(0),
+          style: keepStyle(0),
+        },
+      ];
+    }
     const found = pointsOnGraphAtX(graph.built, x);
     if (!found.length) throw new Error("В этой координате график не определён.");
+
     return found.map((item, index) => ({
       x: item.x,
       y: item.y,
