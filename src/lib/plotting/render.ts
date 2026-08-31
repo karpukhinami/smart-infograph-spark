@@ -79,27 +79,16 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   if (!(xMax > xMin) || !(yMax > yMin)) return null;
 
   const appearance = scene.appearance;
-  const pad = appearance.padding;
-  const labelSpace = Math.round(appearance.labelFontSize * 1.6);
-  const canvasLeft = pad + labelSpace;
-  const canvasRight = appearance.width - pad - Math.round(appearance.arrowSize * 1.6);
-  const canvasTop = pad + Math.round(appearance.arrowSize * 1.6);
-  const canvasBottom = appearance.height - pad - labelSpace;
+  const pad = Math.max(0, appearance.padding);
 
-  // Технический пустой участок до начала сетки, если шкала не начинается с нуля.
-  const leadX = xMin > -1e-12 ? Math.max(14, appearance.arrowSize * 1.4) : 0;
-  const leadY = yMin > -1e-12 ? Math.max(14, appearance.arrowSize * 1.4) : 0;
+  // Математическая область = внутренний прямоугольник полотна (как в TikZ-прототипе):
+  // рамка, сетка и оси используют ровно эти границы.
+  let left = pad;
+  let right = appearance.width - pad;
+  let top = pad;
+  let bottom = appearance.height - pad;
 
-  let left = canvasLeft + leadX;
-  let right = canvasRight;
-  let top = canvasTop;
-  let bottom = canvasBottom - leadY;
-
-  // Равный масштаб по обеим осям: клетки сетки квадратные, более длинная ось
-  // занимает всю доступную сторону изображения, вторая ужимается пропорционально,
-  // а оставшийся запас распределяется поровну — сцена остаётся по центру.
-  let effCanvasRight = canvasRight;
-  let effCanvasTop = canvasTop;
+  // Равный масштаб по обеим осям: клетки сетки квадратные, сцена остаётся по центру.
   if (appearance.equalScale !== false) {
     const scale = Math.min((right - left) / (xMax - xMin), (bottom - top) / (yMax - yMin));
     const newWidth = scale * (xMax - xMin);
@@ -108,10 +97,8 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
     const slackY = (bottom - top - newHeight) / 2;
     left += slackX;
     right = left + newWidth;
-    bottom -= slackY;
-    top = bottom - newHeight;
-    effCanvasRight = right;
-    effCanvasTop = top;
+    top += slackY;
+    bottom = top + newHeight;
   }
 
   const sx = (value: number) => left + ((value - xMin) / (xMax - xMin)) * (right - left);
@@ -126,22 +113,19 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const xAxisY = sy(Math.min(Math.max(0, yMin), yMax));
   const yAxisX = sx(Math.min(Math.max(0, xMin), xMax));
 
-
-  // Оси выходят за математическую область на одинаковый технический вылет
-  // со всех четырёх сторон, чтобы стрелки не «висели» несимметрично.
-  const arrowLead = Math.round(appearance.arrowSize * 1.6);
   return {
     xMin, xMax, yMin, yMax, xStep, yStep, gridStepX, gridStepY,
     left, right, top, bottom,
-    canvasLeft, canvasRight: effCanvasRight, canvasTop: effCanvasTop, canvasBottom,
-    axisStartX: Math.max(appearance.padding, left - arrowLead),
-    axisStartY: Math.min(appearance.height - appearance.padding, bottom + arrowLead),
-    axisEndX: right + arrowLead,
-    axisEndY: top - arrowLead,
+    canvasLeft: left, canvasRight: right, canvasTop: top, canvasBottom: bottom,
+    // Оси идут от края области до края: кончик стрелки лежит на границе.
+    axisStartX: left,
+    axisStartY: bottom,
+    axisEndX: right,
+    axisEndY: top,
     sx, sy, xAxisY, yAxisX,
   };
-
 }
+
 
 function escapeText(value: string): string {
   return String(value ?? "")
@@ -201,17 +185,7 @@ export function renderPlotSvg(
     )}" height="${round(geometry.bottom - geometry.top)}"/></clipPath></defs>`,
   );
 
-  // Рамка — по краю всего изображения, а не вокруг математической области.
-  if (a.frame) {
-    const inset = a.frameWidth / 2;
-    parts.push(
-      `<rect x="${round(inset)}" y="${round(inset)}" width="${round(a.width - a.frameWidth)}" height="${round(
-        a.height - a.frameWidth,
-      )}" fill="none" stroke="${a.frameColor}" stroke-width="${a.frameWidth}"/>`,
-    );
-  }
-
-  // Сетка — только внутри математической области.
+  // Сетка — по всей математической области (как в TikZ-прототипе).
   if (scene.grid.visible) {
     const vertical = tickValues(geometry.xMin, geometry.xMax, geometry.gridStepX);
     const horizontal = tickValues(geometry.yMin, geometry.yMax, geometry.gridStepY);
@@ -233,8 +207,9 @@ export function renderPlotSvg(
     );
   }
 
-  // Оси со стрелками: линия продолжается в техническое поле.
+  // Оси со стрелками: от края области до края, кончик стрелки лежит на границе.
   const arrow = a.arrowSize;
+  const arrowHalf = arrow * 0.45;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
   const xStart = geometry.axisStartX;
   const xEnd = geometry.axisEndX;
@@ -242,15 +217,16 @@ export function renderPlotSvg(
   const yEnd = geometry.axisEndY;
 
   parts.push(
-    `<line x1="${round(xStart)}" y1="${round(geometry.xAxisY)}" x2="${round(xEnd)}" y2="${round(geometry.xAxisY)}" ${axisStyle}/>`,
+    `<line x1="${round(xStart)}" y1="${round(geometry.xAxisY)}" x2="${round(xEnd - arrow)}" y2="${round(geometry.xAxisY)}" ${axisStyle}/>`,
     `<polygon points="${round(xEnd)},${round(geometry.xAxisY)} ${round(xEnd - arrow)},${round(
-      geometry.xAxisY - arrow * 0.45,
-    )} ${round(xEnd - arrow)},${round(geometry.xAxisY + arrow * 0.45)}" fill="${a.axisColor}"/>`,
-    `<line x1="${round(geometry.yAxisX)}" y1="${round(yStart)}" x2="${round(geometry.yAxisX)}" y2="${round(yEnd)}" ${axisStyle}/>`,
-    `<polygon points="${round(geometry.yAxisX)},${round(yEnd)} ${round(geometry.yAxisX - arrow * 0.45)},${round(
+      geometry.xAxisY - arrowHalf,
+    )} ${round(xEnd - arrow)},${round(geometry.xAxisY + arrowHalf)}" fill="${a.axisColor}"/>`,
+    `<line x1="${round(geometry.yAxisX)}" y1="${round(yStart)}" x2="${round(geometry.yAxisX)}" y2="${round(yEnd + arrow)}" ${axisStyle}/>`,
+    `<polygon points="${round(geometry.yAxisX)},${round(yEnd)} ${round(geometry.yAxisX - arrowHalf)},${round(
       yEnd + arrow,
-    )} ${round(geometry.yAxisX + arrow * 0.45)},${round(yEnd + arrow)}" fill="${a.axisColor}"/>`,
+    )} ${round(geometry.yAxisX + arrowHalf)},${round(yEnd + arrow)}" fill="${a.axisColor}"/>`,
   );
+
 
   // Засечки и подписи.
   const labelStyle = `font-family="${escapeText(a.labelFontFamily)}" font-size="${a.labelFontSize}" fill="${a.labelColor}"`;
@@ -297,15 +273,24 @@ export function renderPlotSvg(
   }
   parts.push(ticks.join(""), labels.join(""));
 
-  // Названия осей: горизонтальная — снизу, вертикальная — слева.
+  // Названия осей: внутри области у кончиков стрелок (как в TikZ-прототипе).
+  const xNameY = Math.min(
+    geometry.bottom - 6,
+    Math.max(geometry.top + a.labelFontSize + 2, geometry.xAxisY + a.labelFontSize * 1.8),
+  );
+  const yNameX = Math.min(
+    geometry.right - 8,
+    Math.max(geometry.left + 8, geometry.yAxisX - a.labelFontSize * 0.6),
+  );
   parts.push(
-    `<text x="${round(xEnd)}" y="${round(Math.min(geometry.xAxisY + a.labelFontSize * 2.4, a.height - 4))}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
+    `<text x="${round(xEnd - 10)}" y="${round(xNameY)}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
       axisLabelText(scene.xAxis),
     )}</text>`,
-    `<text x="${round(Math.max(geometry.yAxisX - a.labelFontSize * 2.2, a.labelFontSize * 0.6))}" y="${round(
-      yEnd + a.labelFontSize,
-    )}" text-anchor="start" font-style="italic" ${labelStyle}>${escapeText(axisLabelText(scene.yAxis))}</text>`,
+    `<text x="${round(yNameX)}" y="${round(yEnd + a.labelFontSize + 4)}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
+      axisLabelText(scene.yAxis),
+    )}</text>`,
   );
+
 
   // Графики (клипуются по математической области).
   const curveParts: string[] = [];
@@ -372,6 +357,17 @@ export function renderPlotSvg(
     }
   }
   parts.push(pointParts.join(""));
+
+  // Рамка — по границе математической области, поверх всего.
+  if (a.frame) {
+    parts.push(
+      `<rect x="${round(geometry.left)}" y="${round(geometry.top)}" width="${round(
+        geometry.right - geometry.left,
+      )}" height="${round(geometry.bottom - geometry.top)}" fill="none" stroke="${a.frameColor}" stroke-width="${a.frameWidth}"/>`,
+    );
+  }
+
+
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${a.width}" height="${a.height}" viewBox="0 0 ${a.width} ${a.height}"><rect width="${a.width}" height="${a.height}" fill="#FFFFFF"/>${parts.join(
     "",
