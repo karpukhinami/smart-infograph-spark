@@ -234,7 +234,7 @@ export function renderPlotSvg(
 
   // Засечки и подписи.
   const labelStyle = `font-family="${escapeText(a.labelFontFamily)}" font-size="${a.labelFontSize}" fill="${a.labelColor}"`;
-  const tickStyle = `stroke="${a.axisColor}" stroke-width="${a.tickWidth}"`;
+  const tickStyle = `stroke="${a.axisColor}" stroke-width="${a.tickWidth}" stroke-linecap="round"`;
   const xMarks = markValues(scene.xAxis, geometry.xMin, geometry.xMax, geometry.xStep);
   const yMarks = markValues(scene.yAxis, geometry.yMin, geometry.yMax, geometry.yStep);
   const ticks: string[] = [];
@@ -250,9 +250,13 @@ export function renderPlotSvg(
       );
     }
     const text = displayNumber(value, scene.xAxis.labelFormat);
-    const offsetX = isZero ? x - a.labelFontSize * 0.5 : x;
+    // Ноль на плоскости — снизу-слева от пересечения осей.
+    const offsetX = isZero ? x - 7 : x;
+    const baseline = isZero
+      ? geometry.xAxisY + a.labelFontSize
+      : geometry.xAxisY + a.tickSize + a.labelFontSize + 3;
     labels.push(
-      `<text x="${round(offsetX)}" y="${round(geometry.xAxisY + a.tickSize + a.labelFontSize)}" text-anchor="${
+      `<text x="${round(offsetX)}" y="${round(baseline)}" text-anchor="${
         isZero ? "end" : "middle"
       }" font-style="normal" ${labelStyle}>${escapeText(text)}</text>`,
     );
@@ -270,7 +274,7 @@ export function renderPlotSvg(
     }
     const text = displayNumber(value, scene.yAxis.labelFormat);
     labels.push(
-      `<text x="${round(geometry.yAxisX - a.tickSize - 4)}" y="${round(y + a.labelFontSize * 0.35)}" text-anchor="end" font-style="normal" ${labelStyle}>${escapeText(
+      `<text x="${round(geometry.yAxisX - a.tickSize - 7)}" y="${round(y + a.labelFontSize * 0.35)}" text-anchor="end" font-style="normal" ${labelStyle}>${escapeText(
         text,
       )}</text>`,
     );
