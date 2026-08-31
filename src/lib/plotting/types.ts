@@ -118,6 +118,8 @@ export interface GraphMath {
   pieces: PiecewisePiece[];
   /** Опорные точки качественного графика. */
   anchors: AnchorPoint[];
+  /** Гладко продолжать качественную кривую за крайние опорные точки. */
+  extendEnds?: boolean;
   /** Собственные пределы построения (необязательно). */
   domainFrom: string;
   domainTo: string;
