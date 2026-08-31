@@ -363,3 +363,66 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
     </Card>
   );
 }
+
+/** Настоящая типографская фигурная скобка, растянутая по высоте блока участков. */
+function CurlyBrace() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const update = () => setHeight(node.clientHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    if (node.parentElement) observer.observe(node.parentElement);
+    return () => observer.disconnect();
+  }, []);
+
+  const base = 40;
+  return (
+    <div ref={ref} className="relative w-3 shrink-0 self-stretch overflow-visible">
+      <span
+        aria-hidden
+        className="absolute left-0 top-1/2 select-none font-serif leading-none text-foreground"
+        style={{
+          fontSize: `${base}px`,
+          transform: `translateY(-50%) scaleY(${height ? Math.max(height / (base * 0.95), 0.6) : 1})`,
+          transformOrigin: "center",
+        }}
+      >
+        {"{"}
+      </span>
+    </div>
+  );
+}
+
+/** Отдельная строка с математическим видом формулы участка. */
+function PiecePreview({ expression, variables }: { expression: string; variables: string[] }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const preview = useMemo(() => {
+    const text = expression.trim();
+    if (!text) return null;
+    try {
+      return katex.renderToString(expressionLatex(text, variables), {
+        throwOnError: false,
+        displayMode: false,
+      });
+    } catch {
+      return null;
+    }
+  }, [expression, variables]);
+
+  if (!expression.trim()) return null;
+  if (!mounted || !preview) {
+    return <p className="px-2 text-xs text-destructive">Не удалось разобрать формулу</p>;
+  }
+  return (
+    <div
+      className="rounded-md border border-border bg-muted/40 px-2 py-1 text-sm"
+      dangerouslySetInnerHTML={{ __html: preview }}
+    />
+  );
+}
