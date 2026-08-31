@@ -194,11 +194,13 @@ export function renderPlotSvg(
     )}" height="${round(geometry.bottom - geometry.top)}"/></clipPath></defs>`,
   );
 
+  // Рамка — по краю всего изображения, а не вокруг математической области.
   if (a.frame) {
+    const inset = a.frameWidth / 2;
     parts.push(
-      `<rect x="${round(geometry.canvasLeft)}" y="${round(geometry.canvasTop)}" width="${round(
-        geometry.canvasRight - geometry.canvasLeft,
-      )}" height="${round(geometry.canvasBottom - geometry.canvasTop)}" fill="none" stroke="${a.frameColor}" stroke-width="${a.frameWidth}"/>`,
+      `<rect x="${round(inset)}" y="${round(inset)}" width="${round(a.width - a.frameWidth)}" height="${round(
+        a.height - a.frameWidth,
+      )}" fill="none" stroke="${a.frameColor}" stroke-width="${a.frameWidth}"/>`,
     );
   }
 
