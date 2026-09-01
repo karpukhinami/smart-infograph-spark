@@ -342,42 +342,26 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">
-                  {math.kind === "qualitative" ? "Начало кривой" : `Пределы по ${xName}: от`}
-                </Label>
-                <Input
-                  value={math.domainFrom}
-                  placeholder="как у плоскости"
-                  className="font-mono text-xs"
-                  onChange={(event) => updateGraphMath(graph.id, { domainFrom: event.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">
-                  {math.kind === "qualitative" ? "Конец кривой" : "до"}
-                </Label>
-                <Input
-                  value={math.domainTo}
-                  placeholder="как у плоскости"
-                  className="font-mono text-xs"
-                  onChange={(event) => updateGraphMath(graph.id, { domainTo: event.target.value })}
-                />
-              </div>
+            <div className="flex items-center gap-2">
+              <Label className="shrink-0 text-xs text-muted-foreground">
+                {math.kind === "qualitative" ? "Кривая:" : `Пределы по ${xName}:`}
+              </Label>
+              <span className="shrink-0 text-xs text-muted-foreground">от</span>
+              <Input
+                value={math.domainFrom}
+                placeholder={axisHint.from}
+                className="h-8 min-w-0 flex-1 px-2 text-center font-mono text-xs placeholder:text-muted-foreground/60"
+                onChange={(event) => updateGraphMath(graph.id, { domainFrom: event.target.value })}
+              />
+              <span className="shrink-0 text-xs text-muted-foreground">до</span>
+              <Input
+                value={math.domainTo}
+                placeholder={axisHint.to}
+                className="h-8 min-w-0 flex-1 px-2 text-center font-mono text-xs placeholder:text-muted-foreground/60"
+                onChange={(event) => updateGraphMath(graph.id, { domainTo: event.target.value })}
+              />
             </div>
 
-            <Button type="button" variant="outline" size="sm" disabled className="w-full">
-              Подобрать пределы
-            </Button>
-
-            <ColorSwatches
-              value={graph.style.color}
-              onChange={(color) => updateGraphStyle(graph.id, { color })}
-              customColors={scene.customColors}
-              onAddCustomColor={addCustomColor}
-              label="Цвет графика"
-            />
 
             {graph.error && <p className="text-xs text-destructive">{graph.error}</p>}
 
