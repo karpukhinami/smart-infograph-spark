@@ -18,15 +18,27 @@ import type {
 } from "./types";
 
 
-/** Стандартная палитра чертежей (номер colorGroup = позиция в списке). */
+/** Основные шесть цветов чертежей (номер colorGroup = позиция в списке). */
 export const PLOT_PALETTE = [
-  "#19ADFF",
-  "#FFA84A",
-  "#FF78F8",
-  "#4A7BFF",
-  "#FF8800",
-  "#D438FF",
+  "#29A2E5", // blue 7
+  "#FF9935", // orange 7
+  "#FF3C8A", // pink 7
+  "#9050C7", // violet 7
+  "#5DBB3B", // green 9
+  "#31C2A7", // caribbean 9
 ];
+
+/** Полная фирменная палитра: раскрывается по «плюсику» в выборе цвета. */
+export const PLOT_PALETTE_GROUPS: { name: string; colors: string[] }[] = [
+  { name: "Violet", colors: ["#6E25B9", "#8239CD", "#9050C7", "#A464DB", "#B878EF"] },
+  { name: "Liliac", colors: ["#6366F1"] },
+  { name: "Blue", colors: ["#1164C0", "#0087CD", "#2185F7", "#29A2E5"] },
+  { name: "Caribbean", colors: ["#0BAC91", "#31C2A7", "#15D6A6", "#41EBB9"] },
+  { name: "Green", colors: ["#21A038", "#5DBB3B", "#88C92D", "#94D826"] },
+  { name: "Orange", colors: ["#FF733C", "#FF9935"] },
+  { name: "Pink", colors: ["#CD1E6C", "#E13280", "#FF3C8A"] },
+];
+
 
 export const DEFAULT_APPEARANCE: PlotAppearance = {
   width: 720,
