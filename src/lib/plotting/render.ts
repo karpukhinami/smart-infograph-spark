@@ -84,34 +84,43 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
 
   const appearance = scene.appearance;
   const pad = Math.max(0, appearance.padding);
-
-  // Математическая область = внутренний прямоугольник полотна (как в TikZ-прототипе):
-  // рамка, сетка и оси используют ровно эти границы.
-  let left = pad;
-  let right = appearance.width - pad;
-  let top = pad;
-  let bottom = appearance.height - pad;
-
-  // Равный масштаб по обеим осям: клетки сетки квадратные, сцена остаётся по центру.
-  if (appearance.equalScale !== false) {
-    const scale = Math.min((right - left) / (xMax - xMin), (bottom - top) / (yMax - yMin));
-    const newWidth = scale * (xMax - xMin);
-    const newHeight = scale * (yMax - yMin);
-    const slackX = (right - left - newWidth) / 2;
-    const slackY = (bottom - top - newHeight) / 2;
-    left += slackX;
-    right = left + newWidth;
-    top += slackY;
-    bottom = top + newHeight;
-  }
-
-  const sx = (value: number) => left + ((value - xMin) / (xMax - xMin)) * (right - left);
-  const sy = (value: number) => bottom - ((value - yMin) / (yMax - yMin)) * (bottom - top);
+  const font = appearance.labelFontSize;
 
   const xStep = axisStep(scene.xAxis, xMin, xMax);
   const yStep = axisStep(scene.yAxis, yMin, yMax);
   const gridStepX = scene.grid.followAxisStep ? xStep : axisNumber(scene.grid.stepX) ?? xStep;
   const gridStepY = scene.grid.followAxisStep ? yStep : axisNumber(scene.grid.stepY) ?? yStep;
+
+  // Если ноль не попал внутрь диапазона, ось ложится на рамку, а её подписи
+  // уходят за пределы области — под них нужен запас с «воздухом».
+  const yLabels = markValues(scene.yAxis, yMin, yMax, yStep)
+    .map((value) => displayNumber(value, scene.yAxis.labelFormat).length);
+  const maxYLabel = yLabels.length ? Math.max(...yLabels) : 1;
+  const yGutter = appearance.tickSize + 7 + maxYLabel * font * 0.58 + 10;
+  const xGutter = appearance.tickSize + font + 3 + 10;
+
+  const padLeft = pad + (xMin >= 0 ? yGutter : 0);
+  const padRight = pad + (xMax <= 0 ? yGutter : 0);
+  const padTop = pad + (yMax <= 0 ? xGutter : 0);
+  const padBottom = pad + (yMin >= 0 ? xGutter : 0);
+
+  // Сетка всегда квадратная: масштаб один для обеих осей, более длинная ось
+  // занимает всё доступное место, а картинка становится прямоугольной.
+  const availWidth = Math.max(10, appearance.width - padLeft - padRight);
+  const availHeight = Math.max(10, appearance.height - padTop - padBottom);
+  const scale = Math.min(availWidth / (xMax - xMin), availHeight / (yMax - yMin));
+  const areaWidth = scale * (xMax - xMin);
+  const areaHeight = scale * (yMax - yMin);
+
+  const left = padLeft;
+  const right = left + areaWidth;
+  const top = padTop;
+  const bottom = top + areaHeight;
+  const canvasWidth = padLeft + areaWidth + padRight;
+  const canvasHeight = padTop + areaHeight + padBottom;
+
+  const sx = (value: number) => left + ((value - xMin) / (xMax - xMin)) * (right - left);
+  const sy = (value: number) => bottom - ((value - yMin) / (yMax - yMin)) * (bottom - top);
 
   // Ось остаётся видимой, даже если ноль вне диапазона.
   const xAxisY = sy(Math.min(Math.max(0, yMin), yMax));
@@ -121,6 +130,7 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
     xMin, xMax, yMin, yMax, xStep, yStep, gridStepX, gridStepY,
     left, right, top, bottom,
     canvasLeft: left, canvasRight: right, canvasTop: top, canvasBottom: bottom,
+    canvasWidth, canvasHeight,
     // Оси идут от края области до края: кончик стрелки лежит на границе.
     axisStartX: left,
     axisStartY: bottom,
@@ -129,6 +139,7 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
     sx, sy, xAxisY, yAxisX,
   };
 }
+
 
 
 function escapeText(value: string): string {
