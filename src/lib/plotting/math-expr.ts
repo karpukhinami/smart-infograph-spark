@@ -190,13 +190,19 @@ function fractionText(num: number, den: number, unit = ""): string {
   return `${sign}${head}/${den}`;
 }
 
+/** Десятичная запятая: в русской математической записи точка не используется. */
+export function decimalComma(text: string): string {
+  return text.replace(/(\d)\.(\d)/g, "$1,$2");
+}
+
 function trimNumber(value: number): string {
   if (Object.is(value, -0)) return "0";
   const rounded = Math.abs(value) < 1e-10 ? 0 : value;
   let text = String(Number(rounded.toPrecision(12)));
   if (text.includes("e")) text = String(Number(rounded.toFixed(6)));
-  return text.replace("-", "−");
+  return decimalComma(text.replace("-", "−"));
 }
+
 
 /** Человеческая математическая подпись числа. */
 export function displayNumber(
