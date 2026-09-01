@@ -54,6 +54,31 @@
   font-display: swap;
 }
 
+/* --- SB Serif Text (шрифт для картинок/рендеров) --- */
+@font-face {
+  font-family: "SB Serif Text";
+  src: url("/__l5e/assets-v1/e839a066-8f77-4d13-916d-c89784285869/SBSerifText-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SB Serif Text";
+  src: url("/__l5e/assets-v1/6459993b-1732-4b3f-a708-c7ae19aa9375/SBSerifText-Italic.otf") format("opentype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SB Serif Text";
+  src: url("/__l5e/assets-v1/526bf2f7-22af-4673-b518-72ede1f5ec6a/SBSerifText-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
