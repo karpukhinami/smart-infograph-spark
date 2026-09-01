@@ -52,19 +52,32 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
     <Card className="border-border">
       <CardContent className="space-y-3 p-3">
         <Collapsible open={open} onOpenChange={setOpen}>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium">
               <ChevronDown className={`size-4 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`} />
               <span className="truncate">
-                Функция {graph.index} — {graphSummary(graph, yName)}
+                {graph.style.label.trim()
+                  ? `${graph.style.label.trim()}: ${graphSummary(graph, yName)}`
+                  : `Функция ${graph.index} — ${graphSummary(graph, yName)}`}
               </span>
             </CollapsibleTrigger>
-            <span
-              className="size-4 shrink-0 rounded-full border border-border"
-              style={{ backgroundColor: graph.style.color }}
-            />
             {graph.dirty && graph.built && <Badge variant="secondary">есть изменения</Badge>}
             {!graph.built && <Badge variant="outline">не построена</Badge>}
+            <ColorDot
+              value={graph.style.color}
+              onChange={(color) => updateGraphStyle(graph.id, { color })}
+              title="Цвет графика"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={`size-8 ${graph.style.visible ? "text-primary" : "text-muted-foreground"}`}
+              title={graph.style.visible ? "График виден" : "График скрыт"}
+              onClick={() => updateGraphStyle(graph.id, { visible: !graph.style.visible })}
+            >
+              {graph.style.visible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -77,20 +90,34 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
           </div>
 
           <CollapsibleContent className="space-y-3 pt-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Тип задания</Label>
-              <Select
-                value={math.kind}
-                onValueChange={(value) => updateGraphMath(graph.id, { kind: value as GraphKind })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {KINDS.map((kind) => (
-                    <SelectItem key={kind.value} value={kind.value}>{kind.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex items-end gap-2">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Тип задания</Label>
+                <Select
+                  value={math.kind}
+                  onValueChange={(value) => updateGraphMath(graph.id, { kind: value as GraphKind })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {KINDS.map((kind) => (
+                      <SelectItem key={kind.value} value={kind.value}>{kind.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-24 shrink-0 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Название</Label>
+                <Input
+                  value={graph.style.label}
+                  placeholder="f"
+                  maxLength={4}
+                  className="text-center italic"
+                  title="Буква латинского или греческого алфавита (необязательно)"
+                  onChange={(event) => updateGraphStyle(graph.id, { label: event.target.value })}
+                />
+              </div>
             </div>
+
 
             {math.kind === "explicit" && (
               <MathInput
