@@ -38,7 +38,7 @@ export function ColorSwatches({
             onClick={() => onChange(color)}
             style={{ backgroundColor: color }}
             className={cn(
-              "flex size-6 items-center justify-center rounded-sm border border-border transition",
+              "flex size-6 items-center justify-center rounded-[3px] border border-border transition",
               value.toLowerCase() === color.toLowerCase() &&
                 "ring-2 ring-ring ring-offset-1 ring-offset-background",
             )}
@@ -53,7 +53,7 @@ export function ColorSwatches({
         <span
           title="Текущий цвет"
           style={{ backgroundColor: value }}
-          className="flex size-6 items-center justify-center rounded-sm border-2 border-foreground/40"
+          className="flex size-6 items-center justify-center rounded-[3px] border-2 border-foreground/40"
         >
           <Check className="size-3.5 text-white drop-shadow" />
         </span>
@@ -68,7 +68,7 @@ export function ColorSwatches({
             onClick={() => onChange(color)}
             style={{ backgroundColor: color }}
             className={cn(
-              "flex size-6 items-center justify-center rounded-sm border border-border transition",
+              "flex size-6 items-center justify-center rounded-[3px] border border-border transition",
               value.toLowerCase() === color.toLowerCase() &&
                 "ring-2 ring-ring ring-offset-1 ring-offset-background",
             )}
@@ -87,7 +87,7 @@ export function ColorSwatches({
             onClick={() => onChange(color)}
             style={{ backgroundColor: color }}
             className={cn(
-              "flex size-6 items-center justify-center rounded-sm border border-border transition",
+              "flex size-6 items-center justify-center rounded-[3px] border border-border transition",
               value.toLowerCase() === color.toLowerCase() &&
                 "ring-2 ring-ring ring-offset-1 ring-offset-background",
             )}
@@ -98,7 +98,7 @@ export function ColorSwatches({
             )}
           </button>
         ))}
-        <span className="size-6 rounded-sm border border-dashed border-border bg-white" />
+        <span className="size-6 rounded-[3px] border border-dashed border-border bg-white" />
       </div>
 
       {/* Сразу открытая палитра выбора своего цвета. */}
