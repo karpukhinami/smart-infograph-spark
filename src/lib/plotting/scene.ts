@@ -436,3 +436,50 @@ export function scenePoints(scene: PlotScene): RenderPoint[] {
   }
   return result;
 }
+
+/** Решения для черновика точки (до нажатия «Отметить»). Бросает ошибку. */
+export function solvePointMath(scene: PlotScene, math: PointMath): PointSolution[] {
+  const bounds = sceneBounds(scene);
+  if (!bounds) throw new Error("Заполните пределы обеих осей.");
+  return buildPoint(createPoint(0, math), scene, bounds);
+}
+
+/**
+ * Предпросмотр черновика точки: пока выбор не сделан, показываем все
+ * подходящие варианты, чтобы пользователь видел их на чертеже.
+ */
+export function draftRenderPoints(scene: PlotScene, math: PointMath | null): RenderPoint[] {
+  if (!math) return [];
+  const mark = (x: number, y: number, open = false): RenderPoint => ({
+    x,
+    y,
+    color: PLOT_PALETTE[0],
+    open,
+    label: "",
+    coords: null,
+    projectX: false,
+    projectY: false,
+    labelProjectionX: null,
+    labelProjectionY: null,
+  });
+
+  if (math.mode === "anchor") {
+    const choices = sceneAnchorChoices(scene);
+    const picked =
+      math.graphId && math.anchorIndex !== null
+        ? choices.filter(
+            (choice) => choice.graphId === math.graphId && choice.anchorIndex === math.anchorIndex,
+          )
+        : choices;
+    return picked.map((choice) => mark(choice.x, choice.y));
+  }
+
+  try {
+    return solvePointMath(scene, math).map((solution) =>
+      mark(solution.x, solution.y, Boolean(solution.style?.open)),
+    );
+  } catch {
+    return [];
+  }
+}
+
