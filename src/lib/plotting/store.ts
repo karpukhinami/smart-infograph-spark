@@ -192,13 +192,8 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       },
     })),
 
-  addPoint: () =>
-    set((state) => ({
-      scene: {
-        ...state.scene,
-        points: [...state.scene.points, createPoint(state.scene.points.length + 1)],
-      },
-    })),
+
+
 
   updatePointMath: (id, patch) =>
     set((state) => ({
