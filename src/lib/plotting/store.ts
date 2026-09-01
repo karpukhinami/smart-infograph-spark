@@ -2,10 +2,12 @@
 import { create } from "zustand";
 import {
   DEFAULT_APPEARANCE,
+  EMPTY_POINT_MATH,
   buildScene,
   createGraph,
   createPoint,
   createScene,
+  solvePointMath,
 } from "./scene";
 import type {
   AxisSpec,
@@ -34,6 +36,9 @@ interface PlotStore {
   inputMode: PlotInputMode;
   spaceTab: PlotSpaceTab;
   status: BuildStatus | null;
+  /** Черновик добавляемой точки: живёт вне сцены до нажатия «Отметить». */
+  pointDraft: PointMath | null;
+  pointDraftError: string | null;
   setInputMode: (mode: PlotInputMode) => void;
   setSpaceTab: (tab: PlotSpaceTab) => void;
   updateAxis: (axis: "xAxis" | "yAxis", patch: Partial<AxisSpec>) => void;
@@ -44,7 +49,10 @@ interface PlotStore {
   updateGraphMath: (id: string, patch: Partial<GraphMath>) => void;
   updateGraphStyle: (id: string, patch: Partial<GraphStyle>) => void;
   removeGraph: (id: string) => void;
-  addPoint: () => void;
+  startPointDraft: () => void;
+  updatePointDraft: (patch: Partial<PointMath>) => void;
+  cancelPointDraft: () => void;
+  commitPointDraft: () => void;
   updatePointMath: (id: string, patch: Partial<PointMath>) => void;
   updatePointStyle: (id: string, patch: Partial<PointStyle>) => void;
   togglePointSolution: (id: string, index: number, show: boolean) => void;
@@ -57,6 +65,7 @@ interface PlotStore {
   importScene: (raw: unknown) => void;
   resetScene: () => void;
 }
+
 
 function reindex<T extends { index: number }>(items: T[]): T[] {
   return items.map((item, position) => ({ ...item, index: position + 1 }));
