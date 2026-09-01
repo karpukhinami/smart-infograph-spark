@@ -40,7 +40,8 @@ function PlottingPage() {
   const spaceTab = usePlotStore((state) => state.spaceTab);
   const setSpaceTab = usePlotStore((state) => state.setSpaceTab);
   const addGraph = usePlotStore((state) => state.addGraph);
-  const addPoint = usePlotStore((state) => state.addPoint);
+  const startPointDraft = usePlotStore((state) => state.startPointDraft);
+  const pointDraft = usePlotStore((state) => state.pointDraft);
   const resetScene = usePlotStore((state) => state.resetScene);
 
   return (
@@ -88,12 +89,8 @@ function PlottingPage() {
             <AxesSection />
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">Функции</CardTitle>
-                <Button type="button" variant="outline" size="sm" onClick={addGraph}>
-                  <Plus className="size-4" />
-                  Функция
-                </Button>
               </CardHeader>
               <CardContent className="space-y-3">
                 {scene.graphs.length === 0 ? (
@@ -101,23 +98,32 @@ function PlottingPage() {
                 ) : (
                   scene.graphs.map((graph) => <FunctionCard key={graph.id} graph={graph} />)
                 )}
-                <MathSyntaxHint />
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={addGraph}>
+                    <Plus className="size-4" />
+                    Функция
+                  </Button>
+                  <MathSyntaxHint />
+                </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">Точки</CardTitle>
-                <Button type="button" variant="outline" size="sm" onClick={addPoint}>
-                  <Plus className="size-4" />
-                  Точка
-                </Button>
               </CardHeader>
               <CardContent className="space-y-3">
-                {scene.points.length === 0 ? (
+                {scene.points.length === 0 && !pointDraft ? (
                   <p className="text-sm text-muted-foreground">Точки пока не добавлены.</p>
                 ) : (
                   scene.points.map((point) => <PointCard key={point.id} point={point} />)
+                )}
+                <PointDraftPanel />
+                {!pointDraft && (
+                  <Button type="button" variant="outline" size="sm" onClick={startPointDraft}>
+                    <Plus className="size-4" />
+                    Точка
+                  </Button>
                 )}
               </CardContent>
             </Card>
@@ -132,3 +138,4 @@ function PlottingPage() {
     </div>
   );
 }
+
