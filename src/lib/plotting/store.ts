@@ -315,8 +315,14 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       space: "plane",
     };
     const report = buildScene(scene);
-    set({ scene: report.scene, status: { built: report.built, errors: report.errors, at: Date.now() } });
+    set({
+      scene: report.scene,
+      status: { built: report.built, errors: report.errors, at: Date.now() },
+      pointDraft: null,
+      pointDraftError: null,
+    });
   },
 
-  resetScene: () => set({ scene: createScene(), status: null }),
+  resetScene: () => set({ scene: createScene(), status: null, pointDraft: null, pointDraftError: null }),
 }));
+
