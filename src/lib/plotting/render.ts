@@ -280,16 +280,16 @@ export function renderPlotSvg(
       );
     }
     const text = displayNumber(value, scene.xAxis.labelFormat);
-    // Ноль на плоскости — снизу-слева от пересечения осей.
-    const offsetX = isZero ? x - 7 : x;
-    const baseline = isZero
-      ? geometry.xAxisY + a.labelFontSize
-      : geometry.xAxisY + a.tickSize + a.labelFontSize + 3;
+    // Ноль — снизу-слева от пересечения осей, но на том же удалении от осей,
+    // что и остальные подписи (иначе он «липнет» к осям).
+    const offsetX = isZero ? x - a.tickSize - 7 : x;
+    const baseline = geometry.xAxisY + a.tickSize + a.labelFontSize + 3;
     labels.push(
       `<text x="${round(offsetX)}" y="${round(baseline)}" text-anchor="${
         isZero ? "end" : "middle"
       }" font-style="normal" ${labelStyle}>${escapeText(text)}</text>`,
     );
+
   }
   for (const value of yMarks) {
     const isZero = Math.abs(value) < 1e-12;
