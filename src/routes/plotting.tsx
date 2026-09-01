@@ -6,6 +6,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AxesSection } from "@/components/plotting/AxesSection";
 import { FunctionCard } from "@/components/plotting/FunctionCard";
 import { PointCard } from "@/components/plotting/PointCard";
+import { PointDraftPanel } from "@/components/plotting/PointDraftPanel";
+
 import { PlotPreview } from "@/components/plotting/PlotPreview";
 import { MathSyntaxHint } from "@/components/plotting/MathInput";
 import { usePlotStore } from "@/lib/plotting/store";
