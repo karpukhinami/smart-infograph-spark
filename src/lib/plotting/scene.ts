@@ -8,12 +8,15 @@ import type {
   GraphKind,
   PlotAppearance,
   PlotScene,
+  PointMath,
   PointSolution,
+  PointStyle,
   RenderCurve,
   RenderPoint,
   SceneGraph,
   ScenePoint,
 } from "./types";
+
 
 /** Стандартная палитра чертежей (номер colorGroup = позиция в списке). */
 export const PLOT_PALETTE = [
