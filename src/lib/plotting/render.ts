@@ -197,6 +197,7 @@ export function axisLabelText(axis: AxisSpec): string {
 }
 
 const BACKDROP_OPACITY = 0.85;
+const BACKDROP_STROKE = 4;
 /** Базовый зазор от центра точки до ближайшего края подписи (удвоенный). */
 const POINT_LABEL_GAP = 16;
 
@@ -431,7 +432,7 @@ function renderPointCaption(
   const font = `font-family="${escapeText(a.pointLabelFontFamily)}" font-size="${a.pointLabelFontSize}"`;
   // Подложка повторяет контуры глифов, а не прямоугольник bounding box.
   const backdrop = placed.needsBackdrop
-    ? `<text ${pos} ${font} fill="#FFFFFF" fill-opacity="${BACKDROP_OPACITY}" stroke="#FFFFFF" stroke-opacity="${BACKDROP_OPACITY}" stroke-width="2" stroke-linejoin="round" paint-order="stroke fill">${inner}</text>`
+    ? `<text ${pos} ${font} fill="#FFFFFF" fill-opacity="${BACKDROP_OPACITY}" stroke="#FFFFFF" stroke-opacity="${BACKDROP_OPACITY}" stroke-width="${BACKDROP_STROKE}" stroke-linejoin="round" paint-order="stroke fill">${inner}</text>`
     : "";
   return `${backdrop}<text ${pos} ${font} fill="${point.color}">${inner}</text>`;
 }
