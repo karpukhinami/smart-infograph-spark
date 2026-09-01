@@ -83,7 +83,7 @@
 
 @theme inline {
   --font-sans: "SB Sans Text", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "SB Sans Text", ui-serif, serif;
+  --font-serif: "SB Serif Text", ui-serif, serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

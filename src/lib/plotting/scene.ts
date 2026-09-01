@@ -57,13 +57,13 @@ export const DEFAULT_APPEARANCE: PlotAppearance = {
   tickWidth: 2,
   tickSize: 6,
 
-  labelFontFamily: "SB Sans Text, KaTeX_Main, system-ui, sans-serif",
+  labelFontFamily: "SB Serif Text, KaTeX_Main, ui-serif, serif",
   labelFontSize: 22,
   labelColor: "#1A2236",
   graphWidth: 3,
   pointRadius: 6,
   pointLabelFontSize: 32,
-  pointLabelFontFamily: "SB Sans Text, KaTeX_Main, system-ui, sans-serif",
+  pointLabelFontFamily: "SB Serif Text, KaTeX_Main, ui-serif, serif",
   projectionWidth: 1.2,
   projectionColor: "#8A93A6",
 };
