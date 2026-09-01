@@ -196,7 +196,9 @@ export function axisLabelText(axis: AxisSpec): string {
   return axis.unit.trim() ? `${name}, ${axis.unit.trim()}` : name;
 }
 
-const BACKDROP_PAD = 3;
+const BACKDROP_OPACITY = 0.85;
+/** Базовый зазор от центра точки до ближайшего края подписи (удвоенный). */
+const POINT_LABEL_GAP = 16;
 
 /** Прямоугольник текстовой подписи по якорю и text-anchor. */
 function textBoundingRect(
@@ -403,7 +405,7 @@ function layoutPointLabels(
       anchorY: py,
       width: measureTextWidth(caption, fontSize),
       height: fontSize * 1.12,
-      gap: a.pointRadius + 8,
+      gap: a.pointRadius + POINT_LABEL_GAP,
       placement: point.labelPlacement ?? "auto",
     });
   }
@@ -424,13 +426,14 @@ function renderPointCaption(
   const captionParts: string[] = [];
   if (point.label) captionParts.push(`<tspan font-style="italic">${escapeText(point.label)}</tspan>`);
   if (point.coords) captionParts.push(`<tspan font-style="normal">${escapeText(point.coords)}</tspan>`);
-  const textStyle = `font-family="${escapeText(a.pointLabelFontFamily)}" font-size="${a.pointLabelFontSize}" fill="${point.color}"`;
+  const inner = captionParts.join(" ");
+  const pos = `x="${round(placed.x)}" y="${round(placed.y)}" text-anchor="${placed.textAnchor}"`;
+  const font = `font-family="${escapeText(a.pointLabelFontFamily)}" font-size="${a.pointLabelFontSize}"`;
+  // Подложка повторяет контуры глифов, а не прямоугольник bounding box.
   const backdrop = placed.needsBackdrop
-    ? `<rect x="${round(placed.rect.x - BACKDROP_PAD)}" y="${round(placed.rect.y - BACKDROP_PAD)}" width="${round(
-        placed.rect.width + BACKDROP_PAD * 2,
-      )}" height="${round(placed.rect.height + BACKDROP_PAD * 2)}" fill="#FFFFFF" fill-opacity="0.35" rx="2"/>`
+    ? `<text ${pos} ${font} fill="#FFFFFF" fill-opacity="${BACKDROP_OPACITY}" stroke="#FFFFFF" stroke-opacity="${BACKDROP_OPACITY}" stroke-width="2" stroke-linejoin="round" paint-order="stroke fill">${inner}</text>`
     : "";
-  return `${backdrop}<text x="${round(placed.x)}" y="${round(placed.y)}" text-anchor="${placed.textAnchor}" ${textStyle}>${captionParts.join(" ")}</text>`;
+  return `${backdrop}<text ${pos} ${font} fill="${point.color}">${inner}</text>`;
 }
 
 /** Основной рендер: сцена → SVG. */
