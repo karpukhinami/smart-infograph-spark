@@ -228,6 +228,17 @@ export function renderPlotSvg(
     );
   }
 
+  // Рамка — по границе математической области, но под осями: если ось лежит
+  // на краю (полуось или диапазон без нуля), она должна быть видна поверх рамки.
+  if (a.frame) {
+    parts.push(
+      `<rect x="${round(geometry.left)}" y="${round(geometry.top)}" width="${round(
+        geometry.right - geometry.left,
+      )}" height="${round(geometry.bottom - geometry.top)}" fill="none" stroke="${a.frameColor}" stroke-width="${a.frameWidth}"/>`,
+    );
+  }
+
+
   // Оси со стрелками: от края области до края, кончик стрелки лежит на границе.
   // Равнобедренный треугольник: высота вдоль оси = arrowSize, основание = 0.45 * высоты
   // (узкая «игла», как на классических учебных чертежах).
