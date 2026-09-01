@@ -109,13 +109,11 @@ export function AppearanceDialog() {
         <Separator />
 
         <div className="grid gap-3">
-          <div className="flex items-center justify-between rounded-md border border-border p-3">
-            <Label className="text-sm">Квадратная сетка (равный масштаб осей)</Label>
-            <Switch
-              checked={appearance.equalScale !== false}
-              onCheckedChange={(checked) => updateAppearance({ equalScale: checked })}
-            />
+          <div className="rounded-md border border-border p-3 text-xs text-muted-foreground">
+            Сетка всегда квадратная: масштаб общий для обеих осей, более длинная ось занимает
+            всё доступное место, поэтому картинка может быть прямоугольной.
           </div>
+
           <div className="flex items-center justify-between rounded-md border border-border p-3">
             <Label className="text-sm">Рамка вокруг чертежа</Label>
             <Switch
