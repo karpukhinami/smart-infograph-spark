@@ -1,3 +1,4 @@
+export * from "./label-layout";
 export * from "./types";
 export * from "./math-expr";
 export * from "./ticks";

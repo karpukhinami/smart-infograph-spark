@@ -4,6 +4,7 @@
  * Это внутренний контракт между ручным UI, будущим AI-UI, вычислительным слоем
  * и SVG-рисовальщиком. Пользователь никогда не редактирует её вручную.
  */
+import type { LabelPlacement } from "./label-layout";
 
 /** Значение, которое может быть задано математическим выражением. */
 export interface MathValue {
@@ -182,6 +183,8 @@ export interface PointStyle {
   projectY: boolean;
   labelProjectionX: boolean;
   labelProjectionY: boolean;
+  /** "auto" — автоматическая раскладка; направление — фиксированное положение. */
+  labelPlacement?: LabelPlacement;
 }
 
 /** Одно найденное решение (точка может давать несколько). */
@@ -236,6 +239,7 @@ export interface RenderCurve {
 }
 
 export interface RenderPoint {
+  id: string;
   x: number;
   y: number;
   color: string;
@@ -246,4 +250,5 @@ export interface RenderPoint {
   projectY: boolean;
   labelProjectionX: string | null;
   labelProjectionY: string | null;
+  labelPlacement?: LabelPlacement;
 }

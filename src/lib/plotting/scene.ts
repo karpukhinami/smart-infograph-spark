@@ -427,12 +427,13 @@ export function scenePoints(scene: PlotScene): RenderPoint[] {
   const result: RenderPoint[] = [];
   for (const point of scene.points) {
     if (!point.built || !point.style.visible) continue;
-    for (const solution of point.built) {
+    for (const [solutionIndex, solution] of point.built.entries()) {
       if (!solution.show) continue;
       // Индивидуальные настройки решения перекрывают общие настройки точки.
       const style = { ...point.style, ...(solution.style ?? {}) };
       if (!style.visible) continue;
       result.push({
+        id: `${point.id}:${solutionIndex}`,
         x: solution.x,
         y: solution.y,
         color: style.color,
@@ -443,6 +444,7 @@ export function scenePoints(scene: PlotScene): RenderPoint[] {
         projectY: style.projectY,
         labelProjectionX: style.labelProjectionX ? solution.displayX : null,
         labelProjectionY: style.labelProjectionY ? solution.displayY : null,
+        labelPlacement: style.labelPlacement ?? "auto",
       });
     }
   }
@@ -462,7 +464,8 @@ export function solvePointMath(scene: PlotScene, math: PointMath): PointSolution
  */
 export function draftRenderPoints(scene: PlotScene, math: PointMath | null): RenderPoint[] {
   if (!math) return [];
-  const mark = (x: number, y: number, open = false): RenderPoint => ({
+  const mark = (x: number, y: number, open = false, id = "draft"): RenderPoint => ({
+    id,
     x,
     y,
     color: PLOT_PALETTE[0],
@@ -473,6 +476,7 @@ export function draftRenderPoints(scene: PlotScene, math: PointMath | null): Ren
     projectY: false,
     labelProjectionX: null,
     labelProjectionY: null,
+    labelPlacement: "auto",
   });
 
   if (math.mode === "anchor") {
@@ -483,12 +487,12 @@ export function draftRenderPoints(scene: PlotScene, math: PointMath | null): Ren
             (choice) => choice.graphId === math.graphId && choice.anchorIndex === math.anchorIndex,
           )
         : choices;
-    return picked.map((choice) => mark(choice.x, choice.y));
+    return picked.map((choice, index) => mark(choice.x, choice.y, false, `draft:${index}`));
   }
 
   try {
-    return solvePointMath(scene, math).map((solution) =>
-      mark(solution.x, solution.y, Boolean(solution.style?.open)),
+    return solvePointMath(scene, math).map((solution, index) =>
+      mark(solution.x, solution.y, Boolean(solution.style?.open), `draft:${index}`),
     );
   } catch {
     return [];

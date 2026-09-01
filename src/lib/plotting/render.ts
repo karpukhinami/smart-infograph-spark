@@ -8,8 +8,16 @@
  * только внутри математической области.
  */
 import { displayNumber, evaluateNumber, parseValueList } from "./math-expr";
+import {
+  layoutLabels,
+  measureTextWidth,
+  type LabelRequest,
+  type Obstacle,
+  type PlacedLabel,
+  type Rect,
+} from "./label-layout";
 import { firstStepValue, niceStep, tickValues } from "./ticks";
-import type { AxisSpec, PlotScene, RenderCurve, RenderPoint } from "./types";
+import type { AxisSpec, PlotAppearance, PlotScene, RenderCurve, RenderPoint } from "./types";
 
 export interface PlotGeometry {
   xMin: number;
@@ -188,6 +196,243 @@ export function axisLabelText(axis: AxisSpec): string {
   return axis.unit.trim() ? `${name}, ${axis.unit.trim()}` : name;
 }
 
+const BACKDROP_PAD = 3;
+
+/** Прямоугольник текстовой подписи по якорю и text-anchor. */
+function textBoundingRect(
+  x: number,
+  y: number,
+  text: string,
+  fontSize: number,
+  anchor: "start" | "middle" | "end",
+  baselineShift = fontSize * 0.35,
+): Rect {
+  const width = measureTextWidth(text, fontSize);
+  const height = fontSize * 1.12;
+  let left = x;
+  if (anchor === "middle") left = x - width / 2;
+  else if (anchor === "end") left = x - width;
+  const top = y - baselineShift - fontSize * 0.78;
+  return { x: left, y: top, width, height };
+}
+
+function pointCaptionText(point: RenderPoint): string {
+  const parts: string[] = [];
+  if (point.label) parts.push(point.label);
+  if (point.coords) parts.push(point.coords);
+  return parts.join(" ");
+}
+
+function pointMarkerRect(px: number, py: number, radius: number): Rect {
+  const size = radius * 2 + 4;
+  return { x: px - size / 2, y: py - size / 2, width: size, height: size };
+}
+
+/** Препятствия для автораскладки подписей точек (без самих подписей точек). */
+function buildLabelObstacles(
+  geometry: PlotGeometry,
+  scene: PlotScene,
+  curves: RenderCurve[],
+  points: RenderPoint[],
+  a: PlotAppearance,
+  xMarks: number[],
+  yMarks: number[],
+): Obstacle[] {
+  const obstacles: Obstacle[] = [];
+  const arrow = a.arrowSize;
+
+  obstacles.push({
+    kind: "axis",
+    points: [
+      [geometry.axisStartX, geometry.xAxisY],
+      [geometry.axisEndX - arrow, geometry.xAxisY],
+    ],
+  });
+  obstacles.push({
+    kind: "axis",
+    points: [
+      [geometry.yAxisX, geometry.axisStartY],
+      [geometry.yAxisX, geometry.axisEndY + arrow],
+    ],
+  });
+
+  for (const value of xMarks) {
+    const x = geometry.sx(value);
+    const isZero = Math.abs(value) < 1e-12;
+    const text = displayNumber(value, scene.xAxis.labelFormat);
+    const offsetX = isZero ? x - a.tickSize - 7 : x;
+    const baseline = geometry.xAxisY + a.tickSize + a.labelFontSize + 3;
+    obstacles.push({
+      kind: "axisLabel",
+      rect: textBoundingRect(offsetX, baseline, text, a.labelFontSize, isZero ? "end" : "middle"),
+    });
+  }
+
+  for (const value of yMarks) {
+    const isZero = Math.abs(value) < 1e-12;
+    if (isZero && xMarks.some((mark) => Math.abs(mark) < 1e-12)) continue;
+    const y = geometry.sy(value);
+    const text = displayNumber(value, scene.yAxis.labelFormat);
+    obstacles.push({
+      kind: "axisLabel",
+      rect: textBoundingRect(
+        geometry.yAxisX - a.tickSize - 7,
+        y + a.labelFontSize * 0.35,
+        text,
+        a.labelFontSize,
+        "end",
+      ),
+    });
+  }
+
+  const xNameY = Math.min(geometry.canvasHeight - 4, geometry.xAxisY + a.labelFontSize + 4);
+  const yNameRaw = geometry.yAxisX - 12;
+  const yNameX = yNameRaw < a.labelFontSize * 0.6 ? geometry.yAxisX + 12 : yNameRaw;
+  const yNameAnchor = yNameRaw < a.labelFontSize * 0.6 ? "start" : "end";
+  obstacles.push({
+    kind: "axisLabel",
+    rect: textBoundingRect(
+      geometry.axisEndX - 10,
+      xNameY,
+      axisLabelText(scene.xAxis),
+      a.labelFontSize,
+      "end",
+    ),
+  });
+  obstacles.push({
+    kind: "axisLabel",
+    rect: textBoundingRect(
+      yNameX,
+      geometry.axisEndY + a.labelFontSize + 4,
+      axisLabelText(scene.yAxis),
+      a.labelFontSize,
+      yNameAnchor,
+    ),
+  });
+
+  for (const curve of curves) {
+    for (const segment of curve.segments) {
+      if (segment.length < 2) continue;
+      obstacles.push({
+        kind: "curve",
+        points: segment.map(([x, y]) => [geometry.sx(x), geometry.sy(y)] as [number, number]),
+      });
+    }
+  }
+
+  for (const point of points) {
+    const px = geometry.sx(point.x);
+    const py = geometry.sy(point.y);
+    obstacles.push({ kind: "point", rect: pointMarkerRect(px, py, a.pointRadius) });
+
+    if (point.projectX) {
+      obstacles.push({
+        kind: "helper",
+        points: [
+          [px, py],
+          [px, geometry.xAxisY],
+        ],
+      });
+      if (point.labelProjectionX) {
+        obstacles.push({
+          kind: "helper",
+          rect: textBoundingRect(
+            px,
+            geometry.xAxisY + a.tickSize + a.labelFontSize,
+            point.labelProjectionX,
+            a.labelFontSize,
+            "middle",
+          ),
+        });
+      }
+    }
+
+    if (point.projectY) {
+      obstacles.push({
+        kind: "helper",
+        points: [
+          [px, py],
+          [geometry.yAxisX, py],
+        ],
+      });
+      if (point.labelProjectionY) {
+        obstacles.push({
+          kind: "helper",
+          rect: textBoundingRect(
+            geometry.yAxisX - a.tickSize - 4,
+            py - 4,
+            point.labelProjectionY,
+            a.labelFontSize,
+            "end",
+          ),
+        });
+      }
+    }
+  }
+
+  return obstacles;
+}
+
+function layoutPointLabels(
+  geometry: PlotGeometry,
+  scene: PlotScene,
+  curves: RenderCurve[],
+  points: RenderPoint[],
+  a: PlotAppearance,
+  xMarks: number[],
+  yMarks: number[],
+): Map<string, PlacedLabel> {
+  const area: Rect = {
+    x: geometry.left,
+    y: geometry.top,
+    width: geometry.right - geometry.left,
+    height: geometry.bottom - geometry.top,
+  };
+  const obstacles = buildLabelObstacles(geometry, scene, curves, points, a, xMarks, yMarks);
+  const requests: LabelRequest[] = [];
+
+  for (const point of points) {
+    const caption = pointCaptionText(point);
+    if (!caption) continue;
+    const px = geometry.sx(point.x);
+    const py = geometry.sy(point.y);
+    const fontSize = a.pointLabelFontSize;
+    requests.push({
+      id: point.id,
+      anchorX: px,
+      anchorY: py,
+      width: measureTextWidth(caption, fontSize),
+      height: fontSize * 1.12,
+      gap: a.pointRadius + 8,
+      placement: point.labelPlacement ?? "auto",
+    });
+  }
+
+  return new Map(
+    layoutLabels(requests, obstacles, area, { fontSize: a.pointLabelFontSize }).map((item) => [
+      item.id,
+      item,
+    ]),
+  );
+}
+
+function renderPointCaption(
+  point: RenderPoint,
+  placed: PlacedLabel,
+  a: PlotAppearance,
+): string {
+  const captionParts: string[] = [];
+  if (point.label) captionParts.push(`<tspan font-style="italic">${escapeText(point.label)}</tspan>`);
+  if (point.coords) captionParts.push(`<tspan font-style="normal">${escapeText(point.coords)}</tspan>`);
+  const textStyle = `font-family="${escapeText(a.pointLabelFontFamily)}" font-size="${a.pointLabelFontSize}" fill="${point.color}"`;
+  const backdrop = placed.needsBackdrop
+    ? `<rect x="${round(placed.rect.x - BACKDROP_PAD)}" y="${round(placed.rect.y - BACKDROP_PAD)}" width="${round(
+        placed.rect.width + BACKDROP_PAD * 2,
+      )}" height="${round(placed.rect.height + BACKDROP_PAD * 2)}" fill="#FFFFFF" fill-opacity="0.35" rx="2"/>`
+    : "";
+  return `${backdrop}<text x="${round(placed.x)}" y="${round(placed.y)}" text-anchor="${placed.textAnchor}" ${textStyle}>${captionParts.join(" ")}</text>`;
+}
+
 /** Основной рендер: сцена → SVG. */
 export function renderPlotSvg(
   scene: PlotScene,
@@ -347,20 +592,23 @@ export function renderPlotSvg(
   }
   parts.push(`<g clip-path="url(#${clipId})">${curveParts.join("")}</g>`);
 
-  // Точки, их подписи и проекции на оси.
-  const pointParts: string[] = [];
+  const placedLabels = layoutPointLabels(geometry, scene, curves, points, a, xMarks, yMarks);
+
+  // Маркеры точек и проекции — ниже; подписи точек — в верхнем текстовом слое.
+  const markerParts: string[] = [];
+  const pointLabelParts: string[] = [];
   for (const point of points) {
     const px = geometry.sx(point.x);
     const py = geometry.sy(point.y);
     if (point.projectX) {
-      pointParts.push(
+      markerParts.push(
         `<line x1="${round(px)}" y1="${round(py)}" x2="${round(px)}" y2="${round(geometry.xAxisY)}" stroke="${a.projectionColor}" stroke-width="${a.projectionWidth}" stroke-dasharray="5 4"/>`,
         `<line x1="${round(px)}" y1="${round(geometry.xAxisY - a.tickSize)}" x2="${round(px)}" y2="${round(
           geometry.xAxisY + a.tickSize,
         )}" ${tickStyle}/>`,
       );
       if (point.labelProjectionX) {
-        pointParts.push(
+        markerParts.push(
           `<text x="${round(px)}" y="${round(geometry.xAxisY + a.tickSize + a.labelFontSize)}" text-anchor="middle" ${labelStyle}>${escapeText(
             point.labelProjectionX,
           )}</text>`,
@@ -368,38 +616,33 @@ export function renderPlotSvg(
       }
     }
     if (point.projectY) {
-      pointParts.push(
+      markerParts.push(
         `<line x1="${round(px)}" y1="${round(py)}" x2="${round(geometry.yAxisX)}" y2="${round(py)}" stroke="${a.projectionColor}" stroke-width="${a.projectionWidth}" stroke-dasharray="5 4"/>`,
         `<line x1="${round(geometry.yAxisX - a.tickSize)}" y1="${round(py)}" x2="${round(
           geometry.yAxisX + a.tickSize,
         )}" y2="${round(py)}" ${tickStyle}/>`,
       );
       if (point.labelProjectionY) {
-        pointParts.push(
+        markerParts.push(
           `<text x="${round(geometry.yAxisX - a.tickSize - 4)}" y="${round(py - 4)}" text-anchor="end" ${labelStyle}>${escapeText(
             point.labelProjectionY,
           )}</text>`,
         );
       }
     }
-    pointParts.push(
+    markerParts.push(
       `<circle cx="${round(px)}" cy="${round(py)}" r="${a.pointRadius}" fill="${
         point.open ? "#FFFFFF" : point.color
       }" stroke="${point.color}" stroke-width="2"/>`,
     );
-    // Буквенная метка — курсивом, координаты (числа) — прямым начертанием.
-    const captionParts: string[] = [];
-    if (point.label) captionParts.push(`<tspan font-style="italic">${escapeText(point.label)}</tspan>`);
-    if (point.coords) captionParts.push(`<tspan font-style="normal">${escapeText(point.coords)}</tspan>`);
-    if (captionParts.length) {
-      pointParts.push(
-        `<text x="${round(px)}" y="${round(py - a.pointRadius - 8)}" text-anchor="middle" font-family="${escapeText(
-          a.pointLabelFontFamily,
-        )}" font-size="${a.pointLabelFontSize}" fill="${point.color}">${captionParts.join(" ")}</text>`,
-      );
+
+    const placed = placedLabels.get(point.id);
+    if (placed && pointCaptionText(point)) {
+      pointLabelParts.push(renderPointCaption(point, placed, a));
     }
   }
-  parts.push(pointParts.join(""));
+  parts.push(markerParts.join(""));
+  parts.push(`<g>${pointLabelParts.join("")}</g>`);
 
   const w = round(geometry.canvasWidth);
   const h = round(geometry.canvasHeight);
