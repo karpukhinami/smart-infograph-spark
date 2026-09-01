@@ -32,7 +32,7 @@ export function ColorDot({
           )}
         />
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64">
+      <PopoverContent align="end" className="w-72">
         <ColorSwatches
           value={value}
           onChange={onChange}
