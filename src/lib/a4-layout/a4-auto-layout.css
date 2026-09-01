@@ -64,6 +64,7 @@
 }
 
 .a4-auto-layout-root .poster-frame.a4-clean {
+  font-family: "SB Serif Text", ui-serif, Georgia, serif;
   height: var(--a4-page-h, 842px);
   min-height: var(--a4-page-h, 842px);
   overflow: hidden;
