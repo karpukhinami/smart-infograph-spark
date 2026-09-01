@@ -30,6 +30,9 @@ export interface PlotGeometry {
   canvasRight: number;
   canvasTop: number;
   canvasBottom: number;
+  /** Итоговый размер картинки (может быть прямоугольным). */
+  canvasWidth: number;
+  canvasHeight: number;
   /** Начала и кончики стрелок осей. */
   axisStartX: number;
   axisStartY: number;
@@ -41,6 +44,7 @@ export interface PlotGeometry {
   xAxisY: number;
   yAxisX: number;
 }
+
 
 function axisNumber(raw: string): number | null {
   const text = String(raw ?? "").trim();
