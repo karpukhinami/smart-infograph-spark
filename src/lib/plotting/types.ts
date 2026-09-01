@@ -159,7 +159,7 @@ export interface SceneGraph {
   error: string | null;
 }
 
-export type PointMode = "plane" | "onGraph" | "intersection";
+export type PointMode = "plane" | "onGraph" | "intersection" | "anchor";
 
 export interface PointMath {
   mode: PointMode;
@@ -170,6 +170,7 @@ export interface PointMath {
   /** Выбранная опорная точка качественного графика. */
   anchorIndex: number | null;
 }
+
 
 export interface PointStyle {
   color: string;

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
-import { expressionLatex } from "@/lib/plotting/math-expr";
-import { ChevronDown, Trash2 } from "lucide-react";
+import { displayNumber, evaluateNumber, expressionLatex } from "@/lib/plotting/math-expr";
+import { ChevronDown, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MathInput } from "./MathInput";
-import { ColorSwatches } from "./ColorSwatches";
+import { ColorDot } from "./ColorDot";
 import { usePlotStore } from "@/lib/plotting/store";
 import { graphSummary } from "@/lib/plotting/scene";
 import type { AnchorKind, GraphKind, SceneGraph } from "@/lib/plotting/types";
@@ -42,29 +42,58 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
   const updateGraphStyle = usePlotStore((state) => state.updateGraphStyle);
   const removeGraph = usePlotStore((state) => state.removeGraph);
   const buildGraph = usePlotStore((state) => state.buildGraph);
-  const addCustomColor = usePlotStore((state) => state.addCustomColor);
 
   const xName = scene.xAxis.name.trim() || "x";
   const yName = scene.yAxis.name.trim() || "y";
   const math = graph.math;
 
+  // Серые подсказки в пределах построения — реальные значения по оси x.
+  // Пока пользователь не ввёл своё значение, они следуют за осью.
+  const axisHint = useMemo(() => {
+    const format = (raw: string, positiveFloor: boolean) => {
+      try {
+        const value = evaluateNumber(raw);
+        if (!Number.isFinite(value)) return "";
+        const limited = positiveFloor && scene.xAxis.mode === "positive" ? Math.max(0, value) : value;
+        return displayNumber(limited, scene.xAxis.labelFormat);
+      } catch {
+        return "";
+      }
+    };
+    return { from: format(scene.xAxis.min, true), to: format(scene.xAxis.max, false) };
+  }, [scene.xAxis.min, scene.xAxis.max, scene.xAxis.mode, scene.xAxis.labelFormat]);
+
+
   return (
     <Card className="border-border">
       <CardContent className="space-y-3 p-3">
         <Collapsible open={open} onOpenChange={setOpen}>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium">
               <ChevronDown className={`size-4 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`} />
               <span className="truncate">
-                Функция {graph.index} — {graphSummary(graph, yName)}
+                {graph.style.label.trim()
+                  ? `${graph.style.label.trim()}: ${graphSummary(graph, yName)}`
+                  : `Функция ${graph.index} — ${graphSummary(graph, yName)}`}
               </span>
             </CollapsibleTrigger>
-            <span
-              className="size-4 shrink-0 rounded-full border border-border"
-              style={{ backgroundColor: graph.style.color }}
-            />
             {graph.dirty && graph.built && <Badge variant="secondary">есть изменения</Badge>}
             {!graph.built && <Badge variant="outline">не построена</Badge>}
+            <ColorDot
+              value={graph.style.color}
+              onChange={(color) => updateGraphStyle(graph.id, { color })}
+              title="Цвет графика"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={`size-8 ${graph.style.visible ? "text-primary" : "text-muted-foreground"}`}
+              title={graph.style.visible ? "График виден" : "График скрыт"}
+              onClick={() => updateGraphStyle(graph.id, { visible: !graph.style.visible })}
+            >
+              {graph.style.visible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -77,20 +106,34 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
           </div>
 
           <CollapsibleContent className="space-y-3 pt-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Тип задания</Label>
-              <Select
-                value={math.kind}
-                onValueChange={(value) => updateGraphMath(graph.id, { kind: value as GraphKind })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {KINDS.map((kind) => (
-                    <SelectItem key={kind.value} value={kind.value}>{kind.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex items-end gap-2">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Тип задания</Label>
+                <Select
+                  value={math.kind}
+                  onValueChange={(value) => updateGraphMath(graph.id, { kind: value as GraphKind })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {KINDS.map((kind) => (
+                      <SelectItem key={kind.value} value={kind.value}>{kind.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-24 shrink-0 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Название</Label>
+                <Input
+                  value={graph.style.label}
+                  placeholder="f"
+                  maxLength={4}
+                  className="text-center italic"
+                  title="Буква латинского или греческого алфавита (необязательно)"
+                  onChange={(event) => updateGraphStyle(graph.id, { label: event.target.value })}
+                />
+              </div>
             </div>
+
 
             {math.kind === "explicit" && (
               <MathInput
@@ -315,42 +358,26 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">
-                  {math.kind === "qualitative" ? "Начало кривой" : `Пределы по ${xName}: от`}
-                </Label>
-                <Input
-                  value={math.domainFrom}
-                  placeholder="как у плоскости"
-                  className="font-mono text-xs"
-                  onChange={(event) => updateGraphMath(graph.id, { domainFrom: event.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">
-                  {math.kind === "qualitative" ? "Конец кривой" : "до"}
-                </Label>
-                <Input
-                  value={math.domainTo}
-                  placeholder="как у плоскости"
-                  className="font-mono text-xs"
-                  onChange={(event) => updateGraphMath(graph.id, { domainTo: event.target.value })}
-                />
-              </div>
+            <div className="flex items-center gap-2">
+              <Label className="shrink-0 text-xs text-muted-foreground">
+                {math.kind === "qualitative" ? "Кривая:" : `Пределы по ${xName}:`}
+              </Label>
+              <span className="shrink-0 text-xs text-muted-foreground">от</span>
+              <Input
+                value={math.domainFrom}
+                placeholder={axisHint.from}
+                className="h-8 min-w-0 flex-1 px-2 text-center font-mono text-xs placeholder:text-muted-foreground/60"
+                onChange={(event) => updateGraphMath(graph.id, { domainFrom: event.target.value })}
+              />
+              <span className="shrink-0 text-xs text-muted-foreground">до</span>
+              <Input
+                value={math.domainTo}
+                placeholder={axisHint.to}
+                className="h-8 min-w-0 flex-1 px-2 text-center font-mono text-xs placeholder:text-muted-foreground/60"
+                onChange={(event) => updateGraphMath(graph.id, { domainTo: event.target.value })}
+              />
             </div>
 
-            <Button type="button" variant="outline" size="sm" disabled className="w-full">
-              Подобрать пределы
-            </Button>
-
-            <ColorSwatches
-              value={graph.style.color}
-              onChange={(color) => updateGraphStyle(graph.id, { color })}
-              customColors={scene.customColors}
-              onAddCustomColor={addCustomColor}
-              label="Цвет графика"
-            />
 
             {graph.error && <p className="text-xs text-destructive">{graph.error}</p>}
 

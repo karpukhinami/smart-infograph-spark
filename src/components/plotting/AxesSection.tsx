@@ -1,4 +1,6 @@
 import { ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -178,6 +180,12 @@ export function AxesSection() {
       <CardContent className="space-y-4">
         <AxisMainFields axis="xAxis" title="Горизонтальная ось" />
         <AxisMainFields axis="yAxis" title="Вертикальная ось" />
+
+        <Button type="button" variant="outline" size="sm" disabled className="w-full">
+          Подобрать пределы
+        </Button>
+
+
 
         <Collapsible open={open} onOpenChange={setOpen}>
           <div className="flex items-center justify-between gap-2">

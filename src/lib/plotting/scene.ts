@@ -8,12 +8,15 @@ import type {
   GraphKind,
   PlotAppearance,
   PlotScene,
+  PointMath,
   PointSolution,
+  PointStyle,
   RenderCurve,
   RenderPoint,
   SceneGraph,
   ScenePoint,
 } from "./types";
+
 
 /** Стандартная палитра чертежей (номер colorGroup = позиция в списке). */
 export const PLOT_PALETTE = [
@@ -118,11 +121,24 @@ export function createGraph(index: number, kind: GraphKind = "explicit"): SceneG
   };
 }
 
-export function createPoint(index: number): ScenePoint {
+export const EMPTY_POINT_MATH: PointMath = {
+  mode: "plane",
+  x: "",
+  y: "",
+  graphId: null,
+  graphIdB: null,
+  anchorIndex: null,
+};
+
+export function createPoint(
+  index: number,
+  math?: Partial<PointMath>,
+  style?: Partial<PointStyle>,
+): ScenePoint {
   return {
     id: nextId("point"),
     index,
-    math: { mode: "plane", x: "", y: "", graphId: null, graphIdB: null, anchorIndex: null },
+    math: { ...EMPTY_POINT_MATH, ...(math ?? {}) },
     style: {
       color: PLOT_PALETTE[0],
       open: false,
@@ -133,6 +149,7 @@ export function createPoint(index: number): ScenePoint {
       projectY: false,
       labelProjectionX: false,
       labelProjectionY: false,
+      ...(style ?? {}),
     },
     built: null,
     dirty: true,
@@ -156,6 +173,52 @@ export function graphSummary(graph: SceneGraph, yName: string): string {
       return "функция";
   }
 }
+
+/**
+ * Однозначно ли определена функция: для любого x не более одного значения.
+ * Только у таких графиков координату точки можно менять вручную.
+ */
+export function isSingleValued(graph: SceneGraph): boolean {
+  return graph.math.kind !== "implicit" && graph.math.kind !== "parametric";
+}
+
+export interface AnchorChoice {
+  graphId: string;
+  graphIndex: number;
+  anchorIndex: number;
+  x: number;
+  y: number;
+  displayX: string;
+  displayY: string;
+}
+
+/** Все опорные точки всех качественных графиков сцены. */
+export function sceneAnchorChoices(scene: PlotScene): AnchorChoice[] {
+  const result: AnchorChoice[] = [];
+  for (const graph of scene.graphs) {
+    if (graph.math.kind !== "qualitative") continue;
+    graph.math.anchors.forEach((anchor, anchorIndex) => {
+      if (!anchor.x.trim() || !anchor.y.trim()) return;
+      try {
+        const x = evaluateNumber(anchor.x);
+        const y = evaluateNumber(anchor.y);
+        result.push({
+          graphId: graph.id,
+          graphIndex: graph.index,
+          anchorIndex,
+          x,
+          y,
+          displayX: valueDisplay(anchor.x, x),
+          displayY: valueDisplay(anchor.y, y),
+        });
+      } catch {
+        /* незаполненная опорная точка просто не предлагается */
+      }
+    });
+  }
+  return result;
+}
+
 
 export function sceneBounds(scene: PlotScene): PlotBounds | null {
   const geometry = resolveGeometry(scene);
@@ -198,11 +261,32 @@ export function buildPoint(point: ScenePoint, scene: PlotScene, bounds: PlotBoun
     ];
   }
 
+  if (point.math.mode === "anchor") {
+    const graph = scene.graphs.find((item) => item.id === point.math.graphId);
+    if (!graph) throw new Error("Не выбран график с опорными точками.");
+    if (point.math.anchorIndex === null) throw new Error("Выберите опорную точку.");
+    const anchors = parseAnchors(graph.math);
+    const anchor = anchors[point.math.anchorIndex];
+    if (!anchor) throw new Error("Опорная точка не найдена.");
+    const raw = graph.math.anchors[point.math.anchorIndex];
+    return [
+      {
+        x: anchor.x,
+        y: anchor.y,
+        displayX: valueDisplay(raw?.x ?? "", anchor.x),
+        displayY: valueDisplay(raw?.y ?? "", anchor.y),
+        show: keepShow(0),
+        style: keepStyle(0),
+      },
+    ];
+  }
+
   if (point.math.mode === "onGraph") {
     const graph = scene.graphs.find((item) => item.id === point.math.graphId);
     if (!graph) throw new Error("Не выбран график.");
     if (!graph.built) throw new Error(`Функция ${graph.index} ещё не построена.`);
     if (graph.math.kind === "qualitative" && point.math.anchorIndex !== null) {
+
       const anchors = parseAnchors(graph.math);
       const anchor = anchors[point.math.anchorIndex];
       if (!anchor) throw new Error("Опорная точка не найдена.");
@@ -352,3 +436,50 @@ export function scenePoints(scene: PlotScene): RenderPoint[] {
   }
   return result;
 }
+
+/** Решения для черновика точки (до нажатия «Отметить»). Бросает ошибку. */
+export function solvePointMath(scene: PlotScene, math: PointMath): PointSolution[] {
+  const bounds = sceneBounds(scene);
+  if (!bounds) throw new Error("Заполните пределы обеих осей.");
+  return buildPoint(createPoint(0, math), scene, bounds);
+}
+
+/**
+ * Предпросмотр черновика точки: пока выбор не сделан, показываем все
+ * подходящие варианты, чтобы пользователь видел их на чертеже.
+ */
+export function draftRenderPoints(scene: PlotScene, math: PointMath | null): RenderPoint[] {
+  if (!math) return [];
+  const mark = (x: number, y: number, open = false): RenderPoint => ({
+    x,
+    y,
+    color: PLOT_PALETTE[0],
+    open,
+    label: "",
+    coords: null,
+    projectX: false,
+    projectY: false,
+    labelProjectionX: null,
+    labelProjectionY: null,
+  });
+
+  if (math.mode === "anchor") {
+    const choices = sceneAnchorChoices(scene);
+    const picked =
+      math.graphId && math.anchorIndex !== null
+        ? choices.filter(
+            (choice) => choice.graphId === math.graphId && choice.anchorIndex === math.anchorIndex,
+          )
+        : choices;
+    return picked.map((choice) => mark(choice.x, choice.y));
+  }
+
+  try {
+    return solvePointMath(scene, math).map((solution) =>
+      mark(solution.x, solution.y, Boolean(solution.style?.open)),
+    );
+  } catch {
+    return [];
+  }
+}
+
