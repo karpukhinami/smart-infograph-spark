@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
-import { expressionLatex } from "@/lib/plotting/math-expr";
+import { displayNumber, evaluateNumber, expressionLatex } from "@/lib/plotting/math-expr";
 import { ChevronDown, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
