@@ -261,11 +261,32 @@ export function buildPoint(point: ScenePoint, scene: PlotScene, bounds: PlotBoun
     ];
   }
 
+  if (point.math.mode === "anchor") {
+    const graph = scene.graphs.find((item) => item.id === point.math.graphId);
+    if (!graph) throw new Error("Не выбран график с опорными точками.");
+    if (point.math.anchorIndex === null) throw new Error("Выберите опорную точку.");
+    const anchors = parseAnchors(graph.math);
+    const anchor = anchors[point.math.anchorIndex];
+    if (!anchor) throw new Error("Опорная точка не найдена.");
+    const raw = graph.math.anchors[point.math.anchorIndex];
+    return [
+      {
+        x: anchor.x,
+        y: anchor.y,
+        displayX: valueDisplay(raw?.x ?? "", anchor.x),
+        displayY: valueDisplay(raw?.y ?? "", anchor.y),
+        show: keepShow(0),
+        style: keepStyle(0),
+      },
+    ];
+  }
+
   if (point.math.mode === "onGraph") {
     const graph = scene.graphs.find((item) => item.id === point.math.graphId);
     if (!graph) throw new Error("Не выбран график.");
     if (!graph.built) throw new Error(`Функция ${graph.index} ещё не построена.`);
     if (graph.math.kind === "qualitative" && point.math.anchorIndex !== null) {
+
       const anchors = parseAnchors(graph.math);
       const anchor = anchors[point.math.anchorIndex];
       if (!anchor) throw new Error("Опорная точка не найдена.");
