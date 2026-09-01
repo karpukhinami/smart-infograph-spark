@@ -179,6 +179,12 @@ export function AxesSection() {
         <AxisMainFields axis="xAxis" title="Горизонтальная ось" />
         <AxisMainFields axis="yAxis" title="Вертикальная ось" />
 
+        <Button type="button" variant="outline" size="sm" disabled className="w-full">
+          Подобрать пределы
+        </Button>
+
+
+
         <Collapsible open={open} onOpenChange={setOpen}>
           <div className="flex items-center justify-between gap-2">
             <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium">
