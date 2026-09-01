@@ -76,6 +76,46 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
   inputMode: "manual",
   spaceTab: "plane",
   status: null,
+  pointDraft: null,
+  pointDraftError: null,
+
+  startPointDraft: () => set({ pointDraft: { ...EMPTY_POINT_MATH }, pointDraftError: null }),
+
+  updatePointDraft: (patch) =>
+    set((state) => ({
+      pointDraft: state.pointDraft ? { ...state.pointDraft, ...patch } : state.pointDraft,
+      pointDraftError: null,
+    })),
+
+  cancelPointDraft: () => set({ pointDraft: null, pointDraftError: null }),
+
+  commitPointDraft: () => {
+    const state = get();
+    const draft = state.pointDraft;
+    if (!draft) return;
+    try {
+      const solutions = solvePointMath(state.scene, draft);
+      // Каждое найденное решение становится отдельной плашкой точки.
+      const created = solutions.map((solution, position) =>
+        ({
+          ...createPoint(state.scene.points.length + position + 1, draft, {
+            open: Boolean(solution.style?.open),
+          }),
+          built: [{ ...solution, show: true, style: undefined }],
+          dirty: false,
+          error: null,
+        }) as ScenePoint,
+      );
+      set({
+        scene: { ...state.scene, points: [...state.scene.points, ...created] },
+        pointDraft: null,
+        pointDraftError: null,
+      });
+    } catch (error) {
+      set({ pointDraftError: (error as Error).message });
+    }
+  },
+
 
   setInputMode: (inputMode) => set({ inputMode }),
   setSpaceTab: (spaceTab) => set({ spaceTab }),
