@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import { expressionLatex } from "@/lib/plotting/math-expr";
-import { ChevronDown, Trash2 } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MathInput } from "./MathInput";
-import { ColorSwatches } from "./ColorSwatches";
+import { ColorDot } from "./ColorDot";
 import { usePlotStore } from "@/lib/plotting/store";
 import { graphSummary } from "@/lib/plotting/scene";
 import type { AnchorKind, GraphKind, SceneGraph } from "@/lib/plotting/types";
