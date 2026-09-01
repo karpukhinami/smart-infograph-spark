@@ -95,17 +95,28 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     if (!draft) return;
     try {
       const solutions = solvePointMath(state.scene, draft);
+      // Цвет по умолчанию: точка на графике (в т.ч. из опорных точек) берёт цвет
+      // своего графика, точка на пересечении — цвет первого выбранного графика.
+      const sourceGraphId =
+        draft.mode === "onGraph" || draft.mode === "anchor" || draft.mode === "intersection"
+          ? draft.graphId
+          : null;
+      const sourceColor = sourceGraphId
+        ? state.scene.graphs.find((graph) => graph.id === sourceGraphId)?.style.color
+        : undefined;
       // Каждое найденное решение становится отдельной плашкой точки.
       const created = solutions.map((solution, position) =>
         ({
           ...createPoint(state.scene.points.length + position + 1, draft, {
             open: Boolean(solution.style?.open),
+            ...(sourceColor ? { color: sourceColor } : {}),
           }),
           built: [{ ...solution, show: true, style: undefined }],
           dirty: false,
           error: null,
         }) as ScenePoint,
       );
+
       set({
         scene: { ...state.scene, points: [...state.scene.points, ...created] },
         pointDraft: null,

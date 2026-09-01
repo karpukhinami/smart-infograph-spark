@@ -311,22 +311,24 @@ export function renderPlotSvg(
   }
   parts.push(ticks.join(""), labels.join(""));
 
-  // Названия осей: внутри рабочей области у кончиков стрелок.
+  // Названия осей: подпись x всегда под осью, подпись y всегда слева от оси —
+  // даже если ось лежит на краю рамки (тогда они уходят в свободные поля).
   const xNameY = Math.min(
-    geometry.bottom - 4,
-    Math.max(geometry.top + a.labelFontSize + 2, geometry.xAxisY + a.labelFontSize + 4),
+    geometry.canvasHeight - 4,
+    geometry.xAxisY + a.labelFontSize + 4,
   );
-  const yNameX = Math.min(
-    geometry.right - 8,
-    Math.max(geometry.left + 8, geometry.yAxisX - 12),
-  );
+  const yNameRaw = geometry.yAxisX - 12;
+  const yNameX = yNameRaw < a.labelFontSize * 0.6 ? geometry.yAxisX + 12 : yNameRaw;
+  const yNameAnchor = yNameRaw < a.labelFontSize * 0.6 ? "start" : "end";
+
   parts.push(
     `<text x="${round(xEnd - 10)}" y="${round(xNameY)}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
       axisLabelText(scene.xAxis),
     )}</text>`,
-    `<text x="${round(yNameX)}" y="${round(yEnd + a.labelFontSize + 4)}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
+    `<text x="${round(yNameX)}" y="${round(yEnd + a.labelFontSize + 4)}" text-anchor="${yNameAnchor}" font-style="italic" ${labelStyle}>${escapeText(
       axisLabelText(scene.yAxis),
     )}</text>`,
+
   );
 
 
