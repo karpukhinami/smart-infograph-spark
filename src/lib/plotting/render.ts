@@ -399,18 +399,10 @@ export function renderPlotSvg(
   }
   parts.push(pointParts.join(""));
 
-  // Рамка — по границе математической области, поверх всего.
-  if (a.frame) {
-    parts.push(
-      `<rect x="${round(geometry.left)}" y="${round(geometry.top)}" width="${round(
-        geometry.right - geometry.left,
-      )}" height="${round(geometry.bottom - geometry.top)}" fill="none" stroke="${a.frameColor}" stroke-width="${a.frameWidth}"/>`,
-    );
-  }
-
-
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${a.width}" height="${a.height}" viewBox="0 0 ${a.width} ${a.height}"><rect width="${a.width}" height="${a.height}" fill="#FFFFFF"/>${parts.join(
+  const w = round(geometry.canvasWidth);
+  const h = round(geometry.canvasHeight);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#FFFFFF"/>${parts.join(
     "",
   )}</svg>`;
+
 }
