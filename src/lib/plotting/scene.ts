@@ -118,11 +118,24 @@ export function createGraph(index: number, kind: GraphKind = "explicit"): SceneG
   };
 }
 
-export function createPoint(index: number): ScenePoint {
+export const EMPTY_POINT_MATH: PointMath = {
+  mode: "plane",
+  x: "",
+  y: "",
+  graphId: null,
+  graphIdB: null,
+  anchorIndex: null,
+};
+
+export function createPoint(
+  index: number,
+  math?: Partial<PointMath>,
+  style?: Partial<PointStyle>,
+): ScenePoint {
   return {
     id: nextId("point"),
     index,
-    math: { mode: "plane", x: "", y: "", graphId: null, graphIdB: null, anchorIndex: null },
+    math: { ...EMPTY_POINT_MATH, ...(math ?? {}) },
     style: {
       color: PLOT_PALETTE[0],
       open: false,
@@ -133,6 +146,7 @@ export function createPoint(index: number): ScenePoint {
       projectY: false,
       labelProjectionX: false,
       labelProjectionY: false,
+      ...(style ?? {}),
     },
     built: null,
     dirty: true,
@@ -156,6 +170,52 @@ export function graphSummary(graph: SceneGraph, yName: string): string {
       return "функция";
   }
 }
+
+/**
+ * Однозначно ли определена функция: для любого x не более одного значения.
+ * Только у таких графиков координату точки можно менять вручную.
+ */
+export function isSingleValued(graph: SceneGraph): boolean {
+  return graph.math.kind !== "implicit" && graph.math.kind !== "parametric";
+}
+
+export interface AnchorChoice {
+  graphId: string;
+  graphIndex: number;
+  anchorIndex: number;
+  x: number;
+  y: number;
+  displayX: string;
+  displayY: string;
+}
+
+/** Все опорные точки всех качественных графиков сцены. */
+export function sceneAnchorChoices(scene: PlotScene): AnchorChoice[] {
+  const result: AnchorChoice[] = [];
+  for (const graph of scene.graphs) {
+    if (graph.math.kind !== "qualitative") continue;
+    graph.math.anchors.forEach((anchor, anchorIndex) => {
+      if (!anchor.x.trim() || !anchor.y.trim()) return;
+      try {
+        const x = evaluateNumber(anchor.x);
+        const y = evaluateNumber(anchor.y);
+        result.push({
+          graphId: graph.id,
+          graphIndex: graph.index,
+          anchorIndex,
+          x,
+          y,
+          displayX: valueDisplay(anchor.x, x),
+          displayY: valueDisplay(anchor.y, y),
+        });
+      } catch {
+        /* незаполненная опорная точка просто не предлагается */
+      }
+    });
+  }
+  return result;
+}
+
 
 export function sceneBounds(scene: PlotScene): PlotBounds | null {
   const geometry = resolveGeometry(scene);
