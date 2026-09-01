@@ -325,9 +325,10 @@ export function renderPlotSvg(
     `<text x="${round(xEnd - 10)}" y="${round(xNameY)}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
       axisLabelText(scene.xAxis),
     )}</text>`,
-    `<text x="${round(yNameX)}" y="${round(yEnd + a.labelFontSize + 4)}" text-anchor="end" font-style="italic" ${labelStyle}>${escapeText(
+    `<text x="${round(yNameX)}" y="${round(yEnd + a.labelFontSize + 4)}" text-anchor="${yNameAnchor}" font-style="italic" ${labelStyle}>${escapeText(
       axisLabelText(scene.yAxis),
     )}</text>`,
+
   );
 
 
