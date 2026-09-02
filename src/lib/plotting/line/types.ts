@@ -112,6 +112,8 @@ export interface LinePointStyle {
   colorManual: boolean;
   open: boolean;
   label: string;
+  /** Показывать буквенную подпись (название точки). */
+  showLabel: boolean;
   showCoords: boolean;
   visible: boolean;
   labelSide: LineLabelSide;

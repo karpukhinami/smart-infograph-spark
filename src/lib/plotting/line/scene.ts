@@ -81,6 +81,7 @@ export function createLinePoint(index: number, axisRow: number): SceneLinePoint 
       colorManual: false,
       open: false,
       label: "",
+      showLabel: true,
       showCoords: true,
       visible: true,
       labelSide: "above",

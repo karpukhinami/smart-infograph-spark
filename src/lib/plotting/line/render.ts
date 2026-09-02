@@ -417,26 +417,42 @@ export function renderLineSvg(scene: PlotScene): string | null {
 
     const labelColor = point.style.labelColor === "axis" ? a.labelColor : point.style.color;
     const coordColor = point.style.coordColor === "axis" ? a.labelColor : point.style.color;
-    const name = point.style.label.trim();
+    const nameFontSize = a.pointLabelFontSize * 1.2;
+    const coordFontSize = a.labelFontSize * 0.72;
+    const name =
+      point.style.showLabel && point.style.label.trim() ? point.style.label.trim() : "";
     const coord = point.style.showCoords ? point.built.displayX : "";
     const coordLatex = point.built.latex;
 
-    const labelYAbove = py - 14;
-    const labelYBelow = py + a.labelFontSize + 14;
+    const labelYAbove = py - 10 - nameFontSize * 0.25;
+    const labelYBelow = py + Math.max(nameFontSize, coordFontSize) + 12;
 
     if (name && coord && point.style.labelSide === point.style.coordSide && !labelNeedsLatex(coord)) {
       const y = point.style.labelSide === "above" ? labelYAbove : labelYBelow;
       parts.push(
-        renderSvgTextLabel(px, y, "middle", `${name} (${coord})`, a.labelFontSize, labelColor, font, true),
+        renderSvgTextLabel(
+          px,
+          y,
+          "middle",
+          `${name} (${coord})`,
+          nameFontSize,
+          labelColor,
+          font,
+          true,
+        ),
       );
     } else {
       if (name) {
         const y = point.style.labelSide === "above" ? labelYAbove : labelYBelow;
-        parts.push(renderSvgTextLabel(px, y, "middle", name, a.labelFontSize, labelColor, font, true));
+        parts.push(
+          renderSvgTextLabel(px, y, "middle", name, nameFontSize, labelColor, font, true),
+        );
       }
       if (coord) {
         const y = point.style.coordSide === "above" ? labelYAbove : labelYBelow;
-        parts.push(renderCoordinateLabel(px, y, coord, coordLatex, a.labelFontSize, coordColor, font));
+        parts.push(
+          renderCoordinateLabel(px, y, coord, coordLatex, coordFontSize, coordColor, font),
+        );
       }
     }
   }
