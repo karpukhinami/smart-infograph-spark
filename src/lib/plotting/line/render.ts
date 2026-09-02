@@ -2,8 +2,13 @@
  * SVG-рендерер числовой прямой.
  */
 import { displayNumber, evaluateNumber } from "../math-expr";
-import type { PlotAppearance, PlotScene } from "../types";
+import type { PlotScene } from "../types";
 import { majorTickValues, parseSemicolonList, valueOnMajorTick } from "./intervals";
+import {
+  labelNeedsLatex,
+  renderCoordinateLabel,
+  renderSvgTextLabel,
+} from "./svg-labels";
 import type {
   BuiltSetPart,
   LineSceneData,
@@ -90,13 +95,6 @@ export function resolveLineGeometry(scene: PlotScene): LineGeometry | null {
   };
 }
 
-function escapeText(value: string): string {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
 function round(value: number): string {
   return String(Number(value.toFixed(2)));
 }
@@ -178,46 +176,75 @@ function clipInterval(part: BuiltSetPart, visMin: number, visMax: number): { lef
   return { left, right };
 }
 
+const HATCH_HEIGHT = 20;
+const HATCH_GAP = 11;
+const HATCH_WIDTH = 2;
+const HATCH_ANGLE = 63.435 * (Math.PI / 180);
+const ARC_HEIGHT = 40;
+
 function renderHatch(
   x1: number,
   x2: number,
   axisY: number,
   above: boolean,
-  direction: "right" | "left",
+  slantRight: boolean,
   color: string,
 ): string {
-  const H = 20;
-  const GAP = 11;
-  const W = 2;
-  const angle = 63.435 * (Math.PI / 180);
-  const dx = Math.cos(angle) * H;
-  const dy = Math.sin(angle) * H * (above ? -1 : 1) * (direction === "right" ? 1 : -1);
-  const baseY = above ? axisY - 8 : axisY + 8;
+  const dy = (above ? -1 : 1) * Math.sin(HATCH_ANGLE) * HATCH_HEIGHT;
+  const dx = (slantRight ? 1 : -1) * Math.cos(HATCH_ANGLE) * HATCH_HEIGHT;
   const lines: string[] = [];
-  const width = x2 - x1;
-  if (width <= 0) return "";
-  let pos = 0;
-  while (pos <= width + GAP) {
-    const startX = x1 + pos;
-    const endX = startX + dx;
-    const startY = baseY;
-    const endY = baseY + dy;
-    if (endX >= x1 && startX <= x2) {
-      const clipStartX = Math.max(startX, x1);
-      const clipEndX = Math.min(endX, x2);
-      if (clipEndX > clipStartX) {
-        const t0 = (clipStartX - startX) / (endX - startX || 1);
-        const t1 = (clipEndX - startX) / (endX - startX || 1);
-        const y0 = startY + (endY - startY) * t0;
-        const y1 = startY + (endY - startY) * t1;
-        lines.push(
-          `<line x1="${round(clipStartX)}" y1="${round(y0)}" x2="${round(clipEndX)}" y2="${round(y1)}" stroke="${color}" stroke-width="${W}" stroke-linecap="butt"/>`,
-        );
-      }
+  if (x2 <= x1 + 0.5) return "";
+
+  const minSegX = (x0: number) => Math.min(x0, x0 + dx);
+  const maxSegX = (x0: number) => Math.max(x0, x0 + dx);
+
+  const fits = (x0: number) => {
+    const loX = minSegX(x0);
+    const hiX = maxSegX(x0);
+    return loX >= x1 - 0.01 && hiX <= x2 + 0.01;
+  };
+
+  let x0 = slantRight ? x1 : x1 - dx;
+  const limit = slantRight ? x2 - dx : x2;
+  while (x0 <= limit + 0.01) {
+    if (fits(x0)) {
+      lines.push(
+        `<line x1="${round(x0)}" y1="${round(axisY)}" x2="${round(x0 + dx)}" y2="${round(axisY + dy)}" stroke="${color}" stroke-width="${HATCH_WIDTH}" stroke-linecap="butt"/>`,
+      );
     }
-    pos += GAP;
+    x0 += HATCH_GAP;
   }
   return lines.join("");
+}
+
+function renderArcPath(
+  x1: number,
+  x2: number,
+  axisY: number,
+  above: boolean,
+  color: string,
+  strokeWidth: number,
+  plotLeft: number,
+  plotRight: number,
+  part: BuiltSetPart,
+): string {
+  const sign = above ? -1 : 1;
+  const topY = axisY + sign * ARC_HEIGHT;
+  const leftFinite = Number.isFinite(part.left);
+  const rightFinite = Number.isFinite(part.right);
+  let d = "";
+
+  if (leftFinite && rightFinite) {
+    d = `M ${round(x1)} ${round(axisY)} L ${round(x1)} ${round(topY)} L ${round(x2)} ${round(topY)} L ${round(x2)} ${round(axisY)}`;
+  } else if (leftFinite && !rightFinite) {
+    d = `M ${round(x1)} ${round(axisY)} L ${round(x1)} ${round(topY)} L ${round(plotRight)} ${round(topY)}`;
+  } else if (!leftFinite && rightFinite) {
+    d = `M ${round(plotLeft)} ${round(topY)} L ${round(x2)} ${round(topY)} L ${round(x2)} ${round(axisY)}`;
+  } else {
+    d = `M ${round(plotLeft)} ${round(topY)} L ${round(plotRight)} ${round(topY)}`;
+  }
+
+  return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linejoin="miter" stroke-linecap="butt"/>`;
 }
 
 function renderSetPart(
@@ -225,6 +252,7 @@ function renderSetPart(
   set: SceneSet,
   geom: LineGeometry,
   row: LineRowGeometry,
+  graphWidth: number,
 ): string {
   if (!set.built || !set.style.visible) return "";
   const vis = clipInterval(part, geom.axisMin, geom.axisMax);
@@ -236,15 +264,11 @@ function renderSetPart(
 
   switch (set.style.display) {
     case "hatchRight":
-      return `<g clip-path="url(#row-${row.rowIndex})">${renderHatch(x1, x2, row.axisY, above, "right", color)}</g>`;
+      return `<g clip-path="url(#row-${row.rowIndex})">${renderHatch(x1, x2, row.axisY, above, true, color)}</g>`;
     case "hatchLeft":
-      return `<g clip-path="url(#row-${row.rowIndex})">${renderHatch(x1, x2, row.axisY, above, "left", color)}</g>`;
-    case "arc": {
-      const mid = (x1 + x2) / 2;
-      const height = above ? -28 : 28;
-      const cy = row.axisY + (above ? -36 : 36);
-      return `<path d="M ${round(x1)} ${round(row.axisY)} Q ${round(mid)} ${round(cy)} ${round(x2)} ${round(row.axisY)}" fill="none" stroke="${color}" stroke-width="3"/>`;
-    }
+      return `<g clip-path="url(#row-${row.rowIndex})">${renderHatch(x1, x2, row.axisY, above, false, color)}</g>`;
+    case "arc":
+      return renderArcPath(x1, x2, row.axisY, above, color, graphWidth, row.left, row.right, part);
     case "thickSegment": {
       const offset = above ? -5 : 5;
       return `<line x1="${round(x1)}" y1="${round(row.axisY + offset)}" x2="${round(x2)}" y2="${round(row.axisY + offset)}" stroke="${color}" stroke-width="5" stroke-linecap="butt"/>`;
@@ -305,15 +329,20 @@ export function renderLineSvg(scene: PlotScene): string | null {
     if (!set.built) continue;
     const row = geom.rows[set.axisRow] ?? geom.rows[0];
     for (const part of set.built.parts) {
-      parts.push(renderSetPart(part, set, geom, row));
+      parts.push(renderSetPart(part, set, geom, row, a.graphWidth));
     }
   }
 
+  const font = a.labelFontFamily;
   const axisStyle = `stroke="${a.axisColor}" stroke-width="${a.axisWidth}" stroke-linecap="round"`;
   const tickStyle = `stroke="${a.axisColor}" stroke-width="${a.tickWidth}" stroke-linecap="round"`;
-  const labelStyle = `font-family="${escapeText(a.labelFontFamily)}" fill="${a.labelColor}"`;
   const arrow = a.arrowSize;
   const arrowHalf = arrow * 0.225;
+
+  const unit = line.axis.unit.trim();
+  const axisLabel = unit
+    ? `${line.axis.name.trim() || "x"}, ${unit}`
+    : line.axis.name.trim() || "x";
 
   for (const row of geom.rows) {
     const xStart = geom.sx(geom.contentMin);
@@ -344,33 +373,28 @@ export function renderLineSvg(scene: PlotScene): string | null {
       }
     }
 
+    const tickLabelY = row.axisY + a.tickSize + a.labelFontSize + 2;
     for (const value of majorLabelValues) {
       const x = geom.sx(value);
       const text = displayNumber(value, "number");
-      parts.push(
-        `<text x="${round(x)}" y="${round(row.axisY + a.tickSize + a.labelFontSize + 2)}" text-anchor="middle" font-size="${a.labelFontSize}" ${labelStyle}>${escapeText(text)}</text>`,
-      );
+      parts.push(renderSvgTextLabel(x, tickLabelY, "middle", text, a.labelFontSize, a.labelColor, font));
     }
 
     const minorFont = a.labelFontSize * 0.6;
     for (const value of minorLabelValues) {
       const x = geom.sx(value);
       const text = displayNumber(value, "number");
-      parts.push(
-        `<text x="${round(x)}" y="${round(row.axisY + a.tickSize + minorFont + 2)}" text-anchor="middle" font-size="${minorFont}" ${labelStyle}>${escapeText(text)}</text>`,
-      );
+      parts.push(renderSvgTextLabel(x, tickLabelY, "middle", text, minorFont, a.labelColor, font));
     }
-  }
 
-  const unit = line.axis.unit.trim();
-  const axisName = unit ? `${line.axis.name.trim() || "x"}, ${unit}` : line.axis.name.trim() || "x";
-  const lastRow = geom.rows[geom.rows.length - 1];
-  const nameWidth = axisName.length * a.labelFontSize * 0.55;
-  const nameX = Math.min(geom.canvasWidth - LINE_PADDING - 4, geom.sx(geom.contentMax) - 8);
-  const safeNameX = Math.max(nameX - nameWidth, geom.sx(geom.contentMin) + 20);
-  parts.push(
-    `<text x="${round(safeNameX)}" y="${round(lastRow.axisY - a.tickSize - 6)}" text-anchor="end" font-size="${a.labelFontSize}" ${labelStyle}>${escapeText(axisName)}</text>`,
-  );
+    const nameWidth = axisLabel.length * a.labelFontSize * 0.55;
+    const nameX = Math.min(geom.canvasWidth - LINE_PADDING - 4, xEnd - 8);
+    const safeNameX = Math.max(nameX - nameWidth, xStart + 20);
+    const axisNameY = row.axisY + a.tickSize + a.labelFontSize + 6;
+    parts.push(
+      renderSvgTextLabel(safeNameX, axisNameY, "end", axisLabel, a.labelFontSize, a.labelColor, font, true),
+    );
+  }
 
   for (const point of line.points) {
     if (!point.style.visible || !point.built) continue;
@@ -390,25 +414,24 @@ export function renderLineSvg(scene: PlotScene): string | null {
     const coordColor = point.style.coordColor === "axis" ? a.labelColor : point.style.color;
     const name = point.style.label.trim();
     const coord = point.style.showCoords ? point.built.displayX : "";
+    const coordLatex = point.built.latex;
 
-    if (name && coord && point.style.labelSide === point.style.coordSide) {
+    const labelYAbove = py - 14;
+    const labelYBelow = py + a.labelFontSize + 14;
+
+    if (name && coord && point.style.labelSide === point.style.coordSide && !labelNeedsLatex(coord)) {
+      const y = point.style.labelSide === "above" ? labelYAbove : labelYBelow;
       parts.push(
-        `<text x="${round(px)}" y="${round(point.style.labelSide === "above" ? py - 14 : py + a.labelFontSize + 14)}" text-anchor="middle" font-size="${a.labelFontSize}" ${labelStyle}>` +
-          `<tspan fill="${labelColor}" font-style="italic">${escapeText(name)}</tspan>` +
-          `<tspan fill="${coordColor}"> (${escapeText(coord)})</tspan></text>`,
+        renderSvgTextLabel(px, y, "middle", `${name} (${coord})`, a.labelFontSize, labelColor, font, true),
       );
     } else {
       if (name) {
-        const y = point.style.labelSide === "above" ? py - 14 : py + a.labelFontSize + 14;
-        parts.push(
-          `<text x="${round(px)}" y="${round(y)}" text-anchor="middle" font-size="${a.labelFontSize}" fill="${labelColor}" font-style="italic">${escapeText(name)}</text>`,
-        );
+        const y = point.style.labelSide === "above" ? labelYAbove : labelYBelow;
+        parts.push(renderSvgTextLabel(px, y, "middle", name, a.labelFontSize, labelColor, font, true));
       }
       if (coord) {
-        const y = point.style.coordSide === "above" ? py - 14 : py + a.labelFontSize + 14;
-        parts.push(
-          `<text x="${round(px)}" y="${round(y)}" text-anchor="middle" font-size="${a.labelFontSize}" fill="${coordColor}">${escapeText(coord)}</text>`,
-        );
+        const y = point.style.coordSide === "above" ? labelYAbove : labelYBelow;
+        parts.push(renderCoordinateLabel(px, y, coord, coordLatex, a.labelFontSize, coordColor, font));
       }
     }
   }

@@ -127,7 +127,7 @@ export interface SceneLinePoint {
   axisRow: number;
   math: LinePointMath;
   style: LinePointStyle;
-  built: { x: number; displayX: string } | null;
+  built: { x: number; displayX: string; latex: string } | null;
   dirty: boolean;
   error: string | null;
   /** Граничные точки множеств нельзя удалить вручную. */

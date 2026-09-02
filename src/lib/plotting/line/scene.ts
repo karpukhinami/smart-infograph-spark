@@ -1,5 +1,5 @@
 /** Построение сцены числовой прямой: множества, точки, синхронизация границ. */
-import { evaluateNumber, exactDisplay } from "../math-expr";
+import { evaluateNumber, exactDisplay, makeMathValue } from "../math-expr";
 import { parseIntervalMath, type ParsedInterval } from "./intervals";
 import type {
   BuiltSet,
@@ -119,7 +119,14 @@ function boundariesFromParts(parts: ParsedInterval[]): BuiltSet["boundaries"] {
   return boundaries;
 }
 
-function findPointAtCoordinate(
+function builtCoord(raw: string, x: number): { x: number; displayX: string; latex: string } {
+  try {
+    const mv = makeMathValue(raw);
+    return { x: mv.value, displayX: mv.display, latex: mv.latex ?? mv.display };
+  } catch {
+    return { x, displayX: exactDisplay(x), latex: exactDisplay(x) };
+  }
+}
   points: SceneLinePoint[],
   axisRow: number,
   x: number,
@@ -157,7 +164,7 @@ function syncBoundaryPoints(line: LineSceneData, set: SceneSet, built: BuiltSet)
                 open: boundary.open,
                 color: p.style.colorManual ? p.style.color : set.style.color,
               },
-              built: { x: boundary.x, displayX: boundary.display },
+              built: builtCoord(boundary.display, boundary.x),
               dirty: false,
               error: null,
             }
@@ -180,7 +187,7 @@ function syncBoundaryPoints(line: LineSceneData, set: SceneSet, built: BuiltSet)
       color: set.style.color,
       open: boundary.open,
     };
-    point.built = { x: boundary.x, displayX: boundary.display };
+    point.built = builtCoord(boundary.display, boundary.x);
     point.locked = true;
     point.dirty = false;
     points.push(point);
@@ -232,12 +239,12 @@ export function buildLinePoint(
 ): { point: SceneLinePoint; line: LineSceneData } {
   if (point.locked) return { point, line };
   try {
-    const x = evaluateNumber(point.math.coordinate);
-    if (!Number.isFinite(x)) throw new Error("Координата должна быть конечным числом.");
+    const mv = makeMathValue(point.math.coordinate);
+    if (!Number.isFinite(mv.value)) throw new Error("Координата должна быть конечным числом.");
     return {
       point: {
         ...point,
-        built: { x, displayX: exactDisplay(x) },
+        built: { x: mv.value, displayX: mv.display, latex: mv.latex ?? mv.display },
         dirty: false,
         error: null,
       },
