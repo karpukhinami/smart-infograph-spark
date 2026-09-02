@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AppearanceDialog } from "./AppearanceDialog";
+import { AppearanceDialog } from "../AppearanceDialog";
 import { usePlotStore } from "@/lib/plotting/store";
 import { lineStepWarning } from "@/lib/plotting/line/render";
 import { evaluateNumber } from "@/lib/plotting/math-expr";
