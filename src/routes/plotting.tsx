@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,8 +38,16 @@ function PlottingPage() {
   const setSpaceTab = usePlotStore((state) => state.setSpaceTab);
   const resetScene = usePlotStore((state) => state.resetScene);
 
+  const [aiSessionKey, setAiSessionKey] = useState(0);
   const isAi = inputMode === "ai";
   const isLine = spaceTab === "line";
+
+  function handleReset() {
+    resetScene();
+    if (isAi) {
+      setAiSessionKey((key) => key + 1);
+    }
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -61,7 +70,7 @@ function PlottingPage() {
                 <TabsTrigger value="ai">ИИ-ввод</TabsTrigger>
               </TabsList>
             </Tabs>
-            <Button type="button" variant="outline" size="sm" onClick={resetScene}>
+            <Button type="button" variant="outline" size="sm" onClick={handleReset}>
               <RotateCcw className="size-4" />
               Сбросить
             </Button>
@@ -82,7 +91,7 @@ function PlottingPage() {
 
         <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-2 lg:overflow-hidden">
           <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
-            {isAi ? <PlotAiPanel /> : <PlotManualPanel />}
+            {isAi ? <PlotAiPanel key={aiSessionKey} /> : <PlotManualPanel />}
           </div>
 
           <div className="lg:min-h-0 lg:self-start lg:overflow-y-auto">

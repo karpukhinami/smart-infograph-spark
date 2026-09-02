@@ -66,20 +66,22 @@ export function resolveLineGeometry(scene: PlotScene): LineGeometry | null {
   const a = scene.appearance;
   const pad = Math.max(LINE_PADDING, a.padding);
   const plotLeft = pad;
-  const plotRight = LINE_CANVAS_WIDTH - pad;
+  const plotRightCanvas = LINE_CANVAS_WIDTH - pad;
+  /** contentMax отображается у основания стрелки, не у её кончика. */
+  const plotRightAxis = plotRightCanvas - a.arrowSize;
   const rowCount = Math.max(1, line.axisRowCount);
   const canvasHeight =
     rowCount * LINE_ROW_HEIGHT + Math.max(0, rowCount - 1) * LINE_ROW_GAP + pad * 2;
 
   const sx = (value: number) =>
-    plotLeft + ((value - contentMin) / (contentMax - contentMin)) * (plotRight - plotLeft);
+    plotLeft + ((value - contentMin) / (contentMax - contentMin)) * (plotRightAxis - plotLeft);
 
   const rows: LineRowGeometry[] = [];
   for (let i = 0; i < rowCount; i++) {
     const top = pad + i * (LINE_ROW_HEIGHT + LINE_ROW_GAP);
     const bottom = top + LINE_ROW_HEIGHT;
     const axisY = top + LINE_ROW_HEIGHT * 0.62;
-    rows.push({ rowIndex: i, axisY, left: plotLeft, right: plotRight, top, bottom });
+    rows.push({ rowIndex: i, axisY, left: plotLeft, right: plotRightCanvas, top, bottom });
   }
 
   return {
@@ -346,10 +348,11 @@ export function renderLineSvg(scene: PlotScene): string | null {
 
   for (const row of geom.rows) {
     const xStart = geom.sx(geom.contentMin);
-    const xEnd = geom.sx(geom.contentMax);
+    const xArrowBase = geom.sx(geom.contentMax);
+    const xArrowTip = xArrowBase + arrow;
     parts.push(
-      `<line x1="${round(xStart)}" y1="${round(row.axisY)}" x2="${round(xEnd - arrow)}" y2="${round(row.axisY)}" ${axisStyle}/>`,
-      `<polygon points="${round(xEnd)},${round(row.axisY)} ${round(xEnd - arrow)},${round(row.axisY - arrowHalf)} ${round(xEnd - arrow)},${round(row.axisY + arrowHalf)}" fill="${a.axisColor}"/>`,
+      `<line x1="${round(xStart)}" y1="${round(row.axisY)}" x2="${round(xArrowBase)}" y2="${round(row.axisY)}" ${axisStyle}/>`,
+      `<polygon points="${round(xArrowTip)},${round(row.axisY)} ${round(xArrowBase)},${round(row.axisY - arrowHalf)} ${round(xArrowBase)},${round(row.axisY + arrowHalf)}" fill="${a.axisColor}"/>`,
     );
 
     if (line.ticks.majorVisible) {
@@ -388,7 +391,7 @@ export function renderLineSvg(scene: PlotScene): string | null {
     }
 
     const nameWidth = axisLabel.length * a.labelFontSize * 0.55;
-    const nameX = Math.min(geom.canvasWidth - LINE_PADDING - 4, xEnd - 8);
+    const nameX = Math.min(geom.canvasWidth - LINE_PADDING - 4, xArrowTip - 8);
     const safeNameX = Math.max(nameX - nameWidth, xStart + 20);
     const axisNameY = row.axisY + a.tickSize + a.labelFontSize + 6;
     parts.push(
