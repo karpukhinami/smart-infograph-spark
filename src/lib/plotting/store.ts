@@ -10,11 +10,13 @@ import {
   solvePointMath,
 } from "./scene";
 import type {
+  AxisScaleMode,
   AxisSpec,
   GraphMath,
   GraphStyle,
   GridSpec,
   PlotAppearance,
+  PlotAspectRatio,
   PlotScene,
   PointMath,
   PointStyle,
@@ -42,6 +44,7 @@ interface PlotStore {
   setInputMode: (mode: PlotInputMode) => void;
   setSpaceTab: (tab: PlotSpaceTab) => void;
   updateAxis: (axis: "xAxis" | "yAxis", patch: Partial<AxisSpec>) => void;
+  updateAxisScale: (patch: { axisScaleMode?: AxisScaleMode; plotAspectRatio?: PlotAspectRatio }) => void;
   updateGrid: (patch: Partial<GridSpec>) => void;
   updateAppearance: (patch: Partial<PlotAppearance>) => void;
   resetAppearance: () => void;
@@ -137,6 +140,20 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       // При изменении имени оси зависимые объекты требуют перепроверки.
       if (patch.name !== undefined) {
         scene.graphs = scene.graphs.map((graph) => ({ ...graph, dirty: true }));
+      }
+      return { scene };
+    }),
+
+  updateAxisScale: (patch) =>
+    set((state) => {
+      const nextMode = patch.axisScaleMode ?? state.scene.axisScaleMode;
+      const scene: PlotScene = {
+        ...state.scene,
+        axisScaleMode: nextMode,
+        plotAspectRatio: patch.plotAspectRatio ?? state.scene.plotAspectRatio,
+      };
+      if (patch.axisScaleMode === "independent") {
+        scene.grid = { ...scene.grid, followAxisStep: false };
       }
       return { scene };
     }),
@@ -300,6 +317,8 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const scene: PlotScene = {
       ...base,
       ...input,
+      axisScaleMode: input.axisScaleMode ?? base.axisScaleMode,
+      plotAspectRatio: input.plotAspectRatio ?? base.plotAspectRatio,
       xAxis: { ...base.xAxis, ...(input.xAxis ?? {}) },
       yAxis: { ...base.yAxis, ...(input.yAxis ?? {}) },
       grid: { ...base.grid, ...(input.grid ?? {}) },

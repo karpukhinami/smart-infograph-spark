@@ -22,6 +22,20 @@ export interface MathValue {
 
 export type PlotSpace = "line" | "plane" | "space";
 
+/** Режим масштаба координатной плоскости. */
+export type AxisScaleMode = "equal" | "independent";
+
+/** Соотношение сторон рабочей области (только для independent). */
+export type PlotAspectRatio = "1:1" | "4:3" | "3:2" | "16:9" | "3:4";
+
+export const PLOT_ASPECT_RATIO_OPTIONS: Array<{ value: PlotAspectRatio; label: string }> = [
+  { value: "1:1", label: "1:1" },
+  { value: "4:3", label: "4:3" },
+  { value: "3:2", label: "3:2" },
+  { value: "16:9", label: "16:9" },
+  { value: "3:4", label: "3:4" },
+];
+
 /** Полная ось или только положительная полуось. */
 export type AxisMode = "full" | "positive";
 
@@ -220,6 +234,10 @@ export interface SceneTangent {
 export interface PlotScene {
   version: 1;
   space: PlotSpace;
+  /** equal — квадратная сетка (алгебра); independent — независимые шкалы (физика и т. п.). */
+  axisScaleMode: AxisScaleMode;
+  /** Форма рабочей области; только визуально, не меняет математику сцены. */
+  plotAspectRatio: PlotAspectRatio;
   xAxis: AxisSpec;
   yAxis: AxisSpec;
   grid: GridSpec;

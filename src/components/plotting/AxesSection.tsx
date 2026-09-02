@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,8 +20,14 @@ import { usePlotStore } from "@/lib/plotting/store";
 import { niceStep } from "@/lib/plotting/ticks";
 import { displayNumber } from "@/lib/plotting/math-expr";
 import { resolveGeometry } from "@/lib/plotting/render";
-import type { AxisSpec, MarkRule, TickLabelFormat } from "@/lib/plotting/types";
-import { useState } from "react";
+import {
+  PLOT_ASPECT_RATIO_OPTIONS,
+  type AxisScaleMode,
+  type AxisSpec,
+  type MarkRule,
+  type PlotAspectRatio,
+  type TickLabelFormat,
+} from "@/lib/plotting/types";
 
 const MARK_RULES: Array<{ value: MarkRule; label: string }> = [
   { value: "zeroOnly", label: "только 0" },
@@ -166,11 +172,71 @@ function AxisDetails({ axis, title, autoStep }: { axis: "xAxis" | "yAxis"; title
   );
 }
 
+function IndependentGridFields() {
+  const grid = usePlotStore((state) => state.scene.grid);
+  const updateGrid = usePlotStore((state) => state.updateGrid);
+  return (
+    <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+      <p className="text-sm font-medium">Шаг сетки</p>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">По горизонтали</Label>
+          <Input
+            value={grid.stepX}
+            placeholder="например 2"
+            className="font-mono"
+            onChange={(event) => updateGrid({ stepX: event.target.value })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">По вертикали</Label>
+          <Input
+            value={grid.stepY}
+            placeholder="например 100"
+            className="font-mono"
+            onChange={(event) => updateGrid({ stepY: event.target.value })}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlotAspectField() {
+  const plotAspectRatio = usePlotStore((state) => state.scene.plotAspectRatio);
+  const updateAxisScale = usePlotStore((state) => state.updateAxisScale);
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-sm">Форма графика</Label>
+      <Select
+        value={plotAspectRatio}
+        onValueChange={(value) => updateAxisScale({ plotAspectRatio: value as PlotAspectRatio })}
+      >
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {PLOT_ASPECT_RATIO_OPTIONS.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+              {option.value === "4:3" ? " — по умолчанию" : ""}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">
+        Относится к рабочей области построения, не меняет математические параметры сцены.
+      </p>
+    </div>
+  );
+}
+
 export function AxesSection() {
   const [open, setOpen] = useState(false);
   const scene = usePlotStore((state) => state.scene);
+  const axisScaleMode = scene.axisScaleMode;
+  const updateAxisScale = usePlotStore((state) => state.updateAxisScale);
   const updateGrid = usePlotStore((state) => state.updateGrid);
   const geometry = resolveGeometry(scene);
+  const independent = axisScaleMode === "independent";
 
   return (
     <Card>
@@ -178,14 +244,49 @@ export function AxesSection() {
         <CardTitle className="text-base">Координатная плоскость</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm">Режим масштаба осей</Label>
+          <RadioGroup
+            value={axisScaleMode}
+            onValueChange={(value) => updateAxisScale({ axisScaleMode: value as AxisScaleMode })}
+            className="grid gap-2"
+          >
+            <div className="flex items-start gap-2 rounded-md border border-border p-3">
+              <RadioGroupItem value="equal" id="axis-scale-equal" className="mt-0.5" />
+              <Label htmlFor="axis-scale-equal" className="cursor-pointer space-y-0.5 font-normal">
+                <span className="block text-sm font-medium">Одинаковая размерность осей</span>
+                <span className="block text-xs text-muted-foreground">
+                  Алгебраические графики: квадратная сетка, общий масштаб по X и Y.
+                </span>
+              </Label>
+            </div>
+            <div className="flex items-start gap-2 rounded-md border border-border p-3">
+              <RadioGroupItem value="independent" id="axis-scale-independent" className="mt-0.5" />
+              <Label htmlFor="axis-scale-independent" className="cursor-pointer space-y-0.5 font-normal">
+                <span className="block text-sm font-medium">Разная размерность осей</span>
+                <span className="block text-xs text-muted-foreground">
+                  Физические и статистические зависимости: независимые шкалы и шаг сетки.
+                </span>
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        <Separator />
+
         <AxisMainFields axis="xAxis" title="Горизонтальная ось" />
         <AxisMainFields axis="yAxis" title="Вертикальная ось" />
+
+        {independent && (
+          <>
+            <IndependentGridFields />
+            <PlotAspectField />
+          </>
+        )}
 
         <Button type="button" variant="outline" size="sm" disabled className="w-full">
           Подобрать пределы
         </Button>
-
-
 
         <Collapsible open={open} onOpenChange={setOpen}>
           <div className="flex items-center justify-between gap-2">
@@ -193,7 +294,7 @@ export function AxesSection() {
               <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} />
               Оси и сетка
             </CollapsibleTrigger>
-            {open && <AppearanceDialog />}
+            {open && <AppearanceDialog axisScaleMode={axisScaleMode} />}
           </div>
           <CollapsibleContent className="space-y-3 pt-3">
             <AxisDetails
@@ -215,34 +316,38 @@ export function AxesSection() {
                   onCheckedChange={(checked) => updateGrid({ visible: checked })}
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">Шаг сетки совпадает с ценой деления</Label>
-                <Switch
-                  checked={scene.grid.followAxisStep}
-                  onCheckedChange={(checked) => updateGrid({ followAxisStep: checked })}
-                />
-              </div>
-              {!scene.grid.followAxisStep && (
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Шаг сетки по горизонтали</Label>
-                    <Input
-                      value={scene.grid.stepX}
-                      placeholder="например pi/4"
-                      className="font-mono"
-                      onChange={(event) => updateGrid({ stepX: event.target.value })}
+              {!independent && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Шаг сетки совпадает с ценой деления</Label>
+                    <Switch
+                      checked={scene.grid.followAxisStep}
+                      onCheckedChange={(checked) => updateGrid({ followAxisStep: checked })}
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Шаг сетки по вертикали</Label>
-                    <Input
-                      value={scene.grid.stepY}
-                      placeholder="например 0.5"
-                      className="font-mono"
-                      onChange={(event) => updateGrid({ stepY: event.target.value })}
-                    />
-                  </div>
-                </div>
+                  {!scene.grid.followAxisStep && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Шаг сетки по горизонтали</Label>
+                        <Input
+                          value={scene.grid.stepX}
+                          placeholder="например pi/4"
+                          className="font-mono"
+                          onChange={(event) => updateGrid({ stepX: event.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Шаг сетки по вертикали</Label>
+                        <Input
+                          value={scene.grid.stepY}
+                          placeholder="например 0.5"
+                          className="font-mono"
+                          onChange={(event) => updateGrid({ stepY: event.target.value })}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </CollapsibleContent>

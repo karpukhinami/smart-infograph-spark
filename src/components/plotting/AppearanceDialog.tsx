@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { usePlotStore } from "@/lib/plotting/store";
-import type { PlotAppearance } from "@/lib/plotting/types";
+import type { AxisScaleMode, PlotAppearance } from "@/lib/plotting/types";
 
 const NUMBER_FIELDS: Array<{ key: keyof PlotAppearance; label: string; step?: number }> = [
   { key: "width", label: "Ширина изображения" },
@@ -40,7 +40,7 @@ const COLOR_FIELDS: Array<{ key: keyof PlotAppearance; label: string }> = [
   { key: "projectionColor", label: "Цвет перпендикуляров" },
 ];
 
-export function AppearanceDialog() {
+export function AppearanceDialog({ axisScaleMode = "equal" }: { axisScaleMode?: AxisScaleMode }) {
   const appearance = usePlotStore((state) => state.scene.appearance);
   const updateAppearance = usePlotStore((state) => state.updateAppearance);
   const resetAppearance = usePlotStore((state) => state.resetAppearance);
@@ -109,10 +109,17 @@ export function AppearanceDialog() {
         <Separator />
 
         <div className="grid gap-3">
-          <div className="rounded-md border border-border p-3 text-xs text-muted-foreground">
-            Сетка всегда квадратная: масштаб общий для обеих осей, более длинная ось занимает
-            всё доступное место, поэтому картинка может быть прямоугольной.
-          </div>
+          {axisScaleMode === "equal" ? (
+            <div className="rounded-md border border-border p-3 text-xs text-muted-foreground">
+              Сетка квадратная: масштаб общий для обеих осей, более длинная ось занимает всё
+              доступное место, поэтому картинка может быть прямоугольной.
+            </div>
+          ) : (
+            <div className="rounded-md border border-border p-3 text-xs text-muted-foreground">
+              В режиме разных размерностей форма рабочей области задаётся в блоке «Форма графика».
+              Шаг сетки — в полях над осями.
+            </div>
+          )}
 
           <div className="flex items-center justify-between rounded-md border border-border p-3">
             <Label className="text-sm">Рамка вокруг чертежа</Label>

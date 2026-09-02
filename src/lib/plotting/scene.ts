@@ -93,6 +93,8 @@ export function createScene(): PlotScene {
   return {
     version: 1,
     space: "plane",
+    axisScaleMode: "equal",
+    plotAspectRatio: "4:3",
     xAxis: { ...createAxis("x"), min: "-5", max: "5" },
     yAxis: { ...createAxis("y"), min: "-5", max: "5" },
     grid: { visible: true, followAxisStep: true, stepX: "", stepY: "" },

@@ -17,7 +17,7 @@ import {
   type Rect,
 } from "./label-layout";
 import { firstStepValue, niceStep, tickValues } from "./ticks";
-import type { AxisSpec, PlotAppearance, PlotScene, RenderCurve, RenderPoint } from "./types";
+import type { AxisSpec, PlotAppearance, PlotAspectRatio, PlotScene, RenderCurve, RenderPoint } from "./types";
 
 export interface PlotGeometry {
   xMin: number;
@@ -77,8 +77,14 @@ function axisStep(axis: AxisSpec, min: number, max: number): number {
   return niceStep(min, max);
 }
 
-/** Геометрия сцены или null, если четыре предела ещё не заданы. */
-export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
+interface AxisBounds {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
+function parseAxisBounds(scene: PlotScene): AxisBounds | null {
   const rawXMin = axisNumber(scene.xAxis.min);
   const rawXMax = axisNumber(scene.xAxis.max);
   const rawYMin = axisNumber(scene.yAxis.min);
@@ -89,28 +95,115 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const xMax = rawXMax;
   const yMax = rawYMax;
   if (!(xMax > xMin) || !(yMax > yMin)) return null;
+  return { xMin, xMax, yMin, yMax };
+}
 
-  const appearance = scene.appearance;
+function computeGutters(
+  scene: PlotScene,
+  bounds: AxisBounds,
+  xStep: number,
+  yStep: number,
+  appearance: PlotAppearance,
+): { padLeft: number; padRight: number; padTop: number; padBottom: number } {
   const pad = Math.max(0, appearance.padding);
   const font = appearance.labelFontSize;
+  const { xMin, xMax, yMin, yMax } = bounds;
 
-  const xStep = axisStep(scene.xAxis, xMin, xMax);
-  const yStep = axisStep(scene.yAxis, yMin, yMax);
-  const gridStepX = scene.grid.followAxisStep ? xStep : axisNumber(scene.grid.stepX) ?? xStep;
-  const gridStepY = scene.grid.followAxisStep ? yStep : axisNumber(scene.grid.stepY) ?? yStep;
-
-  // Если ноль не попал внутрь диапазона, ось ложится на рамку, а её подписи
-  // уходят за пределы области — под них нужен запас с «воздухом».
   const yLabels = markValues(scene.yAxis, yMin, yMax, yStep)
     .map((value) => displayNumber(value, scene.yAxis.labelFormat).length);
   const maxYLabel = yLabels.length ? Math.max(...yLabels) : 1;
   const yGutter = appearance.tickSize + 7 + maxYLabel * font * 0.58 + 10;
   const xGutter = appearance.tickSize + font + 3 + 10;
 
-  const padLeft = pad + (xMin >= 0 ? yGutter : 0);
-  const padRight = pad + (xMax <= 0 ? yGutter : 0);
-  const padTop = pad + (yMax <= 0 ? xGutter : 0);
-  const padBottom = pad + (yMin >= 0 ? xGutter : 0);
+  return {
+    padLeft: pad + (xMin >= 0 ? yGutter : 0),
+    padRight: pad + (xMax <= 0 ? yGutter : 0),
+    padTop: pad + (yMax <= 0 ? xGutter : 0),
+    padBottom: pad + (yMin >= 0 ? xGutter : 0),
+  };
+}
+
+function parseAspectRatio(ratio: PlotAspectRatio): { w: number; h: number } {
+  const [w, h] = ratio.split(":").map(Number);
+  return { w: w || 4, h: h || 3 };
+}
+
+/** Вписать прямоугольник с заданным соотношением сторон в доступную область. */
+function fitPlotArea(
+  availWidth: number,
+  availHeight: number,
+  aspect: PlotAspectRatio,
+): { width: number; height: number; offsetX: number; offsetY: number } {
+  const { w, h } = parseAspectRatio(aspect);
+  const target = w / h;
+  const avail = availWidth / availHeight;
+  if (avail >= target) {
+    const height = availHeight;
+    const width = height * target;
+    return { width, height, offsetX: (availWidth - width) / 2, offsetY: 0 };
+  }
+  const width = availWidth;
+  const height = width / target;
+  return { width, height, offsetX: 0, offsetY: (availHeight - height) / 2 };
+}
+
+function finishGeometry(
+  bounds: AxisBounds,
+  steps: { xStep: number; yStep: number; gridStepX: number; gridStepY: number },
+  layout: {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+    canvasWidth: number;
+    canvasHeight: number;
+  },
+): PlotGeometry {
+  const { xMin, xMax, yMin, yMax } = bounds;
+  const { left, right, top, bottom, canvasWidth, canvasHeight } = layout;
+  const sx = (value: number) => left + ((value - xMin) / (xMax - xMin)) * (right - left);
+  const sy = (value: number) => bottom - ((value - yMin) / (yMax - yMin)) * (bottom - top);
+  const xAxisY = sy(Math.min(Math.max(0, yMin), yMax));
+  const yAxisX = sx(Math.min(Math.max(0, xMin), xMax));
+
+  return {
+    xMin,
+    xMax,
+    yMin,
+    yMax,
+    ...steps,
+    left,
+    right,
+    top,
+    bottom,
+    canvasLeft: left,
+    canvasRight: right,
+    canvasTop: top,
+    canvasBottom: bottom,
+    canvasWidth,
+    canvasHeight,
+    axisStartX: left,
+    axisStartY: bottom,
+    axisEndX: right,
+    axisEndY: top,
+    sx,
+    sy,
+    xAxisY,
+    yAxisX,
+  };
+}
+
+/** Режим «одинаковая размерность осей» — существующее поведение без изменений. */
+function resolveGeometryEqual(scene: PlotScene, bounds: AxisBounds): PlotGeometry {
+  const appearance = scene.appearance;
+  const { xMin, xMax, yMin, yMax } = bounds;
+
+  const xStep = axisStep(scene.xAxis, xMin, xMax);
+  const yStep = axisStep(scene.yAxis, yMin, yMax);
+  const gridStepX = scene.grid.followAxisStep ? xStep : axisNumber(scene.grid.stepX) ?? xStep;
+  const gridStepY = scene.grid.followAxisStep ? yStep : axisNumber(scene.grid.stepY) ?? yStep;
+
+  const { padLeft, padRight, padTop, padBottom } = computeGutters(scene, bounds, xStep, yStep, appearance);
 
   // Сетка всегда квадратная: масштаб один для обеих осей, более длинная ось
   // занимает всё доступное место, а картинка становится прямоугольной.
@@ -127,25 +220,52 @@ export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
   const canvasWidth = padLeft + areaWidth + padRight;
   const canvasHeight = padTop + areaHeight + padBottom;
 
-  const sx = (value: number) => left + ((value - xMin) / (xMax - xMin)) * (right - left);
-  const sy = (value: number) => bottom - ((value - yMin) / (yMax - yMin)) * (bottom - top);
+  return finishGeometry(
+    bounds,
+    { xStep, yStep, gridStepX, gridStepY },
+    { left, right, top, bottom, canvasWidth, canvasHeight },
+  );
+}
 
-  // Ось остаётся видимой, даже если ноль вне диапазона.
-  const xAxisY = sy(Math.min(Math.max(0, yMin), yMax));
-  const yAxisX = sx(Math.min(Math.max(0, xMin), xMax));
+/** Режим «разная размерность осей»: независимые шкалы и выбранное соотношение сторон области. */
+function resolveGeometryIndependent(scene: PlotScene, bounds: AxisBounds): PlotGeometry {
+  const appearance = scene.appearance;
+  const { xMin, xMax, yMin, yMax } = bounds;
 
-  return {
-    xMin, xMax, yMin, yMax, xStep, yStep, gridStepX, gridStepY,
-    left, right, top, bottom,
-    canvasLeft: left, canvasRight: right, canvasTop: top, canvasBottom: bottom,
-    canvasWidth, canvasHeight,
-    // Оси идут от края области до края: кончик стрелки лежит на границе.
-    axisStartX: left,
-    axisStartY: bottom,
-    axisEndX: right,
-    axisEndY: top,
-    sx, sy, xAxisY, yAxisX,
-  };
+  const xStep = axisStep(scene.xAxis, xMin, xMax);
+  const yStep = axisStep(scene.yAxis, yMin, yMax);
+  const gridStepX = axisNumber(scene.grid.stepX) ?? xStep;
+  const gridStepY = axisNumber(scene.grid.stepY) ?? yStep;
+
+  const { padLeft, padRight, padTop, padBottom } = computeGutters(scene, bounds, xStep, yStep, appearance);
+
+  const availWidth = Math.max(10, appearance.width - padLeft - padRight);
+  const availHeight = Math.max(10, appearance.height - padTop - padBottom);
+  const fitted = fitPlotArea(availWidth, availHeight, scene.plotAspectRatio);
+
+  const left = padLeft + fitted.offsetX;
+  const top = padTop + fitted.offsetY;
+  const right = left + fitted.width;
+  const bottom = top + fitted.height;
+  const canvasWidth = appearance.width;
+  const canvasHeight = appearance.height;
+
+  return finishGeometry(
+    bounds,
+    { xStep, yStep, gridStepX, gridStepY },
+    { left, right, top, bottom, canvasWidth, canvasHeight },
+  );
+}
+
+/** Геометрия сцены или null, если четыре предела ещё не заданы. */
+export function resolveGeometry(scene: PlotScene): PlotGeometry | null {
+  const bounds = parseAxisBounds(scene);
+  if (!bounds) return null;
+
+  if (scene.axisScaleMode === "independent") {
+    return resolveGeometryIndependent(scene, bounds);
+  }
+  return resolveGeometryEqual(scene, bounds);
 }
 
 
