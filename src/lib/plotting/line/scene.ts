@@ -127,6 +127,8 @@ function builtCoord(raw: string, x: number): { x: number; displayX: string; late
     return { x, displayX: exactDisplay(x), latex: exactDisplay(x) };
   }
 }
+
+function findPointAtCoordinate(
   points: SceneLinePoint[],
   axisRow: number,
   x: number,

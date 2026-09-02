@@ -1,0 +1,106 @@
+СХЕМА JSON-СЦЕНЫ: ЧИСЛОВАЯ ПРЯМАЯ (space = "line")
+
+Корневой объект scene — PlotScene с space = "line". Математические данные в scene.line:
+
+{
+  "version": 1,
+  "space": "line",
+  "axisScaleMode": "independent",
+  "plotAspectRatio": "4:3",
+  "xAxis": { ... },          // можно минимально; для line не используется
+  "yAxis": { ... },
+  "grid": { "visible": false },
+  "appearance": { "width": 720, "height": 144, "frame": false, ... },
+  "graphs": [],
+  "points": [],
+  "tangents": [],
+  "customColors": [],
+  "line": {
+    "axis": { ... },
+    "ticks": { ... },
+    "axisRowCount": number,
+    "sets": [ ... ],
+    "points": [ ... ]
+  }
+}
+
+ОСЬ ПРЯМОЙ (line.axis) — LineAxisSpec:
+- name: string — обычно "x"
+- unit: string
+- min, max: string — границы отображения ("-5", "10")
+- majorStep: string — шаг больших засечек ("1", "2")
+
+ЗАСЕЧКИ (line.ticks) — LineTickSettings:
+- majorVisible: boolean
+- majorLabelMode: "all" | "firstTwo" | "givenTwo" | "selected"
+- majorLabelAnchor: string — для givenTwo
+- majorSelectedLabels: string — через ";"
+- minorEnabled: boolean
+- minorDivisions: string — на сколько частей делить большое деление ("5")
+- minorLabelMode: "all" | "oneInterval"
+- minorLabelIntervalStart: string
+
+axisRowCount — число горизонтальных рядов оси (≥ 1). Обычно 1; несколько рядов — для нескольких независимых прямых друг под другом.
+
+МНОЖЕСТВО (line.sets[]) — SceneSet:
+{
+  "index": number,
+  "axisRow": number,          // индекс ряда, с 0
+  "math": {
+    "kind": "interval" | "ray" | "freeform",
+    "left": string, "right": string,
+    "leftOp": "<" | "<=",
+    "rightOp": "<" | "<=",
+    "rayOp": "<" | "<=" | ">" | ">=",
+    "rayBoundary": string,
+    "freeformInput": string     // для freeform: "(-∞; 2) ∪ [3; +∞)" и т. п.
+  },
+  "style": {
+    "color": string,
+    "display": "hatchRight" | "hatchLeft" | "arc" | "thickSegment",
+    "position": "above" | "below",
+    "visible": true
+  }
+}
+
+Для интервала: kind = "interval", задай left, right, leftOp, rightOp.
+Для луча: kind = "ray", rayOp и rayBoundary.
+Для сложных объединений: kind = "freeform", freeformInput — математическая запись интервалов.
+
+display:
+- hatchRight / hatchLeft — штриховка справа/слева от интервала
+- arc — дуга «П» над/под отрезком
+- thickSegment — утолщённый отрезок
+
+ТОЧКА НА ПРЯМОЙ (line.points[]) — SceneLinePoint:
+{
+  "index": number,
+  "axisRow": number,
+  "math": {
+    "coordinate": string,
+    "sourceSetId": null,
+    "boundaryKey": null
+  },
+  "style": {
+    "color": string,
+    "colorManual": false,
+    "open": boolean,            // true = выколотая точка
+    "label": string,
+    "showCoords": boolean,
+    "visible": true,
+    "labelSide": "above" | "below",
+    "labelColor": "point" | "axis",
+    "coordSide": "above" | "below",
+    "coordColor": "point" | "axis",
+    "perpendicular": boolean
+  },
+  "locked": false
+}
+
+Рекомендации:
+- min/max оси должны охватывать все точки и интервалы с небольшим полями.
+- majorStep подбирай так, чтобы засечки были читаемы.
+- Граничные точки интервалов можно задавать через sets — точки на границах синхронизируются автоматически при построении.
+- Для решения неравенства: sets с правильными операторами и display hatchRight/hatchLeft/arc по смыслу.
+
+appearance для line: width 720, height 144 (или height ≈ 144 × axisRowCount), frame: false, padding: 16.
