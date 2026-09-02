@@ -74,12 +74,48 @@ function createAxis(name: string): AxisSpec {
     unit: "",
     min: "",
     max: "",
-    mode: "full",
-    stepAuto: true,
-    step: "",
+    gridStep: "1",
+    labelStep: "",
     labelFormat: "number",
     markRule: "all",
     selectedMarks: "",
+  };
+}
+
+/** Привести ось из сохранённой сцены к актуальной схеме. */
+export function migrateAxisImport(
+  base: AxisSpec,
+  raw: Partial<AxisSpec> & Record<string, unknown>,
+  legacyGridStep = "",
+): AxisSpec {
+  const merged = { ...base, ...raw } as AxisSpec & Record<string, unknown>;
+  const legacyStepAuto = merged.stepAuto as boolean | undefined;
+  const legacyStep = String(merged.step ?? "").trim();
+
+  if (!String(merged.gridStep ?? "").trim()) {
+    if (legacyGridStep.trim()) merged.gridStep = legacyGridStep;
+    else if (legacyStepAuto === false && legacyStep) merged.gridStep = legacyStep;
+    else merged.gridStep = base.gridStep;
+  }
+
+  if (merged.labelStep === undefined || merged.labelStep === null) {
+    merged.labelStep = legacyStepAuto === false && legacyStep ? legacyStep : "";
+  }
+
+  delete merged.mode;
+  delete merged.stepAuto;
+  delete merged.step;
+
+  return {
+    name: merged.name,
+    unit: merged.unit,
+    min: merged.min,
+    max: merged.max,
+    gridStep: merged.gridStep,
+    labelStep: merged.labelStep,
+    labelFormat: merged.labelFormat,
+    markRule: merged.markRule,
+    selectedMarks: merged.selectedMarks,
   };
 }
 
@@ -97,7 +133,7 @@ export function createScene(): PlotScene {
     plotAspectRatio: "4:3",
     xAxis: { ...createAxis("x"), min: "-5", max: "5" },
     yAxis: { ...createAxis("y"), min: "-5", max: "5" },
-    grid: { visible: true, followAxisStep: true, stepX: "", stepY: "" },
+    grid: { visible: true },
     appearance: { ...DEFAULT_APPEARANCE },
     graphs: [],
     points: [],

@@ -36,9 +36,6 @@ export const PLOT_ASPECT_RATIO_OPTIONS: Array<{ value: PlotAspectRatio; label: s
   { value: "3:4", label: "3:4" },
 ];
 
-/** Полная ось или только положительная полуось. */
-export type AxisMode = "full" | "positive";
-
 /** Формат подписей шкалы. */
 export type TickLabelFormat = "number" | "fraction" | "pi";
 
@@ -52,27 +49,19 @@ export interface AxisSpec {
   unit: string;
   min: string;
   max: string;
-  mode: AxisMode;
-  /** Автоматический выбор цены деления. */
-  stepAuto: boolean;
-  /** Ручная цена деления (выражение, например "pi/4"). */
-  step: string;
+  /** Шаг линий сетки по этой оси (выражение, например "1", "pi/4"). */
+  gridStep: string;
+  /** Шаг засечек и подписей; пусто — совпадает с шагом сетки. */
+  labelStep: string;
   labelFormat: TickLabelFormat;
   markRule: MarkRule;
   /** Избирательные засечки: значения через запятую. */
   selectedMarks: string;
 }
 
-/**
- * Сетка. Хранится отдельно от засечек, чтобы позже можно было развести
- * шаг сетки и шаг подписей (например, сетка π/4, подписи π/2).
- */
+/** Глобальные настройки сетки (видимость). Шаг задаётся отдельно на каждой оси. */
 export interface GridSpec {
   visible: boolean;
-  /** Использовать цену деления осей как шаг сетки. */
-  followAxisStep: boolean;
-  stepX: string;
-  stepY: string;
 }
 
 /** Визуальное оформление координатной системы. */

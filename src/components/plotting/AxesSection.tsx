@@ -17,23 +17,19 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppearanceDialog } from "./AppearanceDialog";
 import { usePlotStore } from "@/lib/plotting/store";
-import { niceStep } from "@/lib/plotting/ticks";
-import { displayNumber } from "@/lib/plotting/math-expr";
-import { resolveGeometry } from "@/lib/plotting/render";
 import {
   PLOT_ASPECT_RATIO_OPTIONS,
   type AxisScaleMode,
-  type AxisSpec,
   type MarkRule,
   type PlotAspectRatio,
   type TickLabelFormat,
 } from "@/lib/plotting/types";
 
 const MARK_RULES: Array<{ value: MarkRule; label: string }> = [
-  { value: "zeroOnly", label: "только 0" },
-  { value: "zeroAndFirst", label: "0 и первые деления" },
-  { value: "all", label: "везде" },
-  { value: "selected", label: "избирательно" },
+  { value: "zeroOnly", label: "Только 0" },
+  { value: "zeroAndFirst", label: "0 и первое деление" },
+  { value: "all", label: "Все засечки" },
+  { value: "selected", label: "Избирательно" },
 ];
 
 const LABEL_FORMATS: Array<{ value: TickLabelFormat; label: string }> = [
@@ -48,33 +44,47 @@ function AxisMainFields({ axis, title }: { axis: "xAxis" | "yAxis"; title: strin
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">{title}</p>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div className="space-y-1.5">
+      <div className="grid grid-cols-5 gap-1.5">
+        <div className="min-w-0 space-y-1">
           <Label className="text-xs text-muted-foreground">Название</Label>
-          <Input value={spec.name} onChange={(event) => updateAxis(axis, { name: event.target.value })} />
+          <Input
+            value={spec.name}
+            className="h-8 px-2 text-sm"
+            onChange={(event) => updateAxis(axis, { name: event.target.value })}
+          />
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Единица измерения</Label>
+        <div className="min-w-0 space-y-1">
+          <Label className="text-xs text-muted-foreground">Ед. изм.</Label>
           <Input
             value={spec.unit}
-            placeholder="необязательно"
+            placeholder="—"
+            className="h-8 px-2 text-sm"
             onChange={(event) => updateAxis(axis, { unit: event.target.value })}
           />
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Минимум</Label>
+        <div className="min-w-0 space-y-1">
+          <Label className="text-xs text-muted-foreground">Мин.</Label>
           <Input
             value={spec.min}
-            className="font-mono"
+            className="h-8 px-2 font-mono text-sm"
             onChange={(event) => updateAxis(axis, { min: event.target.value })}
           />
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Максимум</Label>
+        <div className="min-w-0 space-y-1">
+          <Label className="text-xs text-muted-foreground">Макс.</Label>
           <Input
             value={spec.max}
-            className="font-mono"
+            className="h-8 px-2 font-mono text-sm"
             onChange={(event) => updateAxis(axis, { max: event.target.value })}
+          />
+        </div>
+        <div className="min-w-0 space-y-1">
+          <Label className="text-xs text-muted-foreground">Шаг сетки</Label>
+          <Input
+            value={spec.gridStep}
+            placeholder="1"
+            className="h-8 px-2 font-mono text-sm"
+            onChange={(event) => updateAxis(axis, { gridStep: event.target.value })}
           />
         </div>
       </div>
@@ -82,53 +92,12 @@ function AxisMainFields({ axis, title }: { axis: "xAxis" | "yAxis"; title: strin
   );
 }
 
-function AxisDetails({ axis, title, autoStep }: { axis: "xAxis" | "yAxis"; title: string; autoStep: number | null }) {
-  const spec = usePlotStore((state) => state.scene[axis]) as AxisSpec;
+function AxisDetails({ axis, title }: { axis: "xAxis" | "yAxis"; title: string }) {
+  const spec = usePlotStore((state) => state.scene[axis]);
   const updateAxis = usePlotStore((state) => state.updateAxis);
   return (
     <div className="space-y-3 rounded-md border border-border p-3">
       <p className="text-sm font-medium">{title}</p>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Вид оси</Label>
-        <RadioGroup
-          value={spec.mode}
-          onValueChange={(value) => updateAxis(axis, { mode: value as AxisSpec["mode"] })}
-          className="flex gap-4"
-        >
-          <div className="flex items-center gap-2">
-            <RadioGroupItem value="full" id={`${axis}-full`} />
-            <Label htmlFor={`${axis}-full`} className="text-sm font-normal">полная ось</Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <RadioGroupItem value="positive" id={`${axis}-positive`} />
-            <Label htmlFor={`${axis}-positive`} className="text-sm font-normal">только положительная часть</Label>
-          </div>
-        </RadioGroup>
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs text-muted-foreground">
-            Цена деления {spec.stepAuto && autoStep !== null ? `(авто: ${displayNumber(autoStep, spec.labelFormat)})` : ""}
-          </Label>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">авто</span>
-            <Switch
-              checked={spec.stepAuto}
-              onCheckedChange={(checked) => updateAxis(axis, { stepAuto: checked })}
-            />
-          </div>
-        </div>
-        {!spec.stepAuto && (
-          <Input
-            value={spec.step}
-            placeholder="например 0.5, 1/4, pi/2"
-            className="font-mono"
-            onChange={(event) => updateAxis(axis, { step: event.target.value })}
-          />
-        )}
-      </div>
 
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Формат подписей</Label>
@@ -136,7 +105,7 @@ function AxisDetails({ axis, title, autoStep }: { axis: "xAxis" | "yAxis"; title
           value={spec.labelFormat}
           onValueChange={(value) => updateAxis(axis, { labelFormat: value as TickLabelFormat })}
         >
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
           <SelectContent>
             {LABEL_FORMATS.map((format) => (
               <SelectItem key={format.value} value={format.value}>{format.label}</SelectItem>
@@ -145,59 +114,44 @@ function AxisDetails({ axis, title, autoStep }: { axis: "xAxis" | "yAxis"; title
         </Select>
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Засечки и подписи</Label>
-        <RadioGroup
-          value={spec.markRule}
-          onValueChange={(value) => updateAxis(axis, { markRule: value as MarkRule })}
-          className="grid grid-cols-2 gap-2"
-        >
-          {MARK_RULES.map((rule) => (
-            <div key={rule.value} className="flex items-center gap-2">
-              <RadioGroupItem value={rule.value} id={`${axis}-${rule.value}`} />
-              <Label htmlFor={`${axis}-${rule.value}`} className="text-sm font-normal">{rule.label}</Label>
-            </div>
-          ))}
-        </RadioGroup>
-        {spec.markRule === "selected" && (
+      <div className="grid grid-cols-[1fr,minmax(5rem,7rem)] gap-2">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Засечки и подписи</Label>
+          <Select
+            value={spec.markRule}
+            onValueChange={(value) => updateAxis(axis, { markRule: value as MarkRule })}
+          >
+            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {MARK_RULES.map((rule) => (
+                <SelectItem key={rule.value} value={rule.value}>{rule.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Шаг подписи</Label>
+          <Input
+            value={spec.labelStep}
+            placeholder={spec.gridStep || "1"}
+            className="h-8 px-2 font-mono text-sm"
+            disabled={spec.markRule === "selected"}
+            onChange={(event) => updateAxis(axis, { labelStep: event.target.value })}
+          />
+        </div>
+      </div>
+
+      {spec.markRule === "selected" && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Позиции засечек</Label>
           <Input
             value={spec.selectedMarks}
             placeholder="например -4, 0, 2, 6 или 0, pi/2, pi"
-            className="font-mono"
+            className="font-mono text-sm"
             onChange={(event) => updateAxis(axis, { selectedMarks: event.target.value })}
           />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function IndependentGridFields() {
-  const grid = usePlotStore((state) => state.scene.grid);
-  const updateGrid = usePlotStore((state) => state.updateGrid);
-  return (
-    <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
-      <p className="text-sm font-medium">Шаг сетки</p>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">По горизонтали</Label>
-          <Input
-            value={grid.stepX}
-            placeholder="например 2"
-            className="font-mono"
-            onChange={(event) => updateGrid({ stepX: event.target.value })}
-          />
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">По вертикали</Label>
-          <Input
-            value={grid.stepY}
-            placeholder="например 100"
-            className="font-mono"
-            onChange={(event) => updateGrid({ stepY: event.target.value })}
-          />
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -235,7 +189,6 @@ export function AxesSection() {
   const axisScaleMode = scene.axisScaleMode;
   const updateAxisScale = usePlotStore((state) => state.updateAxisScale);
   const updateGrid = usePlotStore((state) => state.updateGrid);
-  const geometry = resolveGeometry(scene);
   const independent = axisScaleMode === "independent";
 
   return (
@@ -277,12 +230,7 @@ export function AxesSection() {
         <AxisMainFields axis="xAxis" title="Горизонтальная ось" />
         <AxisMainFields axis="yAxis" title="Вертикальная ось" />
 
-        {independent && (
-          <>
-            <IndependentGridFields />
-            <PlotAspectField />
-          </>
-        )}
+        {independent && <PlotAspectField />}
 
         <Button type="button" variant="outline" size="sm" disabled className="w-full">
           Подобрать пределы
@@ -297,59 +245,15 @@ export function AxesSection() {
             {open && <AppearanceDialog axisScaleMode={axisScaleMode} />}
           </div>
           <CollapsibleContent className="space-y-3 pt-3">
-            <AxisDetails
-              axis="xAxis"
-              title="Горизонтальная ось"
-              autoStep={geometry ? niceStep(geometry.xMin, geometry.xMax) : null}
-            />
-            <AxisDetails
-              axis="yAxis"
-              title="Вертикальная ось"
-              autoStep={geometry ? niceStep(geometry.yMin, geometry.yMax) : null}
-            />
-            <Separator />
-            <div className="space-y-2 rounded-md border border-border p-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">Показывать сетку</Label>
-                <Switch
-                  checked={scene.grid.visible}
-                  onCheckedChange={(checked) => updateGrid({ visible: checked })}
-                />
-              </div>
-              {!independent && (
-                <>
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Шаг сетки совпадает с ценой деления</Label>
-                    <Switch
-                      checked={scene.grid.followAxisStep}
-                      onCheckedChange={(checked) => updateGrid({ followAxisStep: checked })}
-                    />
-                  </div>
-                  {!scene.grid.followAxisStep && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Шаг сетки по горизонтали</Label>
-                        <Input
-                          value={scene.grid.stepX}
-                          placeholder="например pi/4"
-                          className="font-mono"
-                          onChange={(event) => updateGrid({ stepX: event.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Шаг сетки по вертикали</Label>
-                        <Input
-                          value={scene.grid.stepY}
-                          placeholder="например 0.5"
-                          className="font-mono"
-                          onChange={(event) => updateGrid({ stepY: event.target.value })}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
+            <div className="flex items-center justify-between rounded-md border border-border p-3">
+              <Label className="text-sm">Показывать сетку</Label>
+              <Switch
+                checked={scene.grid.visible}
+                onCheckedChange={(checked) => updateGrid({ visible: checked })}
+              />
             </div>
+            <AxisDetails axis="xAxis" title="Горизонтальная ось" />
+            <AxisDetails axis="yAxis" title="Вертикальная ось" />
           </CollapsibleContent>
         </Collapsible>
       </CardContent>

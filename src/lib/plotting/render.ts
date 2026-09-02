@@ -24,8 +24,10 @@ export interface PlotGeometry {
   xMax: number;
   yMin: number;
   yMax: number;
+  /** Шаг засечек и подписей. */
   xStep: number;
   yStep: number;
+  /** Шаг линий сетки. */
   gridStepX: number;
   gridStepY: number;
   /** Прямоугольник математической области в пикселях. */
@@ -65,16 +67,16 @@ function axisNumber(raw: string): number | null {
   }
 }
 
-function axisStep(axis: AxisSpec, min: number, max: number): number {
-  if (!axis.stepAuto && axis.step.trim()) {
-    try {
-      const value = evaluateNumber(axis.step);
-      if (Number.isFinite(value) && value > 0) return value;
-    } catch {
-      /* падаем на автоматический шаг */
-    }
-  }
-  return niceStep(min, max);
+(axis: AxisSpec, min: number, max: number, equalMode: boolean): number {
+  const parsed = axisNumber(axis.gridStep);
+  if (parsed !== null && parsed > 0) return parsed;
+  return equalMode ? 1 : niceStep(min, max);
+}
+
+function resolveLabelStep(axis: AxisSpec, gridStep: number): number {
+  const parsed = axisNumber(axis.labelStep);
+  if (parsed !== null && parsed > 0) return parsed;
+  return gridStep;
 }
 
 interface AxisBounds {
@@ -85,15 +87,11 @@ interface AxisBounds {
 }
 
 function parseAxisBounds(scene: PlotScene): AxisBounds | null {
-  const rawXMin = axisNumber(scene.xAxis.min);
-  const rawXMax = axisNumber(scene.xAxis.max);
-  const rawYMin = axisNumber(scene.yAxis.min);
-  const rawYMax = axisNumber(scene.yAxis.max);
-  if (rawXMin === null || rawXMax === null || rawYMin === null || rawYMax === null) return null;
-  const xMin = scene.xAxis.mode === "positive" ? Math.max(0, rawXMin) : rawXMin;
-  const yMin = scene.yAxis.mode === "positive" ? Math.max(0, rawYMin) : rawYMin;
-  const xMax = rawXMax;
-  const yMax = rawYMax;
+  const xMin = axisNumber(scene.xAxis.min);
+  const xMax = axisNumber(scene.xAxis.max);
+  const yMin = axisNumber(scene.yAxis.min);
+  const yMax = axisNumber(scene.yAxis.max);
+  if (xMin === null || xMax === null || yMin === null || yMax === null) return null;
   if (!(xMax > xMin) || !(yMax > yMin)) return null;
   return { xMin, xMax, yMin, yMax };
 }
@@ -198,10 +196,11 @@ function resolveGeometryEqual(scene: PlotScene, bounds: AxisBounds): PlotGeometr
   const appearance = scene.appearance;
   const { xMin, xMax, yMin, yMax } = bounds;
 
-  const xStep = axisStep(scene.xAxis, xMin, xMax);
-  const yStep = axisStep(scene.yAxis, yMin, yMax);
-  const gridStepX = scene.grid.followAxisStep ? xStep : axisNumber(scene.grid.stepX) ?? xStep;
-  const gridStepY = scene.grid.followAxisStep ? yStep : axisNumber(scene.grid.stepY) ?? yStep;
+  const equalMode = true;
+  const gridStepX = resolveGridStep(scene.xAxis, xMin, xMax, equalMode);
+  const gridStepY = resolveGridStep(scene.yAxis, yMin, yMax, equalMode);
+  const xStep = resolveLabelStep(scene.xAxis, gridStepX);
+  const yStep = resolveLabelStep(scene.yAxis, gridStepY);
 
   const { padLeft, padRight, padTop, padBottom } = computeGutters(scene, bounds, xStep, yStep, appearance);
 
@@ -232,10 +231,11 @@ function resolveGeometryIndependent(scene: PlotScene, bounds: AxisBounds): PlotG
   const appearance = scene.appearance;
   const { xMin, xMax, yMin, yMax } = bounds;
 
-  const xStep = axisStep(scene.xAxis, xMin, xMax);
-  const yStep = axisStep(scene.yAxis, yMin, yMax);
-  const gridStepX = axisNumber(scene.grid.stepX) ?? xStep;
-  const gridStepY = axisNumber(scene.grid.stepY) ?? yStep;
+  const equalMode = false;
+  const gridStepX = resolveGridStep(scene.xAxis, xMin, xMax, equalMode);
+  const gridStepY = resolveGridStep(scene.yAxis, yMin, yMax, equalMode);
+  const xStep = resolveLabelStep(scene.xAxis, gridStepX);
+  const yStep = resolveLabelStep(scene.yAxis, gridStepY);
 
   const { padLeft, padRight, padTop, padBottom } = computeGutters(scene, bounds, xStep, yStep, appearance);
 
@@ -281,15 +281,15 @@ function round(value: number): string {
   return String(Number(value.toFixed(2)));
 }
 
-/** Значения засечек оси согласно выбранному правилу. */
-export function markValues(axis: AxisSpec, min: number, max: number, step: number): number[] {
+/** Значения засечек оси согласно выбранному правилу (шаг подписи, не шаг сетки). */
+export function markValues(axis: AxisSpec, min: number, max: number, labelStep: number): number[] {
   switch (axis.markRule) {
     case "zeroOnly":
       return min <= 0 && max >= 0 ? [0] : [];
     case "zeroAndFirst": {
       const values: number[] = [];
       if (min <= 0 && max >= 0) values.push(0);
-      const first = firstStepValue(min, max, step);
+      const first = firstStepValue(min, max, labelStep);
       if (first !== null && Math.abs(first) > 1e-12) values.push(first);
       return values;
     }
@@ -301,12 +301,10 @@ export function markValues(axis: AxisSpec, min: number, max: number, step: numbe
       }
     case "all":
     default: {
-      // Крайние засечки не ставим: у самой рамки не должно быть ни штриха, ни подписи.
       const edge = (max - min) * 1e-6;
-      const values = tickValues(min, max, step).filter(
+      return tickValues(min, max, labelStep).filter(
         (value) => value > min + edge && value < max - edge,
       );
-      return values;
     }
   }
 }

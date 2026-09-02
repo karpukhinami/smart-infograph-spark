@@ -50,18 +50,17 @@ export function FunctionCard({ graph }: { graph: SceneGraph }) {
   // Серые подсказки в пределах построения — реальные значения по оси x.
   // Пока пользователь не ввёл своё значение, они следуют за осью.
   const axisHint = useMemo(() => {
-    const format = (raw: string, positiveFloor: boolean) => {
+    const format = (raw: string) => {
       try {
         const value = evaluateNumber(raw);
         if (!Number.isFinite(value)) return "";
-        const limited = positiveFloor && scene.xAxis.mode === "positive" ? Math.max(0, value) : value;
-        return displayNumber(limited, scene.xAxis.labelFormat);
+        return displayNumber(value, scene.xAxis.labelFormat);
       } catch {
         return "";
       }
     };
-    return { from: format(scene.xAxis.min, true), to: format(scene.xAxis.max, false) };
-  }, [scene.xAxis.min, scene.xAxis.max, scene.xAxis.mode, scene.xAxis.labelFormat]);
+    return { from: format(scene.xAxis.min), to: format(scene.xAxis.max) };
+  }, [scene.xAxis.min, scene.xAxis.max, scene.xAxis.labelFormat]);
 
 
   return (

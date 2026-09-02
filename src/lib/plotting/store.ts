@@ -7,8 +7,11 @@ import {
   createGraph,
   createPoint,
   createScene,
+  migrateAxisImport,
   solvePointMath,
 } from "./scene";
+import { evaluateNumber } from "./math-expr";
+import { niceStep } from "./ticks";
 import type {
   AxisScaleMode,
   AxisSpec,
@@ -74,6 +77,22 @@ function reindex<T extends { index: number }>(items: T[]): T[] {
   return items.map((item, position) => ({ ...item, index: position + 1 }));
 }
 
+function axisBounds(min: string, max: string): { min: number; max: number } | null {
+  try {
+    const lo = evaluateNumber(min);
+    const hi = evaluateNumber(max);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi) || !(hi > lo)) return null;
+    return { min: lo, max: hi };
+  } catch {
+    return null;
+  }
+}
+
+function autoGridStepForAxis(axis: AxisSpec): string {
+  const bounds = axisBounds(axis.min, axis.max);
+  return bounds ? String(niceStep(bounds.min, bounds.max)) : axis.gridStep;
+}
+
 export const usePlotStore = create<PlotStore>((set, get) => ({
   scene: createScene(),
   inputMode: "manual",
@@ -136,8 +155,16 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
 
   updateAxis: (axis, patch) =>
     set((state) => {
-      const scene = { ...state.scene, [axis]: { ...state.scene[axis], ...patch } } as PlotScene;
-      // При изменении имени оси зависимые объекты требуют перепроверки.
+      let nextAxis: AxisSpec = { ...state.scene[axis], ...patch };
+
+      if (
+        state.scene.axisScaleMode === "independent" &&
+        (patch.min !== undefined || patch.max !== undefined)
+      ) {
+        nextAxis = { ...nextAxis, gridStep: autoGridStepForAxis(nextAxis) };
+      }
+
+      const scene = { ...state.scene, [axis]: nextAxis } as PlotScene;
       if (patch.name !== undefined) {
         scene.graphs = scene.graphs.map((graph) => ({ ...graph, dirty: true }));
       }
@@ -147,14 +174,20 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
   updateAxisScale: (patch) =>
     set((state) => {
       const nextMode = patch.axisScaleMode ?? state.scene.axisScaleMode;
-      const scene: PlotScene = {
+      let scene: PlotScene = {
         ...state.scene,
         axisScaleMode: nextMode,
         plotAspectRatio: patch.plotAspectRatio ?? state.scene.plotAspectRatio,
       };
+
       if (patch.axisScaleMode === "independent") {
-        scene.grid = { ...scene.grid, followAxisStep: false };
+        scene = {
+          ...scene,
+          xAxis: { ...scene.xAxis, gridStep: autoGridStepForAxis(scene.xAxis) },
+          yAxis: { ...scene.yAxis, gridStep: autoGridStepForAxis(scene.yAxis) },
+        };
       }
+
       return { scene };
     }),
 
@@ -313,15 +346,18 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
 
   importScene: (raw) => {
     const base = createScene();
-    const input = (raw ?? {}) as Partial<PlotScene>;
+    const input = (raw ?? {}) as Partial<PlotScene> & {
+      grid?: Partial<GridSpec> & { followAxisStep?: boolean; stepX?: string; stepY?: string };
+    };
+    const legacyGrid = input.grid ?? {};
     const scene: PlotScene = {
       ...base,
       ...input,
       axisScaleMode: input.axisScaleMode ?? base.axisScaleMode,
       plotAspectRatio: input.plotAspectRatio ?? base.plotAspectRatio,
-      xAxis: { ...base.xAxis, ...(input.xAxis ?? {}) },
-      yAxis: { ...base.yAxis, ...(input.yAxis ?? {}) },
-      grid: { ...base.grid, ...(input.grid ?? {}) },
+      xAxis: migrateAxisImport(base.xAxis, (input.xAxis ?? {}) as Partial<AxisSpec>, legacyGrid.stepX ?? ""),
+      yAxis: migrateAxisImport(base.yAxis, (input.yAxis ?? {}) as Partial<AxisSpec>, legacyGrid.stepY ?? ""),
+      grid: { visible: legacyGrid.visible ?? base.grid.visible },
       appearance: { ...base.appearance, ...(input.appearance ?? {}) },
       graphs: (input.graphs ?? []).map((graph, position) => ({
         ...createGraph(position + 1),
