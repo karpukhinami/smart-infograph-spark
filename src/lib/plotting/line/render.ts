@@ -128,6 +128,8 @@ function majorLabels(
       } catch {
         return [];
       }
+    case "none":
+      return [];
     case "all":
     default:
       return values;

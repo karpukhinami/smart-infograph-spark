@@ -272,7 +272,7 @@ export function buildLineScene(line: LineSceneData): LineBuildReport {
   let built = 0;
 
   current.sets = current.sets.map((set) => {
-    if (!set.dirty && set.built) return set;
+    if (!set.dirty && set.built?.parts?.length) return set;
     const result = buildSetMath(current, set);
     current = { ...current, points: result.line.points, axisRowCount: result.line.axisRowCount };
     if (result.set.error) errors.push(`Множество ${set.index}: ${result.set.error}`);

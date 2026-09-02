@@ -5,7 +5,7 @@ import {
   createScene,
   migrateAxisImport,
 } from "../scene";
-import { createLineScene } from "../line/scene";
+import { createLineScene, createSet, createLinePoint } from "../line/scene";
 import type { AxisSpec, GridSpec, PlotScene } from "../types";
 
 export function mergeAiScene(raw: unknown): PlotScene {
@@ -25,8 +25,25 @@ export function mergeAiScene(raw: unknown): PlotScene {
       line: {
         ...lineBase.line!,
         ...(input.line ?? {}),
-        sets: input.line?.sets ?? [],
-        points: input.line?.points ?? [],
+        ticks: { ...lineBase.line!.ticks, ...(input.line?.ticks ?? {}) },
+        sets: (input.line?.sets ?? []).map((set, position) => ({
+          ...createSet(position + 1, set.axisRow ?? 0),
+          ...set,
+          math: { ...createSet(position + 1, set.axisRow ?? 0).math, ...set.math },
+          style: { ...createSet(position + 1, set.axisRow ?? 0).style, ...set.style },
+          built: null,
+          dirty: true,
+          error: null,
+        })),
+        points: (input.line?.points ?? []).map((point, position) => ({
+          ...createLinePoint(position + 1, point.axisRow ?? 0),
+          ...point,
+          math: { ...createLinePoint(position + 1, point.axisRow ?? 0).math, ...point.math },
+          style: { ...createLinePoint(position + 1, point.axisRow ?? 0).style, ...point.style },
+          built: null,
+          dirty: true,
+          error: null,
+        })),
       },
       version: 1,
       space: "line",

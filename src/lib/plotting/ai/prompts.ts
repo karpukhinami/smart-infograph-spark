@@ -7,8 +7,7 @@ import generateScene from "@/data/prompts/plotting/generate-scene.txt?raw";
 import generateAnalog from "@/data/prompts/plotting/generate-analog.txt?raw";
 import schemaPlane from "@/data/prompts/plotting/schema-plane.txt?raw";
 import schemaLine from "@/data/prompts/plotting/schema-line.txt?raw";
-import type { DrawSourceMode, PlotAiScenario, PlotAnalysisResult, PlotSceneType } from "./types";
-import { DRAW_SOURCE_MODE_LABELS } from "./types";
+import type { PlotAiScenario, PlotAnalysisResult, PlotSceneType } from "./types";
 
 function injectShared(template: string, sourceText: string): string {
   const shared = sharedSourceRules.replaceAll("{{SOURCE_TEXT}}", sourceText || "(материал не передан)");
@@ -18,16 +17,12 @@ function injectShared(template: string, sourceText: string): string {
 export function buildAnalyzePrompt(opts: {
   scenario: PlotAiScenario;
   sourceText: string;
-  drawSourceMode?: DrawSourceMode;
 }): string {
-  const { scenario, sourceText, drawSourceMode = "condition" } = opts;
+  const { scenario, sourceText } = opts;
   let template: string;
   switch (scenario) {
     case "draw":
-      template = analyzeDraw.replaceAll(
-        "{{DRAW_SOURCE_MODE}}",
-        DRAW_SOURCE_MODE_LABELS[drawSourceMode],
-      );
+      template = analyzeDraw;
       break;
     case "reproduce":
       template = analyzeReproduce;

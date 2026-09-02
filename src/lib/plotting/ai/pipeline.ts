@@ -9,7 +9,6 @@ import {
   generateSchemaHint,
 } from "./prompts";
 import type {
-  DrawSourceMode,
   PlotAiScenario,
   PlotAnalysisResult,
   PlotGenerateAnalogResult,
@@ -29,13 +28,11 @@ export async function analyzePlotMaterial(opts: {
   manualText: string;
   uploadedSourceText: string;
   attachedImages: string[];
-  drawSourceMode?: DrawSourceMode;
 }): Promise<PlotAnalysisResult> {
   const sourceText = buildSourceTextForPrompt(opts.manualText, opts.uploadedSourceText);
   const prompt = buildAnalyzePrompt({
     scenario: opts.scenario,
     sourceText,
-    drawSourceMode: opts.drawSourceMode,
   });
   const images = opts.attachedImages.length ? opts.attachedImages : undefined;
 

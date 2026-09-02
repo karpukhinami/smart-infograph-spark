@@ -16,7 +16,7 @@ import { Markdown } from "@/components/workspace/Markdown";
 import { DEFAULT_TEXT_MODEL } from "@/lib/models";
 import { hasSourceMaterials } from "@/lib/source-material";
 import { analyzePlotMaterial, generatePlotScene } from "@/lib/plotting/ai/pipeline";
-import type { DrawSourceMode, PlotAiScenario, PlotAnalysisResult } from "@/lib/plotting/ai/types";
+import type { PlotAiScenario, PlotAnalysisResult } from "@/lib/plotting/ai/types";
 import { usePlotStore } from "@/lib/plotting/store";
 import {
   PlotSourceInput,
@@ -27,15 +27,9 @@ import { PlotManualPanel } from "../PlotManualPanel";
 import { cn } from "@/lib/utils";
 
 const SCENARIOS: Array<{ id: PlotAiScenario; label: string }> = [
-  { id: "draw", label: "Нарисовать по условию / решению / ответу" },
+  { id: "draw", label: "Нарисовать по заданию" },
   { id: "reproduce", label: "Воспроизвести изображение" },
   { id: "analog", label: "Создать аналогичное задание с изображением" },
-];
-
-const DRAW_MODES: Array<{ id: DrawSourceMode; label: string }> = [
-  { id: "condition", label: "По условию" },
-  { id: "solution", label: "По решению" },
-  { id: "answer", label: "По ответу" },
 ];
 
 export function PlotAiPanel() {
@@ -44,7 +38,6 @@ export function PlotAiPanel() {
   const source = usePlotSourceState();
   const [model, setModel] = useState(DEFAULT_TEXT_MODEL);
   const [scenario, setScenario] = useState<PlotAiScenario>("draw");
-  const [drawSourceMode, setDrawSourceMode] = useState<DrawSourceMode>("condition");
   const [analysis, setAnalysis] = useState<PlotAnalysisResult | null>(null);
   const [userRefinements, setUserRefinements] = useState("");
   const [analogTaskText, setAnalogTaskText] = useState<string | null>(null);
@@ -96,7 +89,6 @@ export function PlotAiPanel() {
         manualText,
         uploadedSourceText: source.state.uploadedSourceText,
         attachedImages,
-        drawSourceMode: scenario === "draw" ? drawSourceMode : undefined,
       });
       setAnalysis(result);
       if (!result.canDraw) {
@@ -163,24 +155,6 @@ export function PlotAiPanel() {
               </label>
             ))}
           </RadioGroup>
-
-          {scenario === "draw" && (
-            <div className="space-y-2 border-t border-border pt-3">
-              <Label className="text-xs text-muted-foreground">Что анализировать</Label>
-              <RadioGroup
-                value={drawSourceMode}
-                onValueChange={(v) => setDrawSourceMode(v as DrawSourceMode)}
-                className="flex flex-wrap gap-3"
-              >
-                {DRAW_MODES.map((m) => (
-                  <label key={m.id} className="flex cursor-pointer items-center gap-1.5 text-sm">
-                    <RadioGroupItem value={m.id} />
-                    {m.label}
-                  </label>
-                ))}
-              </RadioGroup>
-            </div>
-          )}
         </CardContent>
       </Card>
 

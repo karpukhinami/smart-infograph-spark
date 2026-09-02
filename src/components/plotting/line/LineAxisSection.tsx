@@ -21,6 +21,7 @@ import type { MajorLabelMode, MinorLabelMode } from "@/lib/plotting/line/types";
 
 const MAJOR_LABEL_MODES: Array<{ value: MajorLabelMode; label: string }> = [
   { value: "all", label: "Подписать все" },
+  { value: "none", label: "Не подписывать" },
   { value: "firstTwo", label: "Подписать первые две" },
   { value: "givenTwo", label: "Подписать данные две" },
   { value: "selected", label: "Избирательно" },

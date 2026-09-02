@@ -1,6 +1,6 @@
 /** Типы сцены числовой прямой (режим «Прямая»). */
 
-export type MajorLabelMode = "all" | "firstTwo" | "givenTwo" | "selected";
+export type MajorLabelMode = "all" | "firstTwo" | "givenTwo" | "selected" | "none";
 export type MinorLabelMode = "all" | "oneInterval";
 
 /** Способ задания множества. */

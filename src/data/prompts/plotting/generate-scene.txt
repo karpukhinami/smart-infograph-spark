@@ -23,7 +23,8 @@
 Поле scene.space должно быть "{{SCENE_TYPE_SPACE}}" (соответствует sceneType анализа).
 Заполни все поля, необходимые рендереру: оси, сетку, функции/множества/точки, appearance при необходимости.
 Не включай поля built, dirty, error — они вычисляются автоматически.
-Для graphs и points можно опустить id — система создаст их сама; index — порядковый номер с 1.
+Для graphs, line.sets и line.points можно опустить id — система создаст их сама; index — порядковый номер с 1.
+Для числовой прямой с неравенствами: line.ticks.majorLabelMode = "none", minorEnabled = false; множества задавай через line.sets с kind "ray" или "interval" и корректным display (hatchRight/hatchLeft/arc).
 
 ФОРМАТ ОТВЕТА
 Только JSON: { "scene": { ... } }

@@ -1,9 +1,7 @@
 /** Типы и контракты режима ИИ-рисования на странице Plotting. */
 
+/** Что анализировать в сценарии «Нарисовать по заданию» — зарезервировано. */
 export type PlotAiScenario = "draw" | "reproduce" | "analog";
-
-/** Что анализировать в сценарии «Нарисовать по…». */
-export type DrawSourceMode = "condition" | "solution" | "answer";
 
 export type PlotSceneType = "plane" | "line";
 
@@ -31,9 +29,3 @@ export interface PlotSceneValidation {
   valid: boolean;
   errors: string[];
 }
-
-export const DRAW_SOURCE_MODE_LABELS: Record<DrawSourceMode, string> = {
-  condition: "условию",
-  solution: "решению",
-  answer: "ответу",
-};
