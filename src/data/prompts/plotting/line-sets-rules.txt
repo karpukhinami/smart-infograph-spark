@@ -1,0 +1,45 @@
+ПРАВИЛА МНОЖЕСТВ НА ЧИСЛОВОЙ ПРЯМОЙ (обязательны для sceneType = "line")
+
+ОДНА ПРЯМАЯ
+- axisRowCount: 1 — почти всегда (одна горизонтальная ось).
+- axisRow: 0 — у каждого множества и каждой дополнительной точки (индексация с нуля).
+- НИКОГДА не ставь axisRowCount: 2 и axisRow: 1 для одного чертежа с одной осью.
+
+ГРАНИЧНЫЕ ТОЧКИ — ТОЛЬКО ИЗ МНОЖЕСТВ
+- Границы интервалов и лучей (выколотые/закрашенные точки, подписи координат) создаются АВТОМАТИЧЕСКИ из line.sets при importScene.
+- line.points должен быть [] (пустой массив), если нужны только границы множества.
+- ЗАПРЕЩЕНО одновременно задавать множество И отдельные точки на тех же координатах (например, set с left: "3" и point с coordinate: "3").
+- ЗАПРЕЩЕНО включать в JSON точки с sourceSetId / boundaryKey — их создаёт система.
+- Не включай id, built, dirty, error у sets и points.
+
+ЗАСЕЧКИ ОСИ
+- Для неравенств и интервалов: majorLabelMode: "none", minorEnabled: false.
+- majorVisible: false — если на исходном рисунке нет делений оси, только граничные точки решения.
+- majorVisible: true — если на рисунке видны стандартные деления.
+
+ВИЗУАЛИЗАЦИЯ МНОЖЕСТВ (style.display)
+- Луч x > a, x ≥ a → kind: "ray", display: "hatchRight"
+- Луч x < a, x ≤ a → kind: "ray", display: "hatchLeft"
+- Конечный интервал (a; b) / [a; b] со штриховкой НАД/ПОД отрезком между a и b → kind: "interval", display: "hatchRight" (штриховка между границами), position: "above" или "below"
+- Конечный интервал с дугой «П» (обводка без штриховки) → kind: "interval", display: "arc"
+- leftOp/rightOp: "<" — выколотая точка (open), "<=" — закрашенная
+
+ПРИМЕР: интервал (3; 4) со штриховкой сверху (как на типовом чертеже решения)
+{
+  "axisRowCount": 1,
+  "sets": [{
+    "index": 1,
+    "axisRow": 0,
+    "math": { "kind": "interval", "left": "3", "right": "4", "leftOp": "<", "rightOp": "<", "rayOp": ">=", "rayBoundary": "", "freeformInput": "" },
+    "style": { "color": "#e09033", "display": "hatchRight", "position": "above", "visible": true }
+  }],
+  "points": [],
+  "ticks": { "majorVisible": false, "majorLabelMode": "none", "minorEnabled": false }
+}
+
+ОШИБКИ, КОТОРЫХ ИЗБЕГАТЬ
+✗ axisRowCount: 2 при одной прямой
+✗ axisRow: 1 при axisRowCount: 1 или 2 для единственного ряда
+✗ points с coordinate "3" и "4" при set [3; 4] — получится двойные точки и путаница в подписях
+✗ hatchRight для луча, когда нужен interval (и наоборот)
+✗ majorLabelMode: "all" на неравенствах — лишние подписи на оси

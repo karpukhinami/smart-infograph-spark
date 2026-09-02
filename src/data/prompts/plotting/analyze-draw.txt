@@ -25,7 +25,7 @@
 
 Примеры:
 — Задание без явной формулы, но функция следует из условия → реши, найди y = f(x), укажи в analysisText и stageData.functions.
-— Неравенство → вычисли множество решений, укажи интервалы и kind/display для прямой; подписи засечек не нужны.
+— Неравенство / интервал → вычисли множество решений; в stageData.lineSets укажи kind, display, границы; axisRowCount: 1, axisRow: 0; не добавляй linePoints на границах множества.
 — График на картинке → восстанови y = ax² + bx + c по вершине и точке на кривой, не пиши просто «квадратичная функция».
 
 ЧТО УМЕЕТ НАШ ИНСТРУМЕНТ (canDraw = true только если подходит одно из ниже):
@@ -53,8 +53,8 @@
     "functions": [
       { "label": string, "kind": "explicit"|"implicit"|"piecewise"|"qualitative", "expression": string, "equation": string, "notes": string }
     ],
-    "linePoints": [ { "coordinate": string, "label": string, "open": boolean } ],
-    "lineSets": [ { "input": string, "description": string, "kind": string, "display": string } ],
+    "linePoints": [],
+    "lineSets": [ { "kind": "interval"|"ray"|"freeform", "left": string, "right": string, "leftOp": string, "rightOp": string, "rayOp": string, "rayBoundary": string, "display": string, "position": string, "description": string } ],
     "planePoints": [ { "x": string, "y": string, "label": string, "mode": string } ],
     "axisHints": { "xMin": string, "xMax": string, "yMin": string, "yMax": string, "lineMin": string, "lineMax": string },
     "extraElements": string

@@ -6,8 +6,11 @@ import analyzeAnalog from "@/data/prompts/plotting/analyze-analog.txt?raw";
 import generateScene from "@/data/prompts/plotting/generate-scene.txt?raw";
 import generateAnalog from "@/data/prompts/plotting/generate-analog.txt?raw";
 import schemaPlane from "@/data/prompts/plotting/schema-plane.txt?raw";
-import schemaLine from "@/data/prompts/plotting/schema-line.txt?raw";
+import schemaLineRaw from "@/data/prompts/plotting/schema-line.txt?raw";
+import lineSetsRules from "@/data/prompts/plotting/line-sets-rules.txt?raw";
 import type { PlotAiScenario, PlotAnalysisResult, PlotSceneType } from "./types";
+
+const schemaLine = schemaLineRaw.replaceAll("{{LINE_SETS_RULES}}", lineSetsRules);
 
 function injectShared(template: string, sourceText: string): string {
   const shared = sharedSourceRules.replaceAll("{{SOURCE_TEXT}}", sourceText || "(материал не передан)");

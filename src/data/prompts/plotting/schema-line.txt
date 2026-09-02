@@ -7,116 +7,32 @@
   "space": "line",
   "axisScaleMode": "independent",
   "plotAspectRatio": "4:3",
-  "xAxis": { ... },
-  "yAxis": { ... },
   "grid": { "visible": false },
-  "appearance": { "width": 720, "height": 144, "frame": false, ... },
+  "appearance": { "width": 720, "height": 144, "frame": false, "padding": 16, ... },
   "graphs": [],
   "points": [],
   "tangents": [],
   "customColors": [],
   "line": {
-    "axis": { ... },
-    "ticks": { ... },
-    "axisRowCount": number,
+    "axis": { "name": "x", "unit": "", "min": "2", "max": "5", "majorStep": "1" },
+    "ticks": { "majorVisible": false, "majorLabelMode": "none", "minorEnabled": false, ... },
+    "axisRowCount": 1,
     "sets": [ ... ],
-    "points": [ ... ]
+    "points": []
   }
 }
 
-ОСЬ ПРЯМОЙ (line.axis) — LineAxisSpec:
-- name: string — обычно "x"
-- unit: string
-- min, max: string — границы отображения ("-5", "10")
-- majorStep: string — шаг больших засечек ("1", "2")
+{{LINE_SETS_RULES}}
 
-ЗАСЕЧКИ (line.ticks) — LineTickSettings:
-- majorVisible: boolean
-- majorLabelMode: "all" | "firstTwo" | "givenTwo" | "selected" | "none"
-- majorLabelAnchor: string — для givenTwo
-- majorSelectedLabels: string — через ";"
-- minorEnabled: boolean
-- minorDivisions: string
-- minorLabelMode: "all" | "oneInterval"
-- minorLabelIntervalStart: string
-
-Для решений НЕРАВЕНСТВ на числовой прямой по умолчанию:
-- majorVisible: true
-- majorLabelMode: "none" — подписи засечек НЕ ставить (координаты только у граничных точек множества)
-- minorEnabled: false
-Не используй majorLabelMode: "all" для неравенств.
-
-axisRowCount — число горизонтальных рядов оси (≥ 1). Обычно 1.
-
-МНОЖЕСТВО (line.sets[]) — SceneSet:
+ТОЧКА НА ПРЯМОЙ (line.points[]) — только если нужны точки, НЕ являющиеся границами множеств:
 {
   "index": number,
-  "axisRow": number,
-  "math": {
-    "kind": "interval" | "ray" | "freeform",
-    "left": string, "right": string,
-    "leftOp": "<" | "<=",
-    "rightOp": "<" | "<=",
-    "rayOp": "<" | "<=" | ">" | ">=",
-    "rayBoundary": string,
-    "freeformInput": string
-  },
-  "style": {
-    "color": string,
-    "display": "hatchRight" | "hatchLeft" | "arc" | "thickSegment",
-    "position": "above" | "below",
-    "visible": true
-  }
-}
-
-ВАЖНО: не включай поля built, dirty, error — они вычисляются автоматически.
-
-СПОСОБ ЗАДАНИЯ МНОЖЕСТВА
-— Конечный интервал: kind = "interval", left/right, leftOp/rightOp.
-— Луч (одностороннее неравенство): kind = "ray":
-  • x > a  → rayOp: ">",  rayBoundary: "a", display: "hatchRight"
-  • x ≥ a  → rayOp: ">=", rayBoundary: "a", display: "hatchRight"
-  • x < a  → rayOp: "<",  rayBoundary: "a", display: "hatchLeft"
-  • x ≤ a  → rayOp: "<=", rayBoundary: "a", display: "hatchLeft"
-— Объединение: kind = "freeform", freeformInput — интервалы через ";":
-  "[2; 5)" или "(-inf; 3); [7; +inf)" (бесконечность: -inf, +inf, inf)
-
-ВИЗУАЛИЗАЦИЯ (style.display) — только эти значения:
-- hatchRight — штриховка решения справа от границы (лучи x > a, x ≥ a)
-- hatchLeft — штриховка слева (лучи x < a, x ≤ a)
-- arc — дуга «П» над/под конечным интервалом (a; b), [a; b]
-- thickSegment — утолщённый отрезок
-
-Примеры неравенств:
-| Неравенство | kind | Параметры | display |
-| x > 2 | ray | rayOp: ">", rayBoundary: "2" | hatchRight |
-| x ≤ −1 | ray | rayOp: "<=", rayBoundary: "-1" | hatchLeft |
-| −2 < x < 3 | interval | left: "-2", right: "3", leftOp: "<", rightOp: "<" | arc |
-| x ∈ [1; 4] | interval | left: "1", right: "4", leftOp: "<=", rightOp: "<=" | arc |
-
-style.position: "above" или "below".
-
-Граничные точки множества создаются автоматически — не дублируй их в line.points.
-
-ТОЧКА НА ПРЯМОЙ (line.points[]) — только дополнительные точки, не границы множества:
-{
-  "index": number,
-  "axisRow": number,
+  "axisRow": 0,
   "math": { "coordinate": string, "sourceSetId": null, "boundaryKey": null },
-  "style": {
-    "color": string,
-    "open": boolean,
-    "label": string,
-    "showCoords": boolean,
-    "visible": true,
-    "labelSide": "above" | "below",
-    ...
-  }
+  "style": { "open": boolean, "label": string, "showCoords": boolean, "coordSide": "below", ... }
 }
+Если все точки — границы интервалов из sets, оставь "points": [].
 
 Рекомендации:
 - min/max оси — с запасом вокруг решения.
-- majorStep — разумный (1 или 2).
-- Для неравенств: один set на каждый луч/интервал решения; ticks.majorLabelMode = "none".
-
-appearance для line: width 720, height 144, frame: false, padding: 16.
+- majorStep — разумный (1 или 2), используется только если majorVisible: true.

@@ -1,7 +1,64 @@
 import { buildLineScene } from "../line/scene";
+import type { LineSceneData } from "../line/types";
 import { buildScene } from "../scene";
 import type { PlotSceneType } from "./types";
 import { mergeAiScene } from "./merge-scene";
+
+function validateLineSceneStructure(line: LineSceneData): string[] {
+  const errors: string[] = [];
+
+  for (const set of line.sets) {
+    if (set.axisRow < 0 || set.axisRow >= line.axisRowCount) {
+      errors.push(
+        `Множество ${set.index}: axisRow=${set.axisRow} вне диапазона 0..${line.axisRowCount - 1}`,
+      );
+    }
+    if (line.axisRowCount === 1 && set.axisRow !== 0) {
+      errors.push(
+        `Множество ${set.index}: при axisRowCount=1 нужен axisRow=0, не ${set.axisRow}`,
+      );
+    }
+  }
+
+  const boundaryCoords = new Set<string>();
+  for (const set of line.sets) {
+    if (!set.built) continue;
+    for (const b of set.built.boundaries) {
+      boundaryCoords.add(`${set.axisRow}:${b.x.toFixed(9)}`);
+    }
+  }
+
+  for (const point of line.points) {
+    if (point.math.sourceSetId) {
+      errors.push(
+        `Точка ${point.index}: не задавай sourceSetId/boundaryKey в JSON — граничные точки создаются автоматически`,
+      );
+      continue;
+    }
+    if (!point.built) continue;
+    const key = `${point.axisRow}:${point.built.x.toFixed(9)}`;
+    if (boundaryCoords.has(key)) {
+      errors.push(
+        `Точка ${point.index} (${point.built.displayX}) дублирует границу множества — оставь line.points: []`,
+      );
+    }
+  }
+
+  const byRowCoord = new Map<string, number>();
+  for (const point of line.points) {
+    if (!point.built) continue;
+    const key = `${point.axisRow}:${point.built.x.toFixed(9)}`;
+    byRowCoord.set(key, (byRowCoord.get(key) ?? 0) + 1);
+  }
+  for (const [, count] of byRowCoord) {
+    if (count > 1) {
+      errors.push("Несколько точек с одной координатой на одном ряду — убери дубликаты");
+      break;
+    }
+  }
+
+  return errors;
+}
 
 export function validatePlotSceneJson(raw: unknown, expectedSceneType: PlotSceneType): {
   valid: boolean;
@@ -43,7 +100,8 @@ export function validatePlotSceneJson(raw: unknown, expectedSceneType: PlotScene
     if (report.errors.length) {
       errors.push(...report.errors);
     }
-    const hasContent = scene.line.sets.length > 0 || scene.line.points.length > 0;
+    errors.push(...validateLineSceneStructure(report.line));
+    const hasContent = report.line.sets.length > 0 || report.line.points.length > 0;
     if (!hasContent) {
       errors.push("На числовой прямой нет множеств и точек");
     }
