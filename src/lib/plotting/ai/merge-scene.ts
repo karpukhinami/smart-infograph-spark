@@ -6,6 +6,7 @@ import {
   migrateAxisImport,
 } from "../scene";
 import { createLineScene, createSet, createLinePoint } from "../line/scene";
+import { filterAiLinePoints, normalizeLineAxisRows } from "../line/import-ai";
 import type { AxisSpec, GridSpec, PlotScene } from "../types";
 
 export function mergeAiScene(raw: unknown): PlotScene {
@@ -18,15 +19,21 @@ export function mergeAiScene(raw: unknown): PlotScene {
 
   if (isLine) {
     const lineBase = createLineScene();
+    const rawLine = normalizeLineAxisRows({
+      ...(input.line ?? {}),
+      axisRowCount: input.line?.axisRowCount ?? lineBase.line!.axisRowCount,
+      sets: input.line?.sets ?? [],
+      points: filterAiLinePoints(input.line?.points),
+    });
     return {
       ...lineBase,
       ...input,
       appearance: { ...lineBase.appearance, ...(input.appearance ?? {}) },
       line: {
         ...lineBase.line!,
-        ...(input.line ?? {}),
-        ticks: { ...lineBase.line!.ticks, ...(input.line?.ticks ?? {}) },
-        sets: (input.line?.sets ?? []).map((set, position) => ({
+        ...rawLine,
+        ticks: { ...lineBase.line!.ticks, ...(rawLine.ticks ?? {}) },
+        sets: (rawLine.sets ?? []).map((set, position) => ({
           ...createSet(position + 1, set.axisRow ?? 0),
           ...set,
           math: { ...createSet(position + 1, set.axisRow ?? 0).math, ...set.math },
@@ -35,7 +42,7 @@ export function mergeAiScene(raw: unknown): PlotScene {
           dirty: true,
           error: null,
         })),
-        points: (input.line?.points ?? []).map((point, position) => ({
+        points: (rawLine.points ?? []).map((point, position) => ({
           ...createLinePoint(position + 1, point.axisRow ?? 0),
           ...point,
           math: { ...createLinePoint(position + 1, point.axisRow ?? 0).math, ...point.math },

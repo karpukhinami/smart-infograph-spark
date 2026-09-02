@@ -36,6 +36,7 @@ import {
   removeSetFromLine,
   syncSetFromBoundaryPoint,
 } from "./line/scene";
+import { filterAiLinePoints, normalizeLineAxisRows } from "./line/import-ai";
 import type {
   LineAxisSpec,
   LinePointStyle,
@@ -731,36 +732,45 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const legacyGrid = input.grid ?? {};
     const isLine = input.space === "line";
     const scene: PlotScene = isLine
-      ? {
-          ...createLineScene(),
-          ...input,
-          appearance: { ...createLineScene().appearance, ...(input.appearance ?? {}) },
-          line: {
-            ...createLineScene().line!,
+      ? (() => {
+          const lineBase = createLineScene().line!;
+          const rawLine = normalizeLineAxisRows({
             ...(input.line ?? {}),
-            ticks: { ...createLineScene().line!.ticks, ...(input.line?.ticks ?? {}) },
-            sets: (input.line?.sets ?? []).map((set, position) => ({
-              ...createSet(position + 1, set.axisRow ?? 0),
-              ...set,
-              math: { ...createSet(position + 1, set.axisRow ?? 0).math, ...set.math },
-              style: { ...createSet(position + 1, set.axisRow ?? 0).style, ...set.style },
-              built: null,
-              dirty: true,
-              error: null,
-            })),
-            points: (input.line?.points ?? []).map((point, position) => ({
-              ...createLinePoint(position + 1, point.axisRow ?? 0),
-              ...point,
-              math: { ...createLinePoint(position + 1, point.axisRow ?? 0).math, ...point.math },
-              style: { ...createLinePoint(position + 1, point.axisRow ?? 0).style, ...point.style },
-              built: null,
-              dirty: true,
-              error: null,
-            })),
-          },
-          version: 1,
-          space: "line",
-        }
+            axisRowCount: input.line?.axisRowCount ?? lineBase.axisRowCount,
+            sets: input.line?.sets ?? [],
+            points: filterAiLinePoints(input.line?.points),
+          });
+          return {
+            ...createLineScene(),
+            ...input,
+            appearance: { ...createLineScene().appearance, ...(input.appearance ?? {}) },
+            line: {
+              ...lineBase,
+              ...rawLine,
+              ticks: { ...lineBase.ticks, ...(rawLine.ticks ?? {}) },
+              sets: (rawLine.sets ?? []).map((set, position) => ({
+                ...createSet(position + 1, set.axisRow ?? 0),
+                ...set,
+                math: { ...createSet(position + 1, set.axisRow ?? 0).math, ...set.math },
+                style: { ...createSet(position + 1, set.axisRow ?? 0).style, ...set.style },
+                built: null,
+                dirty: true,
+                error: null,
+              })),
+              points: (rawLine.points ?? []).map((point, position) => ({
+                ...createLinePoint(position + 1, point.axisRow ?? 0),
+                ...point,
+                math: { ...createLinePoint(position + 1, point.axisRow ?? 0).math, ...point.math },
+                style: { ...createLinePoint(position + 1, point.axisRow ?? 0).style, ...point.style },
+                built: null,
+                dirty: true,
+                error: null,
+              })),
+            },
+            version: 1,
+            space: "line",
+          };
+        })()
       : {
           ...base,
           ...input,

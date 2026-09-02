@@ -29,13 +29,7 @@ function validateLineSceneStructure(line: LineSceneData): string[] {
   }
 
   for (const point of line.points) {
-    if (point.math.sourceSetId) {
-      errors.push(
-        `Точка ${point.index}: не задавай sourceSetId/boundaryKey в JSON — граничные точки создаются автоматически`,
-      );
-      continue;
-    }
-    if (!point.built) continue;
+    if (!point.built || point.math.sourceSetId) continue;
     const key = `${point.axisRow}:${point.built.x.toFixed(9)}`;
     if (boundaryCoords.has(key)) {
       errors.push(
