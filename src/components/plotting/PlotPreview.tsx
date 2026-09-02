@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { usePlotStore } from "@/lib/plotting/store";
 import { draftRenderPoints, sceneCurves, scenePoints } from "@/lib/plotting/scene";
 import { renderPlotSvg } from "@/lib/plotting/render";
+import { renderLineSvg } from "@/lib/plotting/line/render";
 import { downloadPng, downloadSceneJson, downloadSvg, readSceneJson } from "@/lib/plotting/export";
 import { toast } from "sonner";
 
@@ -16,14 +17,15 @@ export function PlotPreview() {
   const importScene = usePlotStore((state) => state.importScene);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const svg = useMemo(
-    () =>
-      renderPlotSvg(scene, sceneCurves(scene), [
-        ...scenePoints(scene),
-        ...draftRenderPoints(scene, pointDraft),
-      ]),
-    [scene, pointDraft],
-  );
+  const spaceTab = usePlotStore((state) => state.spaceTab);
+
+  const svg = useMemo(() => {
+    if (scene.space === "line") return renderLineSvg(scene);
+    return renderPlotSvg(scene, sceneCurves(scene), [
+      ...scenePoints(scene),
+      ...draftRenderPoints(scene, pointDraft),
+    ]);
+  }, [scene, pointDraft]);
 
 
   return (
@@ -91,7 +93,9 @@ export function PlotPreview() {
             <div className="[&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
           ) : (
             <p className="p-8 text-center text-sm text-muted-foreground">
-              Заполните пределы обеих осей, чтобы увидеть координатную плоскость.
+              {spaceTab === "line"
+                ? "Заполните пределы оси, чтобы увидеть числовую прямую."
+                : "Заполните пределы обеих осей, чтобы увидеть координатную плоскость."}
             </p>
           )}
         </div>

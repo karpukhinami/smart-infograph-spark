@@ -26,6 +26,26 @@ import type {
   SceneGraph,
   ScenePoint,
 } from "./types";
+import {
+  buildLineScene,
+  buildSetMath,
+  buildLinePoint,
+  createLinePoint,
+  createLineScene,
+  createSet,
+  removeSetFromLine,
+  syncSetFromBoundaryPoint,
+} from "./line/scene";
+import type {
+  LineAxisSpec,
+  LinePointStyle,
+  LineSceneData,
+  LineTickSettings,
+  SceneLinePoint,
+  SceneSet,
+  SetMath,
+  SetStyle,
+} from "./line/types";
 
 export type PlotInputMode = "manual" | "ai";
 export type PlotSpaceTab = "line" | "plane" | "space";
@@ -44,8 +64,37 @@ interface PlotStore {
   /** Черновик добавляемой точки: живёт вне сцены до нажатия «Отметить». */
   pointDraft: PointMath | null;
   pointDraftError: string | null;
+  /** Черновик множества на прямой. */
+  setDraft: SceneSet | null;
+  setDraftError: string | null;
+  /** Черновик самостоятельной точки на прямой. */
+  linePointDraft: SceneLinePoint | null;
+  linePointDraftError: string | null;
+  /** Текущий активный ряд оси для новых объектов. */
+  activeAxisRow: number;
   setInputMode: (mode: PlotInputMode) => void;
   setSpaceTab: (tab: PlotSpaceTab) => void;
+  updateLineAxis: (patch: Partial<LineAxisSpec>) => void;
+  updateLineTicks: (patch: Partial<LineTickSettings>) => void;
+  startSetDraft: (createNewAxis?: boolean) => void;
+  updateSetDraft: (patch: Partial<SceneSet>) => void;
+  updateSetDraftMath: (patch: Partial<SetMath>) => void;
+  cancelSetDraft: () => void;
+  commitSetDraft: () => void;
+  updateSetMath: (id: string, patch: Partial<SetMath>) => void;
+  updateSetStyle: (id: string, patch: Partial<SetStyle>) => void;
+  buildSet: (id: string) => void;
+  removeSet: (id: string) => void;
+  startLinePointDraft: () => void;
+  updateLinePointDraft: (patch: Partial<SceneLinePoint>) => void;
+  updateLinePointDraftMath: (patch: Partial<SceneLinePoint["math"]>) => void;
+  updateLinePointDraftStyle: (patch: Partial<LinePointStyle>) => void;
+  cancelLinePointDraft: () => void;
+  commitLinePointDraft: () => void;
+  updateLinePointMath: (id: string, patch: Partial<SceneLinePoint["math"]>) => void;
+  updateLinePointStyle: (id: string, patch: Partial<LinePointStyle>) => void;
+  buildLinePointItem: (id: string) => void;
+  removeLinePoint: (id: string) => void;
   updateAxis: (axis: "xAxis" | "yAxis", patch: Partial<AxisSpec>) => void;
   updateAxisScale: (patch: { axisScaleMode?: AxisScaleMode; plotAspectRatio?: PlotAspectRatio }) => void;
   updateGrid: (patch: Partial<GridSpec>) => void;
@@ -100,6 +149,11 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
   status: null,
   pointDraft: null,
   pointDraftError: null,
+  setDraft: null,
+  setDraftError: null,
+  linePointDraft: null,
+  linePointDraftError: null,
+  activeAxisRow: 0,
 
   startPointDraft: () => set({ pointDraft: { ...EMPTY_POINT_MATH }, pointDraftError: null }),
 
@@ -151,7 +205,323 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
 
 
   setInputMode: (inputMode) => set({ inputMode }),
-  setSpaceTab: (spaceTab) => set({ spaceTab }),
+
+  setSpaceTab: (spaceTab) =>
+    set((state) => {
+      if (spaceTab === state.spaceTab) return state;
+      if (spaceTab === "line") {
+        return {
+          spaceTab,
+          scene: createLineScene(),
+          status: null,
+          pointDraft: null,
+          pointDraftError: null,
+          setDraft: null,
+          setDraftError: null,
+          linePointDraft: null,
+          linePointDraftError: null,
+          activeAxisRow: 0,
+        };
+      }
+      if (spaceTab === "plane") {
+        return {
+          spaceTab,
+          scene: createScene(),
+          status: null,
+          pointDraft: null,
+          pointDraftError: null,
+          setDraft: null,
+          setDraftError: null,
+          linePointDraft: null,
+          linePointDraftError: null,
+          activeAxisRow: 0,
+        };
+      }
+      return { spaceTab };
+    }),
+
+  updateLineAxis: (patch) =>
+    set((state) => {
+      if (!state.scene.line) return state;
+      return {
+        scene: {
+          ...state.scene,
+          line: { ...state.scene.line, axis: { ...state.scene.line.axis, ...patch } },
+        },
+      };
+    }),
+
+  updateLineTicks: (patch) =>
+    set((state) => {
+      if (!state.scene.line) return state;
+      return {
+        scene: {
+          ...state.scene,
+          line: { ...state.scene.line, ticks: { ...state.scene.line.ticks, ...patch } },
+        },
+      };
+    }),
+
+  startSetDraft: (createNewAxis = false) => {
+    const state = get();
+    const line = state.scene.line;
+    if (!line) return;
+    let axisRow = state.activeAxisRow;
+    if (createNewAxis) {
+      axisRow = line.axisRowCount;
+    }
+    const draft = createSet(line.sets.length + 1, axisRow);
+    set({ setDraft: draft, setDraftError: null });
+  },
+
+  updateSetDraft: (patch) =>
+    set((state) =>
+      state.setDraft ? { setDraft: { ...state.setDraft, ...patch }, setDraftError: null } : state,
+    ),
+
+  updateSetDraftMath: (patch) =>
+    set((state) =>
+      state.setDraft
+        ? {
+            setDraft: {
+              ...state.setDraft,
+              math: { ...state.setDraft.math, ...patch },
+              dirty: true,
+              error: null,
+            },
+            setDraftError: null,
+          }
+        : state,
+    ),
+
+  cancelSetDraft: () => set({ setDraft: null, setDraftError: null }),
+
+  commitSetDraft: () => {
+    const state = get();
+    const draft = state.setDraft;
+    const line = state.scene.line;
+    if (!draft || !line) return;
+    const result = buildSetMath(line, { ...draft, dirty: true });
+    if (result.set.error) {
+      set({ setDraftError: result.set.error });
+      return;
+    }
+    const sets = [...line.sets, result.set];
+    const axisRowCount = Math.max(line.axisRowCount, result.line.axisRowCount);
+    set({
+      scene: {
+        ...state.scene,
+        line: { ...result.line, sets, axisRowCount },
+      },
+      setDraft: null,
+      setDraftError: null,
+      activeAxisRow: draft.axisRow,
+    });
+  },
+
+  updateSetMath: (id, patch) =>
+    set((state) => {
+      if (!state.scene.line) return state;
+      return {
+        scene: {
+          ...state.scene,
+          line: {
+            ...state.scene.line,
+            sets: state.scene.line.sets.map((set) =>
+              set.id === id
+                ? { ...set, math: { ...set.math, ...patch }, dirty: true, error: null }
+                : set,
+            ),
+          },
+        },
+      };
+    }),
+
+  updateSetStyle: (id, patch) =>
+    set((state) => {
+      if (!state.scene.line) return state;
+      const line = state.scene.line;
+      const sets = line.sets.map((set) => {
+        if (set.id !== id) return set;
+        const next = { ...set, style: { ...set.style, ...patch } };
+        return next;
+      });
+      let points = line.points;
+      if (patch.color) {
+        points = points.map((point) =>
+          point.math.sourceSetId === id && !point.style.colorManual
+            ? { ...point, style: { ...point.style, color: patch.color! } }
+            : point,
+        );
+      }
+      return { scene: { ...state.scene, line: { ...line, sets, points } } };
+    }),
+
+  buildSet: (id) => {
+    const state = get();
+    const line = state.scene.line;
+    if (!line) return;
+    const set = line.sets.find((item) => item.id === id);
+    if (!set) return;
+    const result = buildSetMath(line, { ...set, dirty: true });
+    const sets = line.sets.map((item) => (item.id === id ? result.set : item));
+    set({
+      scene: {
+        ...state.scene,
+        line: { ...result.line, sets },
+      },
+      status: result.set.error
+        ? { built: 0, errors: [`Множество ${set.index}: ${result.set.error}`], at: Date.now() }
+        : { built: 1, errors: [], at: Date.now() },
+    });
+  },
+
+  removeSet: (id) =>
+    set((state) => {
+      if (!state.scene.line) return state;
+      return {
+        scene: {
+          ...state.scene,
+          line: removeSetFromLine(state.scene.line, id),
+        },
+      };
+    }),
+
+  startLinePointDraft: () => {
+    const state = get();
+    const line = state.scene.line;
+    if (!line) return;
+    const draft = createLinePoint(line.points.length + 1, state.activeAxisRow);
+    set({ linePointDraft: draft, linePointDraftError: null });
+  },
+
+  updateLinePointDraft: (patch) =>
+    set((state) =>
+      state.linePointDraft
+        ? { linePointDraft: { ...state.linePointDraft, ...patch }, linePointDraftError: null }
+        : state,
+    ),
+
+  updateLinePointDraftMath: (patch) =>
+    set((state) =>
+      state.linePointDraft
+        ? {
+            linePointDraft: {
+              ...state.linePointDraft,
+              math: { ...state.linePointDraft.math, ...patch },
+              dirty: true,
+            },
+            linePointDraftError: null,
+          }
+        : state,
+    ),
+
+  updateLinePointDraftStyle: (patch) =>
+    set((state) =>
+      state.linePointDraft
+        ? {
+            linePointDraft: {
+              ...state.linePointDraft,
+              style: { ...state.linePointDraft.style, ...patch },
+            },
+          }
+        : state,
+    ),
+
+  cancelLinePointDraft: () => set({ linePointDraft: null, linePointDraftError: null }),
+
+  commitLinePointDraft: () => {
+    const state = get();
+    const draft = state.linePointDraft;
+    const line = state.scene.line;
+    if (!draft || !line) return;
+    const result = buildLinePoint(line, { ...draft, dirty: true });
+    if (result.point.error) {
+      set({ linePointDraftError: result.point.error });
+      return;
+    }
+    set({
+      scene: {
+        ...state.scene,
+        line: { ...line, points: [...line.points, result.point] },
+      },
+      linePointDraft: null,
+      linePointDraftError: null,
+    });
+  },
+
+  updateLinePointMath: (id, patch) =>
+    set((state) => {
+      if (!state.scene.line) return state;
+      return {
+        scene: {
+          ...state.scene,
+          line: {
+            ...state.scene.line,
+            points: state.scene.line.points.map((point) =>
+              point.id === id && !point.locked
+                ? { ...point, math: { ...point.math, ...patch }, dirty: true, error: null }
+                : point,
+            ),
+          },
+        },
+      };
+    }),
+
+  updateLinePointStyle: (id, patch) =>
+    set((state) => {
+      if (!state.scene.line) return state;
+      let line = state.scene.line;
+      let points = line.points.map((point) => {
+        if (point.id !== id) return point;
+        const style = {
+          ...point.style,
+          ...patch,
+          colorManual: patch.color !== undefined ? true : point.style.colorManual,
+        };
+        return { ...point, style };
+      });
+      const point = points.find((p) => p.id === id);
+      if (point && patch.open !== undefined && point.locked) {
+        line = syncSetFromBoundaryPoint({ ...line, points }, point, patch.open);
+        points = line.points.map((p) => (p.id === id ? { ...p, style: { ...p.style, open: patch.open! } } : p));
+      }
+      return { scene: { ...state.scene, line: { ...line, points } } };
+    }),
+
+  buildLinePointItem: (id) => {
+    const state = get();
+    const line = state.scene.line;
+    if (!line) return;
+    const point = line.points.find((item) => item.id === id);
+    if (!point) return;
+    const result = buildLinePoint(line, { ...point, dirty: true });
+    const points = line.points.map((item) => (item.id === id ? result.point : item));
+    set({
+      scene: { ...state.scene, line: { ...line, points } },
+      status: result.point.error
+        ? { built: 0, errors: [`Точка ${point.index}: ${result.point.error}`], at: Date.now() }
+        : { built: 1, errors: [], at: Date.now() },
+    });
+  },
+
+  removeLinePoint: (id) =>
+    set((state) => {
+      if (!state.scene.line) return state;
+      const point = state.scene.line.points.find((p) => p.id === id);
+      if (point?.locked) return state;
+      return {
+        scene: {
+          ...state.scene,
+          line: {
+            ...state.scene.line,
+            points: reindex(
+              state.scene.line.points.filter((p) => p.id !== id),
+            ) as SceneLinePoint[],
+          },
+        },
+      };
+    }),
 
   updateAxis: (axis, patch) =>
     set((state) => {
@@ -340,7 +710,16 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
   },
 
   buildAll: () => {
-    const report = buildScene(get().scene);
+    const scene = get().scene;
+    if (scene.space === "line" && scene.line) {
+      const report = buildLineScene(scene.line);
+      set({
+        scene: { ...scene, line: report.line },
+        status: { built: report.built, errors: report.errors, at: Date.now() },
+      });
+      return;
+    }
+    const report = buildScene(scene);
     set({ scene: report.scene, status: { built: report.built, errors: report.errors, at: Date.now() } });
   },
 
@@ -350,36 +729,62 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       grid?: Partial<GridSpec> & { followAxisStep?: boolean; stepX?: string; stepY?: string };
     };
     const legacyGrid = input.grid ?? {};
-    const scene: PlotScene = {
-      ...base,
-      ...input,
-      axisScaleMode: input.axisScaleMode ?? base.axisScaleMode,
-      plotAspectRatio: input.plotAspectRatio ?? base.plotAspectRatio,
-      xAxis: migrateAxisImport(base.xAxis, (input.xAxis ?? {}) as Partial<AxisSpec>, legacyGrid.stepX ?? ""),
-      yAxis: migrateAxisImport(base.yAxis, (input.yAxis ?? {}) as Partial<AxisSpec>, legacyGrid.stepY ?? ""),
-      grid: { visible: legacyGrid.visible ?? base.grid.visible },
-      appearance: { ...base.appearance, ...(input.appearance ?? {}) },
-      graphs: (input.graphs ?? []).map((graph, position) => ({
-        ...createGraph(position + 1),
-        ...graph,
-        math: { ...createGraph(position + 1).math, ...graph.math },
-        style: { ...createGraph(position + 1).style, ...graph.style },
-        built: null,
-        dirty: true,
-      })),
-      points: (input.points ?? []).map((point, position) => ({
-        ...createPoint(position + 1),
-        ...point,
-        math: { ...createPoint(position + 1).math, ...point.math },
-        style: { ...createPoint(position + 1).style, ...point.style },
-        built: null,
-        dirty: true,
-      })),
-      tangents: input.tangents ?? [],
-      customColors: input.customColors ?? [],
-      version: 1,
-      space: "plane",
-    };
+    const isLine = input.space === "line";
+    const scene: PlotScene = isLine
+      ? {
+          ...createLineScene(),
+          ...input,
+          appearance: { ...createLineScene().appearance, ...(input.appearance ?? {}) },
+          line: { ...createLineScene().line!, ...(input.line ?? {}), sets: input.line?.sets ?? [], points: input.line?.points ?? [] },
+          version: 1,
+          space: "line",
+        }
+      : {
+          ...base,
+          ...input,
+          axisScaleMode: input.axisScaleMode ?? base.axisScaleMode,
+          plotAspectRatio: input.plotAspectRatio ?? base.plotAspectRatio,
+          xAxis: migrateAxisImport(base.xAxis, (input.xAxis ?? {}) as Partial<AxisSpec>, legacyGrid.stepX ?? ""),
+          yAxis: migrateAxisImport(base.yAxis, (input.yAxis ?? {}) as Partial<AxisSpec>, legacyGrid.stepY ?? ""),
+          grid: { visible: legacyGrid.visible ?? base.grid.visible },
+          appearance: { ...base.appearance, ...(input.appearance ?? {}) },
+          graphs: (input.graphs ?? []).map((graph, position) => ({
+            ...createGraph(position + 1),
+            ...graph,
+            math: { ...createGraph(position + 1).math, ...graph.math },
+            style: { ...createGraph(position + 1).style, ...graph.style },
+            built: null,
+            dirty: true,
+          })),
+          points: (input.points ?? []).map((point, position) => ({
+            ...createPoint(position + 1),
+            ...point,
+            math: { ...createPoint(position + 1).math, ...point.math },
+            style: { ...createPoint(position + 1).style, ...point.style },
+            built: null,
+            dirty: true,
+          })),
+          tangents: input.tangents ?? [],
+          customColors: input.customColors ?? [],
+          line: null,
+          version: 1,
+          space: "plane",
+        };
+    if (isLine) {
+      const report = buildLineScene(scene.line!);
+      set({
+        scene: { ...scene, line: report.line },
+        spaceTab: "line",
+        status: { built: report.built, errors: report.errors, at: Date.now() },
+        pointDraft: null,
+        pointDraftError: null,
+        setDraft: null,
+        setDraftError: null,
+        linePointDraft: null,
+        linePointDraftError: null,
+      });
+      return;
+    }
     const report = buildScene(scene);
     set({
       scene: report.scene,
@@ -389,6 +794,17 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     });
   },
 
-  resetScene: () => set({ scene: createScene(), status: null, pointDraft: null, pointDraftError: null }),
+  resetScene: () =>
+    set((state) => ({
+      scene: state.spaceTab === "line" ? createLineScene() : createScene(),
+      status: null,
+      pointDraft: null,
+      pointDraftError: null,
+      setDraft: null,
+      setDraftError: null,
+      linePointDraft: null,
+      linePointDraftError: null,
+      activeAxisRow: 0,
+    })),
 }));
 

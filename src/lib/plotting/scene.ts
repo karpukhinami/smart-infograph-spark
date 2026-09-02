@@ -139,6 +139,7 @@ export function createScene(): PlotScene {
     points: [],
     tangents: [],
     customColors: [],
+    line: null,
   };
 }
 

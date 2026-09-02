@@ -5,6 +5,7 @@
  * и SVG-рисовальщиком. Пользователь никогда не редактирует её вручную.
  */
 import type { LabelPlacement } from "./label-layout";
+import type { LineSceneData } from "./line/types";
 
 /** Значение, которое может быть задано математическим выражением. */
 export interface MathValue {
@@ -236,6 +237,8 @@ export interface PlotScene {
   tangents: SceneTangent[];
   /** Пользовательские цвета текущего чертежа. */
   customColors: string[];
+  /** Данные числовой прямой (только при space === "line"). */
+  line: LineSceneData | null;
 }
 
 /** Данные, которые получает SVG-рисовальщик (никакого UI-состояния). */
