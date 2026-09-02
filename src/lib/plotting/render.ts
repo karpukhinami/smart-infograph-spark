@@ -67,7 +67,7 @@ function axisNumber(raw: string): number | null {
   }
 }
 
-(axis: AxisSpec, min: number, max: number, equalMode: boolean): number {
+function resolveGridStep(axis: AxisSpec, min: number, max: number, equalMode: boolean): number {
   const parsed = axisNumber(axis.gridStep);
   if (parsed !== null && parsed > 0) return parsed;
   return equalMode ? 1 : niceStep(min, max);
