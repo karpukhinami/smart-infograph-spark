@@ -2,6 +2,8 @@
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { AxesSection } from "@/components/plotting/AxesSection";
 import { FunctionCard } from "@/components/plotting/FunctionCard";
 import { PointCard } from "@/components/plotting/PointCard";
@@ -21,6 +23,7 @@ export function PlotManualPanel() {
   const linePointDraft = usePlotStore((state) => state.linePointDraft);
   const startSetDraft = usePlotStore((state) => state.startSetDraft);
   const startLinePointDraft = usePlotStore((state) => state.startLinePointDraft);
+  const setAllLinePerpendiculars = usePlotStore((state) => state.setAllLinePerpendiculars);
 
   const isLine = scene.space === "line";
   const line = scene.line;
@@ -56,6 +59,15 @@ export function PlotManualPanel() {
             <CardTitle className="text-base">Точки</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {(line?.points.length ?? 0) > 0 && (
+              <div className="flex items-center justify-between rounded-md border border-border px-2 py-1.5">
+                <Label className="text-xs">Построить перпендикуляры</Label>
+                <Switch
+                  checked={line?.points.every((point) => point.style.perpendicular) ?? false}
+                  onCheckedChange={setAllLinePerpendiculars}
+                />
+              </div>
+            )}
             {!line?.points.length && !linePointDraft ? (
               <p className="text-sm text-muted-foreground">Точки пока не добавлены.</p>
             ) : (

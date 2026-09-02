@@ -417,8 +417,8 @@ export function renderLineSvg(scene: PlotScene): string | null {
 
     const labelColor = point.style.labelColor === "axis" ? a.labelColor : point.style.color;
     const coordColor = point.style.coordColor === "axis" ? a.labelColor : point.style.color;
-    const nameFontSize = a.pointLabelFontSize * 1.2;
-    const coordFontSize = a.labelFontSize * 0.72;
+    const nameFontSize = a.pointLabelFontSize;
+    const coordFontSize = a.labelFontSize;
     const name =
       point.style.showLabel && point.style.label.trim() ? point.style.label.trim() : "";
     const coord = point.style.showCoords ? point.built.displayX : "";

@@ -169,6 +169,50 @@ const VULGAR: Record<string, string> = {
   "1/5": "⅕", "1/6": "⅙", "1/8": "⅛", "3/8": "⅜", "5/8": "⅝", "7/8": "⅞",
 };
 
+function gcd(a: number, b: number): number {
+  let x = Math.abs(Math.round(a));
+  let y = Math.abs(Math.round(b));
+  while (y) {
+    const t = y;
+    y = x % y;
+    x = t;
+  }
+  return x || 1;
+}
+
+/** LaTeX для подписи координаты; null — достаточно plain-текста (display). */
+export function coordLabelLatex(value: number): string | null {
+  if (!Number.isFinite(value)) return null;
+  if (Math.abs(value) < 1e-12) return null;
+
+  const rational = approxRational(value, 12);
+  if (rational && rational.den > 1) {
+    const g = gcd(rational.num, rational.den);
+    const n = Math.abs(Math.round(rational.num / g));
+    const d = Math.round(rational.den / g);
+    const sign = value < 0 ? "-" : "";
+    return `${sign}\\frac{${n}}{${d}}`;
+  }
+
+  const piRatio = approxRational(value / Math.PI, 12);
+  if (piRatio && piRatio.num !== 0 && piRatio.den > 1) {
+    const g = gcd(piRatio.num, piRatio.den);
+    const n = Math.abs(Math.round(piRatio.num / g));
+    const d = Math.round(piRatio.den / g);
+    const sign = value < 0 ? "-" : "";
+    if (n === 1 && d === 1) return `${sign}\\pi`;
+    return `${sign}\\frac{${n}}{${d}}\\pi`;
+  }
+
+  const square = value * value;
+  if (Math.abs(square - Math.round(square)) < 1e-9 && Math.round(square) > 1) {
+    const sign = value < 0 ? "-" : "";
+    return `${sign}\\sqrt{${Math.round(square)}}`;
+  }
+
+  return null;
+}
+
 function approxRational(value: number, maxDen = 24): { num: number; den: number } | null {
   for (let den = 1; den <= maxDen; den++) {
     const num = value * den;
@@ -251,7 +295,7 @@ export function makeMathValue(raw: string, format: "number" | "fraction" | "pi" 
     normalized: parsed.normalized,
     value: numeric,
     display: hasSymbols ? exactDisplay(numeric) : displayNumber(numeric, format),
-    latex: parsed.latex,
+    latex: coordLabelLatex(numeric) ?? parsed.latex,
   };
 }
 

@@ -90,11 +90,11 @@ function PlottingPage() {
         )}
 
         <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-2 lg:overflow-hidden">
-          <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
+          <div className="min-h-0 space-y-4 overflow-y-auto lg:pr-2">
             {isAi ? <PlotAiPanel key={aiSessionKey} /> : <PlotManualPanel />}
           </div>
 
-          <div className="lg:min-h-0 lg:self-start lg:overflow-y-auto">
+          <div className="min-h-0 overflow-y-auto lg:pl-1">
             <PlotPreview />
           </div>
         </div>

@@ -1,5 +1,5 @@
 /** Построение сцены числовой прямой: множества, точки, синхронизация границ. */
-import { evaluateNumber, exactDisplay, makeMathValue } from "../math-expr";
+import { evaluateNumber, exactDisplay, makeMathValue, coordLabelLatex } from "../math-expr";
 import { parseIntervalMath, type ParsedInterval } from "./intervals";
 import type {
   BuiltSet,
@@ -123,9 +123,11 @@ function boundariesFromParts(parts: ParsedInterval[]): BuiltSet["boundaries"] {
 function builtCoord(raw: string, x: number): { x: number; displayX: string; latex: string } {
   try {
     const mv = makeMathValue(raw);
-    return { x: mv.value, displayX: mv.display, latex: mv.latex ?? mv.display };
+    const latex = coordLabelLatex(mv.value) ?? mv.latex ?? mv.display;
+    return { x: mv.value, displayX: mv.display, latex };
   } catch {
-    return { x, displayX: exactDisplay(x), latex: exactDisplay(x) };
+    const displayX = exactDisplay(x);
+    return { x, displayX, latex: coordLabelLatex(x) ?? displayX };
   }
 }
 

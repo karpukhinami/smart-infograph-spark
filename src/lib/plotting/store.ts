@@ -94,6 +94,7 @@ interface PlotStore {
   commitLinePointDraft: () => void;
   updateLinePointMath: (id: string, patch: Partial<SceneLinePoint["math"]>) => void;
   updateLinePointStyle: (id: string, patch: Partial<LinePointStyle>) => void;
+  setAllLinePerpendiculars: (enabled: boolean) => void;
   buildLinePointItem: (id: string) => void;
   removeLinePoint: (id: string) => void;
   updateAxis: (axis: "xAxis" | "yAxis", patch: Partial<AxisSpec>) => void;
@@ -391,9 +392,9 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const state = get();
     const line = state.scene.line;
     if (!line) return;
-    const set = line.sets.find((item) => item.id === id);
-    if (!set) return;
-    const result = buildSetMath(line, { ...set, dirty: true });
+    const targetSet = line.sets.find((item) => item.id === id);
+    if (!targetSet) return;
+    const result = buildSetMath(line, { ...targetSet, dirty: true });
     const sets = line.sets.map((item) => (item.id === id ? result.set : item));
     set({
       scene: {
@@ -401,7 +402,7 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
         line: { ...result.line, sets },
       },
       status: result.set.error
-        ? { built: 0, errors: [`Множество ${set.index}: ${result.set.error}`], at: Date.now() }
+        ? { built: 0, errors: [`Множество ${targetSet.index}: ${result.set.error}`], at: Date.now() }
         : { built: 1, errors: [], at: Date.now() },
     });
   },
@@ -517,6 +518,24 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
         points = line.points.map((p) => (p.id === id ? { ...p, style: { ...p.style, open: patch.open! } } : p));
       }
       return { scene: { ...state.scene, line: { ...line, points } } };
+    }),
+
+  setAllLinePerpendiculars: (enabled) =>
+    set((state) => {
+      const line = state.scene.line;
+      if (!line?.points.length) return state;
+      return {
+        scene: {
+          ...state.scene,
+          line: {
+            ...line,
+            points: line.points.map((point) => ({
+              ...point,
+              style: { ...point.style, perpendicular: enabled },
+            })),
+          },
+        },
+      };
     }),
 
   buildLinePointItem: (id) => {
