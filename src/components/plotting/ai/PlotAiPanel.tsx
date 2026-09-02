@@ -33,7 +33,7 @@ const SCENARIOS: Array<{ id: PlotAiScenario; label: string }> = [
 ];
 
 export function PlotAiPanel() {
-  const importScene = usePlotStore((s) => s.importScene);
+  const importAiScene = usePlotStore((s) => s.importAiScene);
 
   const source = usePlotSourceState();
   const [model, setModel] = useState(DEFAULT_TEXT_MODEL);
@@ -116,7 +116,7 @@ export function PlotAiPanel() {
         analysis,
         userRefinements,
       });
-      importScene(result.scene);
+      importAiScene(result.scene);
       setSceneBuilt(true);
       if ("newTaskText" in result && result.newTaskText) {
         setAnalogTaskText(result.newTaskText);

@@ -1,7 +1,6 @@
 /** Состояние страницы plotting. UI меняет только сцену; сцена — единый контракт. */
 import { create } from "zustand";
 import {
-  DEFAULT_APPEARANCE,
   EMPTY_POINT_MATH,
   buildScene,
   createGraph,
@@ -37,6 +36,7 @@ import {
   syncSetFromBoundaryPoint,
 } from "./line/scene";
 import { filterAiLinePoints, normalizeLineAxisRows } from "./line/import-ai";
+import { mergeAiScene } from "./ai/merge-scene";
 import type {
   LineAxisSpec,
   LinePointStyle,
@@ -119,6 +119,7 @@ interface PlotStore {
   buildPoint: (id: string) => void;
   buildAll: () => void;
   importScene: (raw: unknown) => void;
+  importAiScene: (raw: unknown) => void;
   resetScene: () => void;
 }
 
@@ -141,6 +142,34 @@ function axisBounds(min: string, max: string): { min: number; max: number } | nu
 function autoGridStepForAxis(axis: AxisSpec): string {
   const bounds = axisBounds(axis.min, axis.max);
   return bounds ? String(niceStep(bounds.min, bounds.max)) : axis.gridStep;
+}
+
+function commitImportedScene(
+  set: (partial: Partial<PlotStore> | ((state: PlotStore) => Partial<PlotStore>)) => void,
+  scene: PlotScene,
+): void {
+  if (scene.space === "line" && scene.line) {
+    const report = buildLineScene(scene.line);
+    set({
+      scene: { ...scene, line: report.line },
+      spaceTab: "line",
+      status: { built: report.built, errors: report.errors, at: Date.now() },
+      pointDraft: null,
+      pointDraftError: null,
+      setDraft: null,
+      setDraftError: null,
+      linePointDraft: null,
+      linePointDraftError: null,
+    });
+    return;
+  }
+  const report = buildScene(scene);
+  set({
+    scene: report.scene,
+    status: { built: report.built, errors: report.errors, at: Date.now() },
+    pointDraft: null,
+    pointDraftError: null,
+  });
 }
 
 export const usePlotStore = create<PlotStore>((set, get) => ({
@@ -571,7 +600,14 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     })),
 
   resetAppearance: () =>
-    set((state) => ({ scene: { ...state.scene, appearance: { ...DEFAULT_APPEARANCE } } })),
+    set((state) => ({
+      scene: {
+        ...state.scene,
+        appearance: {
+          ...(state.scene.space === "line" ? createLineScene().appearance : createScene().appearance),
+        },
+      },
+    })),
 
   addGraph: () =>
     set((state) => ({
@@ -740,10 +776,13 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
             sets: input.line?.sets ?? [],
             points: filterAiLinePoints(input.line?.points),
           });
+          const lineDefaults = createLineScene();
           return {
-            ...createLineScene(),
+            ...lineDefaults,
             ...input,
-            appearance: { ...createLineScene().appearance, ...(input.appearance ?? {}) },
+            appearance: input.appearance
+              ? { ...lineDefaults.appearance, ...input.appearance }
+              : lineDefaults.appearance,
             line: {
               ...lineBase,
               ...rawLine,
@@ -779,7 +818,9 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
           xAxis: migrateAxisImport(base.xAxis, (input.xAxis ?? {}) as Partial<AxisSpec>, legacyGrid.stepX ?? ""),
           yAxis: migrateAxisImport(base.yAxis, (input.yAxis ?? {}) as Partial<AxisSpec>, legacyGrid.stepY ?? ""),
           grid: { visible: legacyGrid.visible ?? base.grid.visible },
-          appearance: { ...base.appearance, ...(input.appearance ?? {}) },
+          appearance: input.appearance
+            ? { ...base.appearance, ...input.appearance }
+            : base.appearance,
           graphs: (input.graphs ?? []).map((graph, position) => ({
             ...createGraph(position + 1),
             ...graph,
@@ -802,28 +843,11 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
           version: 1,
           space: "plane",
         };
-    if (isLine) {
-      const report = buildLineScene(scene.line!);
-      set({
-        scene: { ...scene, line: report.line },
-        spaceTab: "line",
-        status: { built: report.built, errors: report.errors, at: Date.now() },
-        pointDraft: null,
-        pointDraftError: null,
-        setDraft: null,
-        setDraftError: null,
-        linePointDraft: null,
-        linePointDraftError: null,
-      });
-      return;
-    }
-    const report = buildScene(scene);
-    set({
-      scene: report.scene,
-      status: { built: report.built, errors: report.errors, at: Date.now() },
-      pointDraft: null,
-      pointDraftError: null,
-    });
+    commitImportedScene(set, scene);
+  },
+
+  importAiScene: (raw) => {
+    commitImportedScene(set, mergeAiScene(raw));
   },
 
   resetScene: () =>

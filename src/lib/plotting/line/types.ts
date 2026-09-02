@@ -157,6 +157,5 @@ export const DEFAULT_LINE_TICKS: LineTickSettings = {
 export const LINE_APPEARANCE_OVERRIDES = {
   width: 720,
   height: 144,
-  frame: false,
   padding: 16,
 } as const;

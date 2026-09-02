@@ -1,99 +1,91 @@
-СХЕМА JSON-СЦЕНЫ: КООРДИНАТНАЯ ПЛОСКОСТЬ (space = "plane")
-
-Корневой объект scene — PlotScene. Обязательные поля для построения:
-
-{
-  "version": 1,
-  "space": "plane",
-  "axisScaleMode": "equal" | "independent",
-  "plotAspectRatio": "1:1" | "4:3" | "3:2" | "16:9" | "3:4",
-  "xAxis": { ... },
-  "yAxis": { ... },
-  "grid": { "visible": boolean },
-  "appearance": { ... },   // необязательно; можно опустить — подставятся значения по умолчанию
-  "graphs": [ ... ],
-  "points": [ ... ],
-  "tangents": [],
-  "customColors": []
-}
-
-ОСИ (xAxis, yAxis) — объекты AxisSpec:
-- name: string — имя переменной ("x", "t", "x_1" и т. п.)
-- unit: string — единица измерения или ""
-- min, max: string — границы области в виде выражений ("-5", "2*pi", "pi/2")
-- gridStep: string — шаг линий сетки ("1", "0.5", "pi/4")
-- labelStep: string — шаг засечек и подписей; "" = совпадает с gridStep
-- labelFormat: "number" | "fraction" | "pi"
-- markRule: "zeroOnly" | "zeroAndFirst" | "all" | "selected"
-- selectedMarks: string — через запятую, если markRule = "selected"
-
-axisScaleMode:
-- "equal" — квадратная сетка, один масштаб (типичная алгебра)
-- "independent" — независимые шкалы (физика); plotAspectRatio задаёт форму области
-
-grid.visible — показывать ли сетку.
-
-appearance (PlotAppearance, все числа):
-width, height (обычно 720×720 или по пропорции), equalScale, padding,
-axisWidth, axisColor, arrowSize, gridWidth, gridColor,
-frame, frameWidth, frameColor, tickWidth, tickSize,
-labelFontFamily, labelFontSize, labelColor,
-graphWidth, pointRadius, pointLabelFontSize, pointLabelFontFamily,
-projectionWidth, projectionColor
-
-ГРАФИК (graphs[]) — SceneGraph без id/built/dirty/error:
-{
-  "index": number,
-  "math": {
-    "kind": "explicit" | "implicit" | "piecewise" | "qualitative",
-    "expression": string,     // для explicit: выражение от x, напр. "x^2 - 2*x + 1"
-    "equation": string,         // для implicit: полное уравнение, напр. "x^2 + y^2 = 1"
-    "pieces": [                 // для piecewise
-      { "expression": string, "from": string, "to": string, "includeFrom": boolean, "includeTo": boolean }
-    ],
-    "anchors": [                // для qualitative — опорные точки
-      { "x": string, "y": string, "kind": "plain" | "min" | "max" }
-    ],
-    "extendEnds": boolean,
-    "domainFrom": string,       // ограничение построения; "" = по осям
-    "domainTo": string
-  },
-  "style": {
-    "color": "#29A2E5",         // из палитры или свой hex
-    "width": null | number,
-    "label": string,
-    "visible": true
-  }
-}
-
-Выражения — синтаксис math.js: +, -, *, /, ^, sin, cos, tan, sqrt, abs, pi, e.
-
-ТОЧКА (points[]) — ScenePoint:
-{
-  "index": number,
-  "math": {
-    "mode": "plane" | "onGraph" | "intersection" | "anchor",
-    "x": string, "y": string,
-    "graphId": null | string,
-    "graphIdB": null | string,
-    "anchorIndex": null | number
-  },
-  "style": {
-    "color": string,
-    "open": boolean,
-    "label": string,
-    "showCoords": boolean,
-    "visible": true,
-    "projectX": boolean,
-    "projectY": boolean,
-    "labelProjectionX": boolean,
-    "labelProjectionY": boolean,
-    "labelPlacement": "auto" | "above" | "below" | "left" | "right" | ...
-  }
-}
-
-Рекомендации:
-- Подбирай min/max осей с запасом вокруг графика и точек.
-- gridStep — разумный (1, 0.5, 2); для pi используй labelFormat "pi".
-- Несколько графиков — разные цвета из палитры: #29A2E5, #FF9935, #FF3C8A, #9050C7, #5DBB3B, #31C2A7.
-- Для пересечения графиков: mode "intersection", graphId и graphIdB — id соответствующих graphs (если id не заданы, укажите index и поясните в expression координаты через mode "plane").
+СХЕМА JSON-СЦЕНЫ: КООРДИНАТНАЯ ПЛОСКОСТЬ (space = "plane")
+
+Корневой объект scene — PlotScene. Обязательные поля для построения:
+
+{
+  "version": 1,
+  "space": "plane",
+  "axisScaleMode": "equal" | "independent",
+  "plotAspectRatio": "1:1" | "4:3" | "3:2" | "16:9" | "3:4",
+  "xAxis": { ... },
+  "yAxis": { ... },
+  "grid": { "visible": boolean },
+  "graphs": [ ... ],
+  "points": [ ... ],
+  "tangents": []
+}
+
+{{COLOR_GROUPS_RULES}}
+
+ОСИ (xAxis, yAxis) — объекты AxisSpec:
+- name: string — имя переменной ("x", "t", "x_1" и т. п.)
+- unit: string — единица измерения или ""
+- min, max: string — границы области в виде выражений ("-5", "2*pi", "pi/2")
+- gridStep: string — шаг линий сетки ("1", "0.5", "pi/4")
+- labelStep: string — шаг засечек и подписей; "" = совпадает с gridStep
+- labelFormat: "number" | "fraction" | "pi"
+- markRule: "zeroOnly" | "zeroAndFirst" | "all" | "selected"
+- selectedMarks: string — через запятую, если markRule = "selected"
+
+axisScaleMode:
+- "equal" — квадратная сетка, один масштаб (типичная алгебра)
+- "independent" — независимые шкалы (физика); plotAspectRatio задаёт форму области
+
+grid.visible — показывать ли сетку.
+
+ГРАФИК (graphs[]) — SceneGraph без id/built/dirty/error:
+{
+  "index": number,
+  "math": {
+    "kind": "explicit" | "implicit" | "piecewise" | "qualitative",
+    "expression": string,
+    "equation": string,
+    "pieces": [
+      { "expression": string, "from": string, "to": string, "includeFrom": boolean, "includeTo": boolean }
+    ],
+    "anchors": [
+      { "x": string, "y": string, "kind": "plain" | "min" | "max" }
+    ],
+    "extendEnds": boolean,
+    "domainFrom": string,
+    "domainTo": string
+  },
+  "style": {
+    "colorGroup": number,   // 1–6, см. COLOR_GROUPS_RULES
+    "width": null | number,
+    "label": string,
+    "visible": true
+  }
+}
+
+Выражения — синтаксис math.js: +, -, *, /, ^, sin, cos, tan, sqrt, abs, pi, e.
+
+ТОЧКА (points[]) — ScenePoint:
+{
+  "index": number,
+  "math": {
+    "mode": "plane" | "onGraph" | "intersection" | "anchor",
+    "x": string, "y": string,
+    "graphId": null | string,
+    "graphIdB": null | string,
+    "anchorIndex": null | number
+  },
+  "style": {
+    "colorGroup": number,   // необязательно
+    "open": boolean,
+    "label": string,
+    "showCoords": boolean,
+    "visible": true,
+    "projectX": boolean,
+    "projectY": boolean,
+    "labelProjectionX": boolean,
+    "labelProjectionY": boolean,
+    "labelPlacement": "auto" | "above" | "below" | "left" | "right" | ...
+  }
+}
+
+Рекомендации:
+- Подбирай min/max осей с запасом вокруг графика и точек.
+- gridStep — разумный (1, 0.5, 2); для pi используй labelFormat "pi".
+- Несколько графиков — разные colorGroup (1, 2, 3…).
+- Для пересечения графиков: mode "intersection", graphId и graphIdB — id соответствующих graphs (если id не заданы, укажите index и поясните в expression координаты через mode "plane").

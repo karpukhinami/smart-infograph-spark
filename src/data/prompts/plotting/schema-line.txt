@@ -1,38 +1,38 @@
-СХЕМА JSON-СЦЕНЫ: ЧИСЛОВАЯ ПРЯМАЯ (space = "line")
-
-Корневой объект scene — PlotScene с space = "line". Математические данные в scene.line:
-
-{
-  "version": 1,
-  "space": "line",
-  "axisScaleMode": "independent",
-  "plotAspectRatio": "4:3",
-  "grid": { "visible": false },
-  "appearance": { "width": 720, "height": 144, "frame": false, "padding": 16, ... },
-  "graphs": [],
-  "points": [],
-  "tangents": [],
-  "customColors": [],
-  "line": {
-    "axis": { "name": "x", "unit": "", "min": "2", "max": "5", "majorStep": "1" },
-    "ticks": { "majorVisible": false, "majorLabelMode": "none", "minorEnabled": false, ... },
-    "axisRowCount": 1,
-    "sets": [ ... ],
-    "points": []
-  }
-}
-
-{{LINE_SETS_RULES}}
-
-ТОЧКА НА ПРЯМОЙ (line.points[]) — только если нужны точки, НЕ являющиеся границами множеств:
-{
-  "index": number,
-  "axisRow": 0,
-  "math": { "coordinate": string, "sourceSetId": null, "boundaryKey": null },
-  "style": { "open": boolean, "label": string, "showCoords": boolean, "coordSide": "below", ... }
-}
-Если все точки — границы интервалов из sets, оставь "points": [].
-
-Рекомендации:
-- min/max оси — с запасом вокруг решения.
-- majorStep — разумный (1 или 2), используется только если majorVisible: true.
+СХЕМА JSON-СЦЕНЫ: ЧИСЛОВАЯ ПРЯМАЯ (space = "line")
+
+Корневой объект scene — PlotScene с space = "line". Математические данные в scene.line:
+
+{
+  "version": 1,
+  "space": "line",
+  "axisScaleMode": "independent",
+  "plotAspectRatio": "4:3",
+  "grid": { "visible": false },
+  "graphs": [],
+  "points": [],
+  "tangents": [],
+  "line": {
+    "axis": { "name": "x", "unit": "", "min": "2", "max": "5", "majorStep": "1" },
+    "ticks": { "majorVisible": false, "majorLabelMode": "none", "minorEnabled": false, ... },
+    "axisRowCount": 1,
+    "sets": [ ... ],
+    "points": []
+  }
+}
+
+{{COLOR_GROUPS_RULES}}
+
+{{LINE_SETS_RULES}}
+
+ТОЧКА НА ПРЯМОЙ (line.points[]) — только если нужны точки, НЕ являющиеся границами множеств:
+{
+  "index": number,
+  "axisRow": 0,
+  "math": { "coordinate": string, "sourceSetId": null, "boundaryKey": null },
+  "style": { "colorGroup": number, "open": boolean, "label": string, "showCoords": boolean, "coordSide": "below", ... }
+}
+Если все точки — границы интервалов из sets, оставь "points": [].
+
+Рекомендации:
+- min/max оси — с запасом вокруг решения.
+- majorStep — разумный (1 или 2), используется только если majorVisible: true.

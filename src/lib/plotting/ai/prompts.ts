@@ -5,12 +5,17 @@ import analyzeReproduce from "@/data/prompts/plotting/analyze-reproduce.txt?raw"
 import analyzeAnalog from "@/data/prompts/plotting/analyze-analog.txt?raw";
 import generateScene from "@/data/prompts/plotting/generate-scene.txt?raw";
 import generateAnalog from "@/data/prompts/plotting/generate-analog.txt?raw";
-import schemaPlane from "@/data/prompts/plotting/schema-plane.txt?raw";
+import schemaPlaneRaw from "@/data/prompts/plotting/schema-plane.txt?raw";
 import schemaLineRaw from "@/data/prompts/plotting/schema-line.txt?raw";
 import lineSetsRules from "@/data/prompts/plotting/line-sets-rules.txt?raw";
+import colorGroupsRules from "@/data/prompts/plotting/color-groups.txt?raw";
 import type { PlotAiScenario, PlotAnalysisResult, PlotSceneType } from "./types";
 
-const schemaLine = schemaLineRaw.replaceAll("{{LINE_SETS_RULES}}", lineSetsRules);
+const schemaLine = schemaLineRaw
+  .replaceAll("{{LINE_SETS_RULES}}", lineSetsRules)
+  .replaceAll("{{COLOR_GROUPS_RULES}}", colorGroupsRules);
+
+const schemaPlane = schemaPlaneRaw.replaceAll("{{COLOR_GROUPS_RULES}}", colorGroupsRules);
 
 function injectShared(template: string, sourceText: string): string {
   const shared = sharedSourceRules.replaceAll("{{SOURCE_TEXT}}", sourceText || "(материал не передан)");
@@ -73,7 +78,8 @@ export function analysisSchemaHint(): string {
 }
 
 export function generateSchemaHint(scenario: PlotAiScenario): string {
+  const sceneHint = "PlotScene; цвета — colorGroup 1–6 в style";
   return scenario === "analog"
-    ? `{ "newTaskText": string, "scene": PlotScene }`
-    : `{ "scene": PlotScene }`;
+    ? `{ "newTaskText": string, "scene": ${sceneHint} }`
+    : `{ "scene": ${sceneHint} }`;
 }

@@ -31,7 +31,7 @@
     "index": 1,
     "axisRow": 0,
     "math": { "kind": "interval", "left": "3", "right": "4", "leftOp": "<", "rightOp": "<", "rayOp": ">=", "rayBoundary": "", "freeformInput": "" },
-    "style": { "color": "#e09033", "display": "hatchRight", "position": "above", "visible": true }
+    "style": { "colorGroup": 2, "display": "hatchRight", "position": "above", "visible": true }
   }],
   "points": [],
   "ticks": { "majorVisible": false, "majorLabelMode": "none", "minorEnabled": false }
