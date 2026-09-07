@@ -1,35 +1,51 @@
 # Local analytics specs (PDFs, drafts)
 Аналитика/
 
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
+# Dependencies & build (Render: bun install && bun run build)
 node_modules
+package-lock.json
+
 dist
 dist-ssr
 .output
 .vinxi
-.tanstack/**
+.tanstack
 .nitro
+.vite
+*.tsbuildinfo
+
+# Secrets
+.env
+.env.*
+!.env.example
 *.local
+
+# Logs
+logs
+*.log
+bun-debug.log*
 
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
 
-# Editor directories and files
+# Editors (не .lovable — нужен для Lovable)
 .vscode/*
 !.vscode/extensions.json
 .idea
+.cursor/
+
+# OS
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
+Desktop.ini
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Tests
+coverage/
