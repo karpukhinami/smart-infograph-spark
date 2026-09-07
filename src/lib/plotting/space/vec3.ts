@@ -106,6 +106,24 @@ export function linePlaneIntersection(
   return add(a, scale(dir, t));
 }
 
+/** Прямая пересечения двух плоскостей: n·p + d = 0. */
+export function intersectPlanes(
+  pA: PlaneEq,
+  pB: PlaneEq,
+): { origin: Vec3; dir: Vec3 } | null {
+  const dirRaw = cross(pA.normal, pB.normal);
+  const dirLenSq = dot(dirRaw, dirRaw);
+  if (dirLenSq < 1e-12) return null;
+  const dir = normalize(dirRaw);
+  const h1 = -pA.d;
+  const h2 = -pB.d;
+  const origin = scale(
+    add(scale(cross(pB.normal, dirRaw), h1), scale(cross(dirRaw, pA.normal), h2)),
+    1 / dirLenSq,
+  );
+  return { origin, dir };
+}
+
 export function segmentPlaneIntersection(
   a: Vec3,
   b: Vec3,

@@ -6,6 +6,7 @@ import {
   faceNormal,
   len,
   linePlaneIntersection,
+  intersectPlanes,
   localToWorld,
   lerp,
   normalize,
@@ -258,14 +259,7 @@ export function resolveLineCarrier(
     const pA = planeEqs.get(def.planeAId);
     const pB = planeEqs.get(def.planeBId);
     if (!pA || !pB) return null;
-    const dir = cross(pA.normal, pB.normal);
-    if (len(dir) < 1e-6) return null;
-    const d = normalize(dir);
-    const origin =
-      linePlaneIntersection({ x: 0, y: 0, z: 0 }, { x: d.x, y: d.y, z: d.z }, pA) ??
-      linePlaneIntersection({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, pA);
-    if (!origin) return null;
-    return { origin, dir: d };
+    return intersectPlanes(pA, pB);
   }
   return null;
 }
@@ -375,7 +369,54 @@ export function computeLineDisplayRange(
   return { t0: lo - extension, t1: hi + extension };
 }
 
-/** Диапазон t на носителе, покрывающий проекцию многоугольника. */
+/** Точка внутри выпуклого четырёхугольника в 3D. */
+function pointInPolygon3D(p: Vec3, polygon: Vec3[]): boolean {
+  if (polygon.length < 3) return false;
+  const v0 = polygon[0]!;
+  const v1 = polygon[1]!;
+  const v2 = polygon[2]!;
+  const n = cross(sub(v1, v0), sub(v2, v0));
+  if (len(n) < 1e-9) return false;
+  const nn = normalize(n);
+  if (Math.abs(dot(sub(p, v0), nn)) > 1e-4) return false;
+  const e1 = sub(v1, v0);
+  const e2 = sub(polygon[polygon.length === 4 ? 3 : 2]!, v0);
+  const a = dot(e1, e1);
+  const b = dot(e1, e2);
+  const c = dot(e2, e2);
+  const toP = sub(p, v0);
+  const d = dot(e1, toP);
+  const e = dot(e2, toP);
+  const denom = a * c - b * b;
+  if (Math.abs(denom) < 1e-9) return false;
+  const u = (d * c - b * e) / denom;
+  const v = (a * e - b * d) / denom;
+  return u >= -0.02 && v >= -0.02 && u + v <= 1.02;
+}
+
+/** Отрезок пересечения линии с выпуклым многоугольником в 3D. */
+export function clipLineToConvexPolygon(
+  origin: Vec3,
+  dir: Vec3,
+  polygon: Vec3[],
+): { t0: number; t1: number } | null {
+  if (polygon.length < 2) return null;
+  const ts = polygon.map((v) => dot(sub(v, origin), dir));
+  let tMin = Math.min(...ts);
+  let tMax = Math.max(...ts);
+  if (!(tMax - tMin > 1e-9)) return null;
+  const samples = 48;
+  const inside: number[] = [];
+  for (let i = 0; i <= samples; i += 1) {
+    const t = tMin + ((tMax - tMin) * i) / samples;
+    const p = add(origin, scale(dir, t));
+    if (pointInPolygon3D(p, polygon)) inside.push(t);
+  }
+  if (!inside.length) return null;
+  return { t0: Math.min(...inside), t1: Math.max(...inside) };
+}
+
+/** @deprecated используйте clipLineToConvexPolygon */
 export function clipLineToPolygon(
   origin: Vec3,
   dir: Vec3,
@@ -398,8 +439,8 @@ export function planeIntersectionSegmentRange(
   const sectionA = computeFaceOrPlaneSection(planeAId, figure, points, planeEqs);
   const sectionB = computeFaceOrPlaneSection(planeBId, figure, points, planeEqs);
   if (!sectionA?.length || !sectionB?.length) return null;
-  const clipA = clipLineToPolygon(carrier.origin, carrier.dir, sectionA);
-  const clipB = clipLineToPolygon(carrier.origin, carrier.dir, sectionB);
+  const clipA = clipLineToConvexPolygon(carrier.origin, carrier.dir, sectionA);
+  const clipB = clipLineToConvexPolygon(carrier.origin, carrier.dir, sectionB);
   if (!clipA || !clipB) return null;
   const t0 = Math.max(clipA.t0, clipB.t0);
   const t1 = Math.min(clipA.t1, clipB.t1);

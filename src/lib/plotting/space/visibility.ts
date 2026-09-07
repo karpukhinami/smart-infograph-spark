@@ -181,7 +181,7 @@ function intersectLinePlaneT(origin: Vec3, dir: Vec3, plane: PlaneEq): number | 
   return -(dot(plane.normal, origin) + plane.d) / denom;
 }
 
-function pointInFace3D(
+export function pointInFace3D(
   p: Vec3,
   faceVertexIds: string[],
   points: ResolvedSpaceScene["points"],
@@ -206,6 +206,28 @@ function pointInFace3D(
   const u = (d * c - b * e) / denom;
   const v = (a * e - b * d) / denom;
   return u >= -0.02 && v >= -0.02 && u + v <= 1.02;
+}
+
+export function classifySegmentFaceVisibility(
+  a: Vec3,
+  b: Vec3,
+  figure: ParallelepipedFigure,
+  points: ResolvedSpaceScene["points"],
+): "visible" | "hidden" | "occlude" {
+  for (const faceId of VISIBLE_FACE_IDS) {
+    const face = faceById(figure, faceId);
+    if (!face) continue;
+    if (pointInFace3D(a, face.vertexIds, points) && pointInFace3D(b, face.vertexIds, points)) {
+      return "visible";
+    }
+  }
+  for (const face of figure.faces) {
+    if (VISIBLE_FACE_IDS.has(face.id)) continue;
+    if (pointInFace3D(a, face.vertexIds, points) && pointInFace3D(b, face.vertexIds, points)) {
+      return "hidden";
+    }
+  }
+  return "occlude";
 }
 
 function cross(a: Vec3, b: Vec3): Vec3 {
