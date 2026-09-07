@@ -6,6 +6,7 @@
  */
 import type { LabelPlacement } from "./label-layout";
 import type { LineSceneData } from "./line/types";
+import type { SpaceSceneData } from "./space/types";
 
 /** Значение, которое может быть задано математическим выражением. */
 export interface MathValue {
@@ -239,6 +240,8 @@ export interface PlotScene {
   customColors: string[];
   /** Данные числовой прямой (только при space === "line"). */
   line: LineSceneData | null;
+  /** Данные пространственной сцены (только при space === "space"). */
+  space3d: SpaceSceneData | null;
 }
 
 /** Данные, которые получает SVG-рисовальщик (никакого UI-состояния). */

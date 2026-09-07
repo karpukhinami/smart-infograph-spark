@@ -6,6 +6,7 @@ import { usePlotStore } from "@/lib/plotting/store";
 import { draftRenderPoints, sceneCurves, scenePoints } from "@/lib/plotting/scene";
 import { renderPlotSvg } from "@/lib/plotting/render";
 import { renderLineSvg } from "@/lib/plotting/line/render";
+import { renderSpaceSvg } from "@/lib/plotting/space/render";
 import { generatePlotBeautifiedImage } from "@/lib/plotting/beautify";
 import { downloadPng, downloadSceneJson, downloadSvg, readSceneJson } from "@/lib/plotting/export";
 import { PlotBeautifyDialog } from "@/components/plotting/PlotBeautifyDialog";
@@ -28,6 +29,7 @@ export function PlotPreview() {
 
   const svg = useMemo(() => {
     if (scene.space === "line") return renderLineSvg(scene);
+    if (scene.space === "space" && scene.space3d) return renderSpaceSvg(scene.space3d);
     return renderPlotSvg(scene, sceneCurves(scene), [
       ...scenePoints(scene),
       ...draftRenderPoints(scene, pointDraft),
@@ -127,7 +129,9 @@ export function PlotPreview() {
             <p className="p-8 text-center text-sm text-muted-foreground">
               {spaceTab === "line"
                 ? "Заполните пределы оси, чтобы увидеть числовую прямую."
-                : "Заполните пределы обеих осей, чтобы увидеть координатную плоскость."}
+                : spaceTab === "space"
+                  ? "Выберите фигуру и создайте параллелепипед."
+                  : "Заполните пределы обеих осей, чтобы увидеть координатную плоскость."}
             </p>
           )}
         </div>

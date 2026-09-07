@@ -8,3 +8,6 @@ export * from "./solve";
 export * from "./render";
 export * from "./scene";
 export * from "./export";
+export * from "./space/types";
+export * from "./space/scene";
+export * from "./space/render";

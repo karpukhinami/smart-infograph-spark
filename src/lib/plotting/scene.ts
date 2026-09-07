@@ -2,6 +2,7 @@
 import { buildGraph, parseAnchors, piecewiseValuesAt, type PlotBounds } from "./build";
 import { evaluateNumber, exactDisplay, makeMathValue } from "./math-expr";
 import { resolveGeometry } from "./render";
+import { createSpaceSceneData } from "./space/scene";
 import { intersectGraphs, pointsOnGraphAtX } from "./solve";
 import type {
   AxisSpec,
@@ -140,6 +141,26 @@ export function createScene(): PlotScene {
     tangents: [],
     customColors: [],
     line: null,
+    space3d: null,
+  };
+}
+
+export function createSpacePlotScene(): PlotScene {
+  return {
+    version: 1,
+    space: "space",
+    axisScaleMode: "equal",
+    plotAspectRatio: "4:3",
+    xAxis: { ...createAxis("x") },
+    yAxis: { ...createAxis("y") },
+    grid: { visible: false },
+    appearance: { ...DEFAULT_APPEARANCE },
+    graphs: [],
+    points: [],
+    tangents: [],
+    customColors: [],
+    line: null,
+    space3d: createSpaceSceneData(),
   };
 }
 

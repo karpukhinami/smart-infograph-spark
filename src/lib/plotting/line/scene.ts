@@ -39,6 +39,7 @@ export function createLineScene() {
     tangents: [],
     customColors: [],
     line: createLineSceneData(),
+    space3d: null,
   };
 }
 

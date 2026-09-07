@@ -41,6 +41,7 @@ function PlottingPage() {
   const [aiSessionKey, setAiSessionKey] = useState(0);
   const isAi = inputMode === "ai";
   const isLine = spaceTab === "line";
+  const isSpace = spaceTab === "space";
 
   function handleReset() {
     resetScene();
@@ -60,7 +61,9 @@ function PlottingPage() {
                 ? "ИИ-режим: анализ материала и построение чертежа."
                 : isLine
                   ? "Конструктор чертежей на числовой прямой."
-                  : "Конструктор математических чертежей на координатной плоскости."}
+                  : isSpace
+                    ? "Конструктор пространственных чертежей."
+                    : "Конструктор математических чертежей на координатной плоскости."}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -82,9 +85,7 @@ function PlottingPage() {
             <TabsList>
               <TabsTrigger value="line">Числовая прямая</TabsTrigger>
               <TabsTrigger value="plane">Координатная плоскость</TabsTrigger>
-              <TabsTrigger value="space" disabled>
-                Пространство
-              </TabsTrigger>
+              <TabsTrigger value="space">Пространство</TabsTrigger>
             </TabsList>
           </Tabs>
         )}

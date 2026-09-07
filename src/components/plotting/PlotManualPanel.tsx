@@ -8,6 +8,7 @@ import { AxesSection } from "@/components/plotting/AxesSection";
 import { FunctionCard } from "@/components/plotting/FunctionCard";
 import { PointCard } from "@/components/plotting/PointCard";
 import { PointDraftPanel } from "@/components/plotting/PointDraftPanel";
+import { SpaceManualPanel } from "@/components/plotting/space/SpaceManualPanel";
 import { LineAxisSection } from "@/components/plotting/line/LineAxisSection";
 import { SetCard, SetDraftPanel } from "@/components/plotting/line/SetCard";
 import { LinePointCard, LinePointDraftPanel } from "@/components/plotting/line/LinePointCard";
@@ -26,7 +27,12 @@ export function PlotManualPanel() {
   const setAllLinePerpendiculars = usePlotStore((state) => state.setAllLinePerpendiculars);
 
   const isLine = scene.space === "line";
+  const isSpace = scene.space === "space";
   const line = scene.line;
+
+  if (isSpace) {
+    return <SpaceManualPanel />;
+  }
 
   if (isLine) {
     return (
