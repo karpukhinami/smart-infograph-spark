@@ -19,7 +19,7 @@ import {
   worldToLocal,
   type PlaneEq,
 } from "./vec3";
-import { projectPoint, viewDirection, type ProjectedPoint } from "./camera";
+import { projectFromLocalCoeffs, viewDirection, type ProjectedPoint } from "./camera";
 import { faceById, vertexById } from "./parallelepiped";
 import type {
   BuiltSpacePoint,
@@ -335,7 +335,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   }
 
   for (const [id, pt] of points) {
-    projected.set(id, projectPoint(pt.world, data.view));
+    projected.set(id, projectFromLocalCoeffs(pt.local, pt.world, data.view));
   }
 
   return { basis, points, projected, planes, lineErrors, planeErrors, pointErrors, errors };

@@ -1,8 +1,7 @@
-import { add, dot, lerp, scale, sub } from "./vec3";
+import { projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
 import { facePlane, type ResolvedSpaceScene } from "./build";
-import { viewDirection } from "./camera";
-import type { ParallelepipedFigure, RenderLineSegment, SpaceViewParams, Vec3 } from "./types";
-import type { PlaneEq } from "./vec3";
+import type { ParallelepipedFigure, SpaceViewParams, Vec3 } from "./types";
+import { add, dot, len, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
 
 export interface LineSplitSegment {
   a: Vec3;
@@ -10,7 +9,229 @@ export interface LineSplitSegment {
   visible: boolean;
 }
 
-/** Разбиение отображаемого участка линии на видимые/скрытые части относительно тела. */
+interface ScreenVert {
+  x: number;
+  y: number;
+  depth: number;
+}
+
+interface OccluderFace {
+  id: string;
+  verts: [ScreenVert, ScreenVert, ScreenVert, ScreenVert];
+  area: number;
+}
+
+export interface OcclusionContext {
+  basis: ResolvedSpaceScene["basis"];
+  view: SpaceViewParams;
+  faces: OccluderFace[];
+  /** Проекции 12 рёбер для 2D-пересечений. */
+  edgeScreens: Array<{ aId: string; bId: string; a: ScreenVert; b: ScreenVert }>;
+}
+
+const DEPTH_EPS = 1e-4;
+const T_EPS = 1e-7;
+const MIN_FACE_AREA = 1e-8;
+
+function projectWorldPoint(
+  world: Vec3,
+  local: { u: number; v: number; w: number } | null,
+  ctx: OcclusionContext,
+): ProjectedPoint {
+  const lc =
+    local ??
+    worldToLocal(world, ctx.basis) ?? { u: 0, v: 0, w: 0 };
+  return projectFromLocalCoeffs(lc, world, ctx.view);
+}
+
+function quadArea2D(v: ScreenVert[]): number {
+  if (v.length < 3) return 0;
+  let area = 0;
+  for (let i = 0; i < v.length; i += 1) {
+    const a = v[i]!;
+    const b = v[(i + 1) % v.length]!;
+    area += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(area) * 0.5;
+}
+
+function pointInQuad2D(px: number, py: number, verts: ScreenVert[]): boolean {
+  if (verts.length < 4) return false;
+  let sign = 0;
+  for (let i = 0; i < 4; i += 1) {
+    const a = verts[i]!;
+    const b = verts[(i + 1) % 4]!;
+    const cross = (b.x - a.x) * (py - a.y) - (b.y - a.y) * (px - a.x);
+    if (Math.abs(cross) < 1e-12) continue;
+    if (sign === 0) sign = Math.sign(cross);
+    else if (Math.sign(cross) !== sign) return false;
+  }
+  return sign !== 0;
+}
+
+/** Бilinear depth на четырёхугольнике грани. */
+function depthOnFace(px: number, py: number, verts: ScreenVert[]): number {
+  const [v0, v1, v2, v3] = verts;
+  const denom = (v2!.x - v0!.x) * (v3!.y - v0!.y) - (v2!.y - v0!.y) * (v3!.x - v0!.x);
+  if (Math.abs(denom) < 1e-12) {
+    return (v0!.depth + v1!.depth + v2!.depth + v3!.depth) * 0.25;
+  }
+  const u = ((px - v0!.x) * (v3!.y - v0!.y) - (py - v0!.y) * (v3!.x - v0!.x)) / denom;
+  const v = ((px - v0!.x) * (v1!.y - v0!.y) - (py - v0!.y) * (v1!.x - v0!.x)) / denom;
+  const d0 = v0!.depth + u * (v1!.depth - v0!.depth) + v * (v3!.depth - v0!.depth);
+  const d1 = v0!.depth + u * (v2!.depth - v0!.depth) + v * (v3!.depth - v0!.depth);
+  return (d0 + d1) * 0.5;
+}
+
+export function buildOcclusionContext(
+  figure: ParallelepipedFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
+): OcclusionContext {
+  const ctx: OcclusionContext = {
+    basis: resolved.basis,
+    view,
+    faces: [],
+    edgeScreens: [],
+  };
+
+  for (const face of figure.faces) {
+    const raw = face.vertexIds
+      .map((id) => {
+        const pt = resolved.points.get(id);
+        if (!pt) return null;
+        const pr = projectWorldPoint(pt.world, pt.local, ctx);
+        return { x: pr.x, y: pr.y, depth: pr.depth };
+      })
+      .filter(Boolean) as ScreenVert[];
+    if (raw.length !== 4) continue;
+    const area = quadArea2D(raw);
+    if (area < MIN_FACE_AREA) continue;
+    ctx.faces.push({
+      id: face.id,
+      verts: raw as [ScreenVert, ScreenVert, ScreenVert, ScreenVert],
+      area,
+    });
+  }
+
+  for (const edge of figure.edges) {
+    const pa = resolved.points.get(edge.aId);
+    const pb = resolved.points.get(edge.bId);
+    if (!pa || !pb) continue;
+    const a = projectWorldPoint(pa.world, pa.local, ctx);
+    const b = projectWorldPoint(pb.world, pb.local, ctx);
+    ctx.edgeScreens.push({
+      aId: edge.aId,
+      bId: edge.bId,
+      a: { x: a.x, y: a.y, depth: a.depth },
+      b: { x: b.x, y: b.y, depth: b.depth },
+    });
+  }
+
+  return ctx;
+}
+
+/** Ближайшая к наблюдателю поверхность тела в экранной точке; null — тела нет. */
+export function frontSurfaceDepth(px: number, py: number, ctx: OcclusionContext): number | null {
+  let best: number | null = null;
+  for (const face of ctx.faces) {
+    if (!pointInQuad2D(px, py, face.verts)) continue;
+    const z = depthOnFace(px, py, face.verts);
+    if (best === null || z < best) best = z;
+  }
+  return best;
+}
+
+export function isPointVisible(world: Vec3, local: { u: number; v: number; w: number } | null, ctx: OcclusionContext): boolean {
+  const pr = projectWorldPoint(world, local, ctx);
+  const surface = frontSurfaceDepth(pr.x, pr.y, ctx);
+  if (surface === null) return true;
+  return pr.depth <= surface + DEPTH_EPS;
+}
+
+function mergeBreakpoints(values: number[], t0: number, t1: number): number[] {
+  const sorted = [...values, t0, t1].sort((a, b) => a - b);
+  const out: number[] = [];
+  for (const t of sorted) {
+    if (t < t0 - T_EPS || t > t1 + T_EPS) continue;
+    const clamped = Math.min(t1, Math.max(t0, t));
+    if (!out.length || Math.abs(clamped - out[out.length - 1]!) > T_EPS) out.push(clamped);
+  }
+  return out;
+}
+
+function intersectLinePlaneT(origin: Vec3, dir: Vec3, plane: PlaneEq): number | null {
+  const denom = dot(plane.normal, dir);
+  if (Math.abs(denom) < 1e-9) return null;
+  return -(dot(plane.normal, origin) + plane.d) / denom;
+}
+
+function pointInFace3D(
+  p: Vec3,
+  faceVertexIds: string[],
+  points: ResolvedSpaceScene["points"],
+): boolean {
+  const verts = faceVertexIds.map((id) => points.get(id)?.world).filter(Boolean) as Vec3[];
+  if (verts.length < 4) return false;
+  const [v0, v1, v2, v3] = verts;
+  const n = cross(sub(v1!, v0!), sub(v2!, v0!));
+  if (len(n) < 1e-9) return false;
+  const nn = scale(n, 1 / len(n));
+  const toP = sub(p, v0!);
+  if (Math.abs(dot(toP, nn)) > 1e-4) return false;
+  const e1 = sub(v1!, v0!);
+  const e2 = sub(v3!, v0!);
+  const a = dot(e1, e1);
+  const b = dot(e1, e2);
+  const c = dot(e2, e2);
+  const d = dot(e1, toP);
+  const e = dot(e2, toP);
+  const denom = a * c - b * b;
+  if (Math.abs(denom) < 1e-9) return false;
+  const u = (d * c - b * e) / denom;
+  const v = (a * e - b * d) / denom;
+  return u >= -0.02 && v >= -0.02 && u + v <= 1.02;
+}
+
+function cross(a: Vec3, b: Vec3): Vec3 {
+  return {
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x,
+  };
+}
+
+function segSegIntersectionT(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+  dx: number,
+  dy: number,
+): number | null {
+  const denom = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+  if (Math.abs(denom) < 1e-12) return null;
+  const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / denom;
+  const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / denom;
+  if (t < -T_EPS || t > 1 + T_EPS || u < -T_EPS || u > 1 + T_EPS) return null;
+  return t;
+}
+
+function screenTFromWorldT(
+  origin: Vec3,
+  dir: Vec3,
+  tLine: number,
+  ctx: OcclusionContext,
+): { x: number; y: number } {
+  const w = add(origin, scale(dir, tLine));
+  const lc = worldToLocal(w, ctx.basis);
+  const pr = projectWorldPoint(w, lc, ctx);
+  return { x: pr.x, y: pr.y };
+}
+
+/** Разбиение линии на видимые/скрытые участки относительно непрозрачных граней. */
 export function splitLineByVisibility(
   origin: Vec3,
   dir: Vec3,
@@ -19,30 +240,50 @@ export function splitLineByVisibility(
   figure: ParallelepipedFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
+  ctx?: OcclusionContext,
 ): LineSplitSegment[] {
-  const breakpoints = new Set<number>([t0, t1]);
-  const aWorld = add(origin, scale(dir, t0));
-  const bWorld = add(origin, scale(dir, t1));
+  const occluder = ctx ?? buildOcclusionContext(figure, resolved, view);
+  const breakpoints: number[] = [];
 
   for (const face of figure.faces) {
     const plane = facePlane(figure, face.id, resolved.points);
     if (!plane) continue;
-    const hit = intersectLinePlane(origin, dir, plane);
-    if (hit === null) continue;
-    if (hit >= t0 - 1e-6 && hit <= t1 + 1e-6) breakpoints.add(hit);
+    const tHit = intersectLinePlaneT(origin, dir, plane);
+    if (tHit === null || tHit < t0 - T_EPS || tHit > t1 + T_EPS) continue;
+    const p = add(origin, scale(dir, tHit));
+    if (pointInFace3D(p, face.vertexIds, resolved.points)) breakpoints.push(tHit);
   }
 
-  const sorted = [...breakpoints].sort((x, y) => x - y);
+  const pStart = screenTFromWorldT(origin, dir, t0, occluder);
+  const pEnd = screenTFromWorldT(origin, dir, t1, occluder);
+
+  for (const edge of occluder.edgeScreens) {
+    const t = segSegIntersectionT(
+      pStart.x,
+      pStart.y,
+      pEnd.x,
+      pEnd.y,
+      edge.a.x,
+      edge.a.y,
+      edge.b.x,
+      edge.b.y,
+    );
+    if (t === null) continue;
+    const tWorld = t0 + t * (t1 - t0);
+    if (tWorld >= t0 - T_EPS && tWorld <= t1 + T_EPS) breakpoints.push(tWorld);
+  }
+
+  const sorted = mergeBreakpoints(breakpoints, t0, t1);
   const segments: LineSplitSegment[] = [];
-  const viewDir = viewDirection(view);
 
   for (let i = 0; i < sorted.length - 1; i += 1) {
     const ta = sorted[i]!;
     const tb = sorted[i + 1]!;
-    if (tb - ta < 1e-8) continue;
-    const mid = (ta + tb) / 2;
-    const midWorld = add(origin, scale(dir, mid));
-    const visible = !isHiddenByBody(midWorld, figure, resolved, viewDir);
+    if (tb - ta < T_EPS) continue;
+    const tm = (ta + tb) * 0.5;
+    const mid = add(origin, scale(dir, tm));
+    const lc = worldToLocal(mid, occluder.basis);
+    const visible = isPointVisible(mid, lc, occluder);
     segments.push({
       a: add(origin, scale(dir, ta)),
       b: add(origin, scale(dir, tb)),
@@ -51,93 +292,41 @@ export function splitLineByVisibility(
   }
 
   if (!segments.length) {
-    segments.push({ a: aWorld, b: bWorld, visible: true });
+    segments.push({
+      a: add(origin, scale(dir, t0)),
+      b: add(origin, scale(dir, t1)),
+      visible: isPointVisible(add(origin, scale(dir, (t0 + t1) * 0.5)), null, occluder),
+    });
   }
-  return segments;
+
+  return mergeAdjacentSegments(segments);
 }
 
-function intersectLinePlane(origin: Vec3, dir: Vec3, plane: PlaneEq): number | null {
-  const denom = dot(plane.normal, dir);
-  if (Math.abs(denom) < 1e-9) return null;
-  return -(dot(plane.normal, origin) + plane.d) / denom;
-}
-
-function isHiddenByBody(
-  p: Vec3,
-  figure: ParallelepipedFigure,
-  resolved: ResolvedSpaceScene,
-  viewDir: Vec3,
-): boolean {
-  for (const face of figure.faces) {
-    const plane = facePlane(figure, face.id, resolved.points);
-    if (!plane) continue;
-    const verts = face.vertexIds
-      .map((id) => resolved.points.get(id)?.world)
-      .filter(Boolean) as Vec3[];
-    if (verts.length < 3) continue;
-    const toPoint = sub(p, verts[0]!);
-    const faceDist = dot(plane.normal, toPoint);
-    const facing = dot(plane.normal, viewDir) > 0;
-    if (!facing) continue;
-    const rayTest = dot(plane.normal, viewDir);
-    if (Math.abs(rayTest) < 1e-9) continue;
-    const tHit = -faceDist / rayTest;
-    if (tHit > 1e-6) {
-      const occluder = add(p, scale(viewDir, -tHit));
-      if (pointInFaceQuad(occluder, verts)) return true;
+function mergeAdjacentSegments(segments: LineSplitSegment[]): LineSplitSegment[] {
+  if (segments.length < 2) return segments;
+  const out: LineSplitSegment[] = [{ ...segments[0]! }];
+  for (let i = 1; i < segments.length; i += 1) {
+    const prev = out[out.length - 1]!;
+    const cur = segments[i]!;
+    if (cur.visible === prev.visible && len(sub(cur.a, prev.b)) < 1e-6) {
+      prev.b = cur.b;
+    } else {
+      out.push({ ...cur });
     }
   }
-  return false;
+  return out;
 }
 
-function pointInFaceQuad(p: Vec3, verts: Vec3[]): boolean {
-  if (verts.length < 4) return false;
-  const [v0, v1, v2, v3] = verts;
-  const n = sub(v1!, v0!);
-  const m = sub(v3!, v0!);
-  const q = sub(p, v0!);
-  const det = n.x * m.y - n.y * m.x + (n.x * m.z - n.z * m.x); // rough
-  const a = dot(n, n);
-  const b = dot(n, m);
-  const c = dot(m, m);
-  const d = dot(n, q);
-  const e = dot(m, q);
-  const denom = a * c - b * b;
-  if (Math.abs(denom) < 1e-9) return false;
-  const u = (d * c - b * e) / denom;
-  const v = (a * e - b * d) / denom;
-  return u >= -0.02 && v >= -0.02 && u <= 1.02 && v <= 1.02;
-}
-
-export function segmentsToRender(
-  segments: LineSplitSegment[],
-  projected: Map<string, { x: number; y: number; depth: number; world: Vec3 }>,
-  sourceId: string,
-  color: string,
-  width: number,
-  dashedHidden: string,
-  project: (w: Vec3) => { x: number; y: number },
-): RenderLineSegment[] {
-  return segments.map((seg) => {
-    const p1 = project(seg.a);
-    const p2 = project(seg.b);
-    return {
-      x1: p1.x,
-      y1: p1.y,
-      x2: p2.x,
-      y2: p2.y,
-      visible: seg.visible,
-      color,
-      width,
-      dashed: !seg.visible,
-      sourceId,
-    };
-  });
-}
-
-export function projectWorld(
-  world: Vec3,
-  projectFn: (w: Vec3) => { x: number; y: number },
-): { x: number; y: number } {
-  return projectFn(world);
+export function renderEdgeSegments(
+  aWorld: Vec3,
+  bWorld: Vec3,
+  figure: ParallelepipedFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
+  ctx: OcclusionContext,
+): LineSplitSegment[] {
+  const dir = sub(bWorld, aWorld);
+  const abLen = len(dir);
+  if (!(abLen > 1e-9)) return [];
+  return splitLineByVisibility(aWorld, scale(dir, 1 / abLen), 0, abLen, figure, resolved, view, ctx);
 }
