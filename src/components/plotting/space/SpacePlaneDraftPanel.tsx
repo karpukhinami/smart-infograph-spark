@@ -1,3 +1,4 @@
+import { Hammer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -90,7 +91,8 @@ export function SpacePlaneDraftPanel() {
 
       <div className="flex gap-2">
         <Button type="button" size="sm" className="flex-1" onClick={commit}>
-          Добавить
+          <Hammer className="size-4" />
+          Построить
         </Button>
         <Button type="button" size="sm" variant="outline" className="flex-1" onClick={cancel}>
           Отменить

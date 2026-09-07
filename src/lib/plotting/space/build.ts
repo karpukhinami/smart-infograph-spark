@@ -320,6 +320,12 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
     pending.splice(0, pending.length, ...next);
   }
 
+  // Грани параллелепипеда как плоскости (для пересечений и выбора в UI).
+  for (const face of data.figure.faces) {
+    const eq = facePlane(data.figure, face.id, points);
+    if (eq) planes.set(face.id, eq);
+  }
+
   // Плоскости — два прохода (пересечения прямых могут зависеть от плоскостей).
   for (let pass = 0; pass < 2; pass += 1) {
     for (const plane of data.planes) {
@@ -367,6 +373,83 @@ export function computeLineDisplayRange(
     hi = Math.max(hi, t);
   }
   return { t0: lo - extension, t1: hi + extension };
+}
+
+/** Диапазон t на носителе, покрывающий проекцию многоугольника. */
+export function clipLineToPolygon(
+  origin: Vec3,
+  dir: Vec3,
+  polygon: Vec3[],
+): { t0: number; t1: number } | null {
+  if (polygon.length < 2) return null;
+  const ts = polygon.map((v) => dot(sub(v, origin), dir));
+  return { t0: Math.min(...ts), t1: Math.max(...ts) };
+}
+
+/** Отрезок пересечения двух плоскостей внутри их сечений с параллелепипедом. */
+export function planeIntersectionSegmentRange(
+  carrier: { origin: Vec3; dir: Vec3 },
+  planeAId: string,
+  planeBId: string,
+  figure: ParallelepipedFigure,
+  points: Map<string, BuiltSpacePoint>,
+  planeEqs: Map<string, PlaneEq>,
+): { t0: number; t1: number } | null {
+  const sectionA = computeFaceOrPlaneSection(planeAId, figure, points, planeEqs);
+  const sectionB = computeFaceOrPlaneSection(planeBId, figure, points, planeEqs);
+  if (!sectionA?.length || !sectionB?.length) return null;
+  const clipA = clipLineToPolygon(carrier.origin, carrier.dir, sectionA);
+  const clipB = clipLineToPolygon(carrier.origin, carrier.dir, sectionB);
+  if (!clipA || !clipB) return null;
+  const t0 = Math.max(clipA.t0, clipB.t0);
+  const t1 = Math.min(clipA.t1, clipB.t1);
+  if (t1 - t0 < 1e-6) return null;
+  return { t0, t1 };
+}
+
+function computeFaceOrPlaneSection(
+  id: string,
+  figure: ParallelepipedFigure,
+  points: Map<string, BuiltSpacePoint>,
+  planeEqs: Map<string, PlaneEq>,
+): Vec3[] | null {
+  const eq = planeEqs.get(id);
+  if (!eq) return null;
+  const hits: Vec3[] = [];
+  const seen = new Set<string>();
+  const key = (p: Vec3) => `${p.x.toFixed(4)}:${p.y.toFixed(4)}:${p.z.toFixed(4)}`;
+  for (const edge of figure.edges) {
+    const a = points.get(edge.aId)?.world;
+    const b = points.get(edge.bId)?.world;
+    if (!a || !b) continue;
+    const da = planePointDistance(a, eq);
+    const db = planePointDistance(b, eq);
+    if (Math.abs(da) < 1e-5 && !seen.has(key(a))) {
+      seen.add(key(a));
+      hits.push(a);
+    }
+    if (Math.abs(db) < 1e-5 && !seen.has(key(b))) {
+      seen.add(key(b));
+      hits.push(b);
+    }
+    if (da * db < -1e-10) {
+      const p = lerp(a, b, da / (da - db));
+      const k = key(p);
+      if (!seen.has(k)) {
+        seen.add(k);
+        hits.push(p);
+      }
+    }
+  }
+  if (hits.length < 3) return hits.length ? hits : null;
+  const cx = hits.reduce((s, p) => s + p.x, 0) / hits.length;
+  const cy = hits.reduce((s, p) => s + p.y, 0) / hits.length;
+  const cz = hits.reduce((s, p) => s + p.z, 0) / hits.length;
+  return [...hits].sort((p1, p2) => {
+    const a1 = Math.atan2(p1.y - cy, p1.x - cx);
+    const a2 = Math.atan2(p2.y - cy, p2.x - cx);
+    return a1 - a2;
+  });
 }
 
 export function facePlane(

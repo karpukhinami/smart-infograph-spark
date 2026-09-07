@@ -41,12 +41,14 @@ export function SpacePlaneCard({ plane }: { plane: SpacePlane }) {
             </CollapsibleTrigger>
             <Input
               value={plane.label}
-              className="h-8 w-16 shrink-0 px-2 text-xs italic"
+              readOnly={!plane.built}
+              className="h-8 min-w-16 shrink-0 px-2 text-xs italic"
+              placeholder={plane.built ? "" : "—"}
               onChange={(e) => updateSpacePlane(plane.id, { label: e.target.value })}
             />
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
               {plane.error ?? "плоскость"}
-              {!plane.built ? " · не построена" : plane.dirty ? " · изменена" : ""}
+              {plane.dirty ? " · изменена" : ""}
             </span>
             <ColorDot
               value={plane.style.color}
@@ -126,10 +128,12 @@ export function SpacePlaneCard({ plane }: { plane: SpacePlane }) {
                 ))}
               </div>
             )}
-            <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => buildSpacePlane(plane.id)}>
-              <Hammer className="size-4" />
-              {plane.built ? "Перестроить" : "Построить"}
-            </Button>
+            {(plane.dirty || plane.error) && (
+              <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => buildSpacePlane(plane.id)}>
+                <Hammer className="size-4" />
+                Перестроить
+              </Button>
+            )}
           </CollapsibleContent>
         </Collapsible>
       </CardContent>

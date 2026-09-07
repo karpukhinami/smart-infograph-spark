@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { ColorDot } from "../ColorDot";
 import { usePlotStore } from "@/lib/plotting/store";
-import { pointChoices } from "@/lib/plotting/space/scene";
+import { pointChoices, planeChoices } from "@/lib/plotting/space/scene";
 import type { LinearVisualKind, SpaceLine } from "@/lib/plotting/space/types";
 
 export function SpaceLineCard({ line }: { line: SpaceLine }) {
@@ -27,6 +27,7 @@ export function SpaceLineCard({ line }: { line: SpaceLine }) {
 
   if (!space3d?.figure) return null;
   const choices = pointChoices(space3d);
+  const planes = planeChoices(space3d);
   const def = line.definition;
 
   return (
@@ -40,13 +41,13 @@ export function SpaceLineCard({ line }: { line: SpaceLine }) {
             <Input
               value={line.label}
               readOnly={!line.built}
-              className="h-8 w-16 shrink-0 px-2 text-xs italic"
-              placeholder="—"
+              className="h-8 min-w-16 shrink-0 px-2 text-xs italic"
+              placeholder={line.built ? "" : "—"}
               onChange={(e) => updateSpaceLine(line.id, { label: e.target.value })}
             />
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
               {line.error ?? (def.kind === "twoPoints" ? "через 2 точки" : "пересечение плоскостей")}
-              {!line.built ? " · не построена" : line.dirty ? " · изменена" : ""}
+              {line.dirty ? " · изменена" : ""}
             </span>
             <ColorDot
               value={line.style.color}
@@ -112,10 +113,50 @@ export function SpaceLineCard({ line }: { line: SpaceLine }) {
                 </Select>
               </div>
             )}
-            <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => buildSpaceLine(line.id)}>
-              <Hammer className="size-4" />
-              {line.built ? "Перестроить" : "Построить"}
-            </Button>
+            {def.kind === "planeIntersection" && (
+              <div className="grid grid-cols-2 gap-2">
+                <Select
+                  value={def.planeAId}
+                  onValueChange={(v) =>
+                    updateSpaceLine(line.id, { definition: { ...def, planeAId: v } })
+                  }
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Плоскость 1" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {planes.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={def.planeBId}
+                  onValueChange={(v) =>
+                    updateSpaceLine(line.id, { definition: { ...def, planeBId: v } })
+                  }
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Плоскость 2" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {planes.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {(line.dirty || line.error) && (
+              <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => buildSpaceLine(line.id)}>
+                <Hammer className="size-4" />
+                Перестроить
+              </Button>
+            )}
           </CollapsibleContent>
         </Collapsible>
       </CardContent>

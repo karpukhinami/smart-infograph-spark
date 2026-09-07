@@ -1,3 +1,4 @@
+import { Hammer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,11 +52,11 @@ export function SpacePointDraftPanel() {
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Название</Label>
+        <Label className="text-xs text-muted-foreground">Название (необязательно)</Label>
         <Input
           value={draft.label}
           className="bg-background h-8 text-xs italic"
-          placeholder="M"
+          placeholder="авто — первая свободная буква"
           onChange={(e) => update({ label: e.target.value })}
         />
       </div>
@@ -189,7 +190,8 @@ export function SpacePointDraftPanel() {
 
       <div className="flex gap-2">
         <Button type="button" size="sm" className="flex-1" onClick={commit}>
-          Добавить
+          <Hammer className="size-4" />
+          Построить
         </Button>
         <Button type="button" size="sm" variant="outline" className="flex-1" onClick={cancel}>
           Отменить

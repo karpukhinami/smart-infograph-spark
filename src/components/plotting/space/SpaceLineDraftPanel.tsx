@@ -1,3 +1,4 @@
+import { Hammer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -8,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePlotStore } from "@/lib/plotting/store";
-import { pointChoices } from "@/lib/plotting/space/scene";
+import { planeChoices, pointChoices } from "@/lib/plotting/space/scene";
 import type { LinearVisualKind } from "@/lib/plotting/space/types";
 
 export function SpaceLineDraftPanel() {
@@ -21,6 +22,7 @@ export function SpaceLineDraftPanel() {
 
   if (!draft || !space3d?.figure) return null;
   const choices = pointChoices(space3d);
+  const planes = planeChoices(space3d);
 
   return (
     <div className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
@@ -40,22 +42,24 @@ export function SpaceLineDraftPanel() {
         </Select>
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Тип линии</Label>
-        <Select
-          value={draft.visualKind}
-          onValueChange={(v) => update({ visualKind: v as LinearVisualKind })}
-        >
-          <SelectTrigger className="bg-background">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="segment">отрезок</SelectItem>
-            <SelectItem value="line">прямая</SelectItem>
-            <SelectItem value="vector">вектор</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {draft.kind === "twoPoints" && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Тип линии</Label>
+          <Select
+            value={draft.visualKind}
+            onValueChange={(v) => update({ visualKind: v as LinearVisualKind })}
+          >
+            <SelectTrigger className="bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="segment">отрезок</SelectItem>
+              <SelectItem value="line">прямая</SelectItem>
+              <SelectItem value="vector">вектор</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {draft.kind === "twoPoints" && (
         <div className="grid grid-cols-2 gap-2">
@@ -86,11 +90,47 @@ export function SpaceLineDraftPanel() {
         </div>
       )}
 
+      {draft.kind === "planeIntersection" && (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Плоскость 1</Label>
+            <Select value={draft.planeAId} onValueChange={(v) => update({ planeAId: v })}>
+              <SelectTrigger className="h-8 bg-background text-xs">
+                <SelectValue placeholder="Плоскость 1" />
+              </SelectTrigger>
+              <SelectContent>
+                {planes.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Плоскость 2</Label>
+            <Select value={draft.planeBId} onValueChange={(v) => update({ planeBId: v })}>
+              <SelectTrigger className="h-8 bg-background text-xs">
+                <SelectValue placeholder="Плоскость 2" />
+              </SelectTrigger>
+              <SelectContent>
+                {planes.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       <div className="flex gap-2">
         <Button type="button" size="sm" className="flex-1" onClick={commit}>
-          Добавить
+          <Hammer className="size-4" />
+          Построить
         </Button>
         <Button type="button" size="sm" variant="outline" className="flex-1" onClick={cancel}>
           Отменить

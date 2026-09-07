@@ -1,12 +1,13 @@
 import { nextId, DEFAULT_APPEARANCE, PLOT_PALETTE } from "../shared";
 import { DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
-import { parseBaseVertexLabels } from "./parse-vertices";
+import { parseBaseVertexLabels, formatVertexLabel } from "./parse-vertices";
 import { createParallelepiped } from "./parallelepiped";
 import { buildSpaceScene, clampRegionParam, defaultLineParam, getPointLabel } from "./build";
 import type {
   LineRegion,
   ParallelepipedConstraints,
   ParallelepipedFigure,
+  PointOnLineDefinition,
   SpaceAppearance,
   SpaceLine,
   SpaceLineDefinition,
@@ -17,6 +18,8 @@ import type {
   SpaceSceneData,
   SpaceShapeKind,
 } from "./types";
+
+const GREEK_PLANE_LABELS = "αβγδεζηθικλμνξοπρστυφχψω".split("");
 
 export const DEFAULT_SPACE_APPEARANCE: SpaceAppearance = {
   width: DEFAULT_APPEARANCE.width,
@@ -145,6 +148,80 @@ export function autoLineLabel(
   return nextAutoLineLabel(data.lines.filter((l) => l.id !== line.id));
 }
 
+export function autoPlaneLabel(
+  plane: SpacePlane,
+  data: SpaceSceneData,
+  figure: ParallelepipedFigure,
+): string {
+  const def = plane.definition;
+  if (def.kind === "threePoints") {
+    const a = getPointLabel(def.aId, data, figure);
+    const b = getPointLabel(def.bId, data, figure);
+    const c = getPointLabel(def.cId, data, figure);
+    return `(${a}${b}${c})`;
+  }
+  return nextGreekPlaneLabel(data.planes.filter((p) => p.id !== plane.id));
+}
+
+export function collectUsedPointLabels(
+  data: SpaceSceneData,
+  figure: ParallelepipedFigure,
+): Set<string> {
+  const used = new Set<string>();
+  for (const v of figure.vertices) used.add(v.label);
+  for (const p of data.points) {
+    if (p.label.trim()) used.add(p.label.trim());
+  }
+  return used;
+}
+
+/** Первая свободная латинская буква; при исчерпании — буква с индексом. */
+export function nextFreePointLabel(data: SpaceSceneData, figure: ParallelepipedFigure): string {
+  const used = collectUsedPointLabels(data, figure);
+  for (let c = 65; c <= 90; c += 1) {
+    const ch = String.fromCharCode(c);
+    if (!used.has(ch)) return ch;
+  }
+  for (let sub = 1; sub < 20; sub += 1) {
+    for (let c = 65; c <= 90; c += 1) {
+      const ch = String.fromCharCode(c);
+      const label = formatVertexLabel(ch, sub);
+      if (!used.has(label)) return label;
+    }
+  }
+  return formatVertexLabel("M", data.points.length + 1);
+}
+
+export function findLineThroughPoints(
+  data: SpaceSceneData,
+  aId: string,
+  bId: string,
+): SpaceLine | undefined {
+  return data.lines.find((line) => {
+    if (line.definition.kind !== "twoPoints") return false;
+    const { aId: la, bId: lb } = line.definition;
+    return (la === aId && lb === bId) || (la === bId && lb === aId);
+  });
+}
+
+/** Вспомогательная прямая/отрезок при построении точки на носителе AB. */
+export function createAuxiliaryLineForPoint(
+  data: SpaceSceneData,
+  def: PointOnLineDefinition,
+): SpaceLine | null {
+  if (findLineThroughPoints(data, def.pointAId, def.pointBId)) return null;
+  const visualKind = def.region === "between" ? "segment" : "line";
+  const line = createSpaceLine(
+    data.lines.length + 1,
+    { kind: "twoPoints", aId: def.pointAId, bId: def.pointBId },
+    "",
+  );
+  line.style.visualKind = visualKind;
+  line.built = true;
+  line.dirty = false;
+  return line;
+}
+
 export function buildSpaceSceneData(data: SpaceSceneData): SpaceBuildReport {
   const resolved = buildSpaceScene(data);
   const errors = [...resolved.errors];
@@ -187,7 +264,11 @@ export function buildSpaceSceneData(data: SpaceSceneData): SpaceBuildReport {
     if (err) errors.push(`Плоскость ${plane.label || plane.index}: ${err}`);
     const ok = !err && plane.built && resolved.planes.has(plane.id);
     if (ok) built += 1;
-    return { ...plane, error: err ?? null, lastOk: ok, dirty: err ? plane.dirty : false };
+    const label =
+      plane.built && ok && data.figure
+        ? plane.label.trim() || autoPlaneLabel(plane, { ...data, points }, data.figure)
+        : plane.label;
+    return { ...plane, label: label || plane.label, error: err ?? null, lastOk: ok, dirty: err ? plane.dirty : false };
   });
 
   if (data.figure) built += data.figure.vertices.length + data.figure.edges.length;
@@ -222,6 +303,15 @@ export function faceChoices(data: SpaceSceneData): Array<{ id: string; label: st
     id: f.id,
     label: names[f.id] ?? f.id,
   }));
+}
+
+/** Грани параллелепипеда + построенные плоскости (для пересечений). */
+export function planeChoices(data: SpaceSceneData): Array<{ id: string; label: string }> {
+  const faces = faceChoices(data);
+  const custom = data.planes
+    .filter((p) => p.built)
+    .map((p) => ({ id: p.id, label: p.label || `П${p.index}` }));
+  return [...faces, ...custom];
 }
 
 export function newPointOnLine(
@@ -293,4 +383,12 @@ export function nextAutoLineLabel(lines: SpaceLine[]): string {
     if (!used.has(ch)) return ch;
   }
   return `l${lines.length + 1}`;
+}
+
+export function nextGreekPlaneLabel(planes: SpacePlane[]): string {
+  const used = new Set(planes.map((p) => p.label));
+  for (const g of GREEK_PLANE_LABELS) {
+    if (!used.has(g)) return g;
+  }
+  return `π${planes.length + 1}`;
 }

@@ -1,7 +1,22 @@
 import { projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
 import { facePlane, type ResolvedSpaceScene } from "./build";
+import { edgeById, faceById } from "./parallelepiped";
 import type { ParallelepipedFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, dot, len, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
+
+/** Видимые грани: AA₁D₁D (левая), CDD₁C₁ (задняя), A₁B₁C₁D₁ (верхняя). */
+export const VISIBLE_FACE_IDS = new Set(["f-left", "f-back", "f-top"]);
+
+export function isBodyEdgeVisible(edgeId: string, figure: ParallelepipedFigure): boolean {
+  const edge = edgeById(figure, edgeId);
+  if (!edge) return false;
+  for (const faceId of VISIBLE_FACE_IDS) {
+    const face = faceById(figure, faceId);
+    if (!face) continue;
+    if (face.vertexIds.includes(edge.aId) && face.vertexIds.includes(edge.bId)) return true;
+  }
+  return false;
+}
 
 export interface LineSplitSegment {
   a: Vec3;

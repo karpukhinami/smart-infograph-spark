@@ -50,10 +50,12 @@ import type {
 } from "./line/types";
 import {
   buildSpaceSceneData,
+  createAuxiliaryLineForPoint,
   createParallelepipedFromInput,
   createSpaceLine,
   createSpacePlane,
   createSpacePoint,
+  nextFreePointLabel,
   reindexSpace,
 } from "./space/scene";
 import type {
@@ -1113,9 +1115,9 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     set({
       spacePointDraft: {
         mode: "onLine",
-        label: String.fromCharCode(77 + data.points.length),
+        label: "",
         pointAId: verts[0]!.id,
-        pointBId: verts[1]!.id,
+        pointBId: verts[3]!.id,
         region: "between",
         ratioMode: "auto",
         ratioA: 1,
@@ -1141,39 +1143,44 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const draft = state.spacePointDraft;
     const data = state.scene.space3d;
     if (!draft || !data?.figure) return;
-    if (!draft.label.trim()) {
-      set({ spacePointDraftError: "Введите название точки." });
-      return;
-    }
-    const point =
+
+    const definition =
       draft.mode === "onLine"
-        ? createSpacePoint(
-            data.points.length + 1,
-            {
-              kind: "onLine",
-              pointAId: draft.pointAId,
-              pointBId: draft.pointBId,
-              region: draft.region,
-              ratioMode: draft.ratioMode,
-              ratioA: draft.ratioA,
-              ratioB: draft.ratioB,
-              lineParam: draft.lineParam,
-            },
-            draft.label.trim(),
-          )
-        : createSpacePoint(
-            data.points.length + 1,
-            {
-              kind: "onFace",
-              faceId: draft.faceId,
-              placement: draft.placement,
-              faceU: 0.35,
-              faceV: 0.35,
-            },
-            draft.label.trim(),
-          );
+        ? ({
+            kind: "onLine" as const,
+            pointAId: draft.pointAId,
+            pointBId: draft.pointBId,
+            region: draft.region,
+            ratioMode: draft.ratioMode,
+            ratioA: draft.ratioA,
+            ratioB: draft.ratioB,
+            lineParam: draft.lineParam,
+          } satisfies PointOnLineDefinition)
+        : ({
+            kind: "onFace" as const,
+            faceId: draft.faceId,
+            placement: draft.placement,
+            faceU: 0.35,
+            faceV: 0.35,
+          });
+
+    let lines = data.lines;
+    if (definition.kind === "onLine") {
+      const aux = createAuxiliaryLineForPoint(data, definition);
+      if (aux) lines = [...lines, aux];
+    }
+
+    const label = draft.label.trim() || nextFreePointLabel(data, data.figure);
+    const point = createSpacePoint(data.points.length + 1, definition, label);
+    point.built = true;
+
+    const result = applySpaceBuild({
+      ...state.scene,
+      space3d: { ...data, points: [...data.points, point], lines },
+    });
     set({
-      ...patchSpaceData(state, (d) => ({ ...d, points: [...d.points, point] })),
+      scene: result.scene,
+      status: result.status,
       spacePointDraft: null,
       spacePointDraftError: null,
     });
@@ -1185,10 +1192,16 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     if (!data?.figure) return;
     const target = data.points.find((p) => p.id === id);
     if (!target) return;
+    let lines = data.lines;
+    if (target.definition.kind === "onLine") {
+      const aux = createAuxiliaryLineForPoint(data, target.definition);
+      if (aux) lines = [...lines, aux];
+    }
     const result = applySpaceBuild({
       ...state.scene,
       space3d: {
         ...data,
+        lines,
         points: data.points.map((p) => (p.id === id ? { ...p, built: true, dirty: true } : p)),
       },
     });
@@ -1249,14 +1262,15 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const data = get().scene.space3d;
     if (!data?.figure) return;
     const verts = data.figure.vertices;
+    const faces = data.figure.faces;
     set({
       spaceLineDraft: {
         kind: "twoPoints",
         visualKind: "segment",
         aId: verts[0]!.id,
-        bId: verts[1]!.id,
-        planeAId: data.planes[0]?.id ?? "",
-        planeBId: data.planes[1]?.id ?? data.planes[0]?.id ?? "",
+        bId: verts[3]!.id,
+        planeAId: faces.find((f) => f.id === "f-left")?.id ?? faces[0]!.id,
+        planeBId: faces.find((f) => f.id === "f-back")?.id ?? faces[1]!.id,
       },
       spaceLineDraftError: null,
     });
@@ -1279,14 +1293,25 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       set({ spaceLineDraftError: "Выберите две различные точки." });
       return;
     }
+    if (draft.kind === "planeIntersection" && draft.planeAId === draft.planeBId) {
+      set({ spaceLineDraftError: "Выберите две различные плоскости." });
+      return;
+    }
     const definition: SpaceLineDefinition =
       draft.kind === "twoPoints"
         ? { kind: "twoPoints", aId: draft.aId, bId: draft.bId }
         : { kind: "planeIntersection", planeAId: draft.planeAId, planeBId: draft.planeBId };
     const line = createSpaceLine(data.lines.length + 1, definition, "");
-    line.style.visualKind = draft.visualKind;
+    line.style.visualKind =
+      draft.kind === "planeIntersection" ? "segment" : draft.visualKind;
+    line.built = true;
+    const result = applySpaceBuild({
+      ...state.scene,
+      space3d: { ...data, lines: [...data.lines, line] },
+    });
     set({
-      ...patchSpaceData(state, (d) => ({ ...d, lines: [...d.lines, line] })),
+      scene: result.scene,
+      status: result.status,
       spaceLineDraft: null,
       spaceLineDraftError: null,
     });
@@ -1370,8 +1395,14 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       return;
     }
     const plane = createSpacePlane(data.planes.length + 1, def, "");
+    plane.built = true;
+    const result = applySpaceBuild({
+      ...state.scene,
+      space3d: { ...data, planes: [...data.planes, plane] },
+    });
     set({
-      ...patchSpaceData(state, (d) => ({ ...d, planes: [...d.planes, plane] })),
+      scene: result.scene,
+      status: result.status,
       spacePlaneDraft: null,
       spacePlaneDraftError: null,
     });

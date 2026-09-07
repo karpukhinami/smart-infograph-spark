@@ -201,10 +201,12 @@ export function SpacePointCard({ point }: { point: SpacePoint }) {
                 </Select>
               </div>
             )}
-            <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => buildSpacePoint(point.id)}>
-              <Hammer className="size-4" />
-              {point.built ? "Перестроить" : "Построить"}
-            </Button>
+            {(point.dirty || point.error || !point.built) && (
+              <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => buildSpacePoint(point.id)}>
+                <Hammer className="size-4" />
+                {point.built ? "Перестроить" : "Построить"}
+              </Button>
+            )}
           </CollapsibleContent>
         </Collapsible>
       </CardContent>
