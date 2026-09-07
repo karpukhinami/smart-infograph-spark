@@ -7,41 +7,52 @@ export interface ProjectedPoint {
   world: Vec3;
 }
 
-function rotateY(p: Vec3, yaw: number): Vec3 {
-  const c = Math.cos(yaw);
-  const s = Math.sin(yaw);
-  return { x: p.x * c + p.z * s, y: p.y, z: -p.x * s + p.z * c };
-}
-
-function rotateX(p: Vec3, pitch: number): Vec3 {
-  const c = Math.cos(pitch);
-  const s = Math.sin(pitch);
-  return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c };
-}
-
-/** Ортографическая проекция после поворота вида. depth — для проверки видимости. */
+/** Кабинетная проекция: вертикали строго вверх, глубина — наклон вправо-вниз. */
 export function projectPoint(world: Vec3, view: SpaceViewParams): ProjectedPoint {
-  let p = rotateY(world, view.yaw);
-  p = rotateX(p, view.pitch);
-  return {
-    x: p.x * view.scale,
-    y: -p.z * view.scale,
-    depth: p.y,
-    world,
-  };
+  const depth = world.y;
+  const x = (world.x - world.y * view.oblique) * view.scale;
+  const y = -world.z * view.scale;
+  return { x, y, depth, world };
 }
 
 export const DEFAULT_SPACE_VIEW: SpaceViewParams = {
-  scale: 120,
-  yaw: 0.42,
-  pitch: 0.38,
+  scale: 1,
+  yaw: 0,
+  pitch: 0,
+  oblique: 0.42,
 };
 
-/** Направление наблюдателя в мировых координатах (единичный вектор). */
-export function viewDirection(view: SpaceViewParams): Vec3 {
-  const forward = { x: 0, y: 1, z: 0 };
-  let p = rotateX(forward, -view.pitch);
-  p = rotateY(p, -view.yaw);
-  const l = Math.hypot(p.x, p.y, p.z) || 1;
-  return { x: p.x / l, y: p.y / l, z: p.z / l };
+/** Направление от сцены к наблюдателю: спереди-справа-сверху (видны передняя, верхняя и правая грани). */
+export function viewDirection(_view: SpaceViewParams): Vec3 {
+  const v = { x: 0.4, y: -0.85, z: 0.35 };
+  const l = Math.hypot(v.x, v.y, v.z) || 1;
+  return { x: v.x / l, y: v.y / l, z: v.z / l };
+}
+
+/** Подобрать масштаб и центр, чтобы фигура занимала большую часть полотна. */
+export function fitProjection(
+  projected: Array<{ x: number; y: number }>,
+  width: number,
+  height: number,
+  padding: number,
+): { scale: number; cx: number; cy: number } {
+  if (!projected.length) return { scale: 1, cx: width / 2, cy: height / 2 };
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const p of projected) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  const bw = Math.max(1, maxX - minX);
+  const bh = Math.max(1, maxY - minY);
+  const availW = width - padding * 2;
+  const availH = height - padding * 2;
+  const scale = Math.min(availW / bw, availH / bh) * 0.96;
+  const cx = width / 2 - ((minX + maxX) / 2) * scale;
+  const cy = height / 2 - ((minY + maxY) / 2) * scale;
+  return { scale, cx, cy };
 }

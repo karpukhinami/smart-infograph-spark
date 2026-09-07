@@ -2,6 +2,7 @@ import { nextId } from "../scene";
 import { formatVertexLabel } from "./parse-vertices";
 import type {
   LocalCoords,
+  ParallelepipedConstraints,
   ParallelepipedFigure,
   SpaceEdge,
   SpaceFace,
@@ -9,7 +10,10 @@ import type {
 } from "./types";
 
 /** Топология параллелепипеда: 8 вершин, 12 рёбер, 6 граней со стабильными ID. */
-export function createParallelepiped(baseLabels: [string, string, string, string]): ParallelepipedFigure {
+export function createParallelepiped(
+  baseLabels: [string, string, string, string],
+  constraints: ParallelepipedConstraints = { rectangular: true, equilateral: false },
+): ParallelepipedFigure {
   const [a, b, c, d] = baseLabels;
   const labels = {
     A: a,
@@ -81,7 +85,7 @@ export function createParallelepiped(baseLabels: [string, string, string, string
     id: nextId("pp"),
     kind: "parallelepiped",
     baseLabels,
-    constraints: { rectangular: false, equilateral: false },
+    constraints: { ...constraints },
     vertices,
     edges,
     faces,

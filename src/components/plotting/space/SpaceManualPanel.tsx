@@ -15,18 +15,23 @@ import { Switch } from "@/components/ui/switch";
 import { SpacePointCard } from "./SpacePointCard";
 import { SpaceLineCard } from "./SpaceLineCard";
 import { SpacePlaneCard } from "./SpacePlaneCard";
-import { Plus } from "lucide-react";
+import { SpacePointDraftPanel } from "./SpacePointDraftPanel";
+import { SpaceLineDraftPanel } from "./SpaceLineDraftPanel";
+import { SpacePlaneDraftPanel } from "./SpacePlaneDraftPanel";
+import { Hammer, Plus } from "lucide-react";
 
 export function SpaceManualPanel() {
   const space3d = usePlotStore((s) => s.scene.space3d);
   const setSpaceShapeKind = usePlotStore((s) => s.setSpaceShapeKind);
   const setSpaceBaseInput = usePlotStore((s) => s.setSpaceBaseInput);
-  const createSpaceFigure = usePlotStore((s) => s.createSpaceFigure);
+  const buildSpaceFigure = usePlotStore((s) => s.buildSpaceFigure);
   const updateSpaceConstraints = usePlotStore((s) => s.updateSpaceConstraints);
-  const startSpacePointOnLine = usePlotStore((s) => s.startSpacePointOnLine);
-  const startSpacePointOnFace = usePlotStore((s) => s.startSpacePointOnFace);
-  const addSpaceLine = usePlotStore((s) => s.addSpaceLine);
-  const addSpacePlane = usePlotStore((s) => s.addSpacePlane);
+  const startSpacePointDraft = usePlotStore((s) => s.startSpacePointDraft);
+  const startSpaceLineDraft = usePlotStore((s) => s.startSpaceLineDraft);
+  const startSpacePlaneDraft = usePlotStore((s) => s.startSpacePlaneDraft);
+  const spacePointDraft = usePlotStore((s) => s.spacePointDraft);
+  const spaceLineDraft = usePlotStore((s) => s.spaceLineDraft);
+  const spacePlaneDraft = usePlotStore((s) => s.spacePlaneDraft);
 
   if (!space3d) return null;
 
@@ -58,40 +63,43 @@ export function SpaceManualPanel() {
             </Select>
           </div>
 
-          {space3d.shapeKind === "parallelepiped" && !hasFigure && (
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Вершины нижнего основания</Label>
-              <Input
-                value={space3d.baseVerticesInput}
-                placeholder="A, B, C, D"
-                onChange={(e) => setSpaceBaseInput(e.target.value)}
-              />
-              <Button type="button" size="sm" onClick={createSpaceFigure}>
-                Создать параллелепипед
+          {space3d.shapeKind === "parallelepiped" && (
+            <>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Вершины нижнего основания</Label>
+                <Input
+                  value={space3d.baseVerticesInput}
+                  placeholder="A, B, C, D"
+                  onChange={(e) => setSpaceBaseInput(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2 rounded-md border border-border p-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Прямоугольный</Label>
+                  <Switch
+                    checked={space3d.figureConstraints.rectangular}
+                    onCheckedChange={(checked) => updateSpaceConstraints({ rectangular: checked })}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Равносторонний</Label>
+                  <Switch
+                    checked={space3d.figureConstraints.equilateral}
+                    onCheckedChange={(checked) => updateSpaceConstraints({ equilateral: checked })}
+                  />
+                </div>
+              </div>
+              <Button type="button" size="sm" className="w-full" onClick={buildSpaceFigure}>
+                <Hammer className="size-4" />
+                {hasFigure ? "Построить заново" : "Построить"}
               </Button>
-            </div>
-          )}
-
-          {hasFigure && space3d.figure && (
-            <div className="space-y-2 rounded-md border border-border p-2">
-              <p className="text-xs text-muted-foreground">
-                Основание: {space3d.figure.baseLabels.join(", ")}
-              </p>
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Прямоугольный</Label>
-                <Switch
-                  checked={space3d.figure.constraints.rectangular}
-                  onCheckedChange={(checked) => updateSpaceConstraints({ rectangular: checked })}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Равносторонний</Label>
-                <Switch
-                  checked={space3d.figure.constraints.equilateral}
-                  onCheckedChange={(checked) => updateSpaceConstraints({ equilateral: checked })}
-                />
-              </div>
-            </div>
+              {hasFigure && space3d.figure && (
+                <p className="text-xs text-muted-foreground">
+                  Основание: {space3d.figure.baseLabels.join(", ")}
+                  {space3d.figureDirty ? " · параметры изменены" : ""}
+                </p>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -108,16 +116,14 @@ export function SpaceManualPanel() {
               ) : (
                 space3d.points.map((point) => <SpacePointCard key={point.id} point={point} />)
               )}
-              <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => startSpacePointOnLine()}>
-                    <Plus className="size-4" />
-                    На прямой
-                  </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => startSpacePointOnFace()}>
+              {spacePointDraft ? (
+                <SpacePointDraftPanel />
+              ) : (
+                <Button type="button" variant="outline" size="sm" onClick={() => startSpacePointDraft()}>
                   <Plus className="size-4" />
-                  На грани
+                  Точка
                 </Button>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -131,10 +137,14 @@ export function SpaceManualPanel() {
               ) : (
                 space3d.lines.map((line) => <SpaceLineCard key={line.id} line={line} />)
               )}
-              <Button type="button" variant="outline" size="sm" onClick={() => addSpaceLine()}>
-                <Plus className="size-4" />
-                Прямая
-              </Button>
+              {spaceLineDraft ? (
+                <SpaceLineDraftPanel />
+              ) : (
+                <Button type="button" variant="outline" size="sm" onClick={() => startSpaceLineDraft()}>
+                  <Plus className="size-4" />
+                  Прямая
+                </Button>
+              )}
             </CardContent>
           </Card>
 
@@ -148,10 +158,14 @@ export function SpaceManualPanel() {
               ) : (
                 space3d.planes.map((plane) => <SpacePlaneCard key={plane.id} plane={plane} />)
               )}
-              <Button type="button" variant="outline" size="sm" onClick={() => addSpacePlane()}>
-                <Plus className="size-4" />
-                Плоскость
-              </Button>
+              {spacePlaneDraft ? (
+                <SpacePlaneDraftPanel />
+              ) : (
+                <Button type="button" variant="outline" size="sm" onClick={() => startSpacePlaneDraft()}>
+                  <Plus className="size-4" />
+                  Плоскость
+                </Button>
+              )}
             </CardContent>
           </Card>
         </>

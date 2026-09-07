@@ -115,7 +115,9 @@ export interface SpacePoint {
   label: string;
   definition: SpacePointDefinition;
   style: SpacePointStyle;
-  built: BuiltSpacePoint | null;
+  /** Пользователь нажал «Построить». */
+  built: boolean;
+  geometry: BuiltSpacePoint | null;
   lastBuilt: BuiltSpacePoint | null;
   dirty: boolean;
   error: string | null;
@@ -140,6 +142,8 @@ export interface SpaceLine {
   label: string;
   definition: SpaceLineDefinition;
   style: SpaceLineStyle;
+  built: boolean;
+  dirty: boolean;
   error: string | null;
   lastOk: boolean;
 }
@@ -163,18 +167,21 @@ export interface SpacePlane {
   label: string;
   definition: SpacePlaneDefinition;
   style: SpacePlaneStyle;
+  built: boolean;
+  dirty: boolean;
   error: string | null;
   lastOk: boolean;
 }
 
 /** Параметры вида: меняют только проекцию, не геометрию сцены. */
 export interface SpaceViewParams {
-  /** Масштаб проекции на экран. */
+  /** Базовый масштаб (уточняется авто-fit при рендере). */
   scale: number;
-  /** Поворот вокруг вертикали, радианы. */
+  /** Зарезервировано под будущее вращение. */
   yaw: number;
-  /** Наклон, радианы. */
   pitch: number;
+  /** Кабинетный коэффициент глубины (y → x). */
+  oblique: number;
 }
 
 export interface SpaceAppearance {
@@ -188,12 +195,19 @@ export interface SpaceAppearance {
   labelFontFamily: string;
   labelColor: string;
   pointRadius: number;
+  lineWidth: number;
   lineExtension: number;
+  planeFillOpacity: number;
 }
 
 export interface SpaceSceneData {
   shapeKind: SpaceShapeKind | null;
   baseVerticesInput: string;
+  /** Ограничения фигуры (редактируются до и после построения). */
+  figureConstraints: ParallelepipedConstraints;
+  /** Параметры фигуры изменены после последнего построения. */
+  figureDirty: boolean;
+  /** Построенная фигура; null — на canvas ничего нет. */
   figure: ParallelepipedFigure | null;
   points: SpacePoint[];
   lines: SpaceLine[];

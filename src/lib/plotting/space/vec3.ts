@@ -52,28 +52,26 @@ export function localToWorld(
   );
 }
 
-/** Базис AB, AD, AA₁ с учётом ограничений. */
+/** Базис AB, AD, AA₁ — школьная кабинетная проекция. */
 export function computeBasis(constraints: ParallelepipedConstraints): {
   e1: Vec3;
   e2: Vec3;
   e3: Vec3;
 } {
-  const L = 1;
+  const L = 1.1;
   if (constraints.rectangular && constraints.equilateral) {
     return { e1: vec3(0, -L, 0), e2: vec3(L, 0, 0), e3: vec3(0, 0, L) };
   }
   if (constraints.rectangular) {
-    return { e1: vec3(-0.55, -L, 0), e2: vec3(L, 0, 0), e3: vec3(0, 0, 0.85) };
+    return { e1: vec3(0, -L, 0), e2: vec3(L * 1.15, 0, 0), e3: vec3(0, 0, L * 0.95) };
   }
   if (constraints.equilateral) {
-    const a = vec3(-0.55, -L, 0);
-    const b = vec3(L, 0, 0);
-    const c = vec3(-0.2, -0.35, 0.85);
-    const s = L / Math.max(len(a), len(b), len(c));
-    return { e1: scale(a, s), e2: scale(b, s), e3: scale(c, s) };
+    const e1 = vec3(0, -L, 0);
+    const e2 = vec3(L, 0, 0);
+    const e3 = vec3(0, 0, L);
+    return { e1, e2, e3 };
   }
-  // Школьная косоугольная проекция: A впереди слева, B назад, D вправо, верх выше.
-  return { e1: vec3(-0.55, -L, 0), e2: vec3(L, 0, 0), e3: vec3(0, 0, 0.85) };
+  return { e1: vec3(0, -L, 0), e2: vec3(L * 1.15, 0, 0), e3: vec3(0, 0, L * 0.95) };
 }
 
 export function faceNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {

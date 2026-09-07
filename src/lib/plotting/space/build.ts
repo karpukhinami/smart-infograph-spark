@@ -406,6 +406,22 @@ export function isPointInsideParallelepiped(
   return true;
 }
 
+export function outwardFaceNormal(
+  faceVertexIds: string[],
+  points: Map<string, BuiltSpacePoint>,
+  bodyCenter: Vec3,
+): Vec3 | null {
+  const verts = faceVertexIds.map((id) => points.get(id)?.world).filter(Boolean) as Vec3[];
+  if (verts.length < 3) return null;
+  let n = faceNormal(verts[0]!, verts[1]!, verts[2]!);
+  const center = scale(
+    verts.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
+    1 / verts.length,
+  );
+  if (dot(n, sub(center, bodyCenter)) < 0) n = scale(n, -1);
+  return n;
+}
+
 export function edgeVisible(
   aId: string,
   bId: string,
@@ -413,17 +429,25 @@ export function edgeVisible(
   points: Map<string, BuiltSpacePoint>,
   view: SpaceViewParams,
 ): boolean {
-  const viewDir = viewDirection(view);
+  const toCamera = viewDirection(view);
+  const verts = figure.vertices
+    .map((v) => points.get(v.id)?.world)
+    .filter(Boolean) as Vec3[];
+  const bodyCenter = verts.length
+    ? scale(
+        verts.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
+        1 / verts.length,
+      )
+    : { x: 0, y: 0, z: 0 };
+
   const adjacent = figure.faces.filter(
     (f) => f.vertexIds.includes(aId) && f.vertexIds.includes(bId),
   );
   for (const face of adjacent) {
-    const verts = face.vertexIds.map((id) => points.get(id)?.world).filter(Boolean) as Vec3[];
-    if (verts.length < 3) continue;
-    const n = faceNormal(verts[0]!, verts[1]!, verts[2]!);
-    if (dot(n, viewDir) > 0) return true;
+    const n = outwardFaceNormal(face.vertexIds, points, bodyCenter);
+    if (n && dot(n, toCamera) > 1e-6) return true;
   }
-  return adjacent.length === 0;
+  return false;
 }
 
 export { clampRegionParam, defaultLineParam, ratioToParam, resolveOnLineParam, segmentPlaneIntersection };

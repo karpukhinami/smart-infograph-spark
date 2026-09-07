@@ -53,20 +53,50 @@ import {
   createParallelepipedFromInput,
   createSpaceLine,
   createSpacePlane,
-  newPointOnFace,
-  newPointOnLine,
+  createSpacePoint,
   reindexSpace,
 } from "./space/scene";
 import type {
+  LinearVisualKind,
+  LineRegion,
   ParallelepipedConstraints,
   PointOnLineDefinition,
   SpaceLine,
+  SpaceLineDefinition,
   SpacePlane,
+  SpacePlaneDefinition,
   SpacePoint,
   SpaceSceneData,
   SpaceShapeKind,
 } from "./space/types";
 import { clampRegionParam, defaultLineParam } from "./space/build";
+
+export interface SpacePointDraft {
+  mode: "onLine" | "onFace";
+  label: string;
+  pointAId: string;
+  pointBId: string;
+  region: LineRegion;
+  ratioMode: "auto" | "explicit";
+  ratioA: number;
+  ratioB: number;
+  lineParam: number;
+  faceId: string;
+  placement: "arbitrary" | "center";
+}
+
+export interface SpaceLineDraft {
+  kind: "twoPoints" | "planeIntersection";
+  visualKind: LinearVisualKind;
+  aId: string;
+  bId: string;
+  planeAId: string;
+  planeBId: string;
+}
+
+export interface SpacePlaneDraft {
+  definition: SpacePlaneDefinition;
+}
 
 export type PlotInputMode = "manual" | "ai";
 export type PlotSpaceTab = "line" | "plane" | "space";
@@ -91,6 +121,12 @@ interface PlotStore {
   /** Черновик самостоятельной точки на прямой. */
   linePointDraft: SceneLinePoint | null;
   linePointDraftError: string | null;
+  spacePointDraft: SpacePointDraft | null;
+  spacePointDraftError: string | null;
+  spaceLineDraft: SpaceLineDraft | null;
+  spaceLineDraftError: string | null;
+  spacePlaneDraft: SpacePlaneDraft | null;
+  spacePlaneDraftError: string | null;
   /** Текущий активный ряд оси для новых объектов. */
   activeAxisRow: number;
   setInputMode: (mode: PlotInputMode) => void;
@@ -144,24 +180,44 @@ interface PlotStore {
   resetScene: () => void;
   setSpaceShapeKind: (kind: SpaceShapeKind) => void;
   setSpaceBaseInput: (input: string) => void;
-  createSpaceFigure: () => void;
+  buildSpaceFigure: () => void;
   updateSpaceConstraints: (patch: Partial<ParallelepipedConstraints>) => void;
-  startSpacePointOnLine: () => void;
-  startSpacePointOnFace: () => void;
+  startSpacePointDraft: () => void;
+  updateSpacePointDraft: (patch: Partial<SpacePointDraft>) => void;
+  cancelSpacePointDraft: () => void;
+  commitSpacePointDraft: () => void;
+  buildSpacePoint: (id: string) => void;
   updateSpacePoint: (id: string, patch: Partial<SpacePoint>) => void;
   updateSpacePointStyle: (id: string, patch: Partial<SpacePoint["style"]>) => void;
   updateSpacePointOnLine: (id: string, patch: Partial<PointOnLineDefinition>) => void;
   removeSpacePoint: (id: string) => void;
-  addSpaceLine: () => void;
+  startSpaceLineDraft: () => void;
+  updateSpaceLineDraft: (patch: Partial<SpaceLineDraft>) => void;
+  cancelSpaceLineDraft: () => void;
+  commitSpaceLineDraft: () => void;
+  buildSpaceLine: (id: string) => void;
   updateSpaceLine: (id: string, patch: Partial<SpaceLine>) => void;
   updateSpaceLineStyle: (id: string, patch: Partial<SpaceLine["style"]>) => void;
   removeSpaceLine: (id: string) => void;
-  addSpacePlane: () => void;
+  startSpacePlaneDraft: () => void;
+  updateSpacePlaneDraft: (patch: Partial<SpacePlaneDraft>) => void;
+  cancelSpacePlaneDraft: () => void;
+  commitSpacePlaneDraft: () => void;
+  buildSpacePlane: (id: string) => void;
   updateSpacePlane: (id: string, patch: Partial<SpacePlane>) => void;
   updateSpacePlaneStyle: (id: string, patch: Partial<SpacePlane["style"]>) => void;
   removeSpacePlane: (id: string) => void;
 }
 
+
+function patchSpaceData(
+  state: PlotStore,
+  updater: (data: SpaceSceneData) => SpaceSceneData,
+): Partial<PlotStore> {
+  const data = state.scene.space3d;
+  if (!data) return {};
+  return { scene: { ...state.scene, space3d: updater(data) } };
+}
 
 function applySpaceBuild(scene: PlotScene): { scene: PlotScene; status: BuildStatus } {
   const data = scene.space3d;
@@ -221,6 +277,12 @@ function commitImportedScene(
       setDraftError: null,
       linePointDraft: null,
       linePointDraftError: null,
+      spacePointDraft: null,
+      spacePointDraftError: null,
+      spaceLineDraft: null,
+      spaceLineDraftError: null,
+      spacePlaneDraft: null,
+      spacePlaneDraftError: null,
     });
     return;
   }
@@ -259,6 +321,12 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
   setDraftError: null,
   linePointDraft: null,
   linePointDraftError: null,
+  spacePointDraft: null,
+  spacePointDraftError: null,
+  spaceLineDraft: null,
+  spaceLineDraftError: null,
+  spacePlaneDraft: null,
+  spacePlaneDraftError: null,
   activeAxisRow: 0,
 
   startPointDraft: () => set({ pointDraft: { ...EMPTY_POINT_MATH }, pointDraftError: null }),
@@ -354,6 +422,12 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
           setDraftError: null,
           linePointDraft: null,
           linePointDraftError: null,
+          spacePointDraft: null,
+          spacePointDraftError: null,
+          spaceLineDraft: null,
+          spaceLineDraftError: null,
+          spacePlaneDraft: null,
+          spacePlaneDraftError: null,
           activeAxisRow: 0,
         };
       }
@@ -979,76 +1053,151 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       setDraftError: null,
       linePointDraft: null,
       linePointDraftError: null,
+      spacePointDraft: null,
+      spacePointDraftError: null,
+      spaceLineDraft: null,
+      spaceLineDraftError: null,
+      spacePlaneDraft: null,
+      spacePlaneDraftError: null,
       activeAxisRow: 0,
     })),
 
   setSpaceShapeKind: (kind) =>
     set((state) =>
-      withSpaceData(state, (data) => ({
+      patchSpaceData(state, (data) => ({
         ...data,
         shapeKind: kind,
         figure: kind === "parallelepiped" ? data.figure : null,
+        figureDirty: kind === "parallelepiped" ? data.figureDirty : false,
       })),
     ),
 
   setSpaceBaseInput: (input) =>
-    set((state) => {
-      const data = state.scene.space3d;
-      if (!data) return {};
-      return { scene: { ...state.scene, space3d: { ...data, baseVerticesInput: input } } };
-    }),
+    set((state) =>
+      patchSpaceData(state, (data) => ({
+        ...data,
+        baseVerticesInput: input,
+        figureDirty: data.figure ? true : data.figureDirty,
+      })),
+    ),
 
-  createSpaceFigure: () => {
+  buildSpaceFigure: () => {
     const state = get();
     const data = state.scene.space3d;
     if (!data) return;
-    const { figure, error } = createParallelepipedFromInput(data.baseVerticesInput);
+    const { figure, error } = createParallelepipedFromInput(data.baseVerticesInput, data.figureConstraints);
     if (!figure) {
       set({ status: { built: 0, errors: [error ?? "Ошибка создания фигуры."], at: Date.now() } });
       return;
     }
-    const result = applySpaceBuild({ ...state.scene, space3d: { ...data, figure } });
+    const result = applySpaceBuild({
+      ...state.scene,
+      space3d: { ...data, figure, figureDirty: false },
+    });
     set({ scene: result.scene, status: result.status });
   },
 
   updateSpaceConstraints: (patch) =>
     set((state) =>
-      withSpaceData(state, (data) => {
-        if (!data.figure) return data;
-        return {
-          ...data,
-          figure: {
-            ...data.figure,
-            constraints: { ...data.figure.constraints, ...patch },
-          },
-        };
-      }),
+      patchSpaceData(state, (data) => ({
+        ...data,
+        figureConstraints: { ...data.figureConstraints, ...patch },
+        figureDirty: data.figure ? true : data.figureDirty,
+      })),
     ),
 
-  startSpacePointOnLine: () =>
-    set((state) => {
-      const data = state.scene.space3d;
-      if (!data?.figure) return {};
-      const a = data.figure.vertices[0]!.id;
-      const b = data.figure.vertices[1]!.id;
-      const label = String.fromCharCode(77 + data.points.length);
-      const point = newPointOnLine(data, a, b, label);
-      return withSpaceData(state, (d) => ({ ...d, points: [...d.points, point] }));
-    }),
+  startSpacePointDraft: () => {
+    const data = get().scene.space3d;
+    if (!data?.figure) return;
+    const verts = data.figure.vertices;
+    set({
+      spacePointDraft: {
+        mode: "onLine",
+        label: String.fromCharCode(77 + data.points.length),
+        pointAId: verts[0]!.id,
+        pointBId: verts[1]!.id,
+        region: "between",
+        ratioMode: "auto",
+        ratioA: 1,
+        ratioB: 2,
+        lineParam: defaultLineParam("between"),
+        faceId: data.figure.faces[0]!.id,
+        placement: "arbitrary",
+      },
+      spacePointDraftError: null,
+    });
+  },
 
-  startSpacePointOnFace: () =>
-    set((state) => {
-      const data = state.scene.space3d;
-      if (!data?.figure) return {};
-      const faceId = data.figure.faces[0]!.id;
-      const label = `P${data.points.length + 1}`;
-      const point = newPointOnFace(data, faceId, label);
-      return withSpaceData(state, (d) => ({ ...d, points: [...d.points, point] }));
-    }),
+  updateSpacePointDraft: (patch) =>
+    set((state) => ({
+      spacePointDraft: state.spacePointDraft ? { ...state.spacePointDraft, ...patch } : state.spacePointDraft,
+      spacePointDraftError: null,
+    })),
+
+  cancelSpacePointDraft: () => set({ spacePointDraft: null, spacePointDraftError: null }),
+
+  commitSpacePointDraft: () => {
+    const state = get();
+    const draft = state.spacePointDraft;
+    const data = state.scene.space3d;
+    if (!draft || !data?.figure) return;
+    if (!draft.label.trim()) {
+      set({ spacePointDraftError: "Введите название точки." });
+      return;
+    }
+    const point =
+      draft.mode === "onLine"
+        ? createSpacePoint(
+            data.points.length + 1,
+            {
+              kind: "onLine",
+              pointAId: draft.pointAId,
+              pointBId: draft.pointBId,
+              region: draft.region,
+              ratioMode: draft.ratioMode,
+              ratioA: draft.ratioA,
+              ratioB: draft.ratioB,
+              lineParam: draft.lineParam,
+            },
+            draft.label.trim(),
+          )
+        : createSpacePoint(
+            data.points.length + 1,
+            {
+              kind: "onFace",
+              faceId: draft.faceId,
+              placement: draft.placement,
+              faceU: 0.35,
+              faceV: 0.35,
+            },
+            draft.label.trim(),
+          );
+    set({
+      ...patchSpaceData(state, (d) => ({ ...d, points: [...d.points, point] })),
+      spacePointDraft: null,
+      spacePointDraftError: null,
+    });
+  },
+
+  buildSpacePoint: (id) => {
+    const state = get();
+    const data = state.scene.space3d;
+    if (!data?.figure) return;
+    const target = data.points.find((p) => p.id === id);
+    if (!target) return;
+    const result = applySpaceBuild({
+      ...state.scene,
+      space3d: {
+        ...data,
+        points: data.points.map((p) => (p.id === id ? { ...p, built: true, dirty: true } : p)),
+      },
+    });
+    set({ scene: result.scene, status: result.status });
+  },
 
   updateSpacePoint: (id, patch) =>
     set((state) =>
-      withSpaceData(state, (data) => ({
+      patchSpaceData(state, (data) => ({
         ...data,
         points: data.points.map((p) => (p.id === id ? { ...p, ...patch, dirty: true } : p)),
       })),
@@ -1056,7 +1205,7 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
 
   updateSpacePointStyle: (id, patch) =>
     set((state) =>
-      withSpaceData(state, (data) => ({
+      patchSpaceData(state, (data) => ({
         ...data,
         points: data.points.map((p) =>
           p.id === id ? { ...p, style: { ...p.style, ...patch } } : p,
@@ -1066,7 +1215,7 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
 
   updateSpacePointOnLine: (id, patch) =>
     set((state) =>
-      withSpaceData(state, (data) => ({
+      patchSpaceData(state, (data) => ({
         ...data,
         points: data.points.map((p) => {
           if (p.id !== id || p.definition.kind !== "onLine") return p;
@@ -1096,33 +1245,81 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       })),
     ),
 
-  addSpaceLine: () =>
-    set((state) => {
-      const data = state.scene.space3d;
-      if (!data?.figure) return {};
-      const verts = data.figure.vertices;
-      const line = createSpaceLine(data.lines.length + 1, {
+  startSpaceLineDraft: () => {
+    const data = get().scene.space3d;
+    if (!data?.figure) return;
+    const verts = data.figure.vertices;
+    set({
+      spaceLineDraft: {
         kind: "twoPoints",
+        visualKind: "segment",
         aId: verts[0]!.id,
         bId: verts[1]!.id,
-      }, `(${verts[0]!.label}${verts[1]!.label})`);
-      return withSpaceData(state, (d) => ({ ...d, lines: [...d.lines, line] }));
-    }),
+        planeAId: data.planes[0]?.id ?? "",
+        planeBId: data.planes[1]?.id ?? data.planes[0]?.id ?? "",
+      },
+      spaceLineDraftError: null,
+    });
+  },
+
+  updateSpaceLineDraft: (patch) =>
+    set((state) => ({
+      spaceLineDraft: state.spaceLineDraft ? { ...state.spaceLineDraft, ...patch } : state.spaceLineDraft,
+      spaceLineDraftError: null,
+    })),
+
+  cancelSpaceLineDraft: () => set({ spaceLineDraft: null, spaceLineDraftError: null }),
+
+  commitSpaceLineDraft: () => {
+    const state = get();
+    const draft = state.spaceLineDraft;
+    const data = state.scene.space3d;
+    if (!draft || !data?.figure) return;
+    if (draft.kind === "twoPoints" && draft.aId === draft.bId) {
+      set({ spaceLineDraftError: "Выберите две различные точки." });
+      return;
+    }
+    const definition: SpaceLineDefinition =
+      draft.kind === "twoPoints"
+        ? { kind: "twoPoints", aId: draft.aId, bId: draft.bId }
+        : { kind: "planeIntersection", planeAId: draft.planeAId, planeBId: draft.planeBId };
+    const line = createSpaceLine(data.lines.length + 1, definition, "");
+    line.style.visualKind = draft.visualKind;
+    set({
+      ...patchSpaceData(state, (d) => ({ ...d, lines: [...d.lines, line] })),
+      spaceLineDraft: null,
+      spaceLineDraftError: null,
+    });
+  },
+
+  buildSpaceLine: (id) => {
+    const state = get();
+    const data = state.scene.space3d;
+    if (!data?.figure) return;
+    const result = applySpaceBuild({
+      ...state.scene,
+      space3d: {
+        ...data,
+        lines: data.lines.map((l) => (l.id === id ? { ...l, built: true, dirty: true, label: "" } : l)),
+      },
+    });
+    set({ scene: result.scene, status: result.status });
+  },
 
   updateSpaceLine: (id, patch) =>
     set((state) =>
-      withSpaceData(state, (data) => ({
+      patchSpaceData(state, (data) => ({
         ...data,
-        lines: data.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+        lines: data.lines.map((l) => (l.id === id ? { ...l, ...patch, dirty: true } : l)),
       })),
     ),
 
   updateSpaceLineStyle: (id, patch) =>
     set((state) =>
-      withSpaceData(state, (data) => ({
+      patchSpaceData(state, (data) => ({
         ...data,
         lines: data.lines.map((l) =>
-          l.id === id ? { ...l, style: { ...l.style, ...patch } } : l,
+          l.id === id ? { ...l, style: { ...l.style, ...patch }, dirty: patch.visualKind ? true : l.dirty } : l,
         ),
       })),
     ),
@@ -1135,30 +1332,76 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       })),
     ),
 
-  addSpacePlane: () =>
-    set((state) => {
-      const data = state.scene.space3d;
-      if (!data?.figure) return {};
-      const [a, b, c] = data.figure.vertices;
-      const plane = createSpacePlane(
-        data.planes.length + 1,
-        { kind: "threePoints", aId: a!.id, bId: b!.id, cId: c!.id },
-        `α${data.planes.length + 1}`,
-      );
-      return withSpaceData(state, (d) => ({ ...d, planes: [...d.planes, plane] }));
-    }),
+  startSpacePlaneDraft: () => {
+    const data = get().scene.space3d;
+    if (!data?.figure) return;
+    const verts = data.figure.vertices;
+    set({
+      spacePlaneDraft: {
+        definition: {
+          kind: "threePoints",
+          aId: verts[0]!.id,
+          bId: verts[1]!.id,
+          cId: verts[2]!.id,
+        },
+      },
+      spacePlaneDraftError: null,
+    });
+  },
+
+  updateSpacePlaneDraft: (patch) =>
+    set((state) => ({
+      spacePlaneDraft: state.spacePlaneDraft
+        ? { ...state.spacePlaneDraft, ...patch, definition: patch.definition ?? state.spacePlaneDraft.definition }
+        : state.spacePlaneDraft,
+      spacePlaneDraftError: null,
+    })),
+
+  cancelSpacePlaneDraft: () => set({ spacePlaneDraft: null, spacePlaneDraftError: null }),
+
+  commitSpacePlaneDraft: () => {
+    const state = get();
+    const draft = state.spacePlaneDraft;
+    const data = state.scene.space3d;
+    if (!draft || !data?.figure) return;
+    const def = draft.definition;
+    if (def.kind === "threePoints" && new Set([def.aId, def.bId, def.cId]).size < 3) {
+      set({ spacePlaneDraftError: "Выберите три различные точки." });
+      return;
+    }
+    const plane = createSpacePlane(data.planes.length + 1, def, "");
+    set({
+      ...patchSpaceData(state, (d) => ({ ...d, planes: [...d.planes, plane] })),
+      spacePlaneDraft: null,
+      spacePlaneDraftError: null,
+    });
+  },
+
+  buildSpacePlane: (id) => {
+    const state = get();
+    const data = state.scene.space3d;
+    if (!data?.figure) return;
+    const result = applySpaceBuild({
+      ...state.scene,
+      space3d: {
+        ...data,
+        planes: data.planes.map((p) => (p.id === id ? { ...p, built: true, dirty: true } : p)),
+      },
+    });
+    set({ scene: result.scene, status: result.status });
+  },
 
   updateSpacePlane: (id, patch) =>
     set((state) =>
-      withSpaceData(state, (data) => ({
+      patchSpaceData(state, (data) => ({
         ...data,
-        planes: data.planes.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+        planes: data.planes.map((p) => (p.id === id ? { ...p, ...patch, dirty: true } : p)),
       })),
     ),
 
   updateSpacePlaneStyle: (id, patch) =>
     set((state) =>
-      withSpaceData(state, (data) => ({
+      patchSpaceData(state, (data) => ({
         ...data,
         planes: data.planes.map((p) =>
           p.id === id ? { ...p, style: { ...p.style, ...patch } } : p,

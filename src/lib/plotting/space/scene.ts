@@ -1,10 +1,11 @@
-import { nextId, PLOT_PALETTE } from "../scene";
-import { DEFAULT_SPACE_VIEW } from "./camera";
+import { nextId, DEFAULT_APPEARANCE, PLOT_PALETTE } from "../scene";
+import { DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
 import { parseBaseVertexLabels } from "./parse-vertices";
 import { createParallelepiped } from "./parallelepiped";
-import { buildSpaceScene, clampRegionParam, defaultLineParam } from "./build";
+import { buildSpaceScene, clampRegionParam, defaultLineParam, getPointLabel } from "./build";
 import type {
   LineRegion,
+  ParallelepipedConstraints,
   ParallelepipedFigure,
   SpaceAppearance,
   SpaceLine,
@@ -18,23 +19,27 @@ import type {
 } from "./types";
 
 export const DEFAULT_SPACE_APPEARANCE: SpaceAppearance = {
-  width: 720,
-  height: 520,
-  padding: 40,
-  edgeWidth: 2.5,
-  edgeColor: "#1A2236",
-  hiddenDash: "6 5",
-  labelFontSize: 16,
-  labelFontFamily: "Segoe UI, sans-serif",
-  labelColor: "#1A2236",
-  pointRadius: 5,
-  lineExtension: 0.45,
+  width: DEFAULT_APPEARANCE.width,
+  height: DEFAULT_APPEARANCE.height,
+  padding: 24,
+  edgeWidth: DEFAULT_APPEARANCE.graphWidth,
+  edgeColor: DEFAULT_APPEARANCE.axisColor,
+  hiddenDash: "7 5",
+  labelFontSize: DEFAULT_APPEARANCE.pointLabelFontSize,
+  labelFontFamily: DEFAULT_APPEARANCE.pointLabelFontFamily,
+  labelColor: DEFAULT_APPEARANCE.labelColor,
+  pointRadius: DEFAULT_APPEARANCE.pointRadius,
+  lineWidth: DEFAULT_APPEARANCE.graphWidth,
+  lineExtension: 0.35,
+  planeFillOpacity: 0.5,
 };
 
 export function createSpaceSceneData(): SpaceSceneData {
   return {
     shapeKind: null,
     baseVerticesInput: "",
+    figureConstraints: { rectangular: true, equilateral: false },
+    figureDirty: false,
     figure: null,
     points: [],
     lines: [],
@@ -51,7 +56,8 @@ export function createSpacePoint(index: number, definition: SpacePointDefinition
     label,
     definition,
     style: { color: PLOT_PALETTE[(index - 1) % PLOT_PALETTE.length]!, visible: true },
-    built: null,
+    built: false,
+    geometry: null,
     lastBuilt: null,
     dirty: true,
     error: null,
@@ -70,12 +76,14 @@ export function createSpaceLine(
     definition,
     style: {
       color: PLOT_PALETTE[(index - 1) % PLOT_PALETTE.length]!,
-      width: 2,
+      width: DEFAULT_SPACE_APPEARANCE.lineWidth,
       visible: true,
       visualKind: "segment",
     },
+    built: false,
+    dirty: true,
     error: null,
-    lastOk: true,
+    lastOk: false,
   };
 }
 
@@ -90,12 +98,17 @@ export function createSpacePlane(
     label,
     definition,
     style: { color: PLOT_PALETTE[(index - 1) % PLOT_PALETTE.length]!, visible: true, helperOpacity: 0.45 },
+    built: false,
+    dirty: true,
     error: null,
-    lastOk: true,
+    lastOk: false,
   };
 }
 
-export function createParallelepipedFromInput(input: string): {
+export function createParallelepipedFromInput(
+  input: string,
+  constraints?: ParallelepipedConstraints,
+): {
   figure: ParallelepipedFigure | null;
   error: string | null;
 } {
@@ -104,7 +117,10 @@ export function createParallelepipedFromInput(input: string): {
     return { figure: null, error: "Введите четыре различные буквы вершин нижнего основания." };
   }
   return {
-    figure: createParallelepiped(labels as [string, string, string, string]),
+    figure: createParallelepiped(
+      labels as [string, string, string, string],
+      constraints ?? { rectangular: true, equilateral: false },
+    ),
     error: null,
   };
 }
@@ -115,6 +131,20 @@ export interface SpaceBuildReport {
   errors: string[];
 }
 
+export function autoLineLabel(
+  line: SpaceLine,
+  data: SpaceSceneData,
+  figure: ParallelepipedFigure,
+): string {
+  const def = line.definition;
+  if (def.kind === "twoPoints") {
+    const a = getPointLabel(def.aId, data, figure);
+    const b = getPointLabel(def.bId, data, figure);
+    return `${a}${b}`;
+  }
+  return nextAutoLineLabel(data.lines.filter((l) => l.id !== line.id));
+}
+
 export function buildSpaceSceneData(data: SpaceSceneData): SpaceBuildReport {
   const resolved = buildSpaceScene(data);
   const errors = [...resolved.errors];
@@ -122,30 +152,42 @@ export function buildSpaceSceneData(data: SpaceSceneData): SpaceBuildReport {
 
   const points = data.points.map((point) => {
     const err = resolved.pointErrors.get(point.id);
-    const builtPt = resolved.points.get(point.id) ?? null;
-    if (builtPt) built += 1;
+    const geom = resolved.points.get(point.id) ?? null;
+    if (geom && point.built) built += 1;
     if (err) errors.push(`Точка ${point.label || point.index}: ${err}`);
     return {
       ...point,
-      built: builtPt,
-      lastBuilt: builtPt ?? point.lastBuilt,
+      geometry: point.built ? (geom ?? point.lastBuilt) : null,
+      lastBuilt: geom ?? point.lastBuilt,
       error: err ?? null,
-      dirty: false,
+      dirty: err ? point.dirty : point.built ? false : point.dirty,
     };
   });
 
   const lines = data.lines.map((line) => {
     const err = resolved.lineErrors.get(line.id);
     if (err) errors.push(`Прямая ${line.label || line.index}: ${err}`);
-    else built += 1;
-    return { ...line, error: err ?? null, lastOk: !err };
+    const ok = !err && line.built;
+    if (ok) built += 1;
+    const label =
+      line.built && ok
+        ? line.label.trim() || (data.figure ? autoLineLabel(line, { ...data, points }, data.figure) : "")
+        : line.label;
+    return {
+      ...line,
+      label: label || line.label,
+      error: err ?? null,
+      lastOk: ok,
+      dirty: err ? line.dirty : false,
+    };
   });
 
   const planes = data.planes.map((plane) => {
     const err = resolved.planeErrors.get(plane.id);
     if (err) errors.push(`Плоскость ${plane.label || plane.index}: ${err}`);
-    else if (resolved.planes.has(plane.id)) built += 1;
-    return { ...plane, error: err ?? null, lastOk: !err };
+    const ok = !err && plane.built && resolved.planes.has(plane.id);
+    if (ok) built += 1;
+    return { ...plane, error: err ?? null, lastOk: ok, dirty: err ? plane.dirty : false };
   });
 
   if (data.figure) built += data.figure.vertices.length + data.figure.edges.length;
@@ -161,7 +203,7 @@ export function pointChoices(data: SpaceSceneData): Array<{ id: string; label: s
   if (!data.figure) return [];
   const result = data.figure.vertices.map((v) => ({ id: v.id, label: v.label }));
   for (const p of data.points) {
-    if (p.built || p.lastBuilt) result.push({ id: p.id, label: p.label || `T${p.index}` });
+    if (p.built) result.push({ id: p.id, label: p.label || `T${p.index}` });
   }
   return result;
 }

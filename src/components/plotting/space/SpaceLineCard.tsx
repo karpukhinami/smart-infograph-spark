@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Eye, EyeOff, Trash2 } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Hammer, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -23,6 +23,7 @@ export function SpaceLineCard({ line }: { line: SpaceLine }) {
   const updateSpaceLine = usePlotStore((s) => s.updateSpaceLine);
   const updateSpaceLineStyle = usePlotStore((s) => s.updateSpaceLineStyle);
   const removeSpaceLine = usePlotStore((s) => s.removeSpaceLine);
+  const buildSpaceLine = usePlotStore((s) => s.buildSpaceLine);
 
   if (!space3d?.figure) return null;
   const choices = pointChoices(space3d);
@@ -38,11 +39,14 @@ export function SpaceLineCard({ line }: { line: SpaceLine }) {
             </CollapsibleTrigger>
             <Input
               value={line.label}
+              readOnly={!line.built}
               className="h-8 w-16 shrink-0 px-2 text-xs italic"
+              placeholder="—"
               onChange={(e) => updateSpaceLine(line.id, { label: e.target.value })}
             />
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
               {line.error ?? (def.kind === "twoPoints" ? "через 2 точки" : "пересечение плоскостей")}
+              {!line.built ? " · не построена" : line.dirty ? " · изменена" : ""}
             </span>
             <ColorDot
               value={line.style.color}
@@ -108,6 +112,10 @@ export function SpaceLineCard({ line }: { line: SpaceLine }) {
                 </Select>
               </div>
             )}
+            <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => buildSpaceLine(line.id)}>
+              <Hammer className="size-4" />
+              {line.built ? "Перестроить" : "Построить"}
+            </Button>
           </CollapsibleContent>
         </Collapsible>
       </CardContent>

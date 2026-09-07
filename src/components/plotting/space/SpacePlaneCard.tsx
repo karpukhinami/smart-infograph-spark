@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Eye, EyeOff, Trash2 } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Hammer, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -23,6 +23,7 @@ export function SpacePlaneCard({ plane }: { plane: SpacePlane }) {
   const updateSpacePlane = usePlotStore((s) => s.updateSpacePlane);
   const updateSpacePlaneStyle = usePlotStore((s) => s.updateSpacePlaneStyle);
   const removeSpacePlane = usePlotStore((s) => s.removeSpacePlane);
+  const buildSpacePlane = usePlotStore((s) => s.buildSpacePlane);
 
   if (!space3d?.figure) return null;
   const choices = pointChoices(space3d);
@@ -45,6 +46,7 @@ export function SpacePlaneCard({ plane }: { plane: SpacePlane }) {
             />
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
               {plane.error ?? "плоскость"}
+              {!plane.built ? " · не построена" : plane.dirty ? " · изменена" : ""}
             </span>
             <ColorDot
               value={plane.style.color}
@@ -124,6 +126,10 @@ export function SpacePlaneCard({ plane }: { plane: SpacePlane }) {
                 ))}
               </div>
             )}
+            <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => buildSpacePlane(plane.id)}>
+              <Hammer className="size-4" />
+              {plane.built ? "Перестроить" : "Построить"}
+            </Button>
           </CollapsibleContent>
         </Collapsible>
       </CardContent>

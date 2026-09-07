@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Eye, EyeOff, Trash2 } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Hammer, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -32,6 +32,7 @@ export function SpacePointCard({ point }: { point: SpacePoint }) {
   const updateSpacePointStyle = usePlotStore((s) => s.updateSpacePointStyle);
   const updateSpacePointOnLine = usePlotStore((s) => s.updateSpacePointOnLine);
   const removeSpacePoint = usePlotStore((s) => s.removeSpacePoint);
+  const buildSpacePoint = usePlotStore((s) => s.buildSpacePoint);
 
   if (!space3d?.figure) return null;
   const choices = pointChoices(space3d);
@@ -52,6 +53,7 @@ export function SpacePointCard({ point }: { point: SpacePoint }) {
             />
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
               {def.kind === "onLine" ? "на прямой" : def.kind === "onFace" ? "на грани" : ""}
+              {!point.built ? " · не построена" : point.dirty ? " · изменена" : ""}
               {point.error ? ` · ${point.error}` : ""}
             </span>
             <ColorDot
@@ -199,6 +201,10 @@ export function SpacePointCard({ point }: { point: SpacePoint }) {
                 </Select>
               </div>
             )}
+            <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => buildSpacePoint(point.id)}>
+              <Hammer className="size-4" />
+              {point.built ? "Перестроить" : "Построить"}
+            </Button>
           </CollapsibleContent>
         </Collapsible>
       </CardContent>
