@@ -9,7 +9,7 @@ import type {
   SetMath,
 } from "./types";
 import { DEFAULT_LINE_TICKS, LINE_APPEARANCE_OVERRIDES } from "./types";
-import { DEFAULT_APPEARANCE, nextId, PLOT_PALETTE } from "../scene";
+import { DEFAULT_APPEARANCE, nextId, PLOT_PALETTE } from "../shared";
 
 export function createLineSceneData(): LineSceneData {
   return {

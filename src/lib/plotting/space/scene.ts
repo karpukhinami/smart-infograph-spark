@@ -1,4 +1,4 @@
-import { nextId, DEFAULT_APPEARANCE, PLOT_PALETTE } from "../scene";
+import { nextId, DEFAULT_APPEARANCE, PLOT_PALETTE } from "../shared";
 import { DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
 import { parseBaseVertexLabels } from "./parse-vertices";
 import { createParallelepiped } from "./parallelepiped";

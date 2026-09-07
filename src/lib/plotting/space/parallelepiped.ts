@@ -1,4 +1,4 @@
-import { nextId } from "../scene";
+import { nextId } from "../shared";
 import { formatVertexLabel } from "./parse-vertices";
 import type {
   LocalCoords,
