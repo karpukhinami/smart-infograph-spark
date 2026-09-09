@@ -48,7 +48,7 @@ export function SpacePointCard({ point }: { point: SpacePoint }) {
             </CollapsibleTrigger>
             <Input
               value={point.label}
-              className="h-8 w-16 shrink-0 px-2 text-xs italic"
+              className="h-8 w-12 max-w-12 shrink-0 px-1.5 text-xs italic"
               onChange={(e) => updateSpacePoint(point.id, { label: e.target.value })}
             />
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">

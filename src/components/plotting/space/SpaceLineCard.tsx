@@ -41,7 +41,7 @@ export function SpaceLineCard({ line }: { line: SpaceLine }) {
             <Input
               value={line.label}
               readOnly={!line.built}
-              className="h-8 min-w-16 shrink-0 px-2 text-xs italic"
+              className="h-8 w-12 max-w-12 shrink-0 px-1.5 text-xs italic"
               placeholder={line.built ? "" : "—"}
               onChange={(e) => updateSpaceLine(line.id, { label: e.target.value })}
             />
