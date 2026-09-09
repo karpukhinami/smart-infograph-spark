@@ -320,9 +320,9 @@ function renderPlane(
   if (!planeEq) return;
 
   const helperWidth = edgeWidth / 2;
-  const supports = getPlaneOutsideSupportPoints(plane, figure, resolved.points);
+  const supports = getPlaneOutsideSupportPoints(plane, resolved.points, resolved.basis);
   for (const support of supports) {
-    const helpers = computePlaneHelperSegments(section, support, planeEq);
+    const helpers = computePlaneHelperSegments(section, support, planeEq, resolved.basis);
     for (const seg of helpers) {
       drawSegmentWithVisibility(
         seg.from,
@@ -337,7 +337,6 @@ function renderPlane(
         data.appearance.hiddenDash,
         parts,
         obstacles,
-        plane.style.helperOpacity,
       );
     }
   }

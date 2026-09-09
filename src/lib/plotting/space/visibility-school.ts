@@ -35,16 +35,47 @@ function localOnBoxFace(l: LocalCoords): string | null {
   return null;
 }
 
+/** Точка на грани (включая рёбра и углы) в локальных (u,v,w). */
+export function localInBoxFace(l: LocalCoords, faceId: string): boolean {
+  const e = FACE_EPS;
+  const inRange = (x: number) => x >= -e && x <= 1 + e;
+  switch (faceId) {
+    case "f-left":
+      return l.u >= -e && l.u <= e && inRange(l.v) && inRange(l.w);
+    case "f-right":
+      return l.u >= 1 - e && l.u <= 1 + e && inRange(l.v) && inRange(l.w);
+    case "f-front":
+      return l.v >= -e && l.v <= e && inRange(l.u) && inRange(l.w);
+    case "f-back":
+      return l.v >= 1 - e && l.v <= 1 + e && inRange(l.u) && inRange(l.w);
+    case "f-bottom":
+      return l.w >= -e && l.w <= e && inRange(l.u) && inRange(l.v);
+    case "f-top":
+      return l.w >= 1 - e && l.w <= 1 + e && inRange(l.u) && inRange(l.v);
+    default:
+      return false;
+  }
+}
+
+/** Отрезок целиком лежит на передней грани параллелепипеда. */
+export function isSegmentOnFrontBoxFace(
+  la: LocalCoords,
+  lb: LocalCoords,
+  projection: ProjectionCoeffs,
+): boolean {
+  for (const faceId of Object.keys(FACE_NORMALS)) {
+    if (!isFaceFrontFacing(faceId, projection)) continue;
+    if (localInBoxFace(la, faceId) && localInBoxFace(lb, faceId)) return true;
+  }
+  return false;
+}
+
 function segmentOnSharedFrontFace(
   la: LocalCoords,
   lb: LocalCoords,
   projection: ProjectionCoeffs,
 ): boolean {
-  const fa = localOnBoxFace(la);
-  const fb = localOnBoxFace(lb);
-  if (!fa || fa !== fb) return false;
-  const faceId = BOX_FACE_TO_FACE_ID[fa];
-  return faceId ? isFaceFrontFacing(faceId, projection) : false;
+  return isSegmentOnFrontBoxFace(la, lb, projection);
 }
 
 /** Рёбро → две прилегающие грани. */

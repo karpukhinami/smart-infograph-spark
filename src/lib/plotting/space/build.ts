@@ -828,17 +828,31 @@ export function planeDefiningPointIds(plane: SpacePlane): string[] {
   return [];
 }
 
+/** Строго внутри параллелепипеда (без границы). */
+export function isLocalStrictlyInsideFigure(local: LocalCoords): boolean {
+  const e = LOCAL_UNIT_EPS;
+  return (
+    local.u > e &&
+    local.u < 1 - e &&
+    local.v > e &&
+    local.v < 1 - e &&
+    local.w > e &&
+    local.w < 1 - e
+  );
+}
+
 /** Опорные точки плоскости, лежащие вне параллелепипеда. */
 export function getPlaneOutsideSupportPoints(
   plane: SpacePlane,
-  figure: ParallelepipedFigure,
   points: Map<string, BuiltSpacePoint>,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): Vec3[] {
   const supports: Vec3[] = [];
   for (const id of planeDefiningPointIds(plane)) {
     const pt = points.get(id);
     if (!pt) continue;
-    if (isPointInsideParallelepiped(pt.world, figure, points)) continue;
+    const local = pt.local ?? worldToLocal(pt.world, basis);
+    if (!local || isLocalStrictlyInsideFigure(local)) continue;
     supports.push(pt.world);
   }
   return supports;
@@ -861,25 +875,22 @@ function projectOnPlane2D(p: Vec3, origin: Vec3, e1: Vec3, e2: Vec3): { x: numbe
   return { x: dot(d, e1), y: dot(d, e2) };
 }
 
-function segmentsCross2D(
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-  cx: number,
-  cy: number,
-  dx: number,
-  dy: number,
-): boolean {
-  const denom = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
-  if (Math.abs(denom) < 1e-12) return false;
-  const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / denom;
-  const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / denom;
-  return t > 1e-5 && t < 1 - 1e-5 && u > 1e-5 && u < 1 - 1e-5;
+function pointInPolygon2D(px: number, py: number, poly: Array<{ x: number; y: number }>): boolean {
+  if (poly.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i]!.x;
+    const yi = poly[i]!.y;
+    const xj = poly[j]!.x;
+    const yj = poly[j]!.y;
+    const intersects = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
 }
 
-/** Вершины сечения, видимые с опорной точки (для соединительных линий). */
-function visibleSectionVerticesFromSupport(
+/** Касательные вершины выпуклого многоугольника сечения, видимые с внешней точки. */
+function tangentSectionVerticesFromSupport(
   section: Vec3[],
   support: Vec3,
   planeEq: PlaneEq,
@@ -889,42 +900,59 @@ function visibleSectionVerticesFromSupport(
   const { origin, e1, e2 } = basis;
   const eye = projectOnPlane2D(support, origin, e1, e2);
   const poly = section.map((v) => projectOnPlane2D(v, origin, e1, e2));
-  const visible: Vec3[] = [];
+  if (pointInPolygon2D(eye.x, eye.y, poly)) return [];
 
-  for (let i = 0; i < section.length; i += 1) {
-    const vi = poly[i]!;
-    let blocked = false;
-    for (let j = 0; j < poly.length; j += 1) {
-      const jn = (j + 1) % poly.length;
-      if (j === i || jn === i) continue;
-      const a = poly[j]!;
-      const b = poly[jn]!;
-      if (segmentsCross2D(eye.x, eye.y, vi.x, vi.y, a.x, a.y, b.x, b.y)) {
-        blocked = true;
-        break;
-      }
-    }
-    if (!blocked) visible.push(section[i]!);
+  const n = poly.length;
+  const out: Vec3[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const prev = poly[(i + n - 1) % n]!;
+    const cur = poly[i]!;
+    const next = poly[(i + 1) % n]!;
+    const cross1 =
+      (cur.x - eye.x) * (prev.y - eye.y) - (cur.y - eye.y) * (prev.x - eye.x);
+    const cross2 =
+      (next.x - eye.x) * (cur.y - eye.y) - (next.y - eye.y) * (cur.x - eye.x);
+    if (cross1 * cross2 <= 1e-12) out.push(section[i]!);
   }
-  return visible;
+  return out;
+}
+
+function isOnBoxBoundary(local: LocalCoords, eps = 1e-3): boolean {
+  return (
+    local.u <= eps ||
+    local.u >= 1 - eps ||
+    local.v <= eps ||
+    local.v >= 1 - eps ||
+    local.w <= eps ||
+    local.w >= 1 - eps
+  );
 }
 
 /**
- * Тонкие линии от продолжений сторон сечения плоскости к опорной точке вне тела.
+ * Тонкие линии от вершин сечения (на границе тела) к опорной точке вне параллелепипеда.
  */
 export function computePlaneHelperSegments(
   section: Vec3[],
   support: Vec3,
   planeEq: PlaneEq,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): Array<{ from: Vec3; to: Vec3 }> {
   if (section.length < 3) return [];
-  const vertices = visibleSectionVerticesFromSupport(section, support, planeEq);
+  let sources = tangentSectionVerticesFromSupport(section, support, planeEq);
+  if (!sources.length) {
+    sources = section.filter((v) => {
+      const local = worldToLocal(v, basis);
+      return local !== null && isOnBoxBoundary(local);
+    });
+  }
   const segments: Array<{ from: Vec3; to: Vec3 }> = [];
   const seen = new Set<string>();
   const key = (a: Vec3, b: Vec3) =>
     `${a.x.toFixed(4)}:${a.y.toFixed(4)}:${a.z.toFixed(4)}-${b.x.toFixed(4)}:${b.y.toFixed(4)}:${b.z.toFixed(4)}`;
 
-  for (const from of vertices) {
+  for (const from of sources) {
+    const local = worldToLocal(from, basis);
+    if (!local || !isOnBoxBoundary(local)) continue;
     if (len(sub(from, support)) < 1e-6) continue;
     const k = key(from, support);
     if (seen.has(k)) continue;
