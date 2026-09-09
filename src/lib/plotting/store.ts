@@ -1421,6 +1421,14 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       set({ spacePlaneDraftError: "Выберите три различные точки." });
       return;
     }
+    if (def.kind === "twoLines" && def.lineAId === def.lineBId) {
+      set({ spacePlaneDraftError: "Выберите две различные прямые." });
+      return;
+    }
+    if (def.kind === "lineParallelToLine" && def.throughLineId === def.parallelToLineId) {
+      set({ spacePlaneDraftError: "Выберите две различные прямые." });
+      return;
+    }
     const plane = createSpacePlane(data.planes.length + 1, def, "");
     plane.built = true;
     const result = applySpaceBuild({

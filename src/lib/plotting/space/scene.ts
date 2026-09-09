@@ -402,6 +402,23 @@ export function faceChoices(data: SpaceSceneData): Array<{ id: string; label: st
   }));
 }
 
+/** Рёбра параллелепипеда (AB, …) + построенные прямые. */
+export function lineChoices(data: SpaceSceneData): Array<{ id: string; label: string }> {
+  if (!data.figure) return [];
+  const figure = data.figure;
+  const edges = figure.edges.map((e) => ({
+    id: e.id,
+    label: `${getPointLabel(e.aId, data, figure)}${getPointLabel(e.bId, data, figure)}`,
+  }));
+  const lines = data.lines
+    .filter((l) => l.built)
+    .map((l) => ({
+      id: l.id,
+      label: l.label.trim() || autoLineLabel(l, data, figure),
+    }));
+  return [...edges, ...lines];
+}
+
 /** Грани параллелепипеда + построенные плоскости (для пересечений). */
 export function planeChoices(data: SpaceSceneData): Array<{ id: string; label: string }> {
   const faces = faceChoices(data);

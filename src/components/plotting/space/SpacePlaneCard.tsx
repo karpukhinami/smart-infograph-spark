@@ -14,8 +14,9 @@ import {
 } from "@/components/ui/select";
 import { ColorDot } from "../ColorDot";
 import { usePlotStore } from "@/lib/plotting/store";
-import { pointChoices } from "@/lib/plotting/space/scene";
+import { lineChoices, pointChoices } from "@/lib/plotting/space/scene";
 import type { SpacePlane, SpacePlaneDefinition } from "@/lib/plotting/space/types";
+import { SpacePlaneLinePickers } from "./SpacePlaneLinePickers";
 
 export function SpacePlaneCard({ plane }: { plane: SpacePlane }) {
   const [open, setOpen] = useState(false);
@@ -27,7 +28,14 @@ export function SpacePlaneCard({ plane }: { plane: SpacePlane }) {
 
   if (!space3d?.figure) return null;
   const choices = pointChoices(space3d);
+  const lines = lineChoices(space3d);
   const def = plane.definition;
+
+  const defaultLineIds = (): [string, string] => {
+    const a = lines[0]?.id ?? "";
+    const b = lines[1]?.id ?? lines[0]?.id ?? "";
+    return [a, b];
+  };
 
   const setDef = (next: SpacePlaneDefinition) => updateSpacePlane(plane.id, { definition: next });
 
@@ -76,21 +84,18 @@ export function SpacePlaneCard({ plane }: { plane: SpacePlane }) {
                 value={def.kind}
                 onValueChange={(kind) => {
                   const verts = choices.slice(0, 3).map((c) => c.id);
+                  const [lineA, lineB] = defaultLineIds();
                   if (kind === "threePoints") {
                     setDef({ kind, aId: verts[0] ?? "", bId: verts[1] ?? "", cId: verts[2] ?? "" });
                   } else if (kind === "pointAndLine") {
-                    setDef({ kind, pointId: verts[0] ?? "", lineId: space3d.lines[0]?.id ?? "" });
+                    setDef({ kind, pointId: verts[0] ?? "", lineId: lineA });
                   } else if (kind === "twoLines") {
-                    setDef({
-                      kind,
-                      lineAId: space3d.lines[0]?.id ?? "",
-                      lineBId: space3d.lines[1]?.id ?? space3d.lines[0]?.id ?? "",
-                    });
+                    setDef({ kind, lineAId: lineA, lineBId: lineB });
                   } else {
                     setDef({
                       kind: "lineParallelToLine",
-                      throughLineId: space3d.lines[0]?.id ?? "",
-                      parallelToLineId: space3d.lines[1]?.id ?? space3d.lines[0]?.id ?? "",
+                      throughLineId: lineA,
+                      parallelToLineId: lineB,
                     });
                   }
                 }}
@@ -127,6 +132,54 @@ export function SpacePlaneCard({ plane }: { plane: SpacePlane }) {
                   </Select>
                 ))}
               </div>
+            )}
+            {def.kind === "pointAndLine" && (
+              <div className="grid grid-cols-2 gap-1">
+                <Select value={def.pointId} onValueChange={(v) => setDef({ ...def, pointId: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Точка" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {choices.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={def.lineId} onValueChange={(v) => setDef({ ...def, lineId: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Прямая" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lines.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {def.kind === "twoLines" && (
+              <SpacePlaneLinePickers
+                space3d={space3d}
+                lineAId={def.lineAId}
+                lineBId={def.lineBId}
+                onLineA={(lineAId) => setDef({ ...def, lineAId })}
+                onLineB={(lineBId) => setDef({ ...def, lineBId })}
+              />
+            )}
+            {def.kind === "lineParallelToLine" && (
+              <SpacePlaneLinePickers
+                space3d={space3d}
+                lineAId={def.throughLineId}
+                lineBId={def.parallelToLineId}
+                labelA="Прямая (через неё)"
+                labelB="Параллельно"
+                onLineA={(throughLineId) => setDef({ ...def, throughLineId })}
+                onLineB={(parallelToLineId) => setDef({ ...def, parallelToLineId })}
+              />
             )}
             {(plane.dirty || plane.error) && (
               <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => buildSpacePlane(plane.id)}>

@@ -9,8 +9,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePlotStore } from "@/lib/plotting/store";
-import { pointChoices } from "@/lib/plotting/space/scene";
+import { lineChoices, pointChoices } from "@/lib/plotting/space/scene";
 import type { SpacePlaneDefinition } from "@/lib/plotting/space/types";
+import { SpacePlaneLinePickers } from "./SpacePlaneLinePickers";
 
 export function SpacePlaneDraftPanel() {
   const space3d = usePlotStore((s) => s.scene.space3d);
@@ -22,30 +23,34 @@ export function SpacePlaneDraftPanel() {
 
   if (!draft || !space3d?.figure) return null;
   const choices = pointChoices(space3d);
+  const lines = lineChoices(space3d);
   const def = draft.definition;
+
+  const defaultLineIds = (): [string, string] => {
+    const a = lines[0]?.id ?? "";
+    const b = lines[1]?.id ?? lines[0]?.id ?? "";
+    return [a, b];
+  };
 
   const setKind = (kind: SpacePlaneDefinition["kind"]) => {
     const verts = choices.slice(0, 3).map((c) => c.id);
+    const [lineA, lineB] = defaultLineIds();
     if (kind === "threePoints") {
       update({ definition: { kind, aId: verts[0] ?? "", bId: verts[1] ?? "", cId: verts[2] ?? "" } });
     } else if (kind === "pointAndLine") {
       update({
-        definition: { kind, pointId: verts[0] ?? "", lineId: space3d.lines[0]?.id ?? "" },
+        definition: { kind, pointId: verts[0] ?? "", lineId: lineA },
       });
     } else if (kind === "twoLines") {
       update({
-        definition: {
-          kind,
-          lineAId: space3d.lines[0]?.id ?? "",
-          lineBId: space3d.lines[1]?.id ?? space3d.lines[0]?.id ?? "",
-        },
+        definition: { kind, lineAId: lineA, lineBId: lineB },
       });
     } else {
       update({
         definition: {
           kind: "lineParallelToLine",
-          throughLineId: space3d.lines[0]?.id ?? "",
-          parallelToLineId: space3d.lines[1]?.id ?? space3d.lines[0]?.id ?? "",
+          throughLineId: lineA,
+          parallelToLineId: lineB,
         },
       });
     }
@@ -85,6 +90,63 @@ export function SpacePlaneDraftPanel() {
             </Select>
           ))}
         </div>
+      )}
+
+      {def.kind === "pointAndLine" && (
+        <div className="grid grid-cols-2 gap-2">
+          <Select
+            value={def.pointId}
+            onValueChange={(v) => update({ definition: { ...def, pointId: v } })}
+          >
+            <SelectTrigger className="h-8 bg-background text-xs">
+              <SelectValue placeholder="Точка" />
+            </SelectTrigger>
+            <SelectContent>
+              {choices.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={def.lineId}
+            onValueChange={(v) => update({ definition: { ...def, lineId: v } })}
+          >
+            <SelectTrigger className="h-8 bg-background text-xs">
+              <SelectValue placeholder="Прямая" />
+            </SelectTrigger>
+            <SelectContent>
+              {lines.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {def.kind === "twoLines" && (
+        <SpacePlaneLinePickers
+          space3d={space3d}
+          lineAId={def.lineAId}
+          lineBId={def.lineBId}
+          onLineA={(lineAId) => update({ definition: { ...def, lineAId } })}
+          onLineB={(lineBId) => update({ definition: { ...def, lineBId } })}
+        />
+      )}
+
+      {def.kind === "lineParallelToLine" && (
+        <SpacePlaneLinePickers
+          space3d={space3d}
+          lineAId={def.throughLineId}
+          lineBId={def.parallelToLineId}
+          labelA="Прямая (через неё)"
+          labelB="Параллельно"
+          onLineA={(throughLineId) => update({ definition: { ...def, throughLineId } })}
+          onLineB={(parallelToLineId) => update({ definition: { ...def, parallelToLineId } })}
+        />
       )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}

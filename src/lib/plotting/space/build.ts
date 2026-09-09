@@ -7,6 +7,7 @@ import {
   faceNormal,
   len,
   linePlaneIntersection,
+  intersectLineLine3D,
   intersectPlanes,
   localToWorld,
   lerp,
@@ -28,7 +29,7 @@ import {
   type ProjectionCoeffs,
   type ProjectedPoint,
 } from "./camera";
-import { faceById, vertexById } from "./parallelepiped";
+import { edgeById, faceById, vertexById } from "./parallelepiped";
 import type {
   BuiltSpacePoint,
   LineRegion,
@@ -189,38 +190,30 @@ function resolvePlane(
 
   if (def.kind === "pointAndLine") {
     const p = points.get(def.pointId)?.world;
-    const line = lines.find((l) => l.id === def.lineId);
-    if (!p || !line) return { eq: null, error: "Точка или прямая не найдены." };
-    const carrier = resolveLineCarrier(line, figure, points, planeEqs, lines);
-    if (!carrier) return { eq: null, error: "Прямая не определена." };
+    if (!p) return { eq: null, error: "Точка не найдена." };
+    const carrier = resolveCarrierRef(def.lineId, figure, points, planeEqs, lines);
+    if (!carrier) return { eq: null, error: "Прямая не найдена." };
     const eq = planeFromPoints(p, carrier.origin, add(carrier.origin, carrier.dir));
     if (!eq) return { eq: null, error: "Точка лежит на прямой — плоскость не определена." };
     return { eq, error: null };
   }
 
   if (def.kind === "twoLines") {
-    const cA = resolveLineCarrier(
-      lines.find((l) => l.id === def.lineAId)!,
-      figure,
-      points,
-      planeEqs,
-      lines,
-    );
-    const cB = resolveLineCarrier(
-      lines.find((l) => l.id === def.lineBId)!,
-      figure,
-      points,
-      planeEqs,
-      lines,
-    );
+    const cA = resolveCarrierRef(def.lineAId, figure, points, planeEqs, lines);
+    const cB = resolveCarrierRef(def.lineBId, figure, points, planeEqs, lines);
     if (!cA || !cB) return { eq: null, error: "Прямые не найдены." };
     const crossDir = cross(cA.dir, cB.dir);
     if (len(crossDir) < 1e-6) {
       const diff = sub(cB.origin, cA.origin);
+      if (len(cross(diff, cA.dir)) < 1e-6) {
+        return { eq: null, error: "Прямые совпадают — плоскость не определена однозначно." };
+      }
       const eq = planeFromPoints(cA.origin, add(cA.origin, cA.dir), add(cA.origin, diff));
-      if (!eq) return { eq: null, error: "Прямые совпадают — плоскость не единственна." };
-      if (len(cross(diff, cA.dir)) < 1e-6) return { eq: null, error: "Прямые совпадают — плоскость не единственна." };
+      if (!eq) return { eq: null, error: "Не удалось построить плоскость." };
       return { eq, error: null };
+    }
+    if (!intersectLineLine3D(cA.origin, cA.dir, cB.origin, cB.dir)) {
+      return { eq: null, error: "Прямые скрещивающиеся — плоскость через них не существует." };
     }
     const eq = planeFromPoints(cA.origin, add(cA.origin, cA.dir), add(cA.origin, crossDir));
     if (!eq) return { eq: null, error: "Не удалось построить плоскость." };
@@ -228,31 +221,42 @@ function resolvePlane(
   }
 
   if (def.kind === "lineParallelToLine") {
-    const through = resolveLineCarrier(
-      lines.find((l) => l.id === def.throughLineId)!,
-      figure,
-      points,
-      planeEqs,
-      lines,
-    );
-    const parallel = resolveLineCarrier(
-      lines.find((l) => l.id === def.parallelToLineId)!,
-      figure,
-      points,
-      planeEqs,
-      lines,
-    );
+    const through = resolveCarrierRef(def.throughLineId, figure, points, planeEqs, lines);
+    const parallel = resolveCarrierRef(def.parallelToLineId, figure, points, planeEqs, lines);
     if (!through || !parallel) return { eq: null, error: "Прямые не найдены." };
+    if (len(cross(through.dir, parallel.dir)) < 1e-6) {
+      return { eq: null, error: "Прямые параллельны — плоскость не определена однозначно." };
+    }
     const eq = planeFromPoints(
       through.origin,
       add(through.origin, through.dir),
       add(through.origin, parallel.dir),
     );
-    if (!eq) return { eq: null, error: "Направления совпадают с прямой — плоскость не определена." };
+    if (!eq) return { eq: null, error: "Не удалось построить плоскость." };
     return { eq, error: null };
   }
 
   return { eq: null, error: "Неизвестный способ задания плоскости." };
+}
+
+/** Носитель по id ребра параллелепипеда или построенной прямой. */
+export function resolveCarrierRef(
+  refId: string,
+  figure: ParallelepipedFigure,
+  points: Map<string, BuiltSpacePoint>,
+  planeEqs: Map<string, PlaneEq>,
+  allLines: SpaceLine[],
+): { origin: Vec3; dir: Vec3 } | null {
+  const edge = edgeById(figure, refId);
+  if (edge) {
+    const a = points.get(edge.aId)?.world;
+    const b = points.get(edge.bId)?.world;
+    if (!a || !b) return null;
+    return lineDirectionFromPoints(a, b);
+  }
+  const line = allLines.find((l) => l.id === refId);
+  if (!line) return null;
+  return resolveLineCarrier(line, figure, points, planeEqs, allLines);
 }
 
 export function resolveLineCarrier(
