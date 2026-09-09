@@ -1,5 +1,6 @@
 import {
   add,
+  clipCarrierToUnitCube,
   computeBasis,
   cross,
   dot,
@@ -601,146 +602,22 @@ export function clipLineToPolygon(
   return { t0: Math.min(...ts), t1: Math.max(...ts) };
 }
 
-type BoxFaceKey = "u0" | "u1" | "v0" | "v1" | "w0" | "w1";
-
-interface SectionEdge {
-  a: Vec3;
-  b: Vec3;
-  faceKey: BoxFaceKey | null;
-}
-
-function pointOnBoxFaceLocal(l: { u: number; v: number; w: number }, face: BoxFaceKey): boolean {
-  switch (face) {
-    case "u0":
-      return Math.abs(l.u) < FACE_EPS;
-    case "u1":
-      return Math.abs(l.u - 1) < FACE_EPS;
-    case "v0":
-      return Math.abs(l.v) < FACE_EPS;
-    case "v1":
-      return Math.abs(l.v - 1) < FACE_EPS;
-    case "w0":
-      return Math.abs(l.w) < FACE_EPS;
-    case "w1":
-      return Math.abs(l.w - 1) < FACE_EPS;
-    default:
-      return false;
-  }
-}
-
-function edgeBoxFaceKey(
-  la: { u: number; v: number; w: number },
-  lb: { u: number; v: number; w: number },
-): BoxFaceKey | null {
-  const faces: BoxFaceKey[] = ["u0", "u1", "v0", "v1", "w0", "w1"];
-  for (const f of faces) {
-    if (pointOnBoxFaceLocal(la, f) && pointOnBoxFaceLocal(lb, f)) return f;
-  }
-  return null;
-}
-
-function buildSectionEdges(
-  polygon: Vec3[],
-  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
-): SectionEdge[] {
-  const edges: SectionEdge[] = [];
-  for (let i = 0; i < polygon.length; i += 1) {
-    const a = polygon[i]!;
-    const b = polygon[(i + 1) % polygon.length]!;
-    const la = worldToLocal(a, basis);
-    const lb = worldToLocal(b, basis);
-    if (!la || !lb) continue;
-    edges.push({ a, b, faceKey: edgeBoxFaceKey(la, lb) });
-  }
-  return edges;
-}
-
-function intersectSegments3D(a1: Vec3, a2: Vec3, b1: Vec3, b2: Vec3): Vec3 | null {
-  const d1 = sub(a2, a1);
-  const d2 = sub(b2, b1);
-  const crossD = cross(d1, d2);
-  const crossLen2 = dot(crossD, crossD);
-  if (crossLen2 < 1e-12) return null;
-  const w = sub(a1, b1);
-  const t = dot(cross(w, d2), crossD) / crossLen2;
-  const s = dot(cross(w, d1), crossD) / crossLen2;
-  if (t < -1e-5 || t > 1 + 1e-5 || s < -1e-5 || s > 1 + 1e-5) return null;
-  return add(a1, scale(d1, t));
-}
-
-function paramOnCarrier(
-  carrier: { origin: Vec3; dir: Vec3 },
-  p: Vec3,
-): number | null {
-  const dirLen = len(carrier.dir);
-  if (!(dirLen > 1e-9)) return null;
-  const d = scale(carrier.dir, 1 / dirLen);
-  const t = dot(sub(p, carrier.origin), d);
-  const closest = add(carrier.origin, scale(d, t));
-  if (len(sub(p, closest)) > 1e-4) return null;
-  return t;
-}
-
-function pointInsideBothSections(
-  p: Vec3,
-  sectionA: Vec3[],
-  sectionB: Vec3[],
-): boolean {
-  return pointInPolygon3D(p, sectionA) && pointInPolygon3D(p, sectionB);
-}
-
 /**
  * Отрезок прямой пересечения двух плоскостей внутри параллелепипеда.
- * Крайние точки — пересечения рёбер сечений, лежащих на одной грани параллелепипеда,
- * плюс вершины сечений на носителе; fallback — пересечение интервалов клипа.
+ * Носитель клипируется к кубу (u,v,w) ∈ [0,1]³ в афинных координатах; t₀, t₁ — крайние точки.
  */
 export function planeIntersectionSegmentRange(
   carrier: { origin: Vec3; dir: Vec3 },
-  planeAId: string,
-  planeBId: string,
-  figure: ParallelepipedFigure,
-  points: Map<string, BuiltSpacePoint>,
-  planeEqs: Map<string, PlaneEq>,
+  _planeAId: string,
+  _planeBId: string,
+  _figure: ParallelepipedFigure,
+  _points: Map<string, BuiltSpacePoint>,
+  _planeEqs: Map<string, PlaneEq>,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): { t0: number; t1: number } | null {
-  const sectionA = computeFaceOrPlaneSection(planeAId, figure, points, planeEqs, basis);
-  const sectionB = computeFaceOrPlaneSection(planeBId, figure, points, planeEqs, basis);
-  if (!sectionA?.length || !sectionB?.length) return null;
-
-  const ts: number[] = [];
-
-  const addPoint = (p: Vec3) => {
-    const t = paramOnCarrier(carrier, p);
-    if (t === null) return;
-    if (pointInsideBothSections(p, sectionA, sectionB)) ts.push(t);
-  };
-
-  for (const p of sectionA) addPoint(p);
-  for (const p of sectionB) addPoint(p);
-
-  const edgesA = buildSectionEdges(sectionA, basis);
-  const edgesB = buildSectionEdges(sectionB, basis);
-  for (const ea of edgesA) {
-    if (!ea.faceKey) continue;
-    for (const eb of edgesB) {
-      if (eb.faceKey !== ea.faceKey) continue;
-      const hit = intersectSegments3D(ea.a, ea.b, eb.a, eb.b);
-      if (hit) addPoint(hit);
-    }
-  }
-
-  if (ts.length >= 2) {
-    return { t0: Math.min(...ts), t1: Math.max(...ts) };
-  }
-
-  const clipA = clipLineToConvexPolygon(carrier.origin, carrier.dir, sectionA);
-  const clipB = clipLineToConvexPolygon(carrier.origin, carrier.dir, sectionB);
-  if (!clipA || !clipB) return null;
-
-  const t0 = Math.max(clipA.t0, clipB.t0);
-  const t1 = Math.min(clipA.t1, clipB.t1);
-  if (t1 - t0 < 1e-6) return null;
-  return { t0, t1 };
+  const clip = clipCarrierToUnitCube(carrier, basis);
+  if (!clip || clip.t1 - clip.t0 < 1e-9) return null;
+  return clip;
 }
 
 export function computeFaceOrPlaneSection(

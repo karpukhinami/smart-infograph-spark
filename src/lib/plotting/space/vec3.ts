@@ -187,6 +187,53 @@ export function pointOnLineParam(a: Vec3, b: Vec3, t: number): Vec3 {
   return lerp(a, b, t);
 }
 
+/**
+ * Отрезок прямой L(t) = o + t·d, попадающий в куб (u,v,w) ∈ [0,1]³.
+ * t — параметр вдоль исходной прямой (тот же, что у carrier.origin + t·carrier.dir).
+ */
+export function clipLineToUnitCube(
+  o: LocalCoords,
+  d: LocalCoords,
+  eps = 1e-9,
+): { t0: number; t1: number } | null {
+  let t0 = -Infinity;
+  let t1 = Infinity;
+  const axes: Array<[number, number]> = [
+    [o.u, d.u],
+    [o.v, d.v],
+    [o.w, d.w],
+  ];
+  for (const [origin, delta] of axes) {
+    if (Math.abs(delta) < eps) {
+      if (origin < -eps || origin > 1 + eps) return null;
+      continue;
+    }
+    let ta = (0 - origin) / delta;
+    let tb = (1 - origin) / delta;
+    if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta);
+    t1 = Math.min(t1, tb);
+  }
+  if (t0 > t1 + eps) return null;
+  return { t0, t1 };
+}
+
+/** Часть носителя прямой внутри параллелепипеда (локальные координаты ∈ [0,1]³). */
+export function clipCarrierToUnitCube(
+  carrier: { origin: Vec3; dir: Vec3 },
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+): { t0: number; t1: number } | null {
+  const o0 = worldToLocal(carrier.origin, basis);
+  if (!o0) return null;
+  const o1 = worldToLocal(add(carrier.origin, carrier.dir), basis);
+  if (!o1) return null;
+  return clipLineToUnitCube(o0, {
+    u: o1.u - o0.u,
+    v: o1.v - o0.v,
+    w: o1.w - o0.w,
+  });
+}
+
 export function worldToLocal(
   world: Vec3,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
