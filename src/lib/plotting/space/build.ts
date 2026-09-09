@@ -6,7 +6,10 @@ import {
   faceNormal,
   len,
   linePlaneIntersection,
+  intersectLineLine3D,
   intersectPlanes,
+  distPointToLine,
+  distPointToSegment,
   localToWorld,
   lerp,
   normalize,
@@ -541,37 +544,141 @@ export function clipLineToPolygon(
   return { t0: Math.min(...ts), t1: Math.max(...ts) };
 }
 
-function lineSectionBreakpoints(
-  origin: Vec3,
-  dir: Vec3,
-  polygon: Vec3[],
-): number[] {
-  const dirLen = len(dir);
-  if (!(dirLen > 1e-9) || polygon.length < 2) return [];
-  const d = scale(dir, 1 / dirLen);
-  const ts: number[] = polygon.map((v) => dot(sub(v, origin), d));
+const ON_EDGE_EPS = 1e-4;
+const ON_LINE_EPS = 1e-4;
 
+function paramOnCarrier(origin: Vec3, dirUnit: Vec3, p: Vec3): number | null {
+  const t = dot(sub(p, origin), dirUnit);
+  const proj = add(origin, scale(dirUnit, t));
+  if (len(sub(p, proj)) > ON_LINE_EPS) return null;
+  return t;
+}
+
+function pointInPolygon3DRelaxed(p: Vec3, polygon: Vec3[], margin = 0.04): boolean {
+  if (polygon.length < 3) return false;
+  const v0 = polygon[0]!;
+  const v1 = polygon[1]!;
+  const v2 = polygon[2]!;
+  const n = cross(sub(v1, v0), sub(v2, v0));
+  if (len(n) < 1e-9) return false;
+  const nn = normalize(n);
+  if (Math.abs(dot(sub(p, v0), nn)) > 1e-3) return false;
+  const e1 = sub(v1, v0);
+  const e2 = sub(polygon[polygon.length === 4 ? 3 : 2]!, v0);
+  const a = dot(e1, e1);
+  const b = dot(e1, e2);
+  const c = dot(e2, e2);
+  const toP = sub(p, v0);
+  const d = dot(e1, toP);
+  const e = dot(e2, toP);
+  const denom = a * c - b * b;
+  if (Math.abs(denom) < 1e-9) return false;
+  const u = (d * c - b * e) / denom;
+  const v = (a * e - b * d) / denom;
+  return u >= -margin && v >= -margin && u + v <= 1 + margin;
+}
+
+function pointOnPolygonBoundary(
+  p: Vec3,
+  polygon: Vec3[],
+  allowExtension: boolean,
+): boolean {
+  if (polygon.length < 2) return false;
+  const v0 = polygon[0]!;
+  const v1 = polygon[1]!;
+  const v2 = polygon[2]!;
+  const n = cross(sub(v1, v0), sub(v2, v0));
+  if (len(n) < 1e-9) return false;
+  if (Math.abs(dot(sub(p, v0), normalize(n))) > 1e-3) return false;
   for (let i = 0; i < polygon.length; i += 1) {
     const a = polygon[i]!;
     const b = polygon[(i + 1) % polygon.length]!;
-    const v = sub(b, a);
-    const w0 = sub(origin, a);
-    const a1 = dot(d, d);
-    const b1 = dot(d, v);
-    const c1 = dot(v, v);
-    const d1 = dot(d, w0);
-    const e1 = dot(v, w0);
-    const denom = a1 * c1 - b1 * b1;
-    if (Math.abs(denom) < 1e-12) continue;
-    const tHit = (b1 * e1 - c1 * d1) / denom;
-    const uHit = (a1 * e1 - b1 * d1) / denom;
-    if (uHit >= -1e-4 && uHit <= 1 + 1e-4) ts.push(tHit);
+    const dist = allowExtension ? distPointToLine(p, a, b) : distPointToSegment(p, a, b);
+    if (dist <= ON_EDGE_EPS) return true;
   }
-
-  return ts;
+  return false;
 }
 
-/** Отрезок пересечения двух плоскостей внутри их сечений с параллелепипедом. */
+function isOnBoxSurfaceOrInside(
+  p: Vec3,
+  figure: ParallelepipedFigure,
+  points: Map<string, BuiltSpacePoint>,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+): boolean {
+  if (isPointInsideParallelepiped(p, figure, points)) return true;
+  const local = worldToLocal(p, basis);
+  if (!local) return false;
+  if (localOnBoxFace(local) !== null) return true;
+  const { u, v, w } = local;
+  const inRange = (x: number) => x >= -FACE_EPS && x <= 1 + FACE_EPS;
+  return inRange(u) && inRange(v) && inRange(w);
+}
+
+function isPlaneIntersectionEndpoint(
+  p: Vec3,
+  sectionA: Vec3[],
+  sectionB: Vec3[],
+  figure: ParallelepipedFigure,
+  points: Map<string, BuiltSpacePoint>,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+): boolean {
+  if (!isOnBoxSurfaceOrInside(p, figure, points, basis)) return false;
+  const inA = pointInPolygon3DRelaxed(p, sectionA);
+  const inB = pointInPolygon3DRelaxed(p, sectionB);
+  const onA = pointOnPolygonBoundary(p, sectionA, true);
+  const onB = pointOnPolygonBoundary(p, sectionB, true);
+  if (!(inA || onA) || !(inB || onB)) return false;
+  return onA || onB || (inA && inB);
+}
+
+/** Пересечения продлённых рёбер двух контуров сечений (лежат на прямой пересечения плоскостей). */
+function sectionContourCrossings(
+  polyA: Vec3[],
+  polyB: Vec3[],
+  origin: Vec3,
+  dirUnit: Vec3,
+): Vec3[] {
+  const hits: Vec3[] = [];
+  const seen = new Set<string>();
+  const key = (p: Vec3) => `${p.x.toFixed(5)}:${p.y.toFixed(5)}:${p.z.toFixed(5)}`;
+
+  for (let i = 0; i < polyA.length; i += 1) {
+    const a0 = polyA[i]!;
+    const a1 = polyA[(i + 1) % polyA.length]!;
+    const da = sub(a1, a0);
+    for (let j = 0; j < polyB.length; j += 1) {
+      const b0 = polyB[j]!;
+      const b1 = polyB[(j + 1) % polyB.length]!;
+      const db = sub(b1, b0);
+      const hit = intersectLineLine3D(a0, da, b0, db);
+      if (!hit) continue;
+      const k = key(hit);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      hits.push(hit);
+    }
+  }
+
+  for (const poly of [polyA, polyB]) {
+    for (let i = 0; i < poly.length; i += 1) {
+      const a0 = poly[i]!;
+      const a1 = poly[(i + 1) % poly.length]!;
+      const hit = intersectLineLine3D(origin, dirUnit, a0, sub(a1, a0));
+      if (!hit) continue;
+      const k = key(hit);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      hits.push(hit);
+    }
+  }
+
+  return hits;
+}
+
+/**
+ * Отрезок прямой пересечения двух плоскостей.
+ * Крайние точки — среди пересечений продлённых рёбер контуров сечений и их пересечений с носителем.
+ */
 export function planeIntersectionSegmentRange(
   carrier: { origin: Vec3; dir: Vec3 },
   planeAId: string,
@@ -589,33 +696,37 @@ export function planeIntersectionSegmentRange(
   if (!(dirLen > 1e-9)) return null;
   const d = scale(carrier.dir, 1 / dirLen);
 
-  const ts = [
-    ...lineSectionBreakpoints(carrier.origin, d, sectionA),
-    ...lineSectionBreakpoints(carrier.origin, d, sectionB),
-  ];
-  const sorted = [...new Set(ts.map((t) => Number(t.toFixed(8))))].sort((a, b) => a - b);
-  if (sorted.length < 2) return null;
+  const candidateTs: number[] = [];
 
-  let best: { t0: number; t1: number } | null = null;
-  for (let i = 0; i < sorted.length - 1; i += 1) {
-    const ta = sorted[i]!;
-    const tb = sorted[i + 1]!;
-    if (tb - ta < 1e-6) continue;
-    const mid = add(carrier.origin, scale(d, (ta + tb) * 0.5));
-    if (pointInPolygon3D(mid, sectionA) && pointInPolygon3D(mid, sectionB)) {
-      if (!best || tb - ta > best.t1 - best.t0) best = { t0: ta, t1: tb };
+  for (const p of sectionContourCrossings(sectionA, sectionB, carrier.origin, d)) {
+    const t = paramOnCarrier(carrier.origin, d, p);
+    if (t !== null && isPlaneIntersectionEndpoint(p, sectionA, sectionB, figure, points, basis)) {
+      candidateTs.push(t);
     }
   }
 
-  if (best) return best;
+  for (const poly of [sectionA, sectionB]) {
+    for (const v of poly) {
+      const t = paramOnCarrier(carrier.origin, d, v);
+      if (t !== null && isPlaneIntersectionEndpoint(v, sectionA, sectionB, figure, points, basis)) {
+        candidateTs.push(t);
+      }
+    }
+  }
+
+  if (candidateTs.length >= 2) {
+    return { t0: Math.min(...candidateTs), t1: Math.max(...candidateTs) };
+  }
 
   const clipA = clipLineToConvexPolygon(carrier.origin, carrier.dir, sectionA);
   const clipB = clipLineToConvexPolygon(carrier.origin, carrier.dir, sectionB);
-  if (!clipA || !clipB) return null;
-  const t0 = Math.max(clipA.t0, clipB.t0);
-  const t1 = Math.min(clipA.t1, clipB.t1);
-  if (t1 - t0 < 1e-6) return null;
-  return { t0, t1 };
+  if (clipA && clipB) {
+    const t0 = Math.max(clipA.t0, clipB.t0);
+    const t1 = Math.min(clipA.t1, clipB.t1);
+    if (t1 - t0 >= 1e-6) return { t0, t1 };
+  }
+
+  return null;
 }
 
 export function computeFaceOrPlaneSection(

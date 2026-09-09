@@ -148,6 +148,46 @@ export function paramOnLine(a: Vec3, b: Vec3, p: Vec3): number {
   return dot(sub(p, a), ab) / l2;
 }
 
+/** Пересечение двух прямых в 3D (бесконечных); null — параллельны или скрещиваются. */
+export function intersectLineLine3D(
+  p1: Vec3,
+  d1: Vec3,
+  p2: Vec3,
+  d2: Vec3,
+  tol = 1e-5,
+): Vec3 | null {
+  const w0 = sub(p1, p2);
+  const a = dot(d1, d1);
+  const b = dot(d1, d2);
+  const c = dot(d2, d2);
+  const d = dot(d1, w0);
+  const e = dot(d2, w0);
+  const denom = a * c - b * b;
+  if (Math.abs(denom) < 1e-12) return null;
+  const t = (b * e - c * d) / denom;
+  const s = (a * e - b * d) / denom;
+  const on1 = add(p1, scale(d1, t));
+  const on2 = add(p2, scale(d2, s));
+  if (len(sub(on1, on2)) > tol) return null;
+  return scale(add(on1, on2), 0.5);
+}
+
+export function distPointToSegment(p: Vec3, a: Vec3, b: Vec3): number {
+  const ab = sub(b, a);
+  const l2 = dot(ab, ab);
+  if (l2 < 1e-12) return len(sub(p, a));
+  let t = dot(sub(p, a), ab) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return len(sub(p, add(a, scale(ab, t))));
+}
+
+export function distPointToLine(p: Vec3, a: Vec3, b: Vec3): number {
+  const ab = sub(b, a);
+  const abLen = len(ab);
+  if (abLen < 1e-12) return len(sub(p, a));
+  return len(cross(sub(p, a), ab)) / abLen;
+}
+
 export function pointOnLineParam(a: Vec3, b: Vec3, t: number): Vec3 {
   return lerp(a, b, t);
 }
