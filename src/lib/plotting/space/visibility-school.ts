@@ -2,8 +2,7 @@
  * Школьная фиксированная проекция и видимость (u,v,w + k=0.28).
  * Альтернатива legacy-режиму в visibility.ts.
  */
-import { localToView, viewDirectionLocal, type ViewBasis } from "./camera";
-import type { SpaceViewParams } from "./types";
+import { localToView, viewDirectionLocal } from "./camera";
 import { faceById } from "./parallelepiped";
 import type { ParallelepipedFigure, LocalCoords, SpaceViewParams, Vec3 } from "./types";
 import { add, dotLocal, len, scale, sub, worldToLocal } from "./vec3";
@@ -197,10 +196,10 @@ function facePlaneBreakpointsLocal(
 function projectLocalForScreen(
   local: LocalCoords,
   view: SpaceViewParams,
-  basis?: ViewBasis,
+  projectionAngleRad: number,
 ): { x: number; y: number; z: number } {
   const s = view.scale;
-  const v = localToView(local, view, basis);
+  const v = localToView(local, view, projectionAngleRad);
   return { x: v.x * s, y: -v.y * s, z: v.z };
 }
 
@@ -260,7 +259,7 @@ function frontSurfaceDepthSchool(
       .map((id) => {
         const pt = resolved.points.get(id);
         if (!pt) return null;
-        return projectLocalForScreen(pt.local, view, resolved.basis);
+        return projectLocalForScreen(pt.local, view, resolved.projectionAngleRad);
       })
       .filter(Boolean) as ScreenPt[];
     if (quad.length !== 4) continue;
@@ -300,7 +299,7 @@ function buildSilhouettePolygon(
       if (coords.has(id)) continue;
       const pt = resolved.points.get(id);
       if (!pt) continue;
-      const s = projectLocalForScreen(pt.local, view, resolved.basis);
+      const s = projectLocalForScreen(pt.local, view, resolved.projectionAngleRad);
       coords.set(id, { x: s.x, y: s.y });
     }
   }
@@ -375,7 +374,7 @@ function screenPointAtLocalT(
   dirL: LocalCoords,
   t: number,
   view: SpaceViewParams,
-  basis: ViewBasis,
+  projectionAngleRad: number,
 ): ScreenPt {
   return projectLocalForScreen(
     {
@@ -384,7 +383,7 @@ function screenPointAtLocalT(
       w: originL.w + t * dirL.w,
     },
     view,
-    basis,
+    projectionAngleRad,
   );
 }
 
@@ -400,7 +399,7 @@ function isMidpointVisibleSchool(
   if (segmentOnSharedFrontFace(lAt, lBt, view)) return true;
   if (isPointOccludedLocal(midL, view)) return false;
 
-  const screen = projectLocalForScreen(midL, view, resolved.basis);
+  const screen = projectLocalForScreen(midL, view, resolved.projectionAngleRad);
   const inSilhouette =
     silhouette.length >= 3 && pointInPolygon2D(screen.x, screen.y, silhouette);
 
@@ -459,12 +458,12 @@ function silhouetteBreakpoints(
   t1: number,
   silhouette: Array<{ x: number; y: number }>,
   view: SpaceViewParams,
-  basis: ViewBasis,
+  projectionAngleRad: number,
 ): number[] {
   if (silhouette.length < 3) return [];
   const bps: number[] = [];
-  const p0 = screenPointAtLocalT(originL, dirL, t0, view, basis);
-  const p1 = screenPointAtLocalT(originL, dirL, t1, view, basis);
+  const p0 = screenPointAtLocalT(originL, dirL, t0, view, projectionAngleRad);
+  const p1 = screenPointAtLocalT(originL, dirL, t1, view, projectionAngleRad);
 
   for (let i = 0; i < silhouette.length; i += 1) {
     const a = silhouette[i]!;
@@ -510,7 +509,7 @@ export function splitLineSchoolView(
   const silhouette = buildSilhouettePolygon(figure, resolved, view);
   const bps = [
     ...facePlaneBreakpointsLocal(originL, dirL, t0, t1),
-    ...silhouetteBreakpoints(originL, dirL, t0, t1, silhouette, view, basis),
+    ...silhouetteBreakpoints(originL, dirL, t0, t1, silhouette, view, resolved.projectionAngleRad),
   ];
   const sorted = mergeBreakpoints(bps, t0, t1);
   const segments: LineSplitSegment[] = [];

@@ -103,7 +103,7 @@ function projectWorld(
 ): { x: number; y: number } {
   const local = worldToLocal(world, resolved.basis);
   const pr = local
-    ? projectFromLocalCoeffs(local, world, view, resolved.basis)
+    ? projectFromLocalCoeffs(local, world, view, resolved.projectionAngleRad)
     : { x: 0, y: 0 };
   return { x: pr.x * fit.scale + fit.cx, y: pr.y * fit.scale + fit.cy };
 }
@@ -377,7 +377,7 @@ function collectFitPoints(
         local0,
         add(carrier.origin, scale(carrier.dir, t0)),
         data.view,
-        resolved.basis,
+        resolved.projectionAngleRad,
       );
       pts.push({ x: pr.x, y: pr.y });
     }
@@ -386,7 +386,7 @@ function collectFitPoints(
         local1,
         add(carrier.origin, scale(carrier.dir, t1)),
         data.view,
-        resolved.basis,
+        resolved.projectionAngleRad,
       );
       pts.push({ x: pr.x, y: pr.y });
     }

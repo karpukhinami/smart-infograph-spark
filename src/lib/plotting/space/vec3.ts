@@ -56,7 +56,7 @@ export function localToWorld(
   );
 }
 
-/** Базис e1=AB, e2=AD, e3=AA₁; угол BAD задаётся в плоскости основания. */
+/** Базис e1=AB, e2=AD, e3=AA₁; основание всегда прямоугольное в 3D (∠BAD = 90°). */
 export function computeBasis(constraints: ParallelepipedConstraints): {
   e1: Vec3;
   e2: Vec3;
@@ -67,13 +67,8 @@ export function computeBasis(constraints: ParallelepipedConstraints): {
   const e2Len = constraints.equilateral ? L : L * 1.15;
   const e3Len = constraints.equilateral ? L : L * 0.95;
 
-  const angleDeg = constraints.rectangular
-    ? 90
-    : Math.min(150, Math.max(30, constraints.badAngleDeg ?? 90));
-  const theta = (angleDeg * Math.PI) / 180;
-
   const e1 = vec3(0, -e1Len, 0);
-  const e2 = vec3(e2Len * Math.sin(theta), -e2Len * Math.cos(theta), 0);
+  const e2 = vec3(e2Len, 0, 0);
   const e3 = vec3(0, 0, e3Len);
   return { e1, e2, e3 };
 }

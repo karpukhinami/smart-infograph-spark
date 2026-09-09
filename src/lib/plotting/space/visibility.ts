@@ -42,6 +42,7 @@ interface OccluderFace {
 
 export interface OcclusionContext {
   basis: ResolvedSpaceScene["basis"];
+  projectionAngleRad: number;
   view: SpaceViewParams;
   faces: OccluderFace[];
   /** Проекции 12 рёбер для 2D-пересечений. */
@@ -60,7 +61,7 @@ function projectWorldPoint(
   const lc =
     local ??
     worldToLocal(world, ctx.basis) ?? { u: 0, v: 0, w: 0 };
-  return projectFromLocalCoeffs(lc, world, ctx.view, ctx.basis);
+  return projectFromLocalCoeffs(lc, world, ctx.view, ctx.projectionAngleRad);
 }
 
 function quadArea2D(v: ScreenVert[]): number {
@@ -109,6 +110,7 @@ export function buildOcclusionContext(
 ): OcclusionContext {
   const ctx: OcclusionContext = {
     basis: resolved.basis,
+    projectionAngleRad: resolved.projectionAngleRad,
     view,
     faces: [],
     edgeScreens: [],

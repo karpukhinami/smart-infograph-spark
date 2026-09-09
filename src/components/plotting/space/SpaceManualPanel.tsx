@@ -116,7 +116,7 @@ export function SpaceManualPanel() {
                   />
                   {space3d.figureConstraints.rectangular && (
                     <p className="text-[11px] text-muted-foreground">
-                      Снимите «Прямоугольный», чтобы менять угол основания.
+                      Снимите «Прямоугольный», чтобы менять угол ∠BAD на чертеже.
                     </p>
                   )}
                 </div>

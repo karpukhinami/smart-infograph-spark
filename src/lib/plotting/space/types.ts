@@ -57,7 +57,7 @@ export interface SpaceFace {
 export interface ParallelepipedConstraints {
   rectangular: boolean;
   equilateral: boolean;
-  /** Угол BAD (градусы) при непрямоугольном основании; при rectangular=true всегда 90. */
+  /** Угол ∠BAD на чертеже (градусы); при rectangular=true всегда 90. 3D-геометрию не меняет. */
   badAngleDeg: number;
 }
 

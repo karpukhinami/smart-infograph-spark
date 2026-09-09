@@ -1,4 +1,4 @@
-import type { LocalCoords, SpaceViewParams, Vec3 } from "./types";
+import type { LocalCoords, ParallelepipedConstraints, SpaceViewParams, Vec3 } from "./types";
 
 export interface ProjectedPoint {
   x: number;
@@ -28,12 +28,12 @@ export function getViewK(view: SpaceViewParams): number {
   return getViewKu(view);
 }
 
-/** Угол BAD в радианах из базиса e1=AB, e2=AD. */
-export function badAngleRadFromBasis(basis: ViewBasis): number {
-  const e1xy = Math.hypot(basis.e1.x, basis.e1.y);
-  const e2xy = Math.hypot(basis.e2.x, basis.e2.y);
-  if (e1xy < 1e-9 || e2xy < 1e-9) return Math.PI / 2;
-  return Math.atan2(basis.e2.x / e2xy, -(basis.e2.y / e1xy));
+/** Угол ∠BAD на чертеже в радианах (не влияет на 3D-геометрию). */
+export function projectionBadAngleRad(constraints: ParallelepipedConstraints): number {
+  const angleDeg = constraints.rectangular
+    ? 90
+    : Math.min(150, Math.max(30, constraints.badAngleDeg ?? 90));
+  return (angleDeg * Math.PI) / 180;
 }
 
 /**
@@ -43,14 +43,13 @@ export function badAngleRadFromBasis(basis: ViewBasis): number {
 export function localToView(
   local: LocalCoords,
   view: SpaceViewParams,
-  basis?: ViewBasis,
+  projectionAngleRad = Math.PI / 2,
 ): { x: number; y: number; z: number } {
   const ku = getViewKu(view);
   const kv = getViewKv(view);
-  const theta = basis ? badAngleRadFromBasis(basis) : Math.PI / 2;
   const { u, v, w } = local;
   return {
-    x: v * Math.sin(theta) + ku * u,
+    x: v * Math.sin(projectionAngleRad) + ku * u,
     y: w + kv * u,
     z: u - ku * v - kv * w,
   };
@@ -70,10 +69,10 @@ export function viewDirectionLocal(view: SpaceViewParams): LocalCoords {
 export function projectLocal(
   local: LocalCoords,
   view: SpaceViewParams,
-  basis?: ViewBasis,
+  projectionAngleRad = Math.PI / 2,
 ): ProjectedPoint {
   const s = view.scale;
-  const { x, y, z } = localToView(local, view, basis);
+  const { x, y, z } = localToView(local, view, projectionAngleRad);
   return {
     x: x * s,
     y: -y * s,
@@ -86,9 +85,9 @@ export function projectFromLocalCoeffs(
   local: LocalCoords,
   world: Vec3,
   view: SpaceViewParams,
-  basis?: ViewBasis,
+  projectionAngleRad = Math.PI / 2,
 ): ProjectedPoint {
-  const p = projectLocal(local, view, basis);
+  const p = projectLocal(local, view, projectionAngleRad);
   return { ...p, world };
 }
 

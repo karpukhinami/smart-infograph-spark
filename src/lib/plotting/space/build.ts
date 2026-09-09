@@ -20,7 +20,12 @@ import {
   worldToLocal,
   type PlaneEq,
 } from "./vec3";
-import { projectFromLocalCoeffs, viewDirection, type ProjectedPoint } from "./camera";
+import {
+  projectionBadAngleRad,
+  projectFromLocalCoeffs,
+  viewDirection,
+  type ProjectedPoint,
+} from "./camera";
 import { faceById, vertexById } from "./parallelepiped";
 import type {
   BuiltSpacePoint,
@@ -39,6 +44,8 @@ import type {
 
 export interface ResolvedSpaceScene {
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 };
+  /** Угол ∠BAD на чертеже (радианы). */
+  projectionAngleRad: number;
   points: Map<string, BuiltSpacePoint>;
   projected: Map<string, ProjectedPoint>;
   planes: Map<string, PlaneEq>;
@@ -280,6 +287,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   if (!data.figure) {
     return {
       basis: computeBasis({ rectangular: false, equilateral: false }),
+      projectionAngleRad: Math.PI / 2,
       points,
       projected,
       planes,
@@ -291,6 +299,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   }
 
   const basis = computeBasis(data.figure.constraints);
+  const projectionAngleRad = projectionBadAngleRad(data.figure.constraints);
 
   // Встроенные вершины.
   for (const vertex of data.figure.vertices) {
@@ -361,10 +370,20 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   }
 
   for (const [id, pt] of points) {
-    projected.set(id, projectFromLocalCoeffs(pt.local, pt.world, data.view, basis));
+    projected.set(id, projectFromLocalCoeffs(pt.local, pt.world, data.view, projectionAngleRad));
   }
 
-  return { basis, points, projected, planes, lineErrors, planeErrors, pointErrors, errors };
+  return {
+    basis,
+    projectionAngleRad,
+    points,
+    projected,
+    planes,
+    lineErrors,
+    planeErrors,
+    pointErrors,
+    errors,
+  };
 }
 
 export function getPointLabel(
