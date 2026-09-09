@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { SpacePointCard } from "./SpacePointCard";
 import { SpaceLineCard } from "./SpaceLineCard";
 import { SpacePlaneCard } from "./SpacePlaneCard";
@@ -87,6 +88,37 @@ export function SpaceManualPanel() {
                     checked={space3d.figureConstraints.equilateral}
                     onCheckedChange={(checked) => updateSpaceConstraints({ equilateral: checked })}
                   />
+                </div>
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">∠BAD</Label>
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {space3d.figureConstraints.rectangular
+                        ? 90
+                        : Math.round(space3d.figureConstraints.badAngleDeg ?? 90)}
+                      °
+                    </span>
+                  </div>
+                  <Slider
+                    min={30}
+                    max={150}
+                    step={1}
+                    disabled={space3d.figureConstraints.rectangular}
+                    value={[
+                      space3d.figureConstraints.rectangular
+                        ? 90
+                        : (space3d.figureConstraints.badAngleDeg ?? 90),
+                    ]}
+                    onValueChange={([value]) => {
+                      if (value === undefined) return;
+                      updateSpaceConstraints({ badAngleDeg: value, rectangular: false });
+                    }}
+                  />
+                  {space3d.figureConstraints.rectangular && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Снимите «Прямоугольный», чтобы менять угол основания.
+                    </p>
+                  )}
                 </div>
               </div>
               <Button type="button" size="sm" className="w-full" onClick={buildSpaceFigure}>

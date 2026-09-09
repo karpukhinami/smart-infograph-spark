@@ -1099,14 +1099,28 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     set({ scene: result.scene, status: result.status });
   },
 
-  updateSpaceConstraints: (patch) =>
-    set((state) =>
-      patchSpaceData(state, (data) => ({
-        ...data,
-        figureConstraints: { ...data.figureConstraints, ...patch },
-        figureDirty: data.figure ? true : data.figureDirty,
-      })),
-    ),
+  updateSpaceConstraints: (patch) => {
+    const state = get();
+    const data = state.scene.space3d;
+    if (!data) return;
+    const figureConstraints: ParallelepipedConstraints = {
+      ...data.figureConstraints,
+      ...patch,
+    };
+    if (patch.rectangular === true) figureConstraints.badAngleDeg = 90;
+
+    if (!data.figure) {
+      set((s) => patchSpaceData(s, (d) => ({ ...d, figureConstraints })));
+      return;
+    }
+
+    const figure = { ...data.figure, constraints: { ...figureConstraints } };
+    const result = applySpaceBuild({
+      ...state.scene,
+      space3d: { ...data, figureConstraints, figure, figureDirty: false },
+    });
+    set({ scene: result.scene, status: result.status });
+  },
 
   startSpacePointDraft: () => {
     const data = get().scene.space3d;

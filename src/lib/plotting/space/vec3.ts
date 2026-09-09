@@ -56,26 +56,26 @@ export function localToWorld(
   );
 }
 
-/** Базис AB, AD, AA₁ — школьная кабинетная проекция. */
+/** Базис e1=AB, e2=AD, e3=AA₁; угол BAD задаётся в плоскости основания. */
 export function computeBasis(constraints: ParallelepipedConstraints): {
   e1: Vec3;
   e2: Vec3;
   e3: Vec3;
 } {
   const L = 1.1;
-  if (constraints.rectangular && constraints.equilateral) {
-    return { e1: vec3(0, -L, 0), e2: vec3(L, 0, 0), e3: vec3(0, 0, L) };
-  }
-  if (constraints.rectangular) {
-    return { e1: vec3(0, -L, 0), e2: vec3(L * 1.15, 0, 0), e3: vec3(0, 0, L * 0.95) };
-  }
-  if (constraints.equilateral) {
-    const e1 = vec3(0, -L, 0);
-    const e2 = vec3(L, 0, 0);
-    const e3 = vec3(0, 0, L);
-    return { e1, e2, e3 };
-  }
-  return { e1: vec3(0, -L, 0), e2: vec3(L * 1.15, 0, 0), e3: vec3(0, 0, L * 0.95) };
+  const e1Len = L;
+  const e2Len = constraints.equilateral ? L : L * 1.15;
+  const e3Len = constraints.equilateral ? L : L * 0.95;
+
+  const angleDeg = constraints.rectangular
+    ? 90
+    : Math.min(150, Math.max(30, constraints.badAngleDeg ?? 90));
+  const theta = (angleDeg * Math.PI) / 180;
+
+  const e1 = vec3(0, -e1Len, 0);
+  const e2 = vec3(e2Len * Math.sin(theta), -e2Len * Math.cos(theta), 0);
+  const e3 = vec3(0, 0, e3Len);
+  return { e1, e2, e3 };
 }
 
 export function faceNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {
