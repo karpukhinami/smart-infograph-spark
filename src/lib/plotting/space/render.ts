@@ -17,9 +17,6 @@ import {
 import type { ParallelepipedFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
 import { add, len, scale, sub, worldToLocal } from "./vec3";
 
-const BACKDROP_OPACITY = 0.85;
-const BACKDROP_STROKE = 4;
-
 function round(n: number): string {
   return String(Number(n.toFixed(2)));
 }
@@ -106,7 +103,7 @@ function projectWorld(
 ): { x: number; y: number } {
   const local = worldToLocal(world, resolved.basis);
   const pr = local
-    ? projectFromLocalCoeffs(local, world, view)
+    ? projectFromLocalCoeffs(local, world, view, resolved.basis)
     : { x: 0, y: 0 };
   return { x: pr.x * fit.scale + fit.cx, y: pr.y * fit.scale + fit.cy };
 }
@@ -150,7 +147,7 @@ function renderLabels(
     });
   }
 
-  return layoutLabels(requests, obstacles, area, { fontSize: a.labelFontSize })
+  return layoutLabels(requests, obstacles, area, { fontSize: a.labelFontSize, allowBackdrop: false })
     .map((item) => {
       const color =
         figure.vertices.some((v) => v.id === item.id)
@@ -160,10 +157,7 @@ function renderLabels(
         figure.vertices.find((v) => v.id === item.id)?.label ??
         data.points.find((p) => p.id === item.id)?.label ??
         "";
-      const backdrop = item.needsBackdrop
-        ? `<text x="${round(item.x)}" y="${round(item.y)}" text-anchor="${item.textAnchor}" font-family="${escapeText(a.labelFontFamily)}" font-size="${a.labelFontSize}" fill="#FFFFFF" fill-opacity="${BACKDROP_OPACITY}" stroke="#FFFFFF" stroke-opacity="${BACKDROP_OPACITY}" stroke-width="${BACKDROP_STROKE}" stroke-linejoin="round" paint-order="stroke fill">${escapeText(text)}</text>`
-        : "";
-      return `${backdrop}<text x="${round(item.x)}" y="${round(item.y)}" text-anchor="${item.textAnchor}" font-family="${escapeText(a.labelFontFamily)}" font-size="${a.labelFontSize}" fill="${color}" font-style="italic">${escapeText(text)}</text>`;
+      return `<text x="${round(item.x)}" y="${round(item.y)}" text-anchor="${item.textAnchor}" font-family="${escapeText(a.labelFontFamily)}" font-size="${a.labelFontSize}" fill="${color}" font-style="italic">${escapeText(text)}</text>`;
     })
     .join("");
 }
@@ -220,19 +214,14 @@ function renderLineObject(
       resolved.planes,
       resolved.basis,
     );
-    if (clip) {
-      t0 = clip.t0;
-      t1 = clip.t1;
-    } else {
-      const range = computeLineDisplayRange(
-        carrier,
-        resolved.points,
-        -2,
-        2,
-        data.appearance.lineExtension,
-      );
-      t0 = range.t0;
-      t1 = range.t1;
+    if (!clip) return;
+    t0 = clip.t0;
+    t1 = clip.t1;
+    if (line.style.visualKind === "line") {
+      const span = Math.max(t1 - t0, 1e-6);
+      const ext = data.appearance.lineExtension * span;
+      t0 -= ext;
+      t1 += ext;
     }
   }
 
@@ -371,19 +360,34 @@ function collectFitPoints(
         resolved.planes,
         resolved.basis,
       );
-      if (clip) {
-        t0 = clip.t0;
-        t1 = clip.t1;
+      if (!clip) continue;
+      t0 = clip.t0;
+      t1 = clip.t1;
+      if (line.style.visualKind === "line") {
+        const span = Math.max(t1 - t0, 1e-6);
+        const ext = data.appearance.lineExtension * span;
+        t0 -= ext;
+        t1 += ext;
       }
     }
     const local0 = worldToLocal(add(carrier.origin, scale(carrier.dir, t0)), resolved.basis);
     const local1 = worldToLocal(add(carrier.origin, scale(carrier.dir, t1)), resolved.basis);
     if (local0) {
-      const pr = projectFromLocalCoeffs(local0, add(carrier.origin, scale(carrier.dir, t0)), data.view);
+      const pr = projectFromLocalCoeffs(
+        local0,
+        add(carrier.origin, scale(carrier.dir, t0)),
+        data.view,
+        resolved.basis,
+      );
       pts.push({ x: pr.x, y: pr.y });
     }
     if (local1) {
-      const pr = projectFromLocalCoeffs(local1, add(carrier.origin, scale(carrier.dir, t1)), data.view);
+      const pr = projectFromLocalCoeffs(
+        local1,
+        add(carrier.origin, scale(carrier.dir, t1)),
+        data.view,
+        resolved.basis,
+      );
       pts.push({ x: pr.x, y: pr.y });
     }
   }

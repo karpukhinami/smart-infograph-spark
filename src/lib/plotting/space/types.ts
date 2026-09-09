@@ -95,10 +95,18 @@ export type PointOnFaceDefinition = {
   faceV: number;
 };
 
+export type PointOnSpaceLineDefinition = {
+  kind: "onSpaceLine";
+  lineId: string;
+  /** Параметр t на носителе прямой: P = origin + t·dir. */
+  lineParam: number;
+};
+
 export type SpacePointDefinition =
   | { kind: "builtin"; vertexId: string }
   | PointOnLineDefinition
-  | PointOnFaceDefinition;
+  | PointOnFaceDefinition
+  | PointOnSpaceLineDefinition;
 
 export interface SpacePointStyle {
   color: string;

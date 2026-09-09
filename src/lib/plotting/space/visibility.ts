@@ -1,4 +1,4 @@
-import { getViewK, projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
+import { projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
 import { facePlane, type ResolvedSpaceScene } from "./build";
 import { edgeById, faceById } from "./parallelepiped";
 import type { ParallelepipedFigure, SpaceViewParams, Vec3 } from "./types";
@@ -60,7 +60,7 @@ function projectWorldPoint(
   const lc =
     local ??
     worldToLocal(world, ctx.basis) ?? { u: 0, v: 0, w: 0 };
-  return projectFromLocalCoeffs(lc, world, ctx.view);
+  return projectFromLocalCoeffs(lc, world, ctx.view, ctx.basis);
 }
 
 function quadArea2D(v: ScreenVert[]): number {
@@ -384,7 +384,7 @@ export function isBodyEdgeVisibleForRender(
   view: SpaceViewParams,
 ): boolean {
   if (getVisibilityMode(view) === "legacy") return isBodyEdgeVisible(edgeId, figure);
-  return isBodyEdgeVisibleSchool(edgeId, figure, getViewK(view));
+  return isBodyEdgeVisibleSchool(edgeId, figure, view);
 }
 
 /** Разбиение линии на видимые/скрытые участки (переключаемый режим). */

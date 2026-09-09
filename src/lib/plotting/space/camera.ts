@@ -8,36 +8,72 @@ export interface ProjectedPoint {
   world: Vec3;
 }
 
-/** Фиксированная константа школьной проекции. */
+export type ViewBasis = { e1: Vec3; e2: Vec3; e3: Vec3 };
+
+/** Фиксированная константа школьной проекции (глубина AB). */
 export const VIEW_K = 0.28;
 
-export function getViewK(view: SpaceViewParams): number {
+/** Горизонтальная доля AB на экране (смещение по X). */
+export function getViewKu(view: SpaceViewParams): number {
   return view.depthSkewX ?? VIEW_K;
 }
 
-/** Локальные (u,v,w) → координаты вида (X,Y,Z). */
-export function localToView(local: LocalCoords, k = VIEW_K): { x: number; y: number; z: number } {
+/** Вертикальная доля AB на экране (смещение по Y). */
+export function getViewKv(view: SpaceViewParams): number {
+  return Math.abs(view.depthSkewY ?? VIEW_K);
+}
+
+/** @deprecated используйте getViewKu */
+export function getViewK(view: SpaceViewParams): number {
+  return getViewKu(view);
+}
+
+/** Угол BAD в радианах из базиса e1=AB, e2=AD. */
+export function badAngleRadFromBasis(basis: ViewBasis): number {
+  const e1xy = Math.hypot(basis.e1.x, basis.e1.y);
+  const e2xy = Math.hypot(basis.e2.x, basis.e2.y);
+  if (e1xy < 1e-9 || e2xy < 1e-9) return Math.PI / 2;
+  return Math.atan2(basis.e2.x / e2xy, -(basis.e2.y / e1xy));
+}
+
+/**
+ * Локальные (u,v,w) → координаты вида (X,Y,Z).
+ * AD горизонтален: X = v·sin(∠BAD) + ku·u; AA₁ вертикален: Y = w + kv·u.
+ */
+export function localToView(
+  local: LocalCoords,
+  view: SpaceViewParams,
+  basis?: ViewBasis,
+): { x: number; y: number; z: number } {
+  const ku = getViewKu(view);
+  const kv = getViewKv(view);
+  const theta = basis ? badAngleRadFromBasis(basis) : Math.PI / 2;
   const { u, v, w } = local;
   return {
-    x: v + k * u,
-    y: w + k * u,
-    z: u - k * v - k * w,
+    x: v * Math.sin(theta) + ku * u,
+    y: w + kv * u,
+    z: u - ku * v - kv * w,
   };
 }
 
-/** Направление луча наблюдения (от наблюдателя вглубь сцены) в локальных координатах. */
-export function viewDirectionLocal(k = VIEW_K): LocalCoords {
-  return { u: 1, v: -k, w: -k };
+/** Направление луча наблюдения в локальных (u,v,w). */
+export function viewDirectionLocal(view: SpaceViewParams): LocalCoords {
+  const ku = getViewKu(view);
+  const kv = getViewKv(view);
+  return { u: 1, v: -ku, w: -kv };
 }
 
 /**
  * Школьная косоугольная проекция:
- * AD → вправо, AA₁ → вверх, AB → вглубь (вправо-вверх).
+ * AD → вправо, AA₁ → вверх, AB → вглубь (с коэффициентами ku, kv).
  */
-export function projectLocal(local: LocalCoords, view: SpaceViewParams): ProjectedPoint {
-  const k = getViewK(view);
+export function projectLocal(
+  local: LocalCoords,
+  view: SpaceViewParams,
+  basis?: ViewBasis,
+): ProjectedPoint {
   const s = view.scale;
-  const { x, y, z } = localToView(local, k);
+  const { x, y, z } = localToView(local, view, basis);
   return {
     x: x * s,
     y: -y * s,
@@ -50,8 +86,9 @@ export function projectFromLocalCoeffs(
   local: LocalCoords,
   world: Vec3,
   view: SpaceViewParams,
+  basis?: ViewBasis,
 ): ProjectedPoint {
-  const p = projectLocal(local, view);
+  const p = projectLocal(local, view, basis);
   return { ...p, world };
 }
 
@@ -60,7 +97,7 @@ export const DEFAULT_SPACE_VIEW: SpaceViewParams = {
   yaw: 0,
   pitch: 0,
   depthSkewX: VIEW_K,
-  depthSkewY: -VIEW_K,
+  depthSkewY: VIEW_K,
   visibilityMode: "school",
 };
 
@@ -103,7 +140,8 @@ export function projectPoint(world: Vec3, view: SpaceViewParams): ProjectedPoint
 
 /** @deprecated */
 export function viewDirection(_view: SpaceViewParams): Vec3 {
-  const k = VIEW_K;
-  const l = Math.hypot(1, k, k) || 1;
-  return { x: 1 / l, y: -k / l, z: -k / l };
+  const ku = VIEW_K;
+  const kv = VIEW_K;
+  const l = Math.hypot(1, ku, kv) || 1;
+  return { x: 1 / l, y: -ku / l, z: -kv / l };
 }

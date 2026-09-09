@@ -81,7 +81,7 @@ export function SpaceLineCard({ line }: { line: SpaceLine }) {
                 <SelectContent>
                   <SelectItem value="segment">отрезок</SelectItem>
                   <SelectItem value="line">прямая</SelectItem>
-                  <SelectItem value="vector">вектор</SelectItem>
+                  {def.kind === "twoPoints" && <SelectItem value="vector">вектор</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

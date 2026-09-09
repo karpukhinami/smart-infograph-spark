@@ -2,7 +2,14 @@ import { nextId, DEFAULT_APPEARANCE, PLOT_PALETTE } from "../shared";
 import { DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
 import { parseBaseVertexLabels, formatVertexLabel } from "./parse-vertices";
 import { createParallelepiped } from "./parallelepiped";
-import { buildSpaceScene, clampRegionParam, defaultLineParam, getPointLabel } from "./build";
+import {
+  buildSpaceScene,
+  clampRegionParam,
+  defaultLineParam,
+  getPointLabel,
+  planeIntersectionSegmentRange,
+  resolveLineCarrier,
+} from "./build";
 import { cross, len, sub, type Vec3 } from "./vec3";
 import type {
   LineRegion,
@@ -249,6 +256,53 @@ export function hasCarrierThroughPoints(
   }
 
   return false;
+}
+
+/** Две точки на концах отрезка пересечения плоскостей внутри параллелепипеда. */
+export function createPlaneIntersectionEndpoints(
+  data: SpaceSceneData,
+  line: SpaceLine,
+): SpacePoint[] {
+  if (!data.figure || line.definition.kind !== "planeIntersection") return [];
+  const withLine = data.lines.some((l) => l.id === line.id)
+    ? data
+    : { ...data, lines: [...data.lines, line] };
+  const resolved = buildSpaceScene(withLine);
+  const carrier = resolveLineCarrier(
+    line,
+    data.figure,
+    resolved.points,
+    resolved.planes,
+    withLine.lines,
+  );
+  if (!carrier) return [];
+
+  const clip = planeIntersectionSegmentRange(
+    carrier,
+    line.definition.planeAId,
+    line.definition.planeBId,
+    data.figure,
+    resolved.points,
+    resolved.planes,
+    resolved.basis,
+  );
+  if (!clip) return [];
+
+  const endpoints: SpacePoint[] = [];
+  let working = data;
+  for (const t of [clip.t0, clip.t1]) {
+    const label = nextFreePointLabel(working, data.figure);
+    const point = createSpacePoint(
+      working.points.length + 1,
+      { kind: "onSpaceLine", lineId: line.id, lineParam: t },
+      label,
+    );
+    point.style.color = line.style.color;
+    point.built = true;
+    endpoints.push(point);
+    working = { ...working, points: [...working.points, point] };
+  }
+  return endpoints;
 }
 
 /** Вспомогательная прямая/отрезок при построении точки на носителе AB. */

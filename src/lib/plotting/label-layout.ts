@@ -279,9 +279,10 @@ export function layoutLabels(
   requests: LabelRequest[],
   obstacles: Obstacle[],
   area: Rect,
-  options?: { fontSize?: number },
+  options?: { fontSize?: number; allowBackdrop?: boolean },
 ): PlacedLabel[] {
   const fontSize = options?.fontSize ?? 16;
+  const allowBackdrop = options?.allowBackdrop !== false;
   const live = [...obstacles];
   const placed: PlacedLabel[] = [];
 
@@ -304,7 +305,7 @@ export function layoutLabels(
       x: chosen.rect.x + chosen.rect.width / 2,
       y: chosen.rect.y + chosen.rect.height / 2 + fontSize * 0.35,
       textAnchor: "middle",
-      needsBackdrop: chosen.score > BACKDROP_THRESHOLD,
+      needsBackdrop: allowBackdrop && chosen.score > BACKDROP_THRESHOLD,
     });
     live.push({ kind: "label", rect: chosen.rect });
   }

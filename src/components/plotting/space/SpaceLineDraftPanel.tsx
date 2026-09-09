@@ -42,24 +42,22 @@ export function SpaceLineDraftPanel() {
         </Select>
       </div>
 
-      {draft.kind === "twoPoints" && (
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Тип линии</Label>
-          <Select
-            value={draft.visualKind}
-            onValueChange={(v) => update({ visualKind: v as LinearVisualKind })}
-          >
-            <SelectTrigger className="bg-background">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="segment">отрезок</SelectItem>
-              <SelectItem value="line">прямая</SelectItem>
-              <SelectItem value="vector">вектор</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Тип линии</Label>
+        <Select
+          value={draft.visualKind}
+          onValueChange={(v) => update({ visualKind: v as LinearVisualKind })}
+        >
+          <SelectTrigger className="bg-background">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="segment">отрезок</SelectItem>
+            <SelectItem value="line">прямая</SelectItem>
+            {draft.kind === "twoPoints" && <SelectItem value="vector">вектор</SelectItem>}
+          </SelectContent>
+        </Select>
+      </div>
 
       {draft.kind === "twoPoints" && (
         <div className="grid grid-cols-2 gap-2">

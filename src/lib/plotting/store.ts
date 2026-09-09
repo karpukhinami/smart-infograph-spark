@@ -52,6 +52,7 @@ import {
   buildSpaceSceneData,
   createAuxiliaryLineForPoint,
   createParallelepipedFromInput,
+  createPlaneIntersectionEndpoints,
   createSpaceLine,
   createSpacePlane,
   createSpacePoint,
@@ -1316,12 +1317,17 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
         ? { kind: "twoPoints", aId: draft.aId, bId: draft.bId }
         : { kind: "planeIntersection", planeAId: draft.planeAId, planeBId: draft.planeBId };
     const line = createSpaceLine(data.lines.length + 1, definition, "");
-    line.style.visualKind =
-      draft.kind === "planeIntersection" ? "segment" : draft.visualKind;
+    line.style.visualKind = draft.visualKind;
     line.built = true;
+    const lines = [...data.lines, line];
+    let points = data.points;
+    if (draft.kind === "planeIntersection") {
+      const endpoints = createPlaneIntersectionEndpoints({ ...data, lines }, line);
+      if (endpoints.length) points = [...points, ...endpoints];
+    }
     const result = applySpaceBuild({
       ...state.scene,
-      space3d: { ...data, lines: [...data.lines, line] },
+      space3d: { ...data, points, lines },
     });
     set({
       scene: result.scene,
