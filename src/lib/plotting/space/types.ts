@@ -57,7 +57,7 @@ export interface SpaceFace {
 export interface ParallelepipedConstraints {
   rectangular: boolean;
   equilateral: boolean;
-  /** Визуальный угол ∠BAD на чертеже (10–60°); при rectangular=true — 90°. 3D-геометрию не меняет. */
+  /** Визуальный угол ∠BAD на чертеже (10–60°); 3D-геометрию не меняет. */
   badAngleDeg: number;
 }
 
@@ -196,6 +196,8 @@ export interface SpaceViewParams {
   depthSkewY: number;
   /** Фиксированная визуальная длина единичного глубинного ребра AB на чертеже. */
   depthLength?: number;
+  /** Визуальная длина единичного ребра AA₁ на чертеже. */
+  heightLength?: number;
   /** Масштаб по X при переводе depthScreen → kx; по умолчанию = scale. */
   scaleX?: number;
   /** Масштаб по Y при переводе depthScreen → ky; по умолчанию = scale. */

@@ -49,7 +49,7 @@ export function createSpaceSceneData(): SpaceSceneData {
   return {
     shapeKind: null,
     baseVerticesInput: "",
-    figureConstraints: { rectangular: true, equilateral: false, badAngleDeg: 45 },
+    figureConstraints: { rectangular: true, equilateral: false, badAngleDeg: 35 },
     figureDirty: false,
     figure: null,
     points: [],
@@ -130,7 +130,7 @@ export function createParallelepipedFromInput(
   return {
     figure: createParallelepiped(
       labels as [string, string, string, string],
-      constraints ?? { rectangular: true, equilateral: false, badAngleDeg: 90 },
+      constraints ?? { rectangular: true, equilateral: false, badAngleDeg: 35 },
     ),
     error: null,
   };

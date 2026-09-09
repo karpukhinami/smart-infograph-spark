@@ -1108,8 +1108,6 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       ...data.figureConstraints,
       ...patch,
     };
-    if (patch.rectangular === true) figureConstraints.badAngleDeg = 90;
-
     if (!data.figure) {
       set((s) => patchSpaceData(s, (d) => ({ ...d, figureConstraints })));
       return;

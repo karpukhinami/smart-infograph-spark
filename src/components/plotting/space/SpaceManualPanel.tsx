@@ -93,32 +93,22 @@ export function SpaceManualPanel() {
                   <div className="flex items-center justify-between">
                     <Label className="text-xs">∠BAD</Label>
                     <span className="text-xs tabular-nums text-muted-foreground">
-                      {space3d.figureConstraints.rectangular
-                        ? 90
-                        : Math.round(space3d.figureConstraints.badAngleDeg ?? 45)}
-                      °
+                      {Math.round(space3d.figureConstraints.badAngleDeg ?? 35)}°
                     </span>
                   </div>
                   <Slider
                     min={10}
                     max={60}
                     step={1}
-                    disabled={space3d.figureConstraints.rectangular}
-                    value={[
-                      space3d.figureConstraints.rectangular
-                        ? 90
-                        : (space3d.figureConstraints.badAngleDeg ?? 45),
-                    ]}
+                    value={[space3d.figureConstraints.badAngleDeg ?? 35]}
                     onValueChange={([value]) => {
                       if (value === undefined) return;
-                      updateSpaceConstraints({ badAngleDeg: value, rectangular: false });
+                      updateSpaceConstraints({ badAngleDeg: value });
                     }}
                   />
-                  {space3d.figureConstraints.rectangular && (
-                    <p className="text-[11px] text-muted-foreground">
-                      Снимите «Прямоугольный», чтобы менять угол ∠BAD на чертеже.
-                    </p>
-                  )}
+                  <p className="text-[11px] text-muted-foreground">
+                    «Прямоугольный» задаёт вертикаль AA₁; угол ∠BAD — наклон глубинных рёбер.
+                  </p>
                 </div>
               </div>
               <Button type="button" size="sm" className="w-full" onClick={buildSpaceFigure}>
