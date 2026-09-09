@@ -9,7 +9,8 @@ import {
   resolveLineCarrier,
   type ResolvedSpaceScene,
 } from "./build";
-import { fitProjection, projectFromLocalCoeffs } from "./camera";
+import { fitProjection, projectFromLocalCoeffs, sampleRotationEllipse } from "./camera";
+import { collectVisibleOverlaySegments, isEdgeCoveredOnScreen } from "./edge-overlay";
 import {
   buildOcclusionContext,
   isBodyEdgeVisibleForRender,
@@ -357,6 +358,11 @@ function collectFitPoints(
     const pr = resolved.projected.get(point.id);
     if (pr) pts.push({ x: pr.x, y: pr.y });
   }
+  const ellipse = sampleRotationEllipse(resolved.projection);
+  for (const p of ellipse) {
+    pts.push({ x: p.x * data.view.scale, y: -p.y * data.view.scale });
+  }
+
   for (const line of data.lines) {
     if (!line.built) continue;
     const carrier = resolveLineCarrier(line, figure, resolved.points, resolved.planes, data.lines);
@@ -438,14 +444,39 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
   const parts: string[] = [];
   const obstacles: Obstacle[] = [];
   const occlusion = buildOcclusionContext(figure, resolved, data.view);
+  const projectWorldForFit = (world: Vec3) => projectWorld(world, resolved, data.view, fit);
+  const overlaySegments = collectVisibleOverlaySegments(
+    data,
+    figure,
+    resolved,
+    data.view,
+    fit,
+    occlusion,
+    projectWorldForFit,
+  );
+
+  if (data.view.showRotationEllipse) {
+    const ellipsePts = sampleRotationEllipse(resolved.projection);
+    const d = ellipsePts
+      .map((p) => {
+        const sx = p.x * data.view.scale * fit.scale + fit.cx;
+        const sy = -p.y * data.view.scale * fit.scale + fit.cy;
+        return `${round(sx)},${round(sy)}`;
+      })
+      .join(" ");
+    parts.push(
+      `<polyline points="${d}" fill="none" stroke="#9CA3AF" stroke-width="${Math.max(1, a.edgeWidth / 2)}" stroke-dasharray="6 4" stroke-linecap="round"/>`,
+    );
+  }
 
   for (const edge of figure.edges) {
     const wa = resolved.points.get(edge.aId)?.world;
     const wb = resolved.points.get(edge.bId)?.world;
     if (!wa || !wb) continue;
-    const visible = isBodyEdgeVisibleForRender(edge.id, figure, resolved, data.view);
     const p1 = projectWorld(wa, resolved, data.view, fit);
     const p2 = projectWorld(wb, resolved, data.view, fit);
+    if (isEdgeCoveredOnScreen({ a: p1, b: p2 }, overlaySegments)) continue;
+    const visible = isBodyEdgeVisibleForRender(edge.id, figure, resolved, data.view);
     const dash = visible ? "" : ` stroke-dasharray="${a.hiddenDash}"`;
     parts.push(
       `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${a.edgeColor}" stroke-width="${a.edgeWidth}" stroke-linecap="round"${dash}/>`,

@@ -100,6 +100,15 @@ export function faceById(figure: ParallelepipedFigure, id: string): SpaceFace | 
   return figure.faces.find((f) => f.id === id);
 }
 
+/** Трёхбуквенное имя грани по первым трём вершинам (порядок обхода). */
+export function faceDisplayLabel(figure: ParallelepipedFigure, face: SpaceFace): string {
+  const labels = face.vertexIds.slice(0, 3).map((id) => {
+    const v = figure.vertices.find((vert) => vert.id === id);
+    return v?.label ?? "?";
+  });
+  return labels.join("");
+}
+
 export function edgeById(figure: ParallelepipedFigure, id: string): SpaceEdge | undefined {
   return figure.edges.find((e) => e.id === id);
 }

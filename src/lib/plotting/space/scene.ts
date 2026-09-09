@@ -1,7 +1,7 @@
 import { nextId, DEFAULT_APPEARANCE, PLOT_PALETTE } from "../shared";
 import { DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
 import { parseBaseVertexLabels, formatVertexLabel } from "./parse-vertices";
-import { createParallelepiped } from "./parallelepiped";
+import { createParallelepiped, faceDisplayLabel } from "./parallelepiped";
 import {
   buildSpaceScene,
   clampRegionParam,
@@ -393,17 +393,9 @@ export function pointChoices(data: SpaceSceneData): Array<{ id: string; label: s
 
 export function faceChoices(data: SpaceSceneData): Array<{ id: string; label: string }> {
   if (!data.figure) return [];
-  const names: Record<string, string> = {
-    "f-bottom": "нижнее основание",
-    "f-top": "верхнее основание",
-    "f-front": "передняя",
-    "f-back": "задняя",
-    "f-left": "левая",
-    "f-right": "правая",
-  };
   return data.figure.faces.map((f) => ({
     id: f.id,
-    label: names[f.id] ?? f.id,
+    label: faceDisplayLabel(data.figure!, f),
   }));
 }
 

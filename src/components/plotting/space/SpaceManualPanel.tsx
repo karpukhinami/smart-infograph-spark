@@ -1,4 +1,5 @@
 import { usePlotStore } from "@/lib/plotting/store";
+import { normalizeYawDeg, YAW_SNAP_DEG } from "@/lib/plotting/space/camera";
 import { SPACE_SHAPE_OPTIONS } from "@/lib/plotting/space/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -138,22 +139,37 @@ export function SpaceManualPanel() {
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Поворот</Label>
                   <span className="text-xs tabular-nums text-muted-foreground">
-                    {Math.round(space3d.view.yaw)}°
+                    {Math.round(normalizeYawDeg(space3d.view.yaw))}°
                   </span>
                 </div>
-                <Slider
-                  min={0}
-                  max={360}
-                  step={1}
-                  value={[((space3d.view.yaw % 360) + 360) % 360]}
-                  onValueChange={([value]) => {
-                    if (value === undefined) return;
-                    updateSpaceView({ yaw: value });
-                  }}
-                />
+                <div className="relative px-1 pt-1">
+                  <div
+                    className="pointer-events-none absolute top-0 h-2 w-0.5 -translate-x-1/2 rounded-full bg-muted-foreground/70"
+                    style={{ left: "calc(0% + 4px)" }}
+                    title={`Стандартное положение (±${YAW_SNAP_DEG}°)`}
+                  />
+                  <Slider
+                    min={0}
+                    max={360}
+                    step={1}
+                    value={[((space3d.view.yaw % 360) + 360) % 360]}
+                    onValueChange={([value]) => {
+                      if (value === undefined) return;
+                      updateSpaceView({ yaw: normalizeYawDeg(value) });
+                    }}
+                  />
+                </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Вращение вокруг вертикальной оси; ∠BAD задаёт форму эллипса основания.
+                  Вращение вокруг вертикальной оси; ∠BAD задаёт форму эллипса основания. У нуля — стандартный
+                  ракурс (липкий ±{YAW_SNAP_DEG}°).
                 </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Эллипс вращения</Label>
+                <Switch
+                  checked={space3d.view.showRotationEllipse ?? false}
+                  onCheckedChange={(checked) => updateSpaceView({ showRotationEllipse: checked })}
+                />
               </div>
             </CardContent>
           </Card>

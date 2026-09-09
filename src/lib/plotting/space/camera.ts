@@ -23,17 +23,26 @@ export interface ProjectionCoeffs {
   yawRad: number;
   /** Фазовый сдвиг A→B на эллипсе основания, рад (∠BAD). */
   phi0: number;
-  /** Горизонтальная полуось эллипса основания. */
+  /** Горизонтальная полуось эллипса основания (большая). */
   rx: number;
   /** Вертикальная полуось эллипса основания. */
   ry: number;
+  /** Центр эллипса основания (X). */
+  ox: number;
+  /** Центр эллипса основания (Y). */
+  oy: number;
+  /** Угол A на эллипсе при yaw=0, рад. */
+  alpha: number;
 }
 
 /** Фиксированная константа школьной проекции (legacy). */
 export const VIEW_K = 0.28;
 
-/** Визуальная длина единичного глубинного ребра AB при angle ≈ 45° (kx = ky = VIEW_K). */
-export const DEFAULT_DEPTH_LENGTH = VIEW_K * Math.SQRT2;
+/** Визуальная длина AB на чертеже: половина AD. */
+export const DEFAULT_DEPTH_LENGTH = 0.5;
+
+/** Допуск «липкого» возврата ползунка поворота к 0°, градусы. */
+export const YAW_SNAP_DEG = 4;
 
 /** Визуальная длина единичного ребра AA₁ на чертеже (как AD). */
 export const DEFAULT_HEIGHT_LENGTH = 1;
@@ -79,81 +88,115 @@ export function getProjectionCoeffs(
 ): ProjectionCoeffs {
   const depthAngleRad = (projectionDepthAngleDeg(constraints) * Math.PI) / 180;
   const heightAngleRad = (projectionHeightAngleDeg(constraints) * Math.PI) / 180;
-  const depthLength = view.depthLength ?? DEFAULT_DEPTH_LENGTH;
   const heightLength = view.heightLength ?? DEFAULT_HEIGHT_LENGTH;
   const scaleX = view.scaleX ?? view.scale;
   const scaleY = view.scaleY ?? view.scale;
 
-  const depthScreenX = depthLength * Math.cos(depthAngleRad);
-  const depthScreenY = depthLength * Math.sin(depthAngleRad);
+  // AB: длина = половина AD, угол ∠BAD от горизонтали AD.
+  const abLen = view.depthLength ?? DEFAULT_DEPTH_LENGTH;
+  const kx = (abLen * Math.cos(depthAngleRad)) / scaleX;
+  const ky = (abLen * Math.sin(depthAngleRad)) / scaleY;
   const heightScreenX = heightLength * Math.cos(heightAngleRad);
   const heightScreenY = heightLength * Math.sin(heightAngleRad);
 
-  const kx = depthScreenX / scaleX;
-  const ky = depthScreenY / scaleY;
-  const cosP = Math.cos(depthAngleRad);
-  const sinP = Math.sin(depthAngleRad);
+  const phi0 = depthAngleRad;
+  const cosP = Math.cos(phi0);
+  const sinP = Math.sin(phi0);
   const denom = cosP - 1;
-  const rx = Math.abs(denom) > 1e-8 ? kx / denom : -DEFAULT_DEPTH_LENGTH;
-  const ry = Math.abs(sinP) > 1e-8 ? -ky / sinP : DEFAULT_DEPTH_LENGTH;
+  const rx = Math.abs(denom) > 1e-8 ? Math.abs(kx / denom) : oxFallback(kx);
+  const ry = Math.abs(sinP) > 1e-8 ? Math.abs(ky / sinP) : rx;
+  const ox = (1 + kx) / 2;
+  const oy = ky / 2;
 
   return {
     kx,
     ky,
     kwx: heightScreenX / scaleX,
     kwy: heightScreenY / scaleY,
-    yawRad: (view.yaw * Math.PI) / 180,
-    phi0: depthAngleRad,
-    rx,
-    ry,
+    yawRad: (normalizeYawDeg(view.yaw) * Math.PI) / 180,
+    phi0,
+    rx: Math.max(rx, ry),
+    ry: Math.min(rx, ry),
+    ox,
+    oy,
+    alpha: 0,
   };
+}
+
+function oxFallback(kx: number): number {
+  return Math.max(0.5, (1 + kx) / 2);
+}
+
+/** Нормализует yaw в [0,360) с «липким» нулём. */
+export function normalizeYawDeg(yaw: number): number {
+  let y = ((yaw % 360) + 360) % 360;
+  if (y <= YAW_SNAP_DEG || y >= 360 - YAW_SNAP_DEG) return 0;
+  return y;
 }
 
 function kwySafe(kwy: number): number {
   return Math.abs(kwy) > 1e-9 ? kwy : 1;
 }
 
-/** Точка на эллипсе основания: A при t=0 в начале координат. */
-function ellipseBasePoint(t: number, phase: number, rx: number, ry: number): { x: number; y: number } {
-  const ang = t + phase;
-  return {
-    x: rx * (Math.cos(ang) - 1),
-    y: ry * Math.sin(ang),
-  };
+/** Точки эллипса вращения для отрисовки (координаты вида до fit). */
+export function sampleRotationEllipse(
+  coeffs: ProjectionCoeffs,
+  segments = 64,
+): Array<{ x: number; y: number }> {
+  const { rx, ry } = coeffs;
+  const pts: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i <= segments; i += 1) {
+    const ang = (i / segments) * Math.PI * 2;
+    pts.push({ x: rx * Math.cos(ang) - rx, y: ry * Math.sin(ang) });
+  }
+  return pts;
 }
 
-/** Углы A, B, D нижнего основания на эллипсе при параметре t. */
-function baseCorners(
-  t: number,
-  phi0: number,
-  rx: number,
-  ry: number,
-): { a: { x: number; y: number }; b: { x: number; y: number }; d: { x: number; y: number } } {
+/** Линейная проекция при yaw=0: AD горизонтально, AB под ∠BAD. */
+function linearLocalToView(
+  local: LocalCoords,
+  { kx, ky, kwx, kwy }: ProjectionCoeffs,
+): { x: number; y: number; z: number } {
+  const { u, v, w } = local;
+  const kw = kwySafe(kwy);
   return {
-    a: ellipseBasePoint(t, 0, rx, ry),
-    b: ellipseBasePoint(t, -phi0, rx, ry),
-    d: ellipseBasePoint(t, -phi0 + Math.PI, rx, ry),
+    x: v + kx * u + kwx * w,
+    y: kwy * w + ky * u,
+    z: u - kx * v - (ky / kw) * w,
   };
 }
 
 /**
  * Локальные (u,v,w) → координаты вида (X,Y,Z).
- * Основание — параллелограмм на эллипсе; AA₁ — линейное смещение по w.
+ * При yaw=0: AD горизонтально, AB = ½·AD под ∠BAD; иначе — вращение вокруг центра основания.
  */
 export function localToView(
   local: LocalCoords,
-  { kx, ky, kwx, kwy, yawRad, phi0, rx, ry }: ProjectionCoeffs,
+  coeffs: ProjectionCoeffs,
 ): { x: number; y: number; z: number } {
   const { u, v, w } = local;
-  const { a, b, d } = baseCorners(yawRad, phi0, rx, ry);
+  const { kx, ky, kwx, kwy, yawRad, ox, oy } = coeffs;
   const kw = kwySafe(kwy);
+  const baseLin = linearLocalToView({ u, v, w: 0 }, coeffs);
+
+  let bx = baseLin.x;
+  let by = baseLin.y;
+  if (Math.abs(yawRad) >= 1e-12) {
+    const ct = Math.cos(yawRad);
+    const st = Math.sin(yawRad);
+    const dx = baseLin.x - ox;
+    const dy = baseLin.y - oy;
+    bx = ox + dx * ct - dy * st;
+    by = oy + dx * st + dy * ct;
+  }
+
   const ct = Math.cos(yawRad);
   const st = Math.sin(yawRad);
   const ur = u * ct - v * st;
   const vr = u * st + v * ct;
   return {
-    x: a.x + u * (b.x - a.x) + v * (d.x - a.x) + kwx * w,
-    y: a.y + u * (b.y - a.y) + v * (d.y - a.y) + kwy * w,
+    x: bx + kwx * w,
+    y: by + kwy * w,
     z: ur - kx * vr - (ky / kw) * w,
   };
 }

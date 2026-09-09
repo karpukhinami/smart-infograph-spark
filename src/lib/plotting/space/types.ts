@@ -189,6 +189,8 @@ export interface SpaceViewParams {
   scale: number;
   /** Поворот вокруг вертикальной оси, градусы (0 = исходный ракурс). */
   yaw: number;
+  /** Показать эллипс вращения основания пунктиром. */
+  showRotationEllipse?: boolean;
   pitch: number;
   /** @deprecated kx/ky вычисляются из badAngleDeg и depthLength */
   depthSkewX: number;

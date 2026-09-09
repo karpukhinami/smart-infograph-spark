@@ -289,7 +289,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   if (!data.figure) {
     return {
       basis: computeBasis({ rectangular: false, equilateral: false }),
-      projection: { kx: 0, ky: 0, kwx: 0, kwy: 1, yawRad: 0, phi0: 0, rx: 0, ry: 1 },
+      projection: { kx: 0, ky: 0, kwx: 0, kwy: 1, yawRad: 0, phi0: 0, rx: 0, ry: 1, ox: 0, oy: 0, alpha: 0 },
       points,
       projected,
       planes,
@@ -841,7 +841,7 @@ export function isLocalStrictlyInsideFigure(local: LocalCoords): boolean {
   );
 }
 
-/** Опорные точки плоскости, лежащие вне параллелепипеда. */
+/** Опорные точки плоскости, лежащие строго вне параллелепипеда (не на границе). */
 export function getPlaneOutsideSupportPoints(
   plane: SpacePlane,
   points: Map<string, BuiltSpacePoint>,
@@ -852,7 +852,7 @@ export function getPlaneOutsideSupportPoints(
     const pt = points.get(id);
     if (!pt) continue;
     const local = pt.local ?? worldToLocal(pt.world, basis);
-    if (!local || isLocalStrictlyInsideFigure(local)) continue;
+    if (!local || isLocalInsideFigure(local)) continue;
     supports.push(pt.world);
   }
   return supports;
@@ -928,8 +928,55 @@ function isOnBoxBoundary(local: LocalCoords, eps = 1e-3): boolean {
   );
 }
 
+/** Первое пересечение отрезка [a→b] с границей параллелепипеда (параметр t ∈ (0,1]). */
+function firstBoxBoundaryHit(a: LocalCoords, b: LocalCoords): number | null {
+  const du = b.u - a.u;
+  const dv = b.v - a.v;
+  const dw = b.w - a.w;
+  let best: number | null = null;
+
+  const tryFace = (start: number, delta: number, plane: number) => {
+    if (Math.abs(delta) < 1e-12) return;
+    const t = (plane - start) / delta;
+    if (t <= 1e-6 || t > 1) return;
+    const u = a.u + du * t;
+    const v = a.v + dv * t;
+    const w = a.w + dw * t;
+    const eps = 1e-4;
+    if (u < -eps || u > 1 + eps || v < -eps || v > 1 + eps || w < -eps || w > 1 + eps) return;
+    if (best === null || t < best) best = t;
+  };
+
+  for (const plane of [0, 1]) {
+    tryFace(a.u, du, plane);
+    tryFace(a.v, dv, plane);
+    tryFace(a.w, dw, plane);
+  }
+  return best;
+}
+
+/** Часть отрезка support→target, лежащая вне параллелепипеда. */
+function clipHelperOutsideFigure(
+  support: Vec3,
+  target: Vec3,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+): { from: Vec3; to: Vec3 } | null {
+  const a = worldToLocal(support, basis);
+  const b = worldToLocal(target, basis);
+  if (!a || !b) return null;
+  if (isLocalInsideFigure(a)) return null;
+
+  const tHit = firstBoxBoundaryHit(a, b);
+  if (tHit === null) return null;
+
+  const dir = sub(target, support);
+  const hit = add(support, scale(dir, tHit));
+  if (len(sub(hit, support)) < 1e-6) return null;
+  return { from: support, to: hit };
+}
+
 /**
- * Тонкие линии от вершин сечения (на границе тела) к опорной точке вне параллелепипеда.
+ * Тонкие линии от опорной точки вне тела к границе — только внешняя часть.
  */
 export function computePlaneHelperSegments(
   section: Vec3[],
@@ -938,26 +985,20 @@ export function computePlaneHelperSegments(
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): Array<{ from: Vec3; to: Vec3 }> {
   if (section.length < 3) return [];
-  let sources = tangentSectionVerticesFromSupport(section, support, planeEq);
-  if (!sources.length) {
-    sources = section.filter((v) => {
-      const local = worldToLocal(v, basis);
-      return local !== null && isOnBoxBoundary(local);
-    });
-  }
+  const sources = tangentSectionVerticesFromSupport(section, support, planeEq);
   const segments: Array<{ from: Vec3; to: Vec3 }> = [];
   const seen = new Set<string>();
   const key = (a: Vec3, b: Vec3) =>
     `${a.x.toFixed(4)}:${a.y.toFixed(4)}:${a.z.toFixed(4)}-${b.x.toFixed(4)}:${b.y.toFixed(4)}:${b.z.toFixed(4)}`;
 
-  for (const from of sources) {
-    const local = worldToLocal(from, basis);
-    if (!local || !isOnBoxBoundary(local)) continue;
-    if (len(sub(from, support)) < 1e-6) continue;
-    const k = key(from, support);
+  for (const target of sources) {
+    if (len(sub(target, support)) < 1e-6) continue;
+    const clipped = clipHelperOutsideFigure(support, target, basis);
+    if (!clipped) continue;
+    const k = key(clipped.from, clipped.to);
     if (seen.has(k)) continue;
     seen.add(k);
-    segments.push({ from, to: support });
+    segments.push(clipped);
   }
   return segments;
 }
