@@ -5,11 +5,7 @@ import {
   type ConicEllipse,
 } from "./conic-ellipse";
 import { isParallelepiped, isPyramid } from "./figure";
-import {
-  baseLocalToFanFromUV,
-  ellipseBaseVerticesEqualArc,
-  pyramidBaseUV,
-} from "./pyramid";
+import { ellipseBaseVerticesEqualArc } from "./pyramid";
 import type {
   LocalCoords,
   ParallelepipedConstraints,
@@ -207,19 +203,18 @@ function pyramidScreenBase(figure: PyramidFigure, coeffs: ProjectionCoeffs): Arr
   return ellipseBaseVerticesEqualArc(coeffs.orbit, n, coeffs.orbit.thetaA);
 }
 
+/** Аффинно: A + u·(B−A) + v·(last−A) на экране — согласовано с 3D-базисом. */
 function pyramidBaseAt(
   u: number,
   v: number,
   baseScr: Array<{ x: number; y: number }>,
-  baseUV: Array<{ u: number; v: number }>,
 ): { x: number; y: number } {
-  const fan = baseLocalToFanFromUV(u, v, baseUV);
-  if (!fan) return { x: baseScr[0]?.x ?? 0, y: baseScr[0]?.y ?? 0 };
-  const [i0, i1, i2] = fan.tri;
-  const [w0, w1, w2] = fan.w;
+  const a = baseScr[0] ?? { x: 0, y: 0 };
+  const b = baseScr[1] ?? a;
+  const last = baseScr[baseScr.length - 1] ?? a;
   return {
-    x: w0 * baseScr[i0]!.x + w1 * baseScr[i1]!.x + w2 * baseScr[i2]!.x,
-    y: w0 * baseScr[i0]!.y + w1 * baseScr[i1]!.y + w2 * baseScr[i2]!.y,
+    x: a.x + u * (b.x - a.x) + v * (last.x - a.x),
+    y: a.y + u * (b.y - a.y) + v * (last.y - a.y),
   };
 }
 
@@ -232,11 +227,10 @@ function pyramidLocalToView(
   const kw = kwySafe(kwy);
   const n = figure.baseLabels.length;
   const baseScr = pyramidScreenBase(figure, coeffs);
-  const baseUV = pyramidBaseUV(n);
   const apexAnchor = figure.constraints.apexOnCenter
     ? { x: orbit.cx, y: orbit.cy }
     : baseScr[0]!;
-  const atBase = pyramidBaseAt(local.u, local.v, baseScr, baseUV);
+  const atBase = pyramidBaseAt(local.u, local.v, baseScr);
   const w = local.w;
   return {
     x: atBase.x + w * (apexAnchor.x - atBase.x) + kwx * w,

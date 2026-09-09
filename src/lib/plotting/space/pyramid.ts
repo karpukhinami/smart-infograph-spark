@@ -203,7 +203,7 @@ function barycentric2D(
   const w1 = (v2.x * v1.y - v1.x * v2.y) / den;
   const w2 = (v0.x * v2.y - v2.x * v0.y) / den;
   const w0 = 1 - w1 - w2;
-  return [w0, w2, w1];
+  return [w0, w1, w2];
 }
 
 /** Точка (u,v) внутри основания — веер от первой вершины основания. */
