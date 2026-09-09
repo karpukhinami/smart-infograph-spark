@@ -55,13 +55,13 @@ export interface ProjectionCoeffs {
 export const VIEW_K = 0.28;
 
 /** Визуальная длина AB: половина AD. */
-export const DEFAULT_DEPTH_LENGTH = 0.5;
+export const DEFAULT_DEPTH_LENGTH = 0.875;
 
 /** Допуск «липкого» возврата ползунка поворота к 0°, градусы. */
 export const YAW_SNAP_DEG = 4;
 
-/** Визуальная длина AD (передняя глубина основания). */
-export const DEFAULT_AD_LENGTH = 1;
+/** Визуальная длина AD (передняя глубина основания): базовая × (1 + 3/4). */
+export const DEFAULT_AD_LENGTH = 1.75;
 
 /** Визуальная длина единичного ребра AA₁ на чертеже. */
 export const DEFAULT_HEIGHT_LENGTH = 1.35;
@@ -71,6 +71,9 @@ export const SPACE_FIT_HEIGHT_FRACTION = 2 / 3;
 
 /** Доля ширины холста под фигуру (параллелограмм максимально широкий). */
 export const SPACE_FIT_WIDTH_FRACTION = 0.94;
+
+/** Дополнительный отступ снизу (доля высоты холста): основание выше нижнего края. */
+export const SPACE_FIT_BOTTOM_INSET_FRACTION = 0.1;
 
 /** Угол AA₁ относительно AD на чертеже при непрямоугольной проекции. */
 export const OBLIQUE_HEIGHT_ANGLE_DEG = 75;
@@ -117,8 +120,8 @@ export function getProjectionCoeffs(
   const scaleX = view.scaleX ?? view.scale;
   const scaleY = view.scaleY ?? view.scale;
 
-  const abLen = view.depthLength ?? DEFAULT_DEPTH_LENGTH;
   const adLen = DEFAULT_AD_LENGTH;
+  const abLen = adLen / 2;
   const kxView = abLen * Math.cos(depthAngleRad);
   const kyView = abLen * Math.sin(depthAngleRad);
 
@@ -352,7 +355,8 @@ export function fitSpaceProjection(
   let scale = targetH / bh;
   scale = Math.min(scale, targetW / bw);
   const cx = width / 2 - ((minX + maxX) / 2) * scale;
-  const cy = height - padding - maxY * scale;
+  const bottomInset = (height - padding * 2) * SPACE_FIT_BOTTOM_INSET_FRACTION;
+  const cy = height - padding - bottomInset - maxY * scale;
   return { scale, cx, cy };
 }
 
