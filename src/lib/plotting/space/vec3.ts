@@ -1,4 +1,6 @@
-import type { LocalCoords, ParallelepipedConstraints, Vec3 } from "./types";
+import { isParallelepiped } from "./figure";
+import { regularBasePolygon2D } from "./pyramid";
+import type { LocalCoords, ParallelepipedConstraints, SpaceFigure, Vec3 } from "./types";
 
 export function vec3(x = 0, y = 0, z = 0): Vec3 {
   return { x, y, z };
@@ -70,6 +72,24 @@ export function computeBasis(constraints: ParallelepipedConstraints): {
   const e1 = vec3(0, -e1Len, 0);
   const e2 = vec3(e2Len, 0, 0);
   const e3 = vec3(0, 0, e3Len);
+  return { e1, e2, e3 };
+}
+
+/**
+ * Базис фигуры: e1 — первое ребро основания, e2 — в плоскости основания,
+ * e3 — к вершине (пирамида) или AA₁ (параллелепипед).
+ */
+export function computeFigureBasis(figure: SpaceFigure): { e1: Vec3; e2: Vec3; e3: Vec3 } {
+  if (isParallelepiped(figure)) return computeBasis(figure.constraints);
+  const c = figure.constraints;
+  const L = 1.1;
+  const e1Len = L;
+  const e2Len = c.equilateral ? L : L * 1.15;
+  const e3Len = c.equilateral ? L : L * 0.95;
+  const e1 = vec3(0, -e1Len, 0);
+  const e2 = vec3(e2Len, 0, 0);
+  const e3 = vec3(0, 0, e3Len);
+  void regularBasePolygon2D(figure.baseLabels.length);
   return { e1, e2, e3 };
 }
 

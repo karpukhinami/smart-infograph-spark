@@ -92,23 +92,10 @@ export function createParallelepiped(
   };
 }
 
-export function vertexById(figure: ParallelepipedFigure, id: string): SpaceVertex | undefined {
-  return figure.vertices.find((v) => v.id === id);
-}
-
-export function faceById(figure: ParallelepipedFigure, id: string): SpaceFace | undefined {
-  return figure.faces.find((f) => f.id === id);
-}
-
-/** Трёхбуквенное имя грани по первым трём вершинам (порядок обхода). */
-export function faceDisplayLabel(figure: ParallelepipedFigure, face: SpaceFace): string {
-  const labels = face.vertexIds.slice(0, 3).map((id) => {
-    const v = figure.vertices.find((vert) => vert.id === id);
-    return v?.label ?? "?";
-  });
-  return labels.join("");
-}
-
-export function edgeById(figure: ParallelepipedFigure, id: string): SpaceEdge | undefined {
-  return figure.edges.find((e) => e.id === id);
-}
+export {
+  vertexById,
+  faceById,
+  edgeById,
+  faceDisplayLabel,
+  adjacentFaceIds,
+} from "./figure";

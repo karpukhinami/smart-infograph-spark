@@ -1,7 +1,7 @@
 import {
   add,
   clipCarrierToUnitCube,
-  computeBasis,
+  computeFigureBasis,
   cross,
   dot,
   faceNormal,
@@ -29,12 +29,13 @@ import {
   type ProjectionCoeffs,
   type ProjectedPoint,
 } from "./camera";
-import { edgeById, faceById, vertexById } from "./parallelepiped";
+import { edgeById, faceById, isParallelepiped, isPyramid, vertexById } from "./figure";
+import { baseCentroid2D, baseLocalToFan, regularBasePolygon2D } from "./pyramid";
 import type {
   BuiltSpacePoint,
   LineRegion,
   LocalCoords,
-  ParallelepipedFigure,
+  SpaceFigure,
   PointOnLineDefinition,
   SpaceLine,
   SpaceLineDefinition,
@@ -92,7 +93,7 @@ function resolveOnLineParam(def: PointOnLineDefinition): number {
 }
 
 function facePoint(
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
   faceId: string,
   u: number,
@@ -101,16 +102,33 @@ function facePoint(
   const face = faceById(figure, faceId);
   if (!face) return null;
   const verts = face.vertexIds.map((id) => points.get(id)?.world).filter(Boolean) as Vec3[];
-  if (verts.length !== 4) return null;
-  const [p0, p1, p2, p3] = verts;
-  const bottom = lerp(p0!, p1!, u);
-  const top = lerp(p3!, p2!, u);
-  return lerp(bottom, top, v);
+  if (verts.length === 3) {
+    const [p0, p1, p2] = verts;
+    const a = 1 - u - v;
+    return add(add(scale(p0!, a), scale(p1!, u)), scale(p2!, v));
+  }
+  if (verts.length === 4) {
+    const [p0, p1, p2, p3] = verts;
+    const bottom = lerp(p0!, p1!, u);
+    const top = lerp(p3!, p2!, u);
+    return lerp(bottom, top, v);
+  }
+  if (verts.length > 4) {
+    const triCount = verts.length - 2;
+    const idx = Math.min(triCount - 1, Math.max(0, Math.floor(u * triCount)));
+    const lu = u * triCount - idx;
+    const p0 = verts[0]!;
+    const p1 = verts[idx + 1]!;
+    const p2 = verts[idx + 2]!;
+    const a = 1 - lu - v;
+    return add(add(scale(p0, a), scale(p1, lu)), scale(p2, v));
+  }
+  return null;
 }
 
 function resolvePoint(
   point: SpacePoint,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
   resolved: Map<string, BuiltSpacePoint>,
 ): { built: BuiltSpacePoint | null; error: string | null } {
@@ -144,10 +162,10 @@ function resolvePoint(
       const verts = face.vertexIds
         .map((id) => resolved.get(id)?.world)
         .filter(Boolean) as Vec3[];
-      if (verts.length !== 4) return { built: null, error: "Грань не построена." };
+      if (verts.length < 3) return { built: null, error: "Грань не построена." };
       const world = scale(
         verts.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
-        0.25,
+        1 / verts.length,
       );
       const local = worldToLocal(world, basis);
       if (!local) return { built: null, error: "Не удалось вычислить координаты точки." };
@@ -171,7 +189,7 @@ function lineDirectionFromPoints(a: Vec3, b: Vec3): { origin: Vec3; dir: Vec3 } 
 
 function resolvePlane(
   plane: SpacePlane,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
   lines: SpaceLine[],
   planeEqs: Map<string, PlaneEq>,
@@ -242,7 +260,7 @@ function resolvePlane(
 /** Носитель по id ребра параллелепипеда или построенной прямой. */
 export function resolveCarrierRef(
   refId: string,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
   planeEqs: Map<string, PlaneEq>,
   allLines: SpaceLine[],
@@ -261,7 +279,7 @@ export function resolveCarrierRef(
 
 export function resolveLineCarrier(
   line: SpaceLine,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
   planeEqs: Map<string, PlaneEq>,
   allLines: SpaceLine[],
@@ -293,7 +311,15 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
 
   if (!data.figure) {
     return {
-      basis: computeBasis({ rectangular: false, equilateral: false }),
+      basis: computeFigureBasis({
+        id: "empty",
+        kind: "parallelepiped",
+        baseLabels: ["A", "B", "C", "D"],
+        constraints: { rectangular: false, equilateral: false, badAngleDeg: 35 },
+        vertices: [],
+        edges: [],
+        faces: [],
+      }),
       projection: {
         kx: 0,
         ky: 0,
@@ -318,8 +344,8 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
     };
   }
 
-  const basis = computeBasis(data.figure.constraints);
-  const projection = getProjectionCoeffs(data.view, data.figure.constraints);
+  const basis = computeFigureBasis(data.figure);
+  const projection = getProjectionCoeffs(data.view, data.figure);
 
   // Встроенные вершины.
   for (const vertex of data.figure.vertices) {
@@ -390,7 +416,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   }
 
   for (const [id, pt] of points) {
-    projected.set(id, projectFromLocalCoeffs(pt.local, pt.world, data.view, projection));
+    projected.set(id, projectFromLocalCoeffs(pt.local, pt.world, data.view, projection, data.figure));
   }
 
   return {
@@ -409,7 +435,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
 export function getPointLabel(
   pointId: string,
   data: SpaceSceneData,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
 ): string {
   const vertex = figure.vertices.find((v) => v.id === pointId);
   if (vertex) return vertex.label;
@@ -610,23 +636,56 @@ export function clipLineToPolygon(
  * Отрезок прямой пересечения двух плоскостей внутри параллелепипеда.
  * Носитель клипируется к кубу (u,v,w) ∈ [0,1]³ в афинных координатах; t₀, t₁ — крайние точки.
  */
+function clipCarrierToFigure(
+  carrier: { origin: Vec3; dir: Vec3 },
+  figure: SpaceFigure,
+  points: Map<string, BuiltSpacePoint>,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+): { t0: number; t1: number } | null {
+  if (isParallelepiped(figure)) return clipCarrierToUnitCube(carrier, basis);
+  let t0 = -Infinity;
+  let t1 = Infinity;
+  for (const face of figure.faces) {
+    const plane = facePlane(figure, face.id, points);
+    if (!plane) continue;
+    const ws = face.vertexIds.map((id) => points.get(id)?.world).filter(Boolean) as Vec3[];
+    if (ws.length < 3) continue;
+    const c = scale(
+      ws.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
+      1 / ws.length,
+    );
+    const insideSign = Math.sign(planePointDistance(c, plane)) || 1;
+    const d0 = insideSign * (dot(plane.normal, carrier.origin) + plane.d);
+    const dd = insideSign * dot(plane.normal, carrier.dir);
+    if (Math.abs(dd) < 1e-12) {
+      if (d0 > 1e-6) return null;
+      continue;
+    }
+    const tHit = -d0 / dd;
+    if (dd > 0) t0 = Math.max(t0, tHit);
+    else t1 = Math.min(t1, tHit);
+  }
+  if (t0 > t1 + 1e-9) return null;
+  return { t0, t1 };
+}
+
 export function planeIntersectionSegmentRange(
   carrier: { origin: Vec3; dir: Vec3 },
   _planeAId: string,
   _planeBId: string,
-  _figure: ParallelepipedFigure,
-  _points: Map<string, BuiltSpacePoint>,
+  figure: SpaceFigure,
+  points: Map<string, BuiltSpacePoint>,
   _planeEqs: Map<string, PlaneEq>,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): { t0: number; t1: number } | null {
-  const clip = clipCarrierToUnitCube(carrier, basis);
+  const clip = clipCarrierToFigure(carrier, figure, points, basis);
   if (!clip || clip.t1 - clip.t0 < 1e-9) return null;
   return clip;
 }
 
 export function computeFaceOrPlaneSection(
   id: string,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
   planeEqs: Map<string, PlaneEq>,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
@@ -664,7 +723,7 @@ export function computeFaceOrPlaneSection(
 }
 
 export function facePlane(
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   faceId: string,
   points: Map<string, BuiltSpacePoint>,
 ): PlaneEq | null {
@@ -679,7 +738,7 @@ export function facePlane(
 
 export function isPointInsideParallelepiped(
   p: Vec3,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
 ): boolean {
   for (const face of figure.faces) {
@@ -702,16 +761,24 @@ export function isPointInsideParallelepiped(
 
 const LOCAL_UNIT_EPS = 1e-4;
 
-/** Точка внутри параллелепипеда в локальных (u,v,w) ∈ [0,1]³. */
-export function isLocalInsideFigure(local: LocalCoords): boolean {
-  return (
-    local.u >= -LOCAL_UNIT_EPS &&
-    local.u <= 1 + LOCAL_UNIT_EPS &&
-    local.v >= -LOCAL_UNIT_EPS &&
-    local.v <= 1 + LOCAL_UNIT_EPS &&
-    local.w >= -LOCAL_UNIT_EPS &&
-    local.w <= 1 + LOCAL_UNIT_EPS
-  );
+/** Точка внутри фигуры (для параллелепипеда — куб [0,1]³). */
+export function isLocalInsideFigure(local: LocalCoords, figure?: SpaceFigure): boolean {
+  if (!figure || isParallelepiped(figure)) {
+    return (
+      local.u >= -LOCAL_UNIT_EPS &&
+      local.u <= 1 + LOCAL_UNIT_EPS &&
+      local.v >= -LOCAL_UNIT_EPS &&
+      local.v <= 1 + LOCAL_UNIT_EPS &&
+      local.w >= -LOCAL_UNIT_EPS &&
+      local.w <= 1 + LOCAL_UNIT_EPS
+    );
+  }
+  if (local.w < -LOCAL_UNIT_EPS || local.w > 1 + LOCAL_UNIT_EPS) return false;
+  if (local.w > 1 - LOCAL_UNIT_EPS) {
+    const c = baseCentroid2D(regularBasePolygon2D(figure.baseLabels.length));
+    return Math.hypot(local.u - c.x, local.v - c.y) < LOCAL_UNIT_EPS * 10;
+  }
+  return baseLocalToFan(local.u, local.v, figure.baseLabels.length) !== null;
 }
 
 /** ID точек, задающих плоскость (не прямые). */
@@ -740,13 +807,18 @@ export function getPlaneOutsideSupportPoints(
   plane: SpacePlane,
   points: Map<string, BuiltSpacePoint>,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+  figure?: SpaceFigure,
 ): Vec3[] {
   const supports: Vec3[] = [];
   for (const id of planeDefiningPointIds(plane)) {
     const pt = points.get(id);
     if (!pt) continue;
-    const local = pt.local ?? worldToLocal(pt.world, basis);
-    if (!local || isLocalInsideFigure(local)) continue;
+    if (figure && isPyramid(figure)) {
+      if (isPointInsideParallelepiped(pt.world, figure, points)) continue;
+    } else {
+      const local = pt.local ?? worldToLocal(pt.world, basis);
+      if (!local || isLocalInsideFigure(local, figure)) continue;
+    }
     supports.push(pt.world);
   }
   return supports;
@@ -916,7 +988,7 @@ export function outwardFaceNormal(
 export function edgeVisible(
   aId: string,
   bId: string,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
   view: SpaceViewParams,
 ): boolean {

@@ -10,7 +10,7 @@ export type SpaceShapeKind =
 
 export const SPACE_SHAPE_OPTIONS: Array<{ value: SpaceShapeKind; label: string; enabled: boolean }> = [
   { value: "parallelepiped", label: "Параллелепипед", enabled: true },
-  { value: "pyramid", label: "Пирамида", enabled: false },
+  { value: "pyramid", label: "Пирамида", enabled: true },
   { value: "prism", label: "Призма", enabled: false },
   { value: "cone", label: "Конус", enabled: false },
   { value: "sphere", label: "Шар", enabled: false },
@@ -50,7 +50,7 @@ export interface SpaceEdge {
 
 export interface SpaceFace {
   id: string;
-  vertexIds: [string, string, string, string];
+  vertexIds: string[];
   builtin: boolean;
 }
 
@@ -71,6 +71,29 @@ export interface ParallelepipedFigure {
   edges: SpaceEdge[];
   faces: SpaceFace[];
 }
+
+/** true — вершина на чертеже над центром основания; false — над первой вершиной основания. */
+export interface PyramidConstraints {
+  apexOnCenter: boolean;
+  equilateral: boolean;
+  /** Визуальный угол первого ребра основания на чертеже (10–60°). */
+  badAngleDeg: number;
+}
+
+export interface PyramidFigure {
+  id: string;
+  kind: "pyramid";
+  apexLabel: string;
+  baseLabels: string[];
+  constraints: PyramidConstraints;
+  vertices: SpaceVertex[];
+  edges: SpaceEdge[];
+  faces: SpaceFace[];
+}
+
+export type SpaceFigure = ParallelepipedFigure | PyramidFigure;
+
+export type SpaceFigureConstraints = ParallelepipedConstraints | PyramidConstraints;
 
 export type LineRegion = "before" | "between" | "after";
 
@@ -234,11 +257,11 @@ export interface SpaceSceneData {
   shapeKind: SpaceShapeKind | null;
   baseVerticesInput: string;
   /** Ограничения фигуры (редактируются до и после построения). */
-  figureConstraints: ParallelepipedConstraints;
+  figureConstraints: SpaceFigureConstraints;
   /** Параметры фигуры изменены после последнего построения. */
   figureDirty: boolean;
   /** Построенная фигура; null — на canvas ничего нет. */
-  figure: ParallelepipedFigure | null;
+  figure: SpaceFigure | null;
   points: SpacePoint[];
   lines: SpaceLine[];
   planes: SpacePlane[];

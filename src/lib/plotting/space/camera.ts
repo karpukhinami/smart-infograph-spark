@@ -4,11 +4,15 @@ import {
   sampleConicEllipse,
   type ConicEllipse,
 } from "./conic-ellipse";
+import { isParallelepiped, isPyramid } from "./figure";
+import { baseCentroid2D, baseLocalToFan, regularBasePolygon2D } from "./pyramid";
 import type {
   LocalCoords,
   ParallelepipedConstraints,
-  ParallelepipedFigure,
+  PyramidFigure,
   SpaceAppearance,
+  SpaceFigure,
+  SpaceFigureConstraints,
   SpaceSceneData,
   SpaceViewParams,
   Vec3,
@@ -94,7 +98,7 @@ export function getViewK(view: SpaceViewParams): number {
 }
 
 /** Визуальный угол между AD (вправо) и AB на чертеже, градусы. */
-export function projectionDepthAngleDeg(constraints: ParallelepipedConstraints): number {
+export function projectionDepthAngleDeg(constraints: SpaceFigureConstraints): number {
   return Math.min(60, Math.max(10, constraints.badAngleDeg ?? 35));
 }
 
@@ -102,18 +106,17 @@ export function projectionDepthAngleDeg(constraints: ParallelepipedConstraints):
  * Угол AA₁ относительно AD на чертеже: 90° (вертикально) или наклон (75°).
  * Не влияет на 3D-геометрию.
  */
-export function projectionHeightAngleDeg(constraints: ParallelepipedConstraints): number {
-  return constraints.rectangular ? 90 : OBLIQUE_HEIGHT_ANGLE_DEG;
+export function projectionHeightAngleDeg(constraints: SpaceFigureConstraints): number {
+  if ("rectangular" in constraints) return constraints.rectangular ? 90 : OBLIQUE_HEIGHT_ANGLE_DEG;
+  return 90;
 }
 
 /**
  * kx, ky — наклон глубинных рёбер AB;
  * kwx, kwy — направление AA₁ на чертеже (зависит от «Прямоугольный»).
  */
-export function getProjectionCoeffs(
-  view: SpaceViewParams,
-  constraints: ParallelepipedConstraints,
-): ProjectionCoeffs {
+export function getProjectionCoeffs(view: SpaceViewParams, figure: SpaceFigure): ProjectionCoeffs {
+  const constraints = figure.constraints;
   const depthAngleRad = (projectionDepthAngleDeg(constraints) * Math.PI) / 180;
   const heightAngleRad = (projectionHeightAngleDeg(constraints) * Math.PI) / 180;
   const heightLength = view.heightLength ?? DEFAULT_HEIGHT_LENGTH;
@@ -138,7 +141,7 @@ export function getProjectionCoeffs(
     ky: kyView / scaleY,
     kwx: heightScreenX / scaleX,
     kwy: heightScreenY / scaleY,
-    yawRad: (normalizeYawDeg(view.yaw) * Math.PI) / 180,
+    yawRad: isPyramid(figure) ? 0 : (normalizeYawDeg(view.yaw) * Math.PI) / 180,
     orbit,
     phi0,
     rx: orbit.a,
@@ -195,14 +198,65 @@ export function sampleRotationEllipse(
   return sampleConicEllipse(coeffs.orbit, segments);
 }
 
+function pyramidScreenBase(figure: PyramidFigure, coeffs: ProjectionCoeffs): Array<{ x: number; y: number }> {
+  const n = figure.baseLabels.length;
+  const base2d = regularBasePolygon2D(n);
+  const edgeLen = DEFAULT_AD_LENGTH / 2;
+  const ang = projectionDepthAngleDeg(figure.constraints) * (Math.PI / 180);
+  const e1 = { x: Math.cos(ang) * edgeLen, y: Math.sin(ang) * edgeLen };
+  const e2 = { x: -Math.sin(ang) * edgeLen, y: Math.cos(ang) * edgeLen };
+  return base2d.map((p) => ({
+    x: p.x * e1.x + p.y * e2.x,
+    y: p.x * e1.y + p.y * e2.y,
+  }));
+}
+
+function pyramidBaseAt(
+  u: number,
+  v: number,
+  baseScr: Array<{ x: number; y: number }>,
+  n: number,
+): { x: number; y: number } {
+  const fan = baseLocalToFan(u, v, n);
+  if (!fan) return { x: 0, y: 0 };
+  const [i0, i1, i2] = fan.tri;
+  const [w0, w1, w2] = fan.w;
+  return {
+    x: w0 * baseScr[i0]!.x + w1 * baseScr[i1]!.x + w2 * baseScr[i2]!.x,
+    y: w0 * baseScr[i0]!.y + w1 * baseScr[i1]!.y + w2 * baseScr[i2]!.y,
+  };
+}
+
+function pyramidLocalToView(
+  local: LocalCoords,
+  coeffs: ProjectionCoeffs,
+  figure: PyramidFigure,
+): { x: number; y: number; z: number } {
+  const { kwx, kwy, kx, ky } = coeffs;
+  const kw = kwySafe(kwy);
+  const n = figure.baseLabels.length;
+  const baseScr = pyramidScreenBase(figure, coeffs);
+  const apexAnchor = figure.constraints.apexOnCenter
+    ? baseCentroid2D(baseScr)
+    : baseScr[0]!;
+  const atBase = pyramidBaseAt(local.u, local.v, baseScr, n);
+  const w = local.w;
+  return {
+    x: atBase.x + w * (apexAnchor.x - atBase.x) + kwx * w,
+    y: atBase.y + w * (apexAnchor.y - atBase.y) + kwy * w,
+    z: -local.u * 0.5 - local.v * 0.5 - local.w - kx * local.u - (ky / kw) * w,
+  };
+}
+
 /**
  * Локальные (u,v,w) → координаты вида (X,Y,Z).
- * Основание — параллелограмм на центрированном эллипсе; w — вертикально без поворота.
  */
 export function localToView(
   local: LocalCoords,
   coeffs: ProjectionCoeffs,
+  figure?: SpaceFigure,
 ): { x: number; y: number; z: number } {
+  if (figure && isPyramid(figure)) return pyramidLocalToView(local, coeffs, figure);
   const { u, v, w } = local;
   const { kx, ky, kwx, kwy, yawRad, orbit } = coeffs;
   const kw = kwySafe(kwy);
@@ -235,9 +289,10 @@ export function projectLocal(
   local: LocalCoords,
   view: SpaceViewParams,
   coeffs: ProjectionCoeffs,
+  figure?: SpaceFigure,
 ): ProjectedPoint {
   const s = view.scale;
-  const { x, y, z } = localToView(local, coeffs);
+  const { x, y, z } = localToView(local, coeffs, figure);
   return {
     x: x * s,
     y: -y * s,
@@ -251,8 +306,9 @@ export function projectFromLocalCoeffs(
   world: Vec3,
   view: SpaceViewParams,
   coeffs: ProjectionCoeffs,
+  figure?: SpaceFigure,
 ): ProjectedPoint {
-  const p = projectLocal(local, view, coeffs);
+  const p = projectLocal(local, view, coeffs, figure);
   return { ...p, world };
 }
 
@@ -299,18 +355,16 @@ export function fitProjection(
  * Не зависит от текущего yaw — картинка не «прыгает» при вращении.
  */
 export function collectReferenceFitPoints(
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   view: SpaceViewParams,
-  constraints: ParallelepipedConstraints,
 ): Array<{ x: number; y: number }> {
   const pts: Array<{ x: number; y: number }> = [];
-
-  const yawSteps = 24;
+  const yawSteps = isPyramid(figure) ? 1 : 24;
   for (let i = 0; i < yawSteps; i += 1) {
-    const yawDeg = (i / yawSteps) * 360;
-    const coeffs = getProjectionCoeffs({ ...view, yaw: yawDeg }, constraints);
+    const yawDeg = isPyramid(figure) ? 0 : (i / yawSteps) * 360;
+    const coeffs = getProjectionCoeffs({ ...view, yaw: yawDeg }, figure);
     for (const v of figure.vertices) {
-      const pr = projectLocal(v.local, view, coeffs);
+      const pr = projectLocal(v.local, view, coeffs, figure);
       pts.push({ x: pr.x, y: pr.y });
     }
   }
@@ -323,7 +377,7 @@ export function computeSpaceViewFit(
   appearance: SpaceAppearance,
 ): Pick<SpaceViewParams, "fitScale" | "fitCx" | "fitCy"> | null {
   if (!data.figure) return null;
-  const pts = collectReferenceFitPoints(data.figure, data.view, data.figure.constraints);
+  const pts = collectReferenceFitPoints(data.figure, data.view);
   const fit = fitSpaceProjection(pts, appearance.width, appearance.height, appearance.padding);
   return { fitScale: fit.scale, fitCx: fit.cx, fitCy: fit.cy };
 }

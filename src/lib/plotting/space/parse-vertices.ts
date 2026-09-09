@@ -1,19 +1,32 @@
-/** Извлечение четырёх буквенных обозначений вершин нижнего основания. */
+/** Извлечение буквенных обозначений вершин. */
 
 const LETTER = /[A-Za-zА-Яа-яЁё]/;
 
-export function parseBaseVertexLabels(input: string): string[] | null {
+function extractLetters(input: string, max?: number): string[] {
   const letters: string[] = [];
   for (const char of String(input ?? "")) {
     if (LETTER.test(char)) {
       letters.push(char.toUpperCase());
-      if (letters.length === 4) break;
+      if (max !== undefined && letters.length >= max) break;
     }
   }
-  if (letters.length < 4) return null;
-  const unique = new Set(letters);
-  if (unique.size < 4) return null;
   return letters;
+}
+
+/** Четыре буквы нижнего основания параллелепипеда. */
+export function parseBaseVertexLabels(input: string): string[] | null {
+  const letters = extractLetters(input, 4);
+  if (letters.length < 4) return null;
+  if (new Set(letters).size < 4) return null;
+  return letters;
+}
+
+/** Пирамида: первая буква — вершина, остальные — основание (минимум 3). */
+export function parsePyramidVertexLabels(input: string): { apex: string; base: string[] } | null {
+  const letters = extractLetters(input);
+  if (letters.length < 4) return null;
+  if (new Set(letters).size < letters.length) return null;
+  return { apex: letters[0]!, base: letters.slice(1) };
 }
 
 export function formatVertexLabel(base: string, subscript?: number): string {

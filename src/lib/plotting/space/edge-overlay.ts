@@ -1,4 +1,4 @@
-import type { ParallelepipedFigure, SpaceSceneData, Vec3 } from "./types";
+import type { SpaceFigure, SpaceSceneData, Vec3 } from "./types";
 import {
   computeFaceOrPlaneSection,
   planeIntersectionSegmentRange,
@@ -68,7 +68,7 @@ function projectWorldToScreen(
 function visibleLineScreenSegments(
   line: SpaceSceneData["lines"][number],
   data: SpaceSceneData,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceSceneData["view"],
   fit: { scale: number; cx: number; cy: number },
@@ -136,7 +136,7 @@ function visibleLineScreenSegments(
 function visiblePlaneSectionSegments(
   plane: SpaceSceneData["planes"][number],
   data: SpaceSceneData,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceSceneData["view"],
   occlusion: Parameters<typeof splitLineForRender>[7],
@@ -174,7 +174,7 @@ function visiblePlaneSectionSegments(
 /** Собирает видимые (сплошные) экранные отрезки линий и границ сечений плоскостей. */
 export function collectVisibleOverlaySegments(
   data: SpaceSceneData,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceSceneData["view"],
   fit: { scale: number; cx: number; cy: number },

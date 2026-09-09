@@ -1,7 +1,9 @@
 import { nextId, DEFAULT_APPEARANCE, PLOT_PALETTE } from "../shared";
 import { computeSpaceViewFit, DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
-import { parseBaseVertexLabels, formatVertexLabel } from "./parse-vertices";
-import { createParallelepiped, faceDisplayLabel } from "./parallelepiped";
+import { parseBaseVertexLabels, parsePyramidVertexLabels, formatVertexLabel } from "./parse-vertices";
+import { faceDisplayLabel } from "./figure";
+import { createParallelepiped } from "./parallelepiped";
+import { createPyramid } from "./pyramid";
 import {
   buildSpaceScene,
   clampRegionParam,
@@ -14,7 +16,10 @@ import { cross, len, sub, type Vec3 } from "./vec3";
 import type {
   LineRegion,
   ParallelepipedConstraints,
-  ParallelepipedFigure,
+  PyramidConstraints,
+  SpaceFigure,
+  SpaceFigureConstraints,
+  SpaceShapeKind,
   PointOnLineDefinition,
   SpaceAppearance,
   SpaceLine,
@@ -24,7 +29,6 @@ import type {
   SpacePoint,
   SpacePointDefinition,
   SpaceSceneData,
-  SpaceShapeKind,
 } from "./types";
 
 const GREEK_PLANE_LABELS = "αβγδεζηθικλμνξοπρστυφχψω".split("");
@@ -120,7 +124,7 @@ export function createParallelepipedFromInput(
   input: string,
   constraints?: ParallelepipedConstraints,
 ): {
-  figure: ParallelepipedFigure | null;
+  figure: SpaceFigure | null;
   error: string | null;
 } {
   const labels = parseBaseVertexLabels(input);
@@ -136,6 +140,42 @@ export function createParallelepipedFromInput(
   };
 }
 
+export function createPyramidFromInput(
+  input: string,
+  constraints?: PyramidConstraints,
+): { figure: import("./types").PyramidFigure | null; error: string | null } {
+  const parsed = parsePyramidVertexLabels(input);
+  if (!parsed) {
+    return {
+      figure: null,
+      error: "Введите минимум 4 различные буквы: первая — вершина, остальные — основание.",
+    };
+  }
+  return {
+    figure: createPyramid(parsed.apex, parsed.base, constraints ?? defaultPyramidConstraints()),
+    error: null,
+  };
+}
+
+export function defaultPyramidConstraints(): PyramidConstraints {
+  return { apexOnCenter: true, equilateral: false, badAngleDeg: 35 };
+}
+
+export function defaultParallelepipedConstraints(): ParallelepipedConstraints {
+  return { rectangular: true, equilateral: false, badAngleDeg: 35 };
+}
+
+export function createFigureFromInput(
+  shapeKind: SpaceShapeKind,
+  input: string,
+  constraints: SpaceFigureConstraints,
+): { figure: SpaceFigure | null; error: string | null } {
+  if (shapeKind === "pyramid") {
+    return createPyramidFromInput(input, constraints as PyramidConstraints);
+  }
+  return createParallelepipedFromInput(input, constraints as ParallelepipedConstraints);
+}
+
 export interface SpaceBuildReport {
   data: SpaceSceneData;
   built: number;
@@ -145,7 +185,7 @@ export interface SpaceBuildReport {
 export function autoLineLabel(
   line: SpaceLine,
   data: SpaceSceneData,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
 ): string {
   const def = line.definition;
   if (def.kind === "twoPoints") {
@@ -159,7 +199,7 @@ export function autoLineLabel(
 export function autoPlaneLabel(
   plane: SpacePlane,
   data: SpaceSceneData,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
 ): string {
   const def = plane.definition;
   if (def.kind === "threePoints") {
@@ -173,7 +213,7 @@ export function autoPlaneLabel(
 
 export function collectUsedPointLabels(
   data: SpaceSceneData,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
 ): Set<string> {
   const used = new Set<string>();
   for (const v of figure.vertices) used.add(v.label);
@@ -184,7 +224,7 @@ export function collectUsedPointLabels(
 }
 
 /** Первая свободная латинская буква; при исчерпании — буква с индексом. */
-export function nextFreePointLabel(data: SpaceSceneData, figure: ParallelepipedFigure): string {
+export function nextFreePointLabel(data: SpaceSceneData, figure: SpaceFigure): string {
   const used = collectUsedPointLabels(data, figure);
   for (let c = 65; c <= 90; c += 1) {
     const ch = String.fromCharCode(c);
@@ -223,7 +263,7 @@ function pointsCollinearWithCarrier(a: Vec3, b: Vec3, c: Vec3, d: Vec3): boolean
 /** Носитель через две точки уже есть (пользовательская прямая или ребро тела). */
 export function hasCarrierThroughPoints(
   data: SpaceSceneData,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   aId: string,
   bId: string,
 ): boolean {
@@ -375,7 +415,9 @@ export function buildSpaceSceneData(data: SpaceSceneData): SpaceBuildReport {
 
   if (data.figure) built += data.figure.vertices.length + data.figure.edges.length;
 
-  const viewFit = computeSpaceViewFit({ ...data, points, lines, planes }, data.appearance);
+  const viewFit = data.figure
+    ? computeSpaceViewFit({ ...data, points, lines, planes }, data.appearance)
+    : null;
   const view = viewFit ? { ...data.view, ...viewFit } : data.view;
 
   return {

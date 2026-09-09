@@ -1,8 +1,9 @@
 import { projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
 import { facePlane, type ResolvedSpaceScene } from "./build";
-import { edgeById, faceById } from "./parallelepiped";
-import type { ParallelepipedFigure, SpaceViewParams, Vec3 } from "./types";
-import { add, dot, len, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
+import { adjacentFaceIds, edgeById, faceById, isPyramid } from "./figure";
+import type { SpaceFigure, SpaceViewParams, Vec3 } from "./types";
+import { add, cross, dot, len, normalize, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
+import { viewDirectionLocal } from "./camera";
 import {
   isBodyEdgeVisibleSchool,
   splitLineSchoolView,
@@ -11,7 +12,7 @@ import {
 /** Видимые грани: AA₁D₁D (левая), CDD₁C₁ (задняя), A₁B₁C₁D₁ (верхняя). */
 export const VISIBLE_FACE_IDS = new Set(["f-left", "f-back", "f-top"]);
 
-export function isBodyEdgeVisible(edgeId: string, figure: ParallelepipedFigure): boolean {
+export function isBodyEdgeVisible(edgeId: string, figure: SpaceFigure): boolean {
   const edge = edgeById(figure, edgeId);
   if (!edge) return false;
   for (const faceId of VISIBLE_FACE_IDS) {
@@ -44,6 +45,7 @@ export interface OcclusionContext {
   basis: ResolvedSpaceScene["basis"];
   projection: ResolvedSpaceScene["projection"];
   view: SpaceViewParams;
+  figure: SpaceFigure;
   faces: OccluderFace[];
   /** Проекции 12 рёбер для 2D-пересечений. */
   edgeScreens: Array<{ aId: string; bId: string; a: ScreenVert; b: ScreenVert }>;
@@ -61,7 +63,7 @@ function projectWorldPoint(
   const lc =
     local ??
     worldToLocal(world, ctx.basis) ?? { u: 0, v: 0, w: 0 };
-  return projectFromLocalCoeffs(lc, world, ctx.view, ctx.projection);
+  return projectFromLocalCoeffs(lc, world, ctx.view, ctx.projection, ctx.figure);
 }
 
 function quadArea2D(v: ScreenVert[]): number {
@@ -104,7 +106,7 @@ function depthOnFace(px: number, py: number, verts: ScreenVert[]): number {
 }
 
 export function buildOcclusionContext(
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
 ): OcclusionContext {
@@ -112,6 +114,7 @@ export function buildOcclusionContext(
     basis: resolved.basis,
     projection: resolved.projection,
     view,
+    figure,
     faces: [],
     edgeScreens: [],
   };
@@ -125,6 +128,8 @@ export function buildOcclusionContext(
         return { x: pr.x, y: pr.y, depth: pr.depth };
       })
       .filter(Boolean) as ScreenVert[];
+    if (raw.length < 3) continue;
+    if (raw.length === 3) raw.push(raw[2]!);
     if (raw.length !== 4) continue;
     const area = quadArea2D(raw);
     if (area < MIN_FACE_AREA) continue;
@@ -217,7 +222,7 @@ export function pointInFace3D(
 export function classifySegmentFaceVisibility(
   a: Vec3,
   b: Vec3,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   points: ResolvedSpaceScene["points"],
 ): "visible" | "hidden" | "occlude" {
   for (const faceId of VISIBLE_FACE_IDS) {
@@ -280,7 +285,7 @@ export function splitLineByVisibility(
   dir: Vec3,
   t0: number,
   t1: number,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
   ctx?: OcclusionContext,
@@ -363,7 +368,7 @@ function mergeAdjacentSegments(segments: LineSplitSegment[]): LineSplitSegment[]
 export function renderEdgeSegments(
   aWorld: Vec3,
   bWorld: Vec3,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
   ctx: OcclusionContext,
@@ -379,13 +384,41 @@ export function getVisibilityMode(view: SpaceViewParams): "school" | "legacy" {
   return view.visibilityMode ?? "school";
 }
 
+function viewDirectionWorld(resolved: ResolvedSpaceScene): Vec3 {
+  const vd = viewDirectionLocal(resolved.projection);
+  const { e1, e2, e3 } = resolved.basis;
+  return normalize(add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)));
+}
+
+function isFaceFrontFacingWorld(
+  faceId: string,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+): boolean {
+  const face = faceById(figure, faceId);
+  if (!face || face.vertexIds.length < 3) return false;
+  const ps = face.vertexIds.map((id) => resolved.points.get(id)?.world).filter(Boolean) as Vec3[];
+  if (ps.length < 3) return false;
+  const n = normalize(cross(sub(ps[1]!, ps[0]!), sub(ps[2]!, ps[0]!)));
+  return dot(n, viewDirectionWorld(resolved)) < -1e-5;
+}
+
+function isBodyEdgeVisiblePyramid(
+  edgeId: string,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+): boolean {
+  return adjacentFaceIds(figure, edgeId).some((fid) => isFaceFrontFacingWorld(fid, figure, resolved));
+}
+
 /** Видимость ребра тела: school — через грани, legacy — по списку граней. */
 export function isBodyEdgeVisibleForRender(
   edgeId: string,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
 ): boolean {
+  if (isPyramid(figure)) return isBodyEdgeVisiblePyramid(edgeId, figure, resolved);
   if (getVisibilityMode(view) === "legacy") return isBodyEdgeVisible(edgeId, figure);
   return isBodyEdgeVisibleSchool(edgeId, figure, resolved.projection);
 }
@@ -396,12 +429,12 @@ export function splitLineForRender(
   dir: Vec3,
   t0: number,
   t1: number,
-  figure: ParallelepipedFigure,
+  figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
   ctx?: OcclusionContext,
 ): LineSplitSegment[] {
-  if (getVisibilityMode(view) === "legacy") {
+  if (isPyramid(figure) || getVisibilityMode(view) === "legacy") {
     return splitLineByVisibility(origin, dir, t0, t1, figure, resolved, view, ctx);
   }
   return splitLineSchoolView(origin, dir, t0, t1, figure, resolved, view);

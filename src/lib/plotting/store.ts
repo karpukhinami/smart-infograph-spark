@@ -51,7 +51,9 @@ import type {
 import {
   buildSpaceSceneData,
   createAuxiliaryLineForPoint,
-  createParallelepipedFromInput,
+  createFigureFromInput,
+  defaultParallelepipedConstraints,
+  defaultPyramidConstraints,
   createPlaneIntersectionEndpoints,
   createSpaceLine,
   createSpacePlane,
@@ -62,7 +64,7 @@ import {
 import type {
   LinearVisualKind,
   LineRegion,
-  ParallelepipedConstraints,
+  SpaceFigureConstraints,
   PointOnLineDefinition,
   SpaceLine,
   SpaceLineDefinition,
@@ -184,7 +186,7 @@ interface PlotStore {
   setSpaceShapeKind: (kind: SpaceShapeKind) => void;
   setSpaceBaseInput: (input: string) => void;
   buildSpaceFigure: () => void;
-  updateSpaceConstraints: (patch: Partial<ParallelepipedConstraints>) => void;
+  updateSpaceConstraints: (patch: Partial<SpaceFigureConstraints>) => void;
   updateSpaceView: (patch: Partial<SpaceSceneData["view"]>) => void;
   startSpacePointDraft: () => void;
   updateSpacePointDraft: (patch: Partial<SpacePointDraft>) => void;
@@ -1071,8 +1073,15 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       patchSpaceData(state, (data) => ({
         ...data,
         shapeKind: kind,
-        figure: kind === "parallelepiped" ? data.figure : null,
-        figureDirty: kind === "parallelepiped" ? data.figureDirty : false,
+        figure: null,
+        figureDirty: false,
+        baseVerticesInput: "",
+        figureConstraints:
+          kind === "pyramid"
+            ? defaultPyramidConstraints()
+            : kind === "parallelepiped"
+              ? defaultParallelepipedConstraints()
+              : data.figureConstraints,
       })),
     ),
 
@@ -1088,8 +1097,12 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
   buildSpaceFigure: () => {
     const state = get();
     const data = state.scene.space3d;
-    if (!data) return;
-    const { figure, error } = createParallelepipedFromInput(data.baseVerticesInput, data.figureConstraints);
+    if (!data?.shapeKind) return;
+    const { figure, error } = createFigureFromInput(
+      data.shapeKind,
+      data.baseVerticesInput,
+      data.figureConstraints,
+    );
     if (!figure) {
       set({ status: { built: 0, errors: [error ?? "Ошибка создания фигуры."], at: Date.now() } });
       return;
@@ -1105,7 +1118,7 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const state = get();
     const data = state.scene.space3d;
     if (!data) return;
-    const figureConstraints: ParallelepipedConstraints = {
+    const figureConstraints: SpaceFigureConstraints = {
       ...data.figureConstraints,
       ...patch,
     };
@@ -1114,7 +1127,7 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       return;
     }
 
-    const figure = { ...data.figure, constraints: { ...figureConstraints } };
+    const figure = { ...data.figure, constraints: { ...figureConstraints } } as typeof data.figure;
     const result = applySpaceBuild({
       ...state.scene,
       space3d: { ...data, figureConstraints, figure, figureDirty: false },
