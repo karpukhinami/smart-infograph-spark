@@ -103,8 +103,10 @@ export function getProjectionCoeffs(
   const cosP = Math.cos(phi0);
   const sinP = Math.sin(phi0);
   const denom = cosP - 1;
-  const rx = Math.abs(denom) > 1e-8 ? Math.abs(kx / denom) : oxFallback(kx);
-  const ry = Math.abs(sinP) > 1e-8 ? Math.abs(ky / sinP) : rx;
+  // Эллипс (rx(cos θ−1), ry sin θ): при θ=0 точка A в начале координат,
+  // при θ=−φ₀ — B=(kx, ky); большая ось горизонтальна (|rx| ≥ |ry|).
+  const rx = Math.abs(denom) > 1e-8 ? kx / denom : -2;
+  const ry = Math.abs(sinP) > 1e-8 ? -ky / sinP : 1;
   const ox = (1 + kx) / 2;
   const oy = ky / 2;
 
@@ -115,16 +117,12 @@ export function getProjectionCoeffs(
     kwy: heightScreenY / scaleY,
     yawRad: (normalizeYawDeg(view.yaw) * Math.PI) / 180,
     phi0,
-    rx: Math.max(rx, ry),
-    ry: Math.min(rx, ry),
+    rx,
+    ry,
     ox,
     oy,
     alpha: 0,
   };
-}
-
-function oxFallback(kx: number): number {
-  return Math.max(0.5, (1 + kx) / 2);
 }
 
 /** Нормализует yaw в [0,360) с «липким» нулём. */
@@ -136,6 +134,31 @@ export function normalizeYawDeg(yaw: number): number {
 
 function kwySafe(kwy: number): number {
   return Math.abs(kwy) > 1e-9 ? kwy : 1;
+}
+
+/** Точка на эллипсе основания; при t+phase=0 совпадает с A=(0,0). */
+function ellipseBasePoint(
+  t: number,
+  phase: number,
+  rx: number,
+  ry: number,
+): { x: number; y: number } {
+  const ang = t + phase;
+  return { x: rx * (Math.cos(ang) - 1), y: ry * Math.sin(ang) };
+}
+
+/** Углы A, B, D нижнего основания на эллипсе при параметре t (= yawRad). */
+function baseCorners(
+  t: number,
+  phi0: number,
+  rx: number,
+  ry: number,
+): { a: { x: number; y: number }; b: { x: number; y: number }; d: { x: number; y: number } } {
+  return {
+    a: ellipseBasePoint(t, 0, rx, ry),
+    b: ellipseBasePoint(t, -phi0, rx, ry),
+    d: ellipseBasePoint(t, -phi0 + Math.PI, rx, ry),
+  };
 }
 
 /** Точки эллипса вращения для отрисовки (координаты вида до fit). */
@@ -152,7 +175,7 @@ export function sampleRotationEllipse(
   return pts;
 }
 
-/** Линейная проекция при yaw=0: AD горизонтально, AB под ∠BAD. */
+/** Линейная проекция при yaw=0: AD горизонтально, AB = ½·AD под ∠BAD. */
 function linearLocalToView(
   local: LocalCoords,
   { kx, ky, kwx, kwy }: ProjectionCoeffs,
@@ -168,35 +191,28 @@ function linearLocalToView(
 
 /**
  * Локальные (u,v,w) → координаты вида (X,Y,Z).
- * При yaw=0: AD горизонтально, AB = ½·AD под ∠BAD; иначе — вращение вокруг центра основания.
+ * yaw=0 — линейный ракурс; иначе основание на эллипсе; w — вертикально без поворота.
  */
 export function localToView(
   local: LocalCoords,
   coeffs: ProjectionCoeffs,
 ): { x: number; y: number; z: number } {
   const { u, v, w } = local;
-  const { kx, ky, kwx, kwy, yawRad, ox, oy } = coeffs;
+  const { kx, ky, kwx, kwy, yawRad, phi0, rx, ry } = coeffs;
   const kw = kwySafe(kwy);
-  const baseLin = linearLocalToView({ u, v, w: 0 }, coeffs);
 
-  let bx = baseLin.x;
-  let by = baseLin.y;
-  if (Math.abs(yawRad) >= 1e-12) {
-    const ct = Math.cos(yawRad);
-    const st = Math.sin(yawRad);
-    const dx = baseLin.x - ox;
-    const dy = baseLin.y - oy;
-    bx = ox + dx * ct - dy * st;
-    by = oy + dx * st + dy * ct;
+  if (Math.abs(yawRad) < 1e-12) {
+    return linearLocalToView(local, coeffs);
   }
 
+  const { a, b, d } = baseCorners(yawRad, phi0, rx, ry);
   const ct = Math.cos(yawRad);
   const st = Math.sin(yawRad);
   const ur = u * ct - v * st;
   const vr = u * st + v * ct;
   return {
-    x: bx + kwx * w,
-    y: by + kwy * w,
+    x: a.x + u * (b.x - a.x) + v * (d.x - a.x) + kwx * w,
+    y: a.y + u * (b.y - a.y) + v * (d.y - a.y) + kwy * w,
     z: ur - kx * vr - (ky / kw) * w,
   };
 }
