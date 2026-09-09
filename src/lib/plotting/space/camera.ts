@@ -1,3 +1,9 @@
+import {
+  buildRotationEllipse,
+  ellipsePoint,
+  sampleConicEllipse,
+  type ConicEllipse,
+} from "./conic-ellipse";
 import type {
   LocalCoords,
   ParallelepipedConstraints,
@@ -29,15 +35,17 @@ export interface ProjectionCoeffs {
   kwy: number;
   /** Параметр t вращения вокруг вертикальной оси, рад. */
   yawRad: number;
-  /** Фазовый сдвиг A→B на эллипсе (параметрический), рад. */
+  /** Эллипс вращения (коника через 4 вершины + 5-я точка). */
+  orbit: ConicEllipse;
+  /** Фазовый сдвиг A→B на эллипсе (θ_A − θ_B), рад. */
   phi0: number;
-  /** Горизонтальная полуось эллипса (большая), = ½·AD. */
+  /** @deprecated большая полуось эллипса */
   rx: number;
-  /** Вертикальная полуось эллипса. */
+  /** @deprecated малая полуось эллипса */
   ry: number;
-  /** Центр эллипса (X). */
+  /** @deprecated центр эллипса (X) */
   ox: number;
-  /** Центр эллипса (Y). */
+  /** @deprecated центр эллипса (Y) */
   oy: number;
   /** @deprecated угол A = π при t=0 */
   alpha: number;
@@ -114,15 +122,10 @@ export function getProjectionCoeffs(
   const heightScreenX = heightLength * Math.cos(heightAngleRad);
   const heightScreenY = heightLength * Math.sin(heightAngleRad);
 
-  // Центрированный эллипс с горизонтальной большой осью:
-  // центр (adLen/2, 0), rx = adLen/2; при t=0: A=(0,0), D=(adLen,0), B на эллипсе.
-  const ox = adLen / 2;
-  const oy = 0;
-  const rx = adLen / 2;
-  const cosPhi0 = Math.max(-1, Math.min(1, 1 - (2 * kxView) / adLen));
-  const phi0 = Math.acos(cosPhi0);
-  const sinPhi0 = Math.sin(phi0);
-  const ry = Math.abs(sinPhi0) > 1e-8 ? kyView / sinPhi0 : kyView;
+  const orbit =
+    buildRotationEllipse(kxView, kyView, adLen) ??
+    fallbackRotationEllipse(kxView, kyView, adLen);
+  const phi0 = orbit.thetaA - orbit.thetaB;
 
   return {
     kx: kxView / scaleX,
@@ -130,13 +133,29 @@ export function getProjectionCoeffs(
     kwx: heightScreenX / scaleX,
     kwy: heightScreenY / scaleY,
     yawRad: (normalizeYawDeg(view.yaw) * Math.PI) / 180,
+    orbit,
     phi0,
-    rx,
-    ry,
-    ox,
-    oy,
+    rx: orbit.a,
+    ry: orbit.b,
+    ox: orbit.cx,
+    oy: orbit.cy,
     alpha: Math.PI,
   };
+}
+
+/** Запасной эллипс, если коника по 5 точкам не удалась. */
+function fallbackRotationEllipse(kx: number, ky: number, adLen: number): ConicEllipse {
+  const ox = adLen / 2;
+  const oy = 0;
+  const rx = adLen / 2;
+  const cosPhi0 = Math.max(-1, Math.min(1, 1 - (2 * kx) / adLen));
+  const phi0 = Math.acos(cosPhi0);
+  const sinPhi0 = Math.sin(phi0);
+  const ry = Math.abs(sinPhi0) > 1e-8 ? ky / sinPhi0 : ky;
+  const thetaA = Math.PI;
+  const thetaB = thetaA - phi0;
+  const thetaD = 0;
+  return { cx: ox, cy: oy, a: rx, b: ry, psi: 0, thetaA, thetaB, thetaD };
 }
 
 /** Нормализует yaw в [0,360) с «липким» нулём. */
@@ -150,32 +169,15 @@ function kwySafe(kwy: number): number {
   return Math.abs(kwy) > 1e-9 ? kwy : 1;
 }
 
-function centeredEllipsePoint(
-  cx: number,
-  cy: number,
-  rx: number,
-  ry: number,
-  angle: number,
-): { x: number; y: number } {
-  return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
-}
-
 /** A, B, D нижнего основания на эллипсе при параметре t (= yawRad). */
 function baseCorners(
-  t: number,
-  phi0: number,
-  cx: number,
-  cy: number,
-  rx: number,
-  ry: number,
+  orbit: ConicEllipse,
+  yawRad: number,
 ): { a: { x: number; y: number }; b: { x: number; y: number }; d: { x: number; y: number } } {
-  const thetaA = Math.PI + t;
-  const thetaB = thetaA - phi0;
-  const thetaD = t;
   return {
-    a: centeredEllipsePoint(cx, cy, rx, ry, thetaA),
-    b: centeredEllipsePoint(cx, cy, rx, ry, thetaB),
-    d: centeredEllipsePoint(cx, cy, rx, ry, thetaD),
+    a: ellipsePoint(orbit, orbit.thetaA + yawRad),
+    b: ellipsePoint(orbit, orbit.thetaB + yawRad),
+    d: ellipsePoint(orbit, orbit.thetaD + yawRad),
   };
 }
 
@@ -184,13 +186,7 @@ export function sampleRotationEllipse(
   coeffs: ProjectionCoeffs,
   segments = 64,
 ): Array<{ x: number; y: number }> {
-  const { ox, oy, rx, ry } = coeffs;
-  const pts: Array<{ x: number; y: number }> = [];
-  for (let i = 0; i <= segments; i += 1) {
-    const ang = (i / segments) * Math.PI * 2;
-    pts.push({ x: ox + rx * Math.cos(ang), y: oy + ry * Math.sin(ang) });
-  }
-  return pts;
+  return sampleConicEllipse(coeffs.orbit, segments);
 }
 
 /**
@@ -202,9 +198,9 @@ export function localToView(
   coeffs: ProjectionCoeffs,
 ): { x: number; y: number; z: number } {
   const { u, v, w } = local;
-  const { kx, ky, kwx, kwy, yawRad, phi0, ox, oy, rx, ry } = coeffs;
+  const { kx, ky, kwx, kwy, yawRad, orbit } = coeffs;
   const kw = kwySafe(kwy);
-  const { a, b, d } = baseCorners(yawRad, phi0, ox, oy, rx, ry);
+  const { a, b, d } = baseCorners(orbit, yawRad);
   const ct = Math.cos(yawRad);
   const st = Math.sin(yawRad);
   const ur = u * ct - v * st;

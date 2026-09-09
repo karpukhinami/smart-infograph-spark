@@ -289,7 +289,20 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   if (!data.figure) {
     return {
       basis: computeBasis({ rectangular: false, equilateral: false }),
-      projection: { kx: 0, ky: 0, kwx: 0, kwy: 1, yawRad: 0, phi0: 0, rx: 0.5, ry: 0.3, ox: 0.5, oy: 0, alpha: Math.PI },
+      projection: {
+        kx: 0,
+        ky: 0,
+        kwx: 0,
+        kwy: 1,
+        yawRad: 0,
+        orbit: { cx: 0.5, cy: 0, a: 0.5, b: 0.3, psi: 0, thetaA: Math.PI, thetaB: Math.PI - 0.8, thetaD: 0 },
+        phi0: 0.8,
+        rx: 0.5,
+        ry: 0.3,
+        ox: 0.5,
+        oy: 0,
+        alpha: Math.PI,
+      },
       points,
       projected,
       planes,
