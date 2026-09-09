@@ -9,7 +9,7 @@ import {
   resolveLineCarrier,
   type ResolvedSpaceScene,
 } from "./build";
-import { fitProjection, projectFromLocalCoeffs, sampleRotationEllipse } from "./camera";
+import { fitSpaceProjection, projectFromLocalCoeffs, sampleRotationEllipse } from "./camera";
 import { collectVisibleOverlaySegments, isEdgeCoveredOnScreen } from "./edge-overlay";
 import {
   buildOcclusionContext,
@@ -439,7 +439,16 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
   const resolved = buildSpaceScene(data);
   const a = data.appearance;
 
-  const fit = fitProjection(collectFitPoints(data, figure, resolved), a.width, a.height, a.padding);
+  const hasFixedFit =
+    data.view.fitScale != null && data.view.fitCx != null && data.view.fitCy != null;
+  const fit = hasFixedFit
+    ? { scale: data.view.fitScale!, cx: data.view.fitCx!, cy: data.view.fitCy! }
+    : fitSpaceProjection(
+        collectFitPoints(data, figure, resolved),
+        a.width,
+        a.height,
+        a.padding,
+      );
 
   const parts: string[] = [];
   const obstacles: Obstacle[] = [];

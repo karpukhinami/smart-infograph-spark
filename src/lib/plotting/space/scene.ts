@@ -1,5 +1,5 @@
 import { nextId, DEFAULT_APPEARANCE, PLOT_PALETTE } from "../shared";
-import { DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
+import { computeSpaceViewFit, DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
 import { parseBaseVertexLabels, formatVertexLabel } from "./parse-vertices";
 import { createParallelepiped, faceDisplayLabel } from "./parallelepiped";
 import {
@@ -375,8 +375,11 @@ export function buildSpaceSceneData(data: SpaceSceneData): SpaceBuildReport {
 
   if (data.figure) built += data.figure.vertices.length + data.figure.edges.length;
 
+  const viewFit = computeSpaceViewFit({ ...data, points, lines, planes }, data.appearance);
+  const view = viewFit ? { ...data.view, ...viewFit } : data.view;
+
   return {
-    data: { ...data, points, lines, planes },
+    data: { ...data, points, lines, planes, view },
     built,
     errors,
   };

@@ -1,4 +1,12 @@
-import type { LocalCoords, ParallelepipedConstraints, SpaceViewParams, Vec3 } from "./types";
+import type {
+  LocalCoords,
+  ParallelepipedConstraints,
+  ParallelepipedFigure,
+  SpaceAppearance,
+  SpaceSceneData,
+  SpaceViewParams,
+  Vec3,
+} from "./types";
 
 export interface ProjectedPoint {
   x: number;
@@ -21,31 +29,37 @@ export interface ProjectionCoeffs {
   kwy: number;
   /** Параметр t вращения вокруг вертикальной оси, рад. */
   yawRad: number;
-  /** Фазовый сдвиг A→B на эллипсе основания, рад (∠BAD). */
+  /** Фазовый сдвиг A→B на эллипсе (параметрический), рад. */
   phi0: number;
-  /** Горизонтальная полуось эллипса основания (большая). */
+  /** Горизонтальная полуось эллипса (большая), = ½·AD. */
   rx: number;
-  /** Вертикальная полуось эллипса основания. */
+  /** Вертикальная полуось эллипса. */
   ry: number;
-  /** Центр эллипса основания (X). */
+  /** Центр эллипса (X). */
   ox: number;
-  /** Центр эллипса основания (Y). */
+  /** Центр эллипса (Y). */
   oy: number;
-  /** Угол A на эллипсе при yaw=0, рад. */
+  /** @deprecated угол A = π при t=0 */
   alpha: number;
 }
 
 /** Фиксированная константа школьной проекции (legacy). */
 export const VIEW_K = 0.28;
 
-/** Визуальная длина AB на чертеже: половина AD. */
+/** Визуальная длина AB: половина AD. */
 export const DEFAULT_DEPTH_LENGTH = 0.5;
 
 /** Допуск «липкого» возврата ползунка поворота к 0°, градусы. */
 export const YAW_SNAP_DEG = 4;
 
-/** Визуальная длина единичного ребра AA₁ на чертеже (как AD). */
-export const DEFAULT_HEIGHT_LENGTH = 1;
+/** Визуальная длина AD (передняя глубина основания). */
+export const DEFAULT_AD_LENGTH = 1;
+
+/** Визуальная длина единичного ребра AA₁ на чертеже. */
+export const DEFAULT_HEIGHT_LENGTH = 1.35;
+
+/** Доля высоты холста под фигуру (вертикаль AA₁ ≈ 2/3). */
+export const SPACE_FIT_HEIGHT_FRACTION = 2 / 3;
 
 /** Угол AA₁ относительно AD на чертеже при непрямоугольной проекции. */
 export const OBLIQUE_HEIGHT_ANGLE_DEG = 75;
@@ -92,27 +106,27 @@ export function getProjectionCoeffs(
   const scaleX = view.scaleX ?? view.scale;
   const scaleY = view.scaleY ?? view.scale;
 
-  // AB: длина = половина AD, угол ∠BAD от горизонтали AD.
   const abLen = view.depthLength ?? DEFAULT_DEPTH_LENGTH;
-  const kx = (abLen * Math.cos(depthAngleRad)) / scaleX;
-  const ky = (abLen * Math.sin(depthAngleRad)) / scaleY;
+  const adLen = DEFAULT_AD_LENGTH;
+  const kxView = abLen * Math.cos(depthAngleRad);
+  const kyView = abLen * Math.sin(depthAngleRad);
+
   const heightScreenX = heightLength * Math.cos(heightAngleRad);
   const heightScreenY = heightLength * Math.sin(heightAngleRad);
 
-  const phi0 = depthAngleRad;
-  const cosP = Math.cos(phi0);
-  const sinP = Math.sin(phi0);
-  const denom = cosP - 1;
-  // Эллипс (rx(cos θ−1), ry sin θ): при θ=0 точка A в начале координат,
-  // при θ=−φ₀ — B=(kx, ky); большая ось горизонтальна (|rx| ≥ |ry|).
-  const rx = Math.abs(denom) > 1e-8 ? kx / denom : -2;
-  const ry = Math.abs(sinP) > 1e-8 ? -ky / sinP : 1;
-  const ox = (1 + kx) / 2;
-  const oy = ky / 2;
+  // Центрированный эллипс с горизонтальной большой осью:
+  // центр (adLen/2, 0), rx = adLen/2; при t=0: A=(0,0), D=(adLen,0), B на эллипсе.
+  const ox = adLen / 2;
+  const oy = 0;
+  const rx = adLen / 2;
+  const cosPhi0 = Math.max(-1, Math.min(1, 1 - (2 * kxView) / adLen));
+  const phi0 = Math.acos(cosPhi0);
+  const sinPhi0 = Math.sin(phi0);
+  const ry = Math.abs(sinPhi0) > 1e-8 ? kyView / sinPhi0 : kyView;
 
   return {
-    kx,
-    ky,
+    kx: kxView / scaleX,
+    ky: kyView / scaleY,
     kwx: heightScreenX / scaleX,
     kwy: heightScreenY / scaleY,
     yawRad: (normalizeYawDeg(view.yaw) * Math.PI) / 180,
@@ -121,7 +135,7 @@ export function getProjectionCoeffs(
     ry,
     ox,
     oy,
-    alpha: 0,
+    alpha: Math.PI,
   };
 }
 
@@ -136,28 +150,32 @@ function kwySafe(kwy: number): number {
   return Math.abs(kwy) > 1e-9 ? kwy : 1;
 }
 
-/** Точка на эллипсе основания; при t+phase=0 совпадает с A=(0,0). */
-function ellipseBasePoint(
-  t: number,
-  phase: number,
+function centeredEllipsePoint(
+  cx: number,
+  cy: number,
   rx: number,
   ry: number,
+  angle: number,
 ): { x: number; y: number } {
-  const ang = t + phase;
-  return { x: rx * (Math.cos(ang) - 1), y: ry * Math.sin(ang) };
+  return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
 }
 
-/** Углы A, B, D нижнего основания на эллипсе при параметре t (= yawRad). */
+/** A, B, D нижнего основания на эллипсе при параметре t (= yawRad). */
 function baseCorners(
   t: number,
   phi0: number,
+  cx: number,
+  cy: number,
   rx: number,
   ry: number,
 ): { a: { x: number; y: number }; b: { x: number; y: number }; d: { x: number; y: number } } {
+  const thetaA = Math.PI + t;
+  const thetaB = thetaA - phi0;
+  const thetaD = t;
   return {
-    a: ellipseBasePoint(t, 0, rx, ry),
-    b: ellipseBasePoint(t, -phi0, rx, ry),
-    d: ellipseBasePoint(t, -phi0 + Math.PI, rx, ry),
+    a: centeredEllipsePoint(cx, cy, rx, ry, thetaA),
+    b: centeredEllipsePoint(cx, cy, rx, ry, thetaB),
+    d: centeredEllipsePoint(cx, cy, rx, ry, thetaD),
   };
 }
 
@@ -166,46 +184,27 @@ export function sampleRotationEllipse(
   coeffs: ProjectionCoeffs,
   segments = 64,
 ): Array<{ x: number; y: number }> {
-  const { rx, ry } = coeffs;
+  const { ox, oy, rx, ry } = coeffs;
   const pts: Array<{ x: number; y: number }> = [];
   for (let i = 0; i <= segments; i += 1) {
     const ang = (i / segments) * Math.PI * 2;
-    pts.push({ x: rx * Math.cos(ang) - rx, y: ry * Math.sin(ang) });
+    pts.push({ x: ox + rx * Math.cos(ang), y: oy + ry * Math.sin(ang) });
   }
   return pts;
 }
 
-/** Линейная проекция при yaw=0: AD горизонтально, AB = ½·AD под ∠BAD. */
-function linearLocalToView(
-  local: LocalCoords,
-  { kx, ky, kwx, kwy }: ProjectionCoeffs,
-): { x: number; y: number; z: number } {
-  const { u, v, w } = local;
-  const kw = kwySafe(kwy);
-  return {
-    x: v + kx * u + kwx * w,
-    y: kwy * w + ky * u,
-    z: u - kx * v - (ky / kw) * w,
-  };
-}
-
 /**
  * Локальные (u,v,w) → координаты вида (X,Y,Z).
- * yaw=0 — линейный ракурс; иначе основание на эллипсе; w — вертикально без поворота.
+ * Основание — параллелограмм на центрированном эллипсе; w — вертикально без поворота.
  */
 export function localToView(
   local: LocalCoords,
   coeffs: ProjectionCoeffs,
 ): { x: number; y: number; z: number } {
   const { u, v, w } = local;
-  const { kx, ky, kwx, kwy, yawRad, phi0, rx, ry } = coeffs;
+  const { kx, ky, kwx, kwy, yawRad, phi0, ox, oy, rx, ry } = coeffs;
   const kw = kwySafe(kwy);
-
-  if (Math.abs(yawRad) < 1e-12) {
-    return linearLocalToView(local, coeffs);
-  }
-
-  const { a, b, d } = baseCorners(yawRad, phi0, rx, ry);
+  const { a, b, d } = baseCorners(yawRad, phi0, ox, oy, rx, ry);
   const ct = Math.cos(yawRad);
   const st = Math.sin(yawRad);
   const ur = u * ct - v * st;
@@ -290,6 +289,75 @@ export function fitProjection(
   const scale = Math.min(availW / bw, availH / bh) * 0.96;
   const cx = width / 2 - ((minX + maxX) / 2) * scale;
   const cy = height / 2 - ((minY + maxY) / 2) * scale;
+  return { scale, cx, cy };
+}
+
+/**
+ * Точки для фиксированного fit: эллипс + все вершины при полном обороте.
+ * Не зависит от текущего yaw — картинка не «прыгает» при вращении.
+ */
+export function collectReferenceFitPoints(
+  figure: ParallelepipedFigure,
+  view: SpaceViewParams,
+  constraints: ParallelepipedConstraints,
+): Array<{ x: number; y: number }> {
+  const pts: Array<{ x: number; y: number }> = [];
+  const baseCoeffs = getProjectionCoeffs({ ...view, yaw: 0 }, constraints);
+
+  for (const p of sampleRotationEllipse(baseCoeffs)) {
+    pts.push({ x: p.x * view.scale, y: -p.y * view.scale });
+  }
+
+  const yawSteps = 24;
+  for (let i = 0; i < yawSteps; i += 1) {
+    const yawDeg = (i / yawSteps) * 360;
+    const coeffs = getProjectionCoeffs({ ...view, yaw: yawDeg }, constraints);
+    for (const v of figure.vertices) {
+      const pr = projectLocal(v.local, view, coeffs);
+      pts.push({ x: pr.x, y: pr.y });
+    }
+  }
+  return pts;
+}
+
+/** Вычисляет и возвращает зафиксированный fit для сцены. */
+export function computeSpaceViewFit(
+  data: SpaceSceneData,
+  appearance: SpaceAppearance,
+): Pick<SpaceViewParams, "fitScale" | "fitCx" | "fitCy"> | null {
+  if (!data.figure) return null;
+  const pts = collectReferenceFitPoints(data.figure, data.view, data.figure.constraints);
+  const fit = fitSpaceProjection(pts, appearance.width, appearance.height, appearance.padding);
+  return { fitScale: fit.scale, fitCx: fit.cx, fitCy: fit.cy };
+}
+
+/** Fit для вкладки «Пространство»: высота ≈ 2/3 холста, низ у нижнего края. */
+export function fitSpaceProjection(
+  projected: Array<{ x: number; y: number }>,
+  width: number,
+  height: number,
+  padding: number,
+  heightFraction = SPACE_FIT_HEIGHT_FRACTION,
+): { scale: number; cx: number; cy: number } {
+  if (!projected.length) return { scale: 1, cx: width / 2, cy: height / 2 };
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const p of projected) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  const bw = Math.max(1, maxX - minX);
+  const bh = Math.max(1, maxY - minY);
+  const availW = width - padding * 2;
+  const targetH = (height - padding * 2) * heightFraction;
+  let scale = targetH / bh;
+  scale = Math.min(scale, (availW / bw) * 0.96);
+  const cx = width / 2 - ((minX + maxX) / 2) * scale;
+  const cy = height - padding - maxY * scale;
   return { scale, cx, cy };
 }
 

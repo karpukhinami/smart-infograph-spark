@@ -191,6 +191,10 @@ export interface SpaceViewParams {
   yaw: number;
   /** Показать эллипс вращения основания пунктиром. */
   showRotationEllipse?: boolean;
+  /** Зафиксированный fit (не пересчитывается при повороте). */
+  fitScale?: number;
+  fitCx?: number;
+  fitCy?: number;
   pitch: number;
   /** @deprecated kx/ky вычисляются из badAngleDeg и depthLength */
   depthSkewX: number;
