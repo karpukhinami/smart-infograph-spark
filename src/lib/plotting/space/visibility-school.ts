@@ -1,9 +1,8 @@
 /**
- * Школьная фиксированная проекция и видимость (u,v,w + k=0.28).
+ * Школьная фиксированная проекция и видимость (u,v,w + kx, ky).
  * Альтернатива legacy-режиму в visibility.ts.
  */
-import { localToView, viewDirectionLocal } from "./camera";
-import { faceById } from "./parallelepiped";
+import { localToView, viewDirectionLocal, type ProjectionCoeffs } from "./camera";
 import type { ParallelepipedFigure, LocalCoords, SpaceViewParams, Vec3 } from "./types";
 import { add, dotLocal, len, scale, sub, worldToLocal } from "./vec3";
 import type { ResolvedSpaceScene } from "./build";
@@ -39,17 +38,14 @@ function localOnBoxFace(l: LocalCoords): string | null {
 function segmentOnSharedFrontFace(
   la: LocalCoords,
   lb: LocalCoords,
-  view: SpaceViewParams,
+  projection: ProjectionCoeffs,
 ): boolean {
   const fa = localOnBoxFace(la);
   const fb = localOnBoxFace(lb);
   if (!fa || fa !== fb) return false;
   const faceId = BOX_FACE_TO_FACE_ID[fa];
-  return faceId ? isFaceFrontFacing(faceId, view) : false;
+  return faceId ? isFaceFrontFacing(faceId, projection) : false;
 }
-
-/** Грани, обращённые к наблюдателю при фиксированном k. */
-const FRONT_FACE_IDS = new Set(["f-left", "f-back", "f-top"]);
 
 /** Рёбро → две прилегающие грани. */
 const EDGE_FACES: Record<string, [string, string]> = {
@@ -77,21 +73,21 @@ const FACE_NORMALS: Record<string, LocalCoords> = {
   "f-top": { u: 0, v: 0, w: 1 },
 };
 
-export function isFaceFrontFacing(faceId: string, view: SpaceViewParams): boolean {
+export function isFaceFrontFacing(faceId: string, projection: ProjectionCoeffs): boolean {
   const n = FACE_NORMALS[faceId];
   if (!n) return false;
-  const vd = viewDirectionLocal(view);
+  const vd = viewDirectionLocal(projection);
   return dotLocal(n, vd) < -SURFACE_EPS;
 }
 
 export function isBodyEdgeVisibleSchool(
   edgeId: string,
   _figure: ParallelepipedFigure,
-  view: SpaceViewParams,
+  projection: ProjectionCoeffs,
 ): boolean {
   const pair = EDGE_FACES[edgeId];
   if (!pair) return true;
-  return isFaceFrontFacing(pair[0], view) || isFaceFrontFacing(pair[1], view);
+  return isFaceFrontFacing(pair[0], projection) || isFaceFrontFacing(pair[1], projection);
 }
 
 function inUnit(x: number): boolean {
@@ -99,9 +95,9 @@ function inUnit(x: number): boolean {
 }
 
 /** Закрыта ли точка P=(u,v,w) поверхностью параллелепипеда (луч вдоль viewDirection). */
-export function isPointOccludedLocal(local: LocalCoords, view: SpaceViewParams): boolean {
+export function isPointOccludedLocal(local: LocalCoords, projection: ProjectionCoeffs): boolean {
   const { u, v, w } = local;
-  const vd = viewDirectionLocal(view);
+  const vd = viewDirectionLocal(projection);
 
   const hit = (t: number, check: () => boolean): boolean => {
     if (Math.abs(t) <= SURFACE_EPS) return false;
@@ -196,10 +192,10 @@ function facePlaneBreakpointsLocal(
 function projectLocalForScreen(
   local: LocalCoords,
   view: SpaceViewParams,
-  projectionAngleRad: number,
+  projection: ProjectionCoeffs,
 ): { x: number; y: number; z: number } {
   const s = view.scale;
-  const v = localToView(local, view, projectionAngleRad);
+  const v = localToView(local, projection);
   return { x: v.x * s, y: -v.y * s, z: v.z };
 }
 
@@ -252,14 +248,13 @@ function frontSurfaceDepthSchool(
   view: SpaceViewParams,
 ): number | null {
   let best: number | null = null;
-  for (const faceId of FRONT_FACE_IDS) {
-    const face = faceById(figure, faceId);
-    if (!face) continue;
+  for (const face of figure.faces) {
+    if (!isFaceFrontFacing(face.id, resolved.projection)) continue;
     const quad = face.vertexIds
       .map((id) => {
         const pt = resolved.points.get(id);
         if (!pt) return null;
-        return projectLocalForScreen(pt.local, view, resolved.projectionAngleRad);
+        return projectLocalForScreen(pt.local, view, resolved.projection);
       })
       .filter(Boolean) as ScreenPt[];
     if (quad.length !== 4) continue;
@@ -270,11 +265,11 @@ function frontSurfaceDepthSchool(
   return best;
 }
 
-function onBackFace(local: LocalCoords, view: SpaceViewParams): boolean {
+function onBackFace(local: LocalCoords, projection: ProjectionCoeffs): boolean {
   const faceKey = localOnBoxFace(local);
   if (!faceKey) return false;
   const faceId = BOX_FACE_TO_FACE_ID[faceKey];
-  return faceId ? !isFaceFrontFacing(faceId, view) : false;
+  return faceId ? !isFaceFrontFacing(faceId, projection) : false;
 }
 
 /** 2D-контур силуэта: рёбра между передней и задней гранью. */
@@ -289,7 +284,11 @@ function buildSilhouettePolygon(
   for (const edge of figure.edges) {
     const pair = EDGE_FACES[edge.id];
     if (!pair) continue;
-    if (isFaceFrontFacing(pair[0], view) === isFaceFrontFacing(pair[1], view)) continue;
+    if (
+      isFaceFrontFacing(pair[0], resolved.projection) ===
+      isFaceFrontFacing(pair[1], resolved.projection)
+    )
+      continue;
     const { aId, bId } = edge;
     if (!adj.has(aId)) adj.set(aId, []);
     if (!adj.has(bId)) adj.set(bId, []);
@@ -299,7 +298,7 @@ function buildSilhouettePolygon(
       if (coords.has(id)) continue;
       const pt = resolved.points.get(id);
       if (!pt) continue;
-      const s = projectLocalForScreen(pt.local, view, resolved.projectionAngleRad);
+      const s = projectLocalForScreen(pt.local, view, resolved.projection);
       coords.set(id, { x: s.x, y: s.y });
     }
   }
@@ -374,7 +373,7 @@ function screenPointAtLocalT(
   dirL: LocalCoords,
   t: number,
   view: SpaceViewParams,
-  projectionAngleRad: number,
+  projection: ProjectionCoeffs,
 ): ScreenPt {
   return projectLocalForScreen(
     {
@@ -383,7 +382,7 @@ function screenPointAtLocalT(
       w: originL.w + t * dirL.w,
     },
     view,
-    projectionAngleRad,
+    projection,
   );
 }
 
@@ -396,15 +395,15 @@ function isMidpointVisibleSchool(
   view: SpaceViewParams,
   silhouette: Array<{ x: number; y: number }>,
 ): boolean {
-  if (segmentOnSharedFrontFace(lAt, lBt, view)) return true;
-  if (isPointOccludedLocal(midL, view)) return false;
+  if (segmentOnSharedFrontFace(lAt, lBt, resolved.projection)) return true;
+  if (isPointOccludedLocal(midL, resolved.projection)) return false;
 
-  const screen = projectLocalForScreen(midL, view, resolved.projectionAngleRad);
+  const screen = projectLocalForScreen(midL, view, resolved.projection);
   const inSilhouette =
     silhouette.length >= 3 && pointInPolygon2D(screen.x, screen.y, silhouette);
 
   if (inSilhouette) {
-    if (onBackFace(midL, view)) return false;
+    if (onBackFace(midL, resolved.projection)) return false;
     const frontZ = frontSurfaceDepthSchool(screen.x, screen.y, figure, resolved, view);
     if (frontZ !== null && screen.z > frontZ + DEPTH_EPS) return false;
   }
@@ -458,12 +457,12 @@ function silhouetteBreakpoints(
   t1: number,
   silhouette: Array<{ x: number; y: number }>,
   view: SpaceViewParams,
-  projectionAngleRad: number,
+  projection: ProjectionCoeffs,
 ): number[] {
   if (silhouette.length < 3) return [];
   const bps: number[] = [];
-  const p0 = screenPointAtLocalT(originL, dirL, t0, view, projectionAngleRad);
-  const p1 = screenPointAtLocalT(originL, dirL, t1, view, projectionAngleRad);
+  const p0 = screenPointAtLocalT(originL, dirL, t0, view, projection);
+  const p1 = screenPointAtLocalT(originL, dirL, t1, view, projection);
 
   for (let i = 0; i < silhouette.length; i += 1) {
     const a = silhouette[i]!;
@@ -509,7 +508,7 @@ export function splitLineSchoolView(
   const silhouette = buildSilhouettePolygon(figure, resolved, view);
   const bps = [
     ...facePlaneBreakpointsLocal(originL, dirL, t0, t1),
-    ...silhouetteBreakpoints(originL, dirL, t0, t1, silhouette, view, resolved.projectionAngleRad),
+    ...silhouetteBreakpoints(originL, dirL, t0, t1, silhouette, view, resolved.projection),
   ];
   const sorted = mergeBreakpoints(bps, t0, t1);
   const segments: LineSplitSegment[] = [];

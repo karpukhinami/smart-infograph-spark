@@ -57,7 +57,7 @@ export interface SpaceFace {
 export interface ParallelepipedConstraints {
   rectangular: boolean;
   equilateral: boolean;
-  /** Угол ∠BAD на чертеже (градусы); при rectangular=true всегда 90. 3D-геометрию не меняет. */
+  /** Визуальный угол ∠BAD на чертеже (10–60°); при rectangular=true — 90°. 3D-геометрию не меняет. */
   badAngleDeg: number;
 }
 
@@ -190,16 +190,16 @@ export interface SpaceViewParams {
   /** Зарезервировано под будущее вращение. */
   yaw: number;
   pitch: number;
-  /**
-   * Горизонтальная доля направления AB (глубина) относительно AD.
-   * ~0.25 → сдвиг вправо на четверть ширины передней грани.
-   */
+  /** @deprecated kx/ky вычисляются из badAngleDeg и depthLength */
   depthSkewX: number;
-  /**
-   * Вертикальная доля AB относительно AA₁ (экранная Y вниз → отрицательное = «вверх»).
-   * ~0.15 → лёгкий подъём B относительно A.
-   */
+  /** @deprecated kx/ky вычисляются из badAngleDeg и depthLength */
   depthSkewY: number;
+  /** Фиксированная визуальная длина единичного глубинного ребра AB на чертеже. */
+  depthLength?: number;
+  /** Масштаб по X при переводе depthScreen → kx; по умолчанию = scale. */
+  scaleX?: number;
+  /** Масштаб по Y при переводе depthScreen → ky; по умолчанию = scale. */
+  scaleY?: number;
   /** @deprecated используйте depthSkewX */
   oblique?: number;
   /** Режим видимости: school (фикс. ракурс) или legacy (окклюзия по экрану). */

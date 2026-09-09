@@ -10,69 +10,90 @@ export interface ProjectedPoint {
 
 export type ViewBasis = { e1: Vec3; e2: Vec3; e3: Vec3 };
 
-/** Фиксированная константа школьной проекции (глубина AB). */
+export interface ProjectionCoeffs {
+  kx: number;
+  ky: number;
+}
+
+/** Фиксированная константа школьной проекции (legacy). */
 export const VIEW_K = 0.28;
 
-/** Горизонтальная доля AB на экране (смещение по X). */
+/** Визуальная длина единичного глубинного ребра AB при angle ≈ 45° (kx = ky = VIEW_K). */
+export const DEFAULT_DEPTH_LENGTH = VIEW_K * Math.SQRT2;
+
+/** @deprecated используйте getProjectionCoeffs */
 export function getViewKu(view: SpaceViewParams): number {
   return view.depthSkewX ?? VIEW_K;
 }
 
-/** Вертикальная доля AB на экране (смещение по Y). */
+/** @deprecated используйте getProjectionCoeffs */
 export function getViewKv(view: SpaceViewParams): number {
   return Math.abs(view.depthSkewY ?? VIEW_K);
 }
 
-/** @deprecated используйте getViewKu */
+/** @deprecated */
 export function getViewK(view: SpaceViewParams): number {
   return getViewKu(view);
 }
 
-/** Угол ∠BAD на чертеже в радианах (не влияет на 3D-геометрию). */
-export function projectionBadAngleRad(constraints: ParallelepipedConstraints): number {
-  const angleDeg = constraints.rectangular
-    ? 90
-    : Math.min(150, Math.max(30, constraints.badAngleDeg ?? 90));
-  return (angleDeg * Math.PI) / 180;
+/** Визуальный угол между AD (вправо) и AB на чертеже, градусы. */
+export function projectionAngleDeg(constraints: ParallelepipedConstraints): number {
+  if (constraints.rectangular) return 90;
+  return Math.min(60, Math.max(10, constraints.badAngleDeg ?? 45));
+}
+
+/**
+ * kx, ky из угла и фиксированной depthLength.
+ * AD не затрагивается: X = v + kx·u; глубина AB задаётся (depthScreenX, depthScreenY).
+ */
+export function getProjectionCoeffs(
+  view: SpaceViewParams,
+  constraints: ParallelepipedConstraints,
+): ProjectionCoeffs {
+  const angleRad = (projectionAngleDeg(constraints) * Math.PI) / 180;
+  const depthLength = view.depthLength ?? DEFAULT_DEPTH_LENGTH;
+  const scaleX = view.scaleX ?? view.scale;
+  const scaleY = view.scaleY ?? view.scale;
+  const depthScreenX = depthLength * Math.cos(angleRad);
+  const depthScreenY = depthLength * Math.sin(angleRad);
+  return {
+    kx: depthScreenX / scaleX,
+    ky: depthScreenY / scaleY,
+  };
 }
 
 /**
  * Локальные (u,v,w) → координаты вида (X,Y,Z).
- * AD горизонтален: X = v·sin(∠BAD) + ku·u; AA₁ вертикален: Y = w + kv·u.
+ * X = v + kx·u; Y = w + ky·u; Z = u - kx·v - ky·w.
  */
 export function localToView(
   local: LocalCoords,
-  view: SpaceViewParams,
-  projectionAngleRad = Math.PI / 2,
+  { kx, ky }: ProjectionCoeffs,
 ): { x: number; y: number; z: number } {
-  const ku = getViewKu(view);
-  const kv = getViewKv(view);
   const { u, v, w } = local;
   return {
-    x: v * Math.sin(projectionAngleRad) + ku * u,
-    y: w + kv * u,
-    z: u - ku * v - kv * w,
+    x: v + kx * u,
+    y: w + ky * u,
+    z: u - kx * v - ky * w,
   };
 }
 
 /** Направление луча наблюдения в локальных (u,v,w). */
-export function viewDirectionLocal(view: SpaceViewParams): LocalCoords {
-  const ku = getViewKu(view);
-  const kv = getViewKv(view);
-  return { u: 1, v: -ku, w: -kv };
+export function viewDirectionLocal({ kx, ky }: ProjectionCoeffs): LocalCoords {
+  return { u: 1, v: -kx, w: -ky };
 }
 
 /**
  * Школьная косоугольная проекция:
- * AD → вправо, AA₁ → вверх, AB → вглубь (с коэффициентами ku, kv).
+ * AD → вправо, AA₁ → вверх, AB → по (kx, ky).
  */
 export function projectLocal(
   local: LocalCoords,
   view: SpaceViewParams,
-  projectionAngleRad = Math.PI / 2,
+  coeffs: ProjectionCoeffs,
 ): ProjectedPoint {
   const s = view.scale;
-  const { x, y, z } = localToView(local, view, projectionAngleRad);
+  const { x, y, z } = localToView(local, coeffs);
   return {
     x: x * s,
     y: -y * s,
@@ -85,9 +106,9 @@ export function projectFromLocalCoeffs(
   local: LocalCoords,
   world: Vec3,
   view: SpaceViewParams,
-  projectionAngleRad = Math.PI / 2,
+  coeffs: ProjectionCoeffs,
 ): ProjectedPoint {
-  const p = projectLocal(local, view, projectionAngleRad);
+  const p = projectLocal(local, view, coeffs);
   return { ...p, world };
 }
 
@@ -97,6 +118,7 @@ export const DEFAULT_SPACE_VIEW: SpaceViewParams = {
   pitch: 0,
   depthSkewX: VIEW_K,
   depthSkewY: VIEW_K,
+  depthLength: DEFAULT_DEPTH_LENGTH,
   visibilityMode: "school",
 };
 

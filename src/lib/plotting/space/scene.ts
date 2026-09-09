@@ -49,7 +49,7 @@ export function createSpaceSceneData(): SpaceSceneData {
   return {
     shapeKind: null,
     baseVerticesInput: "",
-    figureConstraints: { rectangular: true, equilateral: false, badAngleDeg: 90 },
+    figureConstraints: { rectangular: true, equilateral: false, badAngleDeg: 45 },
     figureDirty: false,
     figure: null,
     points: [],

@@ -95,19 +95,19 @@ export function SpaceManualPanel() {
                     <span className="text-xs tabular-nums text-muted-foreground">
                       {space3d.figureConstraints.rectangular
                         ? 90
-                        : Math.round(space3d.figureConstraints.badAngleDeg ?? 90)}
+                        : Math.round(space3d.figureConstraints.badAngleDeg ?? 45)}
                       °
                     </span>
                   </div>
                   <Slider
-                    min={30}
-                    max={150}
+                    min={10}
+                    max={60}
                     step={1}
                     disabled={space3d.figureConstraints.rectangular}
                     value={[
                       space3d.figureConstraints.rectangular
                         ? 90
-                        : (space3d.figureConstraints.badAngleDeg ?? 90),
+                        : (space3d.figureConstraints.badAngleDeg ?? 45),
                     ]}
                     onValueChange={([value]) => {
                       if (value === undefined) return;

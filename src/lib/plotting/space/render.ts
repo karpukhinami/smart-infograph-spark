@@ -103,7 +103,7 @@ function projectWorld(
 ): { x: number; y: number } {
   const local = worldToLocal(world, resolved.basis);
   const pr = local
-    ? projectFromLocalCoeffs(local, world, view, resolved.projectionAngleRad)
+    ? projectFromLocalCoeffs(local, world, view, resolved.projection)
     : { x: 0, y: 0 };
   return { x: pr.x * fit.scale + fit.cx, y: pr.y * fit.scale + fit.cy };
 }
@@ -377,7 +377,7 @@ function collectFitPoints(
         local0,
         add(carrier.origin, scale(carrier.dir, t0)),
         data.view,
-        resolved.projectionAngleRad,
+        resolved.projection,
       );
       pts.push({ x: pr.x, y: pr.y });
     }
@@ -386,7 +386,7 @@ function collectFitPoints(
         local1,
         add(carrier.origin, scale(carrier.dir, t1)),
         data.view,
-        resolved.projectionAngleRad,
+        resolved.projection,
       );
       pts.push({ x: pr.x, y: pr.y });
     }
@@ -410,7 +410,7 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     const wa = resolved.points.get(edge.aId)?.world;
     const wb = resolved.points.get(edge.bId)?.world;
     if (!wa || !wb) continue;
-    const visible = isBodyEdgeVisibleForRender(edge.id, figure, data.view);
+    const visible = isBodyEdgeVisibleForRender(edge.id, figure, resolved, data.view);
     const p1 = projectWorld(wa, resolved, data.view, fit);
     const p2 = projectWorld(wb, resolved, data.view, fit);
     const dash = visible ? "" : ` stroke-dasharray="${a.hiddenDash}"`;
