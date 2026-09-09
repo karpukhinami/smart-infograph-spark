@@ -1,23 +1,21 @@
 import { layoutLabels, measureTextWidth, type LabelRequest, type Obstacle, type Rect } from "../label-layout";
 import {
   buildSpaceScene,
+  computeFaceOrPlaneSection,
   computeLineDisplayRange,
   planeIntersectionSegmentRange,
   resolveLineCarrier,
   type ResolvedSpaceScene,
 } from "./build";
-
 import { fitProjection, projectFromLocalCoeffs } from "./camera";
 import {
   buildOcclusionContext,
-  classifySegmentFaceVisibility,
-  isBodyEdgeVisible,
-  splitLineByVisibility,
+  isBodyEdgeVisibleForRender,
+  splitLineForRender,
   type OcclusionContext,
 } from "./visibility";
 import type { ParallelepipedFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
-import { add, len, lerp, planePointDistance, scale, sub, worldToLocal } from "./vec3";
-import type { PlaneEq } from "./vec3";
+import { add, len, scale, sub, worldToLocal } from "./vec3";
 
 const BACKDROP_OPACITY = 0.85;
 const BACKDROP_STROKE = 4;
@@ -52,30 +50,11 @@ function drawSegmentWithVisibility(
   parts: string[],
   obstacles: Obstacle[],
 ): void {
-  const faceClass = classifySegmentFaceVisibility(aWorld, bWorld, figure, resolved.points);
-  if (faceClass === "visible") {
-    const p1 = projectWorld(aWorld, resolved, view, fit);
-    const p2 = projectWorld(bWorld, resolved, view, fit);
-    parts.push(
-      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"/>`,
-    );
-    obstacles.push(lineObstacle(p1.x, p1.y, p2.x, p2.y, "curve"));
-    return;
-  }
-  if (faceClass === "hidden") {
-    const p1 = projectWorld(aWorld, resolved, view, fit);
-    const p2 = projectWorld(bWorld, resolved, view, fit);
-    parts.push(
-      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-dasharray="${hiddenDash}"/>`,
-    );
-    obstacles.push(lineObstacle(p1.x, p1.y, p2.x, p2.y, "helper"));
-    return;
-  }
   const dir = sub(bWorld, aWorld);
   const abLen = len(dir);
   if (!(abLen > 1e-9)) return;
   const unit = scale(dir, 1 / abLen);
-  const segments = splitLineByVisibility(aWorld, unit, 0, abLen, figure, resolved, view, occlusion);
+  const segments = splitLineForRender(aWorld, unit, 0, abLen, figure, resolved, view, occlusion);
   for (const seg of segments) {
     const p1 = projectWorld(seg.a, resolved, view, fit);
     const p2 = projectWorld(seg.b, resolved, view, fit);
@@ -239,6 +218,7 @@ function renderLineObject(
       figure,
       resolved.points,
       resolved.planes,
+      resolved.basis,
     );
     if (clip) {
       t0 = clip.t0;
@@ -257,33 +237,22 @@ function renderLineObject(
   }
 
   const sw = line.style.width ?? data.appearance.lineWidth;
-  const a = data.appearance;
-
-  if (def.kind === "twoPoints") {
-    const p1 = projectWorld(add(origin, scale(dir, t0)), resolved, data.view, fit);
-    const p2 = projectWorld(add(origin, scale(dir, t1)), resolved, data.view, fit);
-    parts.push(
-      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${line.style.color}" stroke-width="${sw}" stroke-linecap="round"/>`,
-    );
-    obstacles.push(lineObstacle(p1.x, p1.y, p2.x, p2.y, "curve"));
-  } else {
-    drawCarrierWithVisibility(
-      origin,
-      dir,
-      t0,
-      t1,
-      figure,
-      resolved,
-      data.view,
-      fit,
-      occlusion,
-      line.style.color,
-      sw,
-      a.hiddenDash,
-      parts,
-      obstacles,
-    );
-  }
+  drawCarrierWithVisibility(
+    origin,
+    dir,
+    t0,
+    t1,
+    figure,
+    resolved,
+    data.view,
+    fit,
+    occlusion,
+    line.style.color,
+    sw,
+    data.appearance.hiddenDash,
+    parts,
+    obstacles,
+  );
 
   if (line.style.visualKind === "vector" && def.kind === "twoPoints") {
     const b = resolved.points.get(def.bId)?.world;
@@ -303,50 +272,6 @@ function renderLineObject(
   }
 }
 
-function computePlaneSection(
-  plane: PlaneEq,
-  figure: ParallelepipedFigure,
-  resolved: ResolvedSpaceScene,
-): Vec3[] {
-  const hits: Vec3[] = [];
-  const seen = new Set<string>();
-  const key = (p: Vec3) => `${p.x.toFixed(4)}:${p.y.toFixed(4)}:${p.z.toFixed(4)}`;
-
-  for (const edge of figure.edges) {
-    const a = resolved.points.get(edge.aId)?.world;
-    const b = resolved.points.get(edge.bId)?.world;
-    if (!a || !b) continue;
-    const da = planePointDistance(a, plane);
-    const db = planePointDistance(b, plane);
-    if (Math.abs(da) < 1e-5 && !seen.has(key(a))) {
-      seen.add(key(a));
-      hits.push(a);
-    }
-    if (Math.abs(db) < 1e-5 && !seen.has(key(b))) {
-      seen.add(key(b));
-      hits.push(b);
-    }
-    if (da * db < -1e-10) {
-      const p = lerp(a, b, da / (da - db));
-      const k = key(p);
-      if (!seen.has(k)) {
-        seen.add(k);
-        hits.push(p);
-      }
-    }
-  }
-
-  if (hits.length < 3) return hits;
-  const cx = hits.reduce((s, p) => s + p.x, 0) / hits.length;
-  const cy = hits.reduce((s, p) => s + p.y, 0) / hits.length;
-  const cz = hits.reduce((s, p) => s + p.z, 0) / hits.length;
-  return [...hits].sort((p1, p2) => {
-    const a1 = Math.atan2(p1.y - cy, p1.x - cx);
-    const a2 = Math.atan2(p2.y - cy, p2.x - cx);
-    return a1 - a2;
-  });
-}
-
 function renderPlane(
   plane: SpacePlane,
   data: SpaceSceneData,
@@ -358,10 +283,14 @@ function renderPlane(
   obstacles: Obstacle[],
 ): void {
   if (!plane.style.visible || !plane.built) return;
-  const eq = resolved.planes.get(plane.id);
-  if (!eq) return;
-  const section = computePlaneSection(eq, figure, resolved);
-  if (section.length < 3) return;
+  const section = computeFaceOrPlaneSection(
+    plane.id,
+    figure,
+    resolved.points,
+    resolved.planes,
+    resolved.basis,
+  );
+  if (!section || section.length < 3) return;
 
   const screenPts = section.map((w) => projectWorld(w, resolved, data.view, fit));
   const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
@@ -440,6 +369,7 @@ function collectFitPoints(
         figure,
         resolved.points,
         resolved.planes,
+        resolved.basis,
       );
       if (clip) {
         t0 = clip.t0;
@@ -476,7 +406,7 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     const wa = resolved.points.get(edge.aId)?.world;
     const wb = resolved.points.get(edge.bId)?.world;
     if (!wa || !wb) continue;
-    const visible = isBodyEdgeVisible(edge.id, figure);
+    const visible = isBodyEdgeVisibleForRender(edge.id, figure, data.view);
     const p1 = projectWorld(wa, resolved, data.view, fit);
     const p2 = projectWorld(wb, resolved, data.view, fit);
     const dash = visible ? "" : ` stroke-dasharray="${a.hiddenDash}"`;

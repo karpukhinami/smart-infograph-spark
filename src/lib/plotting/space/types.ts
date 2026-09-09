@@ -192,6 +192,8 @@ export interface SpaceViewParams {
   depthSkewY: number;
   /** @deprecated используйте depthSkewX */
   oblique?: number;
+  /** Режим видимости: school (фикс. ракурс) или legacy (окклюзия по экрану). */
+  visibilityMode?: "school" | "legacy";
 }
 
 export interface SpaceAppearance {

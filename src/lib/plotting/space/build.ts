@@ -394,26 +394,140 @@ function pointInPolygon3D(p: Vec3, polygon: Vec3[]): boolean {
   return u >= -0.02 && v >= -0.02 && u + v <= 1.02;
 }
 
-/** Отрезок пересечения линии с выпуклым многоугольником в 3D. */
+const FACE_EPS = 1e-4;
+
+function localOnBoxFace(l: { u: number; v: number; w: number }): string | null {
+  if (Math.abs(l.u) < FACE_EPS) return "u0";
+  if (Math.abs(l.u - 1) < FACE_EPS) return "u1";
+  if (Math.abs(l.v) < FACE_EPS) return "v0";
+  if (Math.abs(l.v - 1) < FACE_EPS) return "v1";
+  if (Math.abs(l.w) < FACE_EPS) return "w0";
+  if (Math.abs(l.w - 1) < FACE_EPS) return "w1";
+  return null;
+}
+
+function shareBoxFace(
+  l1: { u: number; v: number; w: number },
+  l2: { u: number; v: number; w: number },
+): boolean {
+  const f1 = localOnBoxFace(l1);
+  const f2 = localOnBoxFace(l2);
+  return f1 !== null && f1 === f2;
+}
+
+function orderSectionByFaceWalk(
+  tagged: Array<{ w: Vec3; l: { u: number; v: number; w: number } }>,
+): Vec3[] | null {
+  const n = tagged.length;
+  if (n <= 2) return tagged.map((t) => t.w);
+
+  const adj: number[][] = Array.from({ length: n }, () => []);
+  for (let i = 0; i < n; i += 1) {
+    for (let j = i + 1; j < n; j += 1) {
+      if (shareBoxFace(tagged[i]!.l, tagged[j]!.l)) {
+        adj[i]!.push(j);
+        adj[j]!.push(i);
+      }
+    }
+  }
+
+  for (let start = 0; start < n; start += 1) {
+    if (!adj[start]!.length) continue;
+    const path: number[] = [start];
+    const used = new Set<number>([start]);
+    let prev = -1;
+    let cur = start;
+
+    while (path.length < n) {
+      const next = adj[cur]!.find((j) => j !== prev && !used.has(j));
+      if (next === undefined) break;
+      path.push(next);
+      used.add(next);
+      prev = cur;
+      cur = next;
+    }
+
+    if (path.length === n) return path.map((i) => tagged[i]!.w);
+  }
+  return null;
+}
+
+/** Упорядочить вершины сечения: соседние лежат на одной грани параллелепипеда. */
+export function orderSectionPolygon(
+  hits: Vec3[],
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+): Vec3[] {
+  if (hits.length <= 2) return hits;
+  const tagged = hits.map((w) => ({ w, l: worldToLocal(w, basis)! }));
+
+  const walked = orderSectionByFaceWalk(tagged);
+  if (walked && walked.length === hits.length) return walked;
+
+  // Fallback: сортировка по углу в плоскости сечения
+  const n = cross(sub(tagged[1]!.w, tagged[0]!.w), sub(tagged[2]!.w, tagged[0]!.w));
+  if (len(n) < 1e-9) return walked && walked.length >= 3 ? walked : hits;
+  const nn = normalize(n);
+  let e1 = normalize(sub(tagged[1]!.w, tagged[0]!.w));
+  if (len(cross(e1, nn)) < 1e-9) e1 = normalize(sub(tagged[2]!.w, tagged[0]!.w));
+  const e2 = normalize(cross(nn, e1));
+  const origin = tagged[0]!.w;
+  const cx =
+    tagged.reduce((s, t) => s + dot(sub(t.w, origin), e1), 0) / tagged.length;
+  const cy =
+    tagged.reduce((s, t) => s + dot(sub(t.w, origin), e2), 0) / tagged.length;
+  const sorted = [...hits].sort((p1, p2) => {
+    const a1 = Math.atan2(dot(sub(p1, origin), e2) - cy, dot(sub(p1, origin), e1) - cx);
+    const a2 = Math.atan2(dot(sub(p2, origin), e2) - cy, dot(sub(p2, origin), e1) - cx);
+    return a1 - a2;
+  });
+  const taggedSorted = sorted.map((w) => ({ w, l: worldToLocal(w, basis)! }));
+  const walkedSorted = orderSectionByFaceWalk(taggedSorted);
+  if (walkedSorted && walkedSorted.length === hits.length) return walkedSorted;
+  return sorted;
+}
+
+/** Отрезок пересечения линии с выпуклым многоугольником в 3D (точные пересечения с рёбрами). */
 export function clipLineToConvexPolygon(
   origin: Vec3,
   dir: Vec3,
   polygon: Vec3[],
 ): { t0: number; t1: number } | null {
   if (polygon.length < 2) return null;
-  const ts = polygon.map((v) => dot(sub(v, origin), dir));
-  let tMin = Math.min(...ts);
-  let tMax = Math.max(...ts);
-  if (!(tMax - tMin > 1e-9)) return null;
-  const samples = 48;
-  const inside: number[] = [];
-  for (let i = 0; i <= samples; i += 1) {
-    const t = tMin + ((tMax - tMin) * i) / samples;
-    const p = add(origin, scale(dir, t));
-    if (pointInPolygon3D(p, polygon)) inside.push(t);
+  const dirLen = len(dir);
+  if (!(dirLen > 1e-9)) return null;
+  const d = scale(dir, 1 / dirLen);
+  const ts: number[] = polygon.map((v) => dot(sub(v, origin), d));
+
+  for (let i = 0; i < polygon.length; i += 1) {
+    const a = polygon[i]!;
+    const b = polygon[(i + 1) % polygon.length]!;
+    const v = sub(b, a);
+    const w0 = sub(origin, a);
+    const a1 = dot(d, d);
+    const b1 = dot(d, v);
+    const c1 = dot(v, v);
+    const d1 = dot(d, w0);
+    const e1 = dot(v, w0);
+    const denom = a1 * c1 - b1 * b1;
+    if (Math.abs(denom) < 1e-12) continue;
+    const tHit = (b1 * e1 - c1 * d1) / denom;
+    const uHit = (a1 * e1 - b1 * d1) / denom;
+    if (uHit >= -1e-4 && uHit <= 1 + 1e-4) ts.push(tHit);
   }
-  if (!inside.length) return null;
-  return { t0: Math.min(...inside), t1: Math.max(...inside) };
+
+  const sorted = [...new Set(ts.map((t) => Number(t.toFixed(8))))].sort((a, b) => a - b);
+  let best: { t0: number; t1: number } | null = null;
+  for (let i = 0; i < sorted.length - 1; i += 1) {
+    const ta = sorted[i]!;
+    const tb = sorted[i + 1]!;
+    if (tb - ta < 1e-9) continue;
+    const tm = (ta + tb) * 0.5;
+    const mid = add(origin, scale(d, tm));
+    if (pointInPolygon3D(mid, polygon)) {
+      if (!best || tb - ta > best.t1 - best.t0) best = { t0: ta, t1: tb };
+    }
+  }
+  return best;
 }
 
 /** @deprecated используйте clipLineToConvexPolygon */
@@ -427,6 +541,36 @@ export function clipLineToPolygon(
   return { t0: Math.min(...ts), t1: Math.max(...ts) };
 }
 
+function lineSectionBreakpoints(
+  origin: Vec3,
+  dir: Vec3,
+  polygon: Vec3[],
+): number[] {
+  const dirLen = len(dir);
+  if (!(dirLen > 1e-9) || polygon.length < 2) return [];
+  const d = scale(dir, 1 / dirLen);
+  const ts: number[] = polygon.map((v) => dot(sub(v, origin), d));
+
+  for (let i = 0; i < polygon.length; i += 1) {
+    const a = polygon[i]!;
+    const b = polygon[(i + 1) % polygon.length]!;
+    const v = sub(b, a);
+    const w0 = sub(origin, a);
+    const a1 = dot(d, d);
+    const b1 = dot(d, v);
+    const c1 = dot(v, v);
+    const d1 = dot(d, w0);
+    const e1 = dot(v, w0);
+    const denom = a1 * c1 - b1 * b1;
+    if (Math.abs(denom) < 1e-12) continue;
+    const tHit = (b1 * e1 - c1 * d1) / denom;
+    const uHit = (a1 * e1 - b1 * d1) / denom;
+    if (uHit >= -1e-4 && uHit <= 1 + 1e-4) ts.push(tHit);
+  }
+
+  return ts;
+}
+
 /** Отрезок пересечения двух плоскостей внутри их сечений с параллелепипедом. */
 export function planeIntersectionSegmentRange(
   carrier: { origin: Vec3; dir: Vec3 },
@@ -435,10 +579,36 @@ export function planeIntersectionSegmentRange(
   figure: ParallelepipedFigure,
   points: Map<string, BuiltSpacePoint>,
   planeEqs: Map<string, PlaneEq>,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): { t0: number; t1: number } | null {
-  const sectionA = computeFaceOrPlaneSection(planeAId, figure, points, planeEqs);
-  const sectionB = computeFaceOrPlaneSection(planeBId, figure, points, planeEqs);
+  const sectionA = computeFaceOrPlaneSection(planeAId, figure, points, planeEqs, basis);
+  const sectionB = computeFaceOrPlaneSection(planeBId, figure, points, planeEqs, basis);
   if (!sectionA?.length || !sectionB?.length) return null;
+
+  const dirLen = len(carrier.dir);
+  if (!(dirLen > 1e-9)) return null;
+  const d = scale(carrier.dir, 1 / dirLen);
+
+  const ts = [
+    ...lineSectionBreakpoints(carrier.origin, d, sectionA),
+    ...lineSectionBreakpoints(carrier.origin, d, sectionB),
+  ];
+  const sorted = [...new Set(ts.map((t) => Number(t.toFixed(8))))].sort((a, b) => a - b);
+  if (sorted.length < 2) return null;
+
+  let best: { t0: number; t1: number } | null = null;
+  for (let i = 0; i < sorted.length - 1; i += 1) {
+    const ta = sorted[i]!;
+    const tb = sorted[i + 1]!;
+    if (tb - ta < 1e-6) continue;
+    const mid = add(carrier.origin, scale(d, (ta + tb) * 0.5));
+    if (pointInPolygon3D(mid, sectionA) && pointInPolygon3D(mid, sectionB)) {
+      if (!best || tb - ta > best.t1 - best.t0) best = { t0: ta, t1: tb };
+    }
+  }
+
+  if (best) return best;
+
   const clipA = clipLineToConvexPolygon(carrier.origin, carrier.dir, sectionA);
   const clipB = clipLineToConvexPolygon(carrier.origin, carrier.dir, sectionB);
   if (!clipA || !clipB) return null;
@@ -448,11 +618,12 @@ export function planeIntersectionSegmentRange(
   return { t0, t1 };
 }
 
-function computeFaceOrPlaneSection(
+export function computeFaceOrPlaneSection(
   id: string,
   figure: ParallelepipedFigure,
   points: Map<string, BuiltSpacePoint>,
   planeEqs: Map<string, PlaneEq>,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): Vec3[] | null {
   const eq = planeEqs.get(id);
   if (!eq) return null;
@@ -483,14 +654,7 @@ function computeFaceOrPlaneSection(
     }
   }
   if (hits.length < 3) return hits.length ? hits : null;
-  const cx = hits.reduce((s, p) => s + p.x, 0) / hits.length;
-  const cy = hits.reduce((s, p) => s + p.y, 0) / hits.length;
-  const cz = hits.reduce((s, p) => s + p.z, 0) / hits.length;
-  return [...hits].sort((p1, p2) => {
-    const a1 = Math.atan2(p1.y - cy, p1.x - cx);
-    const a2 = Math.atan2(p2.y - cy, p2.x - cx);
-    return a1 - a2;
-  });
+  return orderSectionPolygon(hits, basis);
 }
 
 export function facePlane(

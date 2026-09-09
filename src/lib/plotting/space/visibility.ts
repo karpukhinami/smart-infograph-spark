@@ -1,8 +1,12 @@
-import { projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
+import { getViewK, projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
 import { facePlane, type ResolvedSpaceScene } from "./build";
 import { edgeById, faceById } from "./parallelepiped";
 import type { ParallelepipedFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, dot, len, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
+import {
+  isBodyEdgeVisibleSchool,
+  splitLineSchoolView,
+} from "./visibility-school";
 
 /** Видимые грани: AA₁D₁D (левая), CDD₁C₁ (задняя), A₁B₁C₁D₁ (верхняя). */
 export const VISIBLE_FACE_IDS = new Set(["f-left", "f-back", "f-top"]);
@@ -365,5 +369,37 @@ export function renderEdgeSegments(
   const dir = sub(bWorld, aWorld);
   const abLen = len(dir);
   if (!(abLen > 1e-9)) return [];
-  return splitLineByVisibility(aWorld, scale(dir, 1 / abLen), 0, abLen, figure, resolved, view, ctx);
+  return splitLineForRender(aWorld, scale(dir, 1 / abLen), 0, abLen, figure, resolved, view, ctx);
+}
+
+/** Режим видимости из параметров вида (по умолчанию school). */
+export function getVisibilityMode(view: SpaceViewParams): "school" | "legacy" {
+  return view.visibilityMode ?? "school";
+}
+
+/** Видимость ребра тела: school — через грани, legacy — по списку граней. */
+export function isBodyEdgeVisibleForRender(
+  edgeId: string,
+  figure: ParallelepipedFigure,
+  view: SpaceViewParams,
+): boolean {
+  if (getVisibilityMode(view) === "legacy") return isBodyEdgeVisible(edgeId, figure);
+  return isBodyEdgeVisibleSchool(edgeId, figure, getViewK(view));
+}
+
+/** Разбиение линии на видимые/скрытые участки (переключаемый режим). */
+export function splitLineForRender(
+  origin: Vec3,
+  dir: Vec3,
+  t0: number,
+  t1: number,
+  figure: ParallelepipedFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
+  ctx?: OcclusionContext,
+): LineSplitSegment[] {
+  if (getVisibilityMode(view) === "legacy") {
+    return splitLineByVisibility(origin, dir, t0, t1, figure, resolved, view, ctx);
+  }
+  return splitLineSchoolView(origin, dir, t0, t1, figure, resolved, view);
 }

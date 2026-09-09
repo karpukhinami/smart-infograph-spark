@@ -3,6 +3,7 @@ import { DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
 import { parseBaseVertexLabels, formatVertexLabel } from "./parse-vertices";
 import { createParallelepiped } from "./parallelepiped";
 import { buildSpaceScene, clampRegionParam, defaultLineParam, getPointLabel } from "./build";
+import { cross, len, sub, type Vec3 } from "./vec3";
 import type {
   LineRegion,
   ParallelepipedConstraints,
@@ -27,7 +28,7 @@ export const DEFAULT_SPACE_APPEARANCE: SpaceAppearance = {
   padding: 24,
   edgeWidth: DEFAULT_APPEARANCE.graphWidth,
   edgeColor: DEFAULT_APPEARANCE.axisColor,
-  hiddenDash: "7 5",
+  hiddenDash: "20 14",
   labelFontSize: DEFAULT_APPEARANCE.pointLabelFontSize,
   labelFontFamily: DEFAULT_APPEARANCE.pointLabelFontFamily,
   labelColor: DEFAULT_APPEARANCE.labelColor,
@@ -204,12 +205,59 @@ export function findLineThroughPoints(
   });
 }
 
+const COLLINEAR_EPS = 1e-5;
+
+function pointsCollinearWithCarrier(a: Vec3, b: Vec3, c: Vec3, d: Vec3): boolean {
+  const cd = sub(d, c);
+  if (len(cd) < 1e-9) return false;
+  return len(cross(sub(a, c), cd)) < COLLINEAR_EPS && len(cross(sub(b, c), cd)) < COLLINEAR_EPS;
+}
+
+/** Носитель через две точки уже есть (пользовательская прямая или ребро тела). */
+export function hasCarrierThroughPoints(
+  data: SpaceSceneData,
+  figure: ParallelepipedFigure,
+  aId: string,
+  bId: string,
+): boolean {
+  if (findLineThroughPoints(data, aId, bId)) return true;
+  if (
+    figure.edges.some(
+      (e) => (e.aId === aId && e.bId === bId) || (e.aId === bId && e.bId === aId),
+    )
+  ) {
+    return true;
+  }
+
+  const resolved = buildSpaceScene(data);
+  const pa = resolved.points.get(aId)?.world;
+  const pb = resolved.points.get(bId)?.world;
+  if (!pa || !pb) return false;
+
+  for (const edge of figure.edges) {
+    const ea = resolved.points.get(edge.aId)?.world;
+    const eb = resolved.points.get(edge.bId)?.world;
+    if (ea && eb && pointsCollinearWithCarrier(pa, pb, ea, eb)) return true;
+  }
+
+  for (const line of data.lines) {
+    if (line.definition.kind !== "twoPoints") continue;
+    const { aId: la, bId: lb } = line.definition;
+    const wa = resolved.points.get(la)?.world;
+    const wb = resolved.points.get(lb)?.world;
+    if (wa && wb && pointsCollinearWithCarrier(pa, pb, wa, wb)) return true;
+  }
+
+  return false;
+}
+
 /** Вспомогательная прямая/отрезок при построении точки на носителе AB. */
 export function createAuxiliaryLineForPoint(
   data: SpaceSceneData,
   def: PointOnLineDefinition,
 ): SpaceLine | null {
-  if (findLineThroughPoints(data, def.pointAId, def.pointBId)) return null;
+  if (!data.figure) return null;
+  if (hasCarrierThroughPoints(data, data.figure, def.pointAId, def.pointBId)) return null;
   const visualKind = def.region === "between" ? "segment" : "line";
   const line = createSpaceLine(
     data.lines.length + 1,

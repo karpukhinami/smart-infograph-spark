@@ -3,42 +3,49 @@ import type { LocalCoords, SpaceViewParams, Vec3 } from "./types";
 export interface ProjectedPoint {
   x: number;
   y: number;
-  /** Глубина в системе наблюдателя: больше = дальше от камеры. */
+  /** Глубина Z: меньше = ближе к наблюдателю. */
   depth: number;
   world: Vec3;
 }
-const DEPTH_V_WEIGHT = 0.12;
-const DEPTH_W_WEIGHT = 0.06;
 
-function depthSkewX(view: SpaceViewParams): number {
-  return view.depthSkewX ?? view.oblique ?? 0.25;
+/** Фиксированная константа школьной проекции. */
+export const VIEW_K = 0.28;
+
+export function getViewK(view: SpaceViewParams): number {
+  return view.depthSkewX ?? VIEW_K;
 }
 
-function depthSkewY(view: SpaceViewParams): number {
-  return view.depthSkewY ?? -(view.oblique ?? 0.25) * 0.55;
+/** Локальные (u,v,w) → координаты вида (X,Y,Z). */
+export function localToView(local: LocalCoords, k = VIEW_K): { x: number; y: number; z: number } {
+  const { u, v, w } = local;
+  return {
+    x: v + k * u,
+    y: w + k * u,
+    z: u - k * v - k * w,
+  };
+}
+
+/** Направление луча наблюдения (от наблюдателя вглубь сцены) в локальных координатах. */
+export function viewDirectionLocal(k = VIEW_K): LocalCoords {
+  return { u: 1, v: -k, w: -k };
 }
 
 /**
- * Школьная аксонометрия: три базисных направления имеют разные экранные проекции.
- * e1=AB → вглубь (вправо+вверх), e2=AD → вправо, e3=AA₁ → вверх.
- * Вершины = origin + u·depth + v·right + w·up.
+ * Школьная косоугольная проекция:
+ * AD → вправо, AA₁ → вверх, AB → вглубь (вправо-вверх).
  */
 export function projectLocal(local: LocalCoords, view: SpaceViewParams): ProjectedPoint {
+  const k = getViewK(view);
   const s = view.scale;
-  const dx = depthSkewX(view);
-  const dy = depthSkewY(view);
-  const x = s * (local.v + local.u * dx);
-  const y = s * (local.u * dy - local.w);
-  const depth = local.u + local.v * DEPTH_V_WEIGHT + local.w * DEPTH_W_WEIGHT;
+  const { x, y, z } = localToView(local, k);
   return {
-    x,
-    y,
-    depth,
+    x: x * s,
+    y: -y * s,
+    depth: z,
     world: { x: 0, y: 0, z: 0 },
   };
 }
 
-/** Проекция 3D-точки через локальные коэффициенты (геометрия → вид → экран). */
 export function projectFromLocalCoeffs(
   local: LocalCoords,
   world: Vec3,
@@ -52,21 +59,11 @@ export const DEFAULT_SPACE_VIEW: SpaceViewParams = {
   scale: 1,
   yaw: 0,
   pitch: 0,
-  depthSkewX: 0.25,
-  depthSkewY: -0.15,
+  depthSkewX: VIEW_K,
+  depthSkewY: -VIEW_K,
+  visibilityMode: "school",
 };
 
-/** @deprecated используйте projectFromLocalCoeffs */
-export function projectPoint(world: Vec3, view: SpaceViewParams): ProjectedPoint {
-  return {
-    x: world.x * view.scale,
-    y: -world.z * view.scale,
-    depth: world.y,
-    world,
-  };
-}
-
-/** Подобрать масштаб и центр, чтобы фигура занимала большую часть полотна. */
 export function fitProjection(
   projected: Array<{ x: number; y: number }>,
   width: number,
@@ -94,12 +91,19 @@ export function fitProjection(
   return { scale, cx, cy };
 }
 
-/** Направление к наблюдателю (для устаревших вызовов). */
-export function viewDirection(_view: SpaceViewParams): Vec3 {
-  return normalizeVec({ x: -0.4, y: 0.85, z: -0.35 });
+/** @deprecated */
+export function projectPoint(world: Vec3, view: SpaceViewParams): ProjectedPoint {
+  return {
+    x: world.x * view.scale,
+    y: -world.z * view.scale,
+    depth: world.y,
+    world,
+  };
 }
 
-function normalizeVec(v: Vec3): Vec3 {
-  const l = Math.hypot(v.x, v.y, v.z) || 1;
-  return { x: v.x / l, y: v.y / l, z: v.z / l };
+/** @deprecated */
+export function viewDirection(_view: SpaceViewParams): Vec3 {
+  const k = VIEW_K;
+  const l = Math.hypot(1, k, k) || 1;
+  return { x: 1 / l, y: -k / l, z: -k / l };
 }
