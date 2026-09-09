@@ -30,7 +30,7 @@ import {
   type ProjectedPoint,
 } from "./camera";
 import { edgeById, faceById, isParallelepiped, isPyramid, vertexById } from "./figure";
-import { baseCentroid2D, baseLocalToFan, regularBasePolygon2D } from "./pyramid";
+import { baseLocalToFanFromUV, pyramidBaseUV } from "./pyramid";
 import type {
   BuiltSpacePoint,
   LineRegion,
@@ -775,10 +775,9 @@ export function isLocalInsideFigure(local: LocalCoords, figure?: SpaceFigure): b
   }
   if (local.w < -LOCAL_UNIT_EPS || local.w > 1 + LOCAL_UNIT_EPS) return false;
   if (local.w > 1 - LOCAL_UNIT_EPS) {
-    const c = baseCentroid2D(regularBasePolygon2D(figure.baseLabels.length));
-    return Math.hypot(local.u - c.x, local.v - c.y) < LOCAL_UNIT_EPS * 10;
+    return Math.hypot(local.u, local.v) < LOCAL_UNIT_EPS * 10;
   }
-  return baseLocalToFan(local.u, local.v, figure.baseLabels.length) !== null;
+  return baseLocalToFanFromUV(local.u, local.v, pyramidBaseUV(figure.baseLabels.length)) !== null;
 }
 
 /** ID точек, задающих плоскость (не прямые). */

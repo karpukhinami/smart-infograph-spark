@@ -5,7 +5,11 @@ import {
   type ConicEllipse,
 } from "./conic-ellipse";
 import { isParallelepiped, isPyramid } from "./figure";
-import { baseCentroid2D, baseLocalToFan, regularBasePolygon2D } from "./pyramid";
+import {
+  baseLocalToFanFromUV,
+  ellipseBaseVerticesEqualArc,
+  pyramidBaseUV,
+} from "./pyramid";
 import type {
   LocalCoords,
   ParallelepipedConstraints,
@@ -200,25 +204,17 @@ export function sampleRotationEllipse(
 
 function pyramidScreenBase(figure: PyramidFigure, coeffs: ProjectionCoeffs): Array<{ x: number; y: number }> {
   const n = figure.baseLabels.length;
-  const base2d = regularBasePolygon2D(n);
-  const edgeLen = DEFAULT_AD_LENGTH / 2;
-  const ang = projectionDepthAngleDeg(figure.constraints) * (Math.PI / 180);
-  const e1 = { x: Math.cos(ang) * edgeLen, y: Math.sin(ang) * edgeLen };
-  const e2 = { x: -Math.sin(ang) * edgeLen, y: Math.cos(ang) * edgeLen };
-  return base2d.map((p) => ({
-    x: p.x * e1.x + p.y * e2.x,
-    y: p.x * e1.y + p.y * e2.y,
-  }));
+  return ellipseBaseVerticesEqualArc(coeffs.orbit, n, coeffs.orbit.thetaA);
 }
 
 function pyramidBaseAt(
   u: number,
   v: number,
   baseScr: Array<{ x: number; y: number }>,
-  n: number,
+  baseUV: Array<{ u: number; v: number }>,
 ): { x: number; y: number } {
-  const fan = baseLocalToFan(u, v, n);
-  if (!fan) return { x: 0, y: 0 };
+  const fan = baseLocalToFanFromUV(u, v, baseUV);
+  if (!fan) return { x: baseScr[0]?.x ?? 0, y: baseScr[0]?.y ?? 0 };
   const [i0, i1, i2] = fan.tri;
   const [w0, w1, w2] = fan.w;
   return {
@@ -232,19 +228,20 @@ function pyramidLocalToView(
   coeffs: ProjectionCoeffs,
   figure: PyramidFigure,
 ): { x: number; y: number; z: number } {
-  const { kwx, kwy, kx, ky } = coeffs;
+  const { kwx, kwy, kx, ky, orbit } = coeffs;
   const kw = kwySafe(kwy);
   const n = figure.baseLabels.length;
   const baseScr = pyramidScreenBase(figure, coeffs);
+  const baseUV = pyramidBaseUV(n);
   const apexAnchor = figure.constraints.apexOnCenter
-    ? baseCentroid2D(baseScr)
+    ? { x: orbit.cx, y: orbit.cy }
     : baseScr[0]!;
-  const atBase = pyramidBaseAt(local.u, local.v, baseScr, n);
+  const atBase = pyramidBaseAt(local.u, local.v, baseScr, baseUV);
   const w = local.w;
   return {
     x: atBase.x + w * (apexAnchor.x - atBase.x) + kwx * w,
     y: atBase.y + w * (apexAnchor.y - atBase.y) + kwy * w,
-    z: -local.u * 0.5 - local.v * 0.5 - local.w - kx * local.u - (ky / kw) * w,
+    z: local.u - kx * local.v - (ky / kw) * w,
   };
 }
 
