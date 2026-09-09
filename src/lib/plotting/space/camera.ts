@@ -69,6 +69,9 @@ export const DEFAULT_HEIGHT_LENGTH = 1.35;
 /** Доля высоты холста под фигуру (вертикаль AA₁ ≈ 2/3). */
 export const SPACE_FIT_HEIGHT_FRACTION = 2 / 3;
 
+/** Доля ширины холста под фигуру (параллелограмм максимально широкий). */
+export const SPACE_FIT_WIDTH_FRACTION = 0.94;
+
 /** Угол AA₁ относительно AD на чертеже при непрямоугольной проекции. */
 export const OBLIQUE_HEIGHT_ANGLE_DEG = 75;
 
@@ -143,19 +146,19 @@ export function getProjectionCoeffs(
   };
 }
 
-/** Запасной эллипс, если коника по 5 точкам не удалась. */
+/** Запасной эллипс с центром в O, если подгонка не удалась. */
 function fallbackRotationEllipse(kx: number, ky: number, adLen: number): ConicEllipse {
-  const ox = adLen / 2;
-  const oy = 0;
-  const rx = adLen / 2;
+  const cx = (adLen + kx) / 2;
+  const cy = ky / 2;
   const cosPhi0 = Math.max(-1, Math.min(1, 1 - (2 * kx) / adLen));
   const phi0 = Math.acos(cosPhi0);
   const sinPhi0 = Math.sin(phi0);
-  const ry = Math.abs(sinPhi0) > 1e-8 ? ky / sinPhi0 : ky;
+  const a = adLen / 2;
+  const b = Math.abs(sinPhi0) > 1e-8 ? Math.abs(ky / 2 / sinPhi0) : Math.abs(ky / 2);
   const thetaA = Math.PI;
   const thetaB = thetaA - phi0;
-  const thetaD = 0;
-  return { cx: ox, cy: oy, a: rx, b: ry, psi: 0, thetaA, thetaB, thetaD };
+  const thetaD = thetaB + Math.PI;
+  return { cx, cy, a, b, psi: 0, thetaA, thetaB, thetaD };
 }
 
 /** Нормализует yaw в [0,360) с «липким» нулём. */
@@ -289,7 +292,7 @@ export function fitProjection(
 }
 
 /**
- * Точки для фиксированного fit: эллипс + все вершины при полном обороте.
+ * Точки для фиксированного fit: все вершины при полном обороте (без контура эллипса).
  * Не зависит от текущего yaw — картинка не «прыгает» при вращении.
  */
 export function collectReferenceFitPoints(
@@ -298,11 +301,6 @@ export function collectReferenceFitPoints(
   constraints: ParallelepipedConstraints,
 ): Array<{ x: number; y: number }> {
   const pts: Array<{ x: number; y: number }> = [];
-  const baseCoeffs = getProjectionCoeffs({ ...view, yaw: 0 }, constraints);
-
-  for (const p of sampleRotationEllipse(baseCoeffs)) {
-    pts.push({ x: p.x * view.scale, y: -p.y * view.scale });
-  }
 
   const yawSteps = 24;
   for (let i = 0; i < yawSteps; i += 1) {
@@ -350,8 +348,9 @@ export function fitSpaceProjection(
   const bh = Math.max(1, maxY - minY);
   const availW = width - padding * 2;
   const targetH = (height - padding * 2) * heightFraction;
+  const targetW = availW * SPACE_FIT_WIDTH_FRACTION;
   let scale = targetH / bh;
-  scale = Math.min(scale, (availW / bw) * 0.96);
+  scale = Math.min(scale, targetW / bw);
   const cx = width / 2 - ((minX + maxX) / 2) * scale;
   const cy = height - padding - maxY * scale;
   return { scale, cx, cy };

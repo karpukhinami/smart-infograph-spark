@@ -1,14 +1,4 @@
-/** Коэффициенты коники: A x² + B xy + C y² + D x + E y + F = 0 */
-export interface ConicCoeffs {
-  A: number;
-  B: number;
-  C: number;
-  D: number;
-  E: number;
-  F: number;
-}
-
-/** Эллипс, полученный из коники: (cx,cy) + R(ψ)·(a cos θ, b sin θ). */
+/** Эллипс: (cx,cy) + R(ψ)·(a cos θ, b sin θ). Центр = центр параллелограмма. */
 export interface ConicEllipse {
   cx: number;
   cy: number;
@@ -18,93 +8,13 @@ export interface ConicEllipse {
   b: number;
   /** Угол большой оси от горизонтали, рад. */
   psi: number;
-  /** Параметры θ вершин A, B, D при yaw=0. */
+  /** Параметры θ вершин A, B, D при yaw=0; C = θ_A + π, D = θ_B + π. */
   thetaA: number;
   thetaB: number;
   thetaD: number;
 }
 
 export type Point2 = { x: number; y: number };
-
-function solve5x5(m: number[][], b: number[]): number[] | null {
-  const n = 5;
-  const a = m.map((row, i) => [...row, b[i]!]);
-  for (let col = 0; col < n; col += 1) {
-    let pivot = col;
-    for (let row = col + 1; row < n; row += 1) {
-      if (Math.abs(a[row]![col]!) > Math.abs(a[pivot]![col]!)) pivot = row;
-    }
-    if (Math.abs(a[pivot]![col]!) < 1e-12) return null;
-    [a[col], a[pivot]] = [a[pivot]!, a[col]!];
-    const div = a[col]![col]!;
-    for (let j = col; j <= n; j += 1) a[col]![j]! /= div;
-    for (let row = 0; row < n; row += 1) {
-      if (row === col) continue;
-      const factor = a[row]![col]!;
-      for (let j = col; j <= n; j += 1) a[row]![j]! -= factor * a[col]![j]!;
-    }
-  }
-  return a.map((row) => row[n]!);
-}
-
-/** Коника через 5 точек (F = 1). */
-export function fitConicFrom5Points(points: Point2[]): ConicCoeffs | null {
-  if (points.length < 5) return null;
-  const m = points.slice(0, 5).map(({ x, y }) => [x * x, x * y, y * y, x, y]);
-  const rhs = [-1, -1, -1, -1, -1];
-  const sol = solve5x5(m, rhs);
-  if (!sol) return null;
-  return { A: sol[0]!, B: sol[1]!, C: sol[2]!, D: sol[3]!, E: sol[4]!, F: 1 };
-}
-
-export function conicDiscriminant(c: ConicCoeffs): number {
-  return c.B * c.B - 4 * c.A * c.C;
-}
-
-/** true, если коника — эллипс (вещественный). */
-export function isEllipseConic(c: ConicCoeffs): boolean {
-  const disc = conicDiscriminant(c);
-  if (disc >= -1e-10) return false;
-  const detQ = c.A * c.C - (c.B / 2) * (c.B / 2);
-  return detQ > 1e-12;
-}
-
-/** Коника → параметры эллипса; null, если не эллипс. */
-export function conicToEllipse(c: ConicCoeffs): Omit<ConicEllipse, "thetaA" | "thetaB" | "thetaD"> | null {
-  if (!isEllipseConic(c)) return null;
-  const { A, B, C, D, E, F } = c;
-  const denom = B * B - 4 * A * C;
-  const cx = (2 * C * D - B * E) / denom;
-  const cy = (2 * A * E - B * D) / denom;
-
-  const F0 = A * cx * cx + B * cx * cy + C * cy * cy + D * cx + E * cy + F;
-  if (F0 >= -1e-10) return null;
-
-  const ap = A;
-  const bp = B / 2;
-  const cp = C;
-  const trace = ap + cp;
-  const detM = ap * cp - bp * bp;
-  const half = trace / 2;
-  const rad = Math.sqrt(Math.max(0, half * half - detM));
-  let lam1 = half + rad;
-  let lam2 = half - rad;
-  if (lam1 < lam2) [lam1, lam2] = [lam2, lam1];
-
-  let a = Math.sqrt(-F0 / lam1);
-  let b = Math.sqrt(-F0 / lam2);
-  let psi = Math.abs(bp) > 1e-12 ? Math.atan2(lam1 - ap, bp) : ap <= cp ? 0 : Math.PI / 2;
-
-  if (a < b) {
-    [a, b] = [b, a];
-    psi += Math.PI / 2;
-  }
-
-  while (psi > Math.PI / 2) psi -= Math.PI;
-  while (psi < -Math.PI / 2) psi += Math.PI;
-
-  return { cx, cy, a, b, psi };
-}
 
 export function ellipsePoint(e: Pick<ConicEllipse, "cx" | "cy" | "a" | "b" | "psi">, theta: number): Point2 {
   const ct = Math.cos(e.psi);
@@ -131,6 +41,29 @@ export function ellipseAngleForPoint(
   return Math.atan2(uy / e.b, ux / e.a);
 }
 
+function toLocal(p: Point2, center: Point2, psi: number): Point2 {
+  const px = p.x - center.x;
+  const py = p.y - center.y;
+  const c = Math.cos(psi);
+  const s = Math.sin(psi);
+  return { x: c * px + s * py, y: -s * px + c * py };
+}
+
+/** (u/a)² + (v/b)² = 1 по двум точкам в локальных координатах. */
+function semiAxesFromTwoLocal(p1: Point2, p2: Point2): { a: number; b: number } | null {
+  const det = p1.x * p1.x * p2.y * p2.y - p2.x * p2.x * p1.y * p1.y;
+  if (Math.abs(det) < 1e-14) return null;
+  const invA2 = (p2.y * p2.y - p1.y * p1.y) / det;
+  const invB2 = (p1.x * p1.x - p2.x * p2.x) / det;
+  if (invA2 <= 1e-12 || invB2 <= 1e-12) return null;
+  return { a: Math.sqrt(1 / invA2), b: Math.sqrt(1 / invB2) };
+}
+
+function onEllipse(local: Point2, a: number, b: number, tol = 0.02): boolean {
+  const v = (local.x / a) ** 2 + (local.y / b) ** 2;
+  return Math.abs(v - 1) <= tol;
+}
+
 /** Исходное основание: A=(0,0), D=(ad,0), B=(kx,ky), C=(ad+kx,ky). */
 export function initialBaseCorners(
   kx: number,
@@ -146,10 +79,21 @@ export function initialBaseCorners(
   };
 }
 
-const FIFTH_POINT_X_CANDIDATES = [-0.15, -0.25, -0.35, -0.5, -0.65, -0.85, -1.1];
+/** 5-я точка: на горизонтали через центр, слева от A (для формы эллипса). */
+function fifthPointCandidates(adLen: number): number[] {
+  return [
+    -0.02 * adLen,
+    -0.08 * adLen,
+    -0.15 * adLen,
+    -0.25 * adLen,
+    -0.4 * adLen,
+    -0.6 * adLen,
+  ];
+}
 
 /**
- * Эллипс через 4 вершины основания + 5-я точка на горизонтали через центр (слева).
+ * Эллипс с центром в O (центр параллелограмма), проходящий через A, B и P5.
+ * Тогда C = 2O−A и D = 2O−B автоматически на эллипсе.
  */
 export function buildRotationEllipse(
   kx: number,
@@ -158,19 +102,45 @@ export function buildRotationEllipse(
 ): ConicEllipse | null {
   const { a, b, c, d, center } = initialBaseCorners(kx, ky, adLen);
 
-  for (const x5 of FIFTH_POINT_X_CANDIDATES) {
+  for (const x5 of fifthPointCandidates(adLen)) {
     const p5: Point2 = { x: x5, y: center.y };
-    const conic = fitConicFrom5Points([a, b, c, d, p5]);
-    if (!conic || !isEllipseConic(conic)) continue;
-    const base = conicToEllipse(conic);
-    if (!base) continue;
+    const orbit = fitCenteredEllipseThroughThreePoints(center, a, b, p5);
+    if (!orbit) continue;
 
-    const thetaA = ellipseAngleForPoint(base, a);
-    const thetaB = ellipseAngleForPoint(base, b);
-    const thetaD = ellipseAngleForPoint(base, d);
+    const checkD = ellipsePoint(orbit, orbit.thetaD);
+    const checkC = ellipsePoint(orbit, orbit.thetaA + Math.PI);
+    if (
+      Math.hypot(checkD.x - d.x, checkD.y - d.y) > 0.02 ||
+      Math.hypot(checkC.x - c.x, checkC.y - c.y) > 0.02
+    ) {
+      continue;
+    }
+    return orbit;
+  }
+  return null;
+}
 
-    const checkA = ellipsePoint(base, thetaA);
-    if (Math.hypot(checkA.x - a.x, checkA.y - a.y) > 0.05) continue;
+function fitCenteredEllipseThroughThreePoints(
+  center: Point2,
+  pA: Point2,
+  pB: Point2,
+  p5: Point2,
+): ConicEllipse | null {
+  const steps = 720;
+  for (let i = 0; i <= steps; i += 1) {
+    const psi = (i / steps) * Math.PI - Math.PI / 2;
+    const la = toLocal(pA, center, psi);
+    const lb = toLocal(pB, center, psi);
+    const axes = semiAxesFromTwoLocal(la, lb);
+    if (!axes) continue;
+
+    const l5 = toLocal(p5, center, psi);
+    if (!onEllipse(l5, axes.a, axes.b, 0.015)) continue;
+
+    const base = { cx: center.x, cy: center.y, a: axes.a, b: axes.b, psi };
+    const thetaA = ellipseAngleForPoint(base, pA);
+    const thetaB = ellipseAngleForPoint(base, pB);
+    const thetaD = thetaB + Math.PI;
 
     return { ...base, thetaA, thetaB, thetaD };
   }
@@ -183,4 +153,24 @@ export function sampleConicEllipse(e: ConicEllipse, segments = 64): Point2[] {
     pts.push(ellipsePoint(e, (i / segments) * Math.PI * 2));
   }
   return pts;
+}
+
+/** Проверка: все 4 вершины основания на эллипсе (для отладки). */
+export function verifyBaseOnEllipse(
+  orbit: ConicEllipse,
+  kx: number,
+  ky: number,
+  adLen: number,
+): boolean {
+  const { a, b, c, d } = initialBaseCorners(kx, ky, adLen);
+  const corners = [
+    { p: a, theta: orbit.thetaA },
+    { p: b, theta: orbit.thetaB },
+    { p: d, theta: orbit.thetaD },
+    { p: c, theta: orbit.thetaA + Math.PI },
+  ];
+  return corners.every(({ p, theta }) => {
+    const q = ellipsePoint(orbit, theta);
+    return Math.hypot(q.x - p.x, q.y - p.y) < 0.02;
+  });
 }
