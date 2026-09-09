@@ -31,6 +31,7 @@ import { faceById, vertexById } from "./parallelepiped";
 import type {
   BuiltSpacePoint,
   LineRegion,
+  LocalCoords,
   ParallelepipedFigure,
   PointOnLineDefinition,
   SpaceLine,
@@ -803,6 +804,134 @@ export function isPointInsideParallelepiped(
     if (sign !== 0 && sign * d > 1e-6) return false;
   }
   return true;
+}
+
+const LOCAL_UNIT_EPS = 1e-4;
+
+/** Точка внутри параллелепипеда в локальных (u,v,w) ∈ [0,1]³. */
+export function isLocalInsideFigure(local: LocalCoords): boolean {
+  return (
+    local.u >= -LOCAL_UNIT_EPS &&
+    local.u <= 1 + LOCAL_UNIT_EPS &&
+    local.v >= -LOCAL_UNIT_EPS &&
+    local.v <= 1 + LOCAL_UNIT_EPS &&
+    local.w >= -LOCAL_UNIT_EPS &&
+    local.w <= 1 + LOCAL_UNIT_EPS
+  );
+}
+
+/** ID точек, задающих плоскость (не прямые). */
+export function planeDefiningPointIds(plane: SpacePlane): string[] {
+  const def = plane.definition;
+  if (def.kind === "threePoints") return [def.aId, def.bId, def.cId];
+  if (def.kind === "pointAndLine") return [def.pointId];
+  return [];
+}
+
+/** Опорные точки плоскости, лежащие вне параллелепипеда. */
+export function getPlaneOutsideSupportPoints(
+  plane: SpacePlane,
+  figure: ParallelepipedFigure,
+  points: Map<string, BuiltSpacePoint>,
+): Vec3[] {
+  const supports: Vec3[] = [];
+  for (const id of planeDefiningPointIds(plane)) {
+    const pt = points.get(id);
+    if (!pt) continue;
+    if (isPointInsideParallelepiped(pt.world, figure, points)) continue;
+    supports.push(pt.world);
+  }
+  return supports;
+}
+
+function planeTangentBasis(section: Vec3[], normal: Vec3): { origin: Vec3; e1: Vec3; e2: Vec3 } | null {
+  if (section.length < 2) return null;
+  const origin = section[0]!;
+  let e1 = sub(section[1]!, origin);
+  if (len(e1) < 1e-9) return null;
+  e1 = normalize(e1);
+  let e2 = cross(normal, e1);
+  if (len(e2) < 1e-9) return null;
+  e2 = normalize(e2);
+  return { origin, e1, e2 };
+}
+
+function projectOnPlane2D(p: Vec3, origin: Vec3, e1: Vec3, e2: Vec3): { x: number; y: number } {
+  const d = sub(p, origin);
+  return { x: dot(d, e1), y: dot(d, e2) };
+}
+
+function segmentsCross2D(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+  dx: number,
+  dy: number,
+): boolean {
+  const denom = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+  if (Math.abs(denom) < 1e-12) return false;
+  const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / denom;
+  const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / denom;
+  return t > 1e-5 && t < 1 - 1e-5 && u > 1e-5 && u < 1 - 1e-5;
+}
+
+/** Вершины сечения, видимые с опорной точки (для соединительных линий). */
+function visibleSectionVerticesFromSupport(
+  section: Vec3[],
+  support: Vec3,
+  planeEq: PlaneEq,
+): Vec3[] {
+  const basis = planeTangentBasis(section, planeEq.normal);
+  if (!basis) return [];
+  const { origin, e1, e2 } = basis;
+  const eye = projectOnPlane2D(support, origin, e1, e2);
+  const poly = section.map((v) => projectOnPlane2D(v, origin, e1, e2));
+  const visible: Vec3[] = [];
+
+  for (let i = 0; i < section.length; i += 1) {
+    const vi = poly[i]!;
+    let blocked = false;
+    for (let j = 0; j < poly.length; j += 1) {
+      const jn = (j + 1) % poly.length;
+      if (j === i || jn === i) continue;
+      const a = poly[j]!;
+      const b = poly[jn]!;
+      if (segmentsCross2D(eye.x, eye.y, vi.x, vi.y, a.x, a.y, b.x, b.y)) {
+        blocked = true;
+        break;
+      }
+    }
+    if (!blocked) visible.push(section[i]!);
+  }
+  return visible;
+}
+
+/**
+ * Тонкие линии от продолжений сторон сечения плоскости к опорной точке вне тела.
+ */
+export function computePlaneHelperSegments(
+  section: Vec3[],
+  support: Vec3,
+  planeEq: PlaneEq,
+): Array<{ from: Vec3; to: Vec3 }> {
+  if (section.length < 3) return [];
+  const vertices = visibleSectionVerticesFromSupport(section, support, planeEq);
+  const segments: Array<{ from: Vec3; to: Vec3 }> = [];
+  const seen = new Set<string>();
+  const key = (a: Vec3, b: Vec3) =>
+    `${a.x.toFixed(4)}:${a.y.toFixed(4)}:${a.z.toFixed(4)}-${b.x.toFixed(4)}:${b.y.toFixed(4)}:${b.z.toFixed(4)}`;
+
+  for (const from of vertices) {
+    if (len(sub(from, support)) < 1e-6) continue;
+    const k = key(from, support);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    segments.push({ from, to: support });
+  }
+  return segments;
 }
 
 export function outwardFaceNormal(

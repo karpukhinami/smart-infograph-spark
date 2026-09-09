@@ -3,6 +3,8 @@ import {
   buildSpaceScene,
   computeFaceOrPlaneSection,
   computeLineDisplayRange,
+  computePlaneHelperSegments,
+  getPlaneOutsideSupportPoints,
   planeIntersectionSegmentRange,
   resolveLineCarrier,
   type ResolvedSpaceScene,
@@ -46,18 +48,23 @@ function drawSegmentWithVisibility(
   hiddenDash: string,
   parts: string[],
   obstacles: Obstacle[],
+  strokeOpacity?: number,
 ): void {
   const dir = sub(bWorld, aWorld);
   const abLen = len(dir);
   if (!(abLen > 1e-9)) return;
   const unit = scale(dir, 1 / abLen);
   const segments = splitLineForRender(aWorld, unit, 0, abLen, figure, resolved, view, occlusion);
+  const opacityAttr =
+    strokeOpacity !== undefined && strokeOpacity < 1
+      ? ` stroke-opacity="${strokeOpacity}"`
+      : "";
   for (const seg of segments) {
     const p1 = projectWorld(seg.a, resolved, view, fit);
     const p2 = projectWorld(seg.b, resolved, view, fit);
     const dash = seg.visible ? "" : ` stroke-dasharray="${hiddenDash}"`;
     parts.push(
-      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"${dash}/>`,
+      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"${dash}${opacityAttr}/>`,
     );
     obstacles.push(lineObstacle(p1.x, p1.y, p2.x, p2.y, seg.visible ? "curve" : "helper"));
   }
@@ -289,6 +296,7 @@ function renderPlane(
     `<polygon points="${poly}" fill="${plane.style.color}" fill-opacity="${fillOpacity}" stroke="none"/>`,
   );
 
+  const edgeWidth = data.appearance.lineWidth;
   for (let i = 0; i < section.length; i += 1) {
     const a = section[i]!;
     const b = section[(i + 1) % section.length]!;
@@ -301,11 +309,37 @@ function renderPlane(
       fit,
       occlusion,
       plane.style.color,
-      data.appearance.lineWidth,
+      edgeWidth,
       data.appearance.hiddenDash,
       parts,
       obstacles,
     );
+  }
+
+  const planeEq = resolved.planes.get(plane.id);
+  if (!planeEq) return;
+
+  const helperWidth = edgeWidth / 2;
+  const supports = getPlaneOutsideSupportPoints(plane, figure, resolved.points);
+  for (const support of supports) {
+    const helpers = computePlaneHelperSegments(section, support, planeEq);
+    for (const seg of helpers) {
+      drawSegmentWithVisibility(
+        seg.from,
+        seg.to,
+        figure,
+        resolved,
+        data.view,
+        fit,
+        occlusion,
+        plane.style.color,
+        helperWidth,
+        data.appearance.hiddenDash,
+        parts,
+        obstacles,
+        plane.style.helperOpacity,
+      );
+    }
   }
 }
 
