@@ -13,6 +13,9 @@ const T_EPS = 1e-7;
 const SURFACE_EPS = 1e-5;
 const UNIT_EPS = 1e-4;
 const FACE_EPS = 1e-4;
+const DEPTH_EPS = 1e-4;
+
+type ScreenPt = { x: number; y: number; z: number };
 
 const BOX_FACE_TO_FACE_ID: Record<string, string> = {
   u0: "f-left",
@@ -213,6 +216,202 @@ function pointInQuad2D(px: number, py: number, verts: Array<{ x: number; y: numb
   return sign !== 0;
 }
 
+function pointInPolygon2D(px: number, py: number, verts: Array<{ x: number; y: number }>): boolean {
+  if (verts.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = verts.length - 1; i < verts.length; j = i++) {
+    const xi = verts[i]!.x;
+    const yi = verts[i]!.y;
+    const xj = verts[j]!.x;
+    const yj = verts[j]!.y;
+    const intersects = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function depthOnFaceQuad(px: number, py: number, verts: ScreenPt[]): number {
+  const [v0, v1, v2, v3] = verts;
+  const denom = (v2!.x - v0!.x) * (v3!.y - v0!.y) - (v2!.y - v0!.y) * (v3!.x - v0!.x);
+  if (Math.abs(denom) < 1e-12) {
+    return (v0!.z + v1!.z + v2!.z + v3!.z) * 0.25;
+  }
+  const u = ((px - v0!.x) * (v3!.y - v0!.y) - (py - v0!.y) * (v3!.x - v0!.x)) / denom;
+  const v = ((px - v0!.x) * (v1!.y - v0!.y) - (py - v0!.y) * (v1!.x - v0!.x)) / denom;
+  const d0 = v0!.z + u * (v1!.z - v0!.z) + v * (v3!.z - v0!.z);
+  const d1 = v0!.z + u * (v2!.z - v0!.z) + v * (v3!.z - v0!.z);
+  return (d0 + d1) * 0.5;
+}
+
+/** Ближайшая к наблюдателю поверхность среди передних граней в экранной точке. */
+function frontSurfaceDepthSchool(
+  px: number,
+  py: number,
+  figure: ParallelepipedFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
+): number | null {
+  let best: number | null = null;
+  for (const faceId of FRONT_FACE_IDS) {
+    const face = faceById(figure, faceId);
+    if (!face) continue;
+    const quad = face.vertexIds
+      .map((id) => {
+        const pt = resolved.points.get(id);
+        if (!pt) return null;
+        return projectLocalForScreen(pt.local, view);
+      })
+      .filter(Boolean) as ScreenPt[];
+    if (quad.length !== 4) continue;
+    if (!pointInQuad2D(px, py, quad)) continue;
+    const z = depthOnFaceQuad(px, py, quad);
+    if (best === null || z < best) best = z;
+  }
+  return best;
+}
+
+function onBackFace(local: LocalCoords, k: number): boolean {
+  const faceKey = localOnBoxFace(local);
+  if (!faceKey) return false;
+  const faceId = BOX_FACE_TO_FACE_ID[faceKey];
+  return faceId ? !isFaceFrontFacing(faceId, k) : false;
+}
+
+/** 2D-контур силуэта: рёбра между передней и задней гранью. */
+function buildSilhouettePolygon(
+  figure: ParallelepipedFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
+  k: number,
+): Array<{ x: number; y: number }> {
+  const adj = new Map<string, string[]>();
+  const coords = new Map<string, { x: number; y: number }>();
+
+  for (const edge of figure.edges) {
+    const pair = EDGE_FACES[edge.id];
+    if (!pair) continue;
+    if (isFaceFrontFacing(pair[0], k) === isFaceFrontFacing(pair[1], k)) continue;
+    const { aId, bId } = edge;
+    if (!adj.has(aId)) adj.set(aId, []);
+    if (!adj.has(bId)) adj.set(bId, []);
+    adj.get(aId)!.push(bId);
+    adj.get(bId)!.push(aId);
+    for (const id of [aId, bId]) {
+      if (coords.has(id)) continue;
+      const pt = resolved.points.get(id);
+      if (!pt) continue;
+      const s = projectLocalForScreen(pt.local, view);
+      coords.set(id, { x: s.x, y: s.y });
+    }
+  }
+
+  if (adj.size < 3) return [];
+
+  const start = [...adj.keys()].sort((a, b) => {
+    const pa = coords.get(a)!;
+    const pb = coords.get(b)!;
+    if (pa.y !== pb.y) return pa.y - pb.y;
+    return pa.x - pb.x;
+  })[0]!;
+
+  const pickNext = (cur: string, prev: string | null): string | null => {
+    const nbs = adj.get(cur) ?? [];
+    if (!nbs.length) return null;
+    if (nbs.length === 1) return nbs[0]!;
+    const pc = coords.get(cur)!;
+    if (prev === null) {
+      return [...nbs].sort((a, b) => {
+        const aa = Math.atan2(coords.get(a)!.y - pc.y, coords.get(a)!.x - pc.x);
+        const bb = Math.atan2(coords.get(b)!.y - pc.y, coords.get(b)!.x - pc.x);
+        return aa - bb;
+      })[0]!;
+    }
+    const ppc = coords.get(prev)!;
+    const base = Math.atan2(pc.y - ppc.y, pc.x - ppc.x);
+    const candidates = nbs.filter((n) => n !== prev);
+    if (!candidates.length) return null;
+    return candidates.sort((a, b) => {
+      const aa = Math.atan2(coords.get(a)!.y - pc.y, coords.get(a)!.x - pc.x) - base;
+      const bb = Math.atan2(coords.get(b)!.y - pc.y, coords.get(b)!.x - pc.x) - base;
+      const normA = ((aa % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const normB = ((bb % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      return normA - normB;
+    })[0]!;
+  };
+
+  const poly: Array<{ x: number; y: number }> = [];
+  let cur = start;
+  let prev: string | null = null;
+  for (let guard = 0; guard < 24; guard += 1) {
+    poly.push(coords.get(cur)!);
+    const next = pickNext(cur, prev);
+    if (!next || next === start) break;
+    prev = cur;
+    cur = next;
+  }
+  return poly;
+}
+
+function segSegIntersectionT2D(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+  dx: number,
+  dy: number,
+): number | null {
+  const denom = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+  if (Math.abs(denom) < 1e-12) return null;
+  const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / denom;
+  const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / denom;
+  if (t < -T_EPS || t > 1 + T_EPS || u < -T_EPS || u > 1 + T_EPS) return null;
+  return t;
+}
+
+function screenPointAtLocalT(
+  originL: LocalCoords,
+  dirL: LocalCoords,
+  t: number,
+  view: SpaceViewParams,
+): ScreenPt {
+  return projectLocalForScreen(
+    {
+      u: originL.u + t * dirL.u,
+      v: originL.v + t * dirL.v,
+      w: originL.w + t * dirL.w,
+    },
+    view,
+  );
+}
+
+function isMidpointVisibleSchool(
+  lAt: LocalCoords,
+  lBt: LocalCoords,
+  midL: LocalCoords,
+  figure: ParallelepipedFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
+  k: number,
+  silhouette: Array<{ x: number; y: number }>,
+): boolean {
+  if (segmentOnSharedFrontFace(lAt, lBt, k)) return true;
+  if (isPointOccludedLocal(midL, k)) return false;
+
+  const screen = projectLocalForScreen(midL, view);
+  const inSilhouette =
+    silhouette.length >= 3 && pointInPolygon2D(screen.x, screen.y, silhouette);
+
+  if (inSilhouette) {
+    if (onBackFace(midL, k)) return false;
+    const frontZ = frontSurfaceDepthSchool(screen.x, screen.y, figure, resolved, view);
+    if (frontZ !== null && screen.z > frontZ + DEPTH_EPS) return false;
+  }
+
+  return true;
+}
+
 /** Clip отрезка (s0,s1) в 2D по выпуклому четырёхугольнику → [lo, hi] или null. */
 function clipSegmentToQuad2D(
   ax: number,
@@ -251,49 +450,26 @@ function clipSegmentToQuad2D(
   return [t0, t1];
 }
 
-function screenOverlapBreakpoints(
+/** Точки смены видимости — пересечения 2D-проекции с контуром силуэта. */
+function silhouetteBreakpoints(
   originL: LocalCoords,
   dirL: LocalCoords,
   t0: number,
   t1: number,
-  figure: ParallelepipedFigure,
-  resolved: ResolvedSpaceScene,
+  silhouette: Array<{ x: number; y: number }>,
   view: SpaceViewParams,
 ): number[] {
+  if (silhouette.length < 3) return [];
   const bps: number[] = [];
-  const p0 = projectLocalForScreen(
-    {
-      u: originL.u + t0 * dirL.u,
-      v: originL.v + t0 * dirL.v,
-      w: originL.w + t0 * dirL.w,
-    },
-    view,
-  );
-  const p1 = projectLocalForScreen(
-    {
-      u: originL.u + t1 * dirL.u,
-      v: originL.v + t1 * dirL.v,
-      w: originL.w + t1 * dirL.w,
-    },
-    view,
-  );
+  const p0 = screenPointAtLocalT(originL, dirL, t0, view);
+  const p1 = screenPointAtLocalT(originL, dirL, t1, view);
 
-  for (const faceId of FRONT_FACE_IDS) {
-    const face = faceById(figure, faceId);
-    if (!face) continue;
-    const quad = face.vertexIds
-      .map((id) => {
-        const pt = resolved.points.get(id);
-        if (!pt) return null;
-        return projectLocalForScreen(pt.local, view);
-      })
-      .filter(Boolean) as Array<{ x: number; y: number; z: number }>;
-    if (quad.length !== 4) continue;
-    const clip = clipSegmentToQuad2D(p0.x, p0.y, p1.x, p1.y, quad);
-    if (!clip) continue;
-    const [lo, hi] = clip;
-    bps.push(t0 + lo * (t1 - t0));
-    bps.push(t0 + hi * (t1 - t0));
+  for (let i = 0; i < silhouette.length; i += 1) {
+    const a = silhouette[i]!;
+    const b = silhouette[(i + 1) % silhouette.length]!;
+    const hit = segSegIntersectionT2D(p0.x, p0.y, p1.x, p1.y, a.x, a.y, b.x, b.y);
+    if (hit === null) continue;
+    bps.push(t0 + hit * (t1 - t0));
   }
   return bps;
 }
@@ -330,9 +506,10 @@ export function splitLineSchoolView(
     w: endL.w - originL.w,
   };
 
+  const silhouette = buildSilhouettePolygon(figure, resolved, view, k);
   const bps = [
     ...facePlaneBreakpointsLocal(originL, dirL, t0, t1),
-    ...screenOverlapBreakpoints(originL, dirL, t0, t1, figure, resolved, view),
+    ...silhouetteBreakpoints(originL, dirL, t0, t1, silhouette, view),
   ];
   const sorted = mergeBreakpoints(bps, t0, t1);
   const segments: LineSplitSegment[] = [];
@@ -357,8 +534,16 @@ export function splitLineSchoolView(
       v: originL.v + tm * dirL.v,
       w: originL.w + tm * dirL.w,
     };
-    const visible =
-      segmentOnSharedFrontFace(lAt, lBt, k) || !isPointOccludedLocal(midL, k);
+    const visible = isMidpointVisibleSchool(
+      lAt,
+      lBt,
+      midL,
+      figure,
+      resolved,
+      view,
+      k,
+      silhouette,
+    );
     segments.push({
       a: add(originWorld, scale(dirWorld, ta)),
       b: add(originWorld, scale(dirWorld, tb)),
@@ -367,16 +552,36 @@ export function splitLineSchoolView(
   }
 
   if (!segments.length) {
+    const tm = (t0 + t1) * 0.5;
+    const lAt: LocalCoords = {
+      u: originL.u + t0 * dirL.u,
+      v: originL.v + t0 * dirL.v,
+      w: originL.w + t0 * dirL.w,
+    };
+    const lBt: LocalCoords = {
+      u: originL.u + t1 * dirL.u,
+      v: originL.v + t1 * dirL.v,
+      w: originL.w + t1 * dirL.w,
+    };
     const midL: LocalCoords = {
-      u: originL.u + ((t0 + t1) * 0.5) * dirL.u,
-      v: originL.v + ((t0 + t1) * 0.5) * dirL.v,
-      w: originL.w + ((t0 + t1) * 0.5) * dirL.w,
+      u: originL.u + tm * dirL.u,
+      v: originL.v + tm * dirL.v,
+      w: originL.w + tm * dirL.w,
     };
     return [
       {
         a: add(originWorld, scale(dirWorld, t0)),
         b: add(originWorld, scale(dirWorld, t1)),
-        visible: !isPointOccludedLocal(midL, k),
+        visible: isMidpointVisibleSchool(
+          lAt,
+          lBt,
+          midL,
+          figure,
+          resolved,
+          view,
+          k,
+          silhouette,
+        ),
       },
     ];
   }
