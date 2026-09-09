@@ -11,6 +11,7 @@ import {
 } from "./build";
 import { fitSpaceProjection, projectFromLocalCoeffs, sampleRotationEllipse } from "./camera";
 import { collectVisibleOverlaySegments, isEdgeCoveredOnScreen } from "./edge-overlay";
+import { collectPlaneFillFragments } from "./plane-subdivision";
 import {
   buildOcclusionContext,
   isBodyEdgeVisibleForRender,
@@ -270,7 +271,25 @@ function renderLineObject(
   }
 }
 
-function renderPlane(
+function renderPlaneFillPolygon(
+  vertices: Vec3[],
+  color: string,
+  fillOpacity: number,
+  data: SpaceSceneData,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  fit: { scale: number; cx: number; cy: number },
+  parts: string[],
+): void {
+  if (vertices.length < 3) return;
+  const screenPts = vertices.map((w) => projectWorld(w, resolved, data.view, fit, figure));
+  const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
+  parts.push(
+    `<polygon points="${poly}" fill="${color}" fill-opacity="${fillOpacity}" stroke="none"/>`,
+  );
+}
+
+function renderPlaneOutlines(
   plane: SpacePlane,
   data: SpaceSceneData,
   figure: SpaceFigure,
@@ -289,14 +308,6 @@ function renderPlane(
     resolved.basis,
   );
   if (!section || section.length < 3) return;
-
-  const screenPts = section.map((w) => projectWorld(w, resolved, data.view, fit, figure));
-  const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
-  const fillOpacity = data.appearance.planeFillOpacity;
-
-  parts.push(
-    `<polygon points="${poly}" fill="${plane.style.color}" fill-opacity="${fillOpacity}" stroke="none"/>`,
-  );
 
   const edgeWidth = data.appearance.lineWidth;
   for (let i = 0; i < section.length; i += 1) {
@@ -342,6 +353,39 @@ function renderPlane(
       );
     }
   }
+}
+
+function renderPlane(
+  plane: SpacePlane,
+  data: SpaceSceneData,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  fit: { scale: number; cx: number; cy: number },
+  occlusion: OcclusionContext,
+  parts: string[],
+  obstacles: Obstacle[],
+): void {
+  if (!plane.style.visible || !plane.built) return;
+  const section = computeFaceOrPlaneSection(
+    plane.id,
+    figure,
+    resolved.points,
+    resolved.planes,
+    resolved.basis,
+  );
+  if (!section || section.length < 3) return;
+
+  renderPlaneFillPolygon(
+    section,
+    plane.style.color,
+    data.appearance.planeFillOpacity,
+    data,
+    figure,
+    resolved,
+    fit,
+    parts,
+  );
+  renderPlaneOutlines(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
 }
 
 function collectFitPoints(
@@ -496,8 +540,27 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     obstacles.push(lineObstacle(p1.x, p1.y, p2.x, p2.y, visible ? "curve" : "axis"));
   }
 
-  for (const plane of data.planes) {
-    renderPlane(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
+  if (data.view.planeFillByDepth) {
+    const fragments = collectPlaneFillFragments(data, figure, resolved);
+    for (const fragment of fragments) {
+      renderPlaneFillPolygon(
+        fragment.vertices,
+        fragment.color,
+        a.planeFillOpacity,
+        data,
+        figure,
+        resolved,
+        fit,
+        parts,
+      );
+    }
+    for (const plane of data.planes) {
+      renderPlaneOutlines(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
+    }
+  } else {
+    for (const plane of data.planes) {
+      renderPlane(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
+    }
   }
 
   for (const line of data.lines) {

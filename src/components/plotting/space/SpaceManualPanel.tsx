@@ -271,6 +271,18 @@ export function SpaceManualPanel() {
               <CardTitle className="text-base">Плоскости</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="flex items-center justify-between rounded-md border border-border p-2">
+                <div className="space-y-0.5">
+                  <Label className="text-xs">Рассчитать глубину</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Заливка плоскостей по глубине; линии их пересечения не рисуются.
+                  </p>
+                </div>
+                <Switch
+                  checked={space3d.view.planeFillByDepth ?? false}
+                  onCheckedChange={(checked) => updateSpaceView({ planeFillByDepth: checked })}
+                />
+              </div>
               {space3d.planes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Плоскости пока не добавлены.</p>
               ) : (

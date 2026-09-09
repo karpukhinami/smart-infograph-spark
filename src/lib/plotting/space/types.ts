@@ -235,6 +235,8 @@ export interface SpaceViewParams {
   oblique?: number;
   /** Режим видимости: school (фикс. ракурс) или legacy (окклюзия по экрану). */
   visibilityMode?: "school" | "legacy";
+  /** Заливка плоскостей с учётом глубины (разбиение по линиям пересечения). */
+  planeFillByDepth?: boolean;
 }
 
 export interface SpaceAppearance {
