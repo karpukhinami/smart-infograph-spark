@@ -185,6 +185,7 @@ interface PlotStore {
   setSpaceBaseInput: (input: string) => void;
   buildSpaceFigure: () => void;
   updateSpaceConstraints: (patch: Partial<ParallelepipedConstraints>) => void;
+  updateSpaceView: (patch: Partial<SpaceSceneData["view"]>) => void;
   startSpacePointDraft: () => void;
   updateSpacePointDraft: (patch: Partial<SpacePointDraft>) => void;
   cancelSpacePointDraft: () => void;
@@ -1120,6 +1121,14 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     });
     set({ scene: result.scene, status: result.status });
   },
+
+  updateSpaceView: (patch) =>
+    set((state) =>
+      patchSpaceData(state, (data) => ({
+        ...data,
+        view: { ...data.view, ...patch },
+      })),
+    ),
 
   startSpacePointDraft: () => {
     const data = get().scene.space3d;

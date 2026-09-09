@@ -27,6 +27,7 @@ export function SpaceManualPanel() {
   const setSpaceBaseInput = usePlotStore((s) => s.setSpaceBaseInput);
   const buildSpaceFigure = usePlotStore((s) => s.buildSpaceFigure);
   const updateSpaceConstraints = usePlotStore((s) => s.updateSpaceConstraints);
+  const updateSpaceView = usePlotStore((s) => s.updateSpaceView);
   const startSpacePointDraft = usePlotStore((s) => s.startSpacePointDraft);
   const startSpaceLineDraft = usePlotStore((s) => s.startSpaceLineDraft);
   const startSpacePlaneDraft = usePlotStore((s) => s.startSpacePlaneDraft);
@@ -128,6 +129,35 @@ export function SpaceManualPanel() {
 
       {hasFigure && (
         <>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Вид</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Поворот</Label>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {Math.round(space3d.view.yaw)}°
+                  </span>
+                </div>
+                <Slider
+                  min={0}
+                  max={360}
+                  step={1}
+                  value={[((space3d.view.yaw % 360) + 360) % 360]}
+                  onValueChange={([value]) => {
+                    if (value === undefined) return;
+                    updateSpaceView({ yaw: value });
+                  }}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Вращение вокруг вертикальной оси; ∠BAD задаёт форму эллипса основания.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Точки</CardTitle>

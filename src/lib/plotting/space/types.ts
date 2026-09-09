@@ -187,7 +187,7 @@ export interface SpacePlane {
 export interface SpaceViewParams {
   /** Базовый масштаб ребра AD на экране (уточняется авто-fit). */
   scale: number;
-  /** Зарезервировано под будущее вращение. */
+  /** Поворот вокруг вертикальной оси, градусы (0 = исходный ракурс). */
   yaw: number;
   pitch: number;
   /** @deprecated kx/ky вычисляются из badAngleDeg и depthLength */

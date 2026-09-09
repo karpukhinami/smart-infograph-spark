@@ -19,6 +19,14 @@ export interface ProjectionCoeffs {
   kwx: number;
   /** Высота: компонента w → экран Y. */
   kwy: number;
+  /** Параметр t вращения вокруг вертикальной оси, рад. */
+  yawRad: number;
+  /** Фазовый сдвиг A→B на эллипсе основания, рад (∠BAD). */
+  phi0: number;
+  /** Горизонтальная полуось эллипса основания. */
+  rx: number;
+  /** Вертикальная полуось эллипса основания. */
+  ry: number;
 }
 
 /** Фиксированная константа школьной проекции (legacy). */
@@ -81,11 +89,23 @@ export function getProjectionCoeffs(
   const heightScreenX = heightLength * Math.cos(heightAngleRad);
   const heightScreenY = heightLength * Math.sin(heightAngleRad);
 
+  const kx = depthScreenX / scaleX;
+  const ky = depthScreenY / scaleY;
+  const cosP = Math.cos(depthAngleRad);
+  const sinP = Math.sin(depthAngleRad);
+  const denom = cosP - 1;
+  const rx = Math.abs(denom) > 1e-8 ? kx / denom : -DEFAULT_DEPTH_LENGTH;
+  const ry = Math.abs(sinP) > 1e-8 ? -ky / sinP : DEFAULT_DEPTH_LENGTH;
+
   return {
-    kx: depthScreenX / scaleX,
-    ky: depthScreenY / scaleY,
+    kx,
+    ky,
     kwx: heightScreenX / scaleX,
     kwy: heightScreenY / scaleY,
+    yawRad: (view.yaw * Math.PI) / 180,
+    phi0: depthAngleRad,
+    rx,
+    ry,
   };
 }
 
@@ -93,29 +113,60 @@ function kwySafe(kwy: number): number {
   return Math.abs(kwy) > 1e-9 ? kwy : 1;
 }
 
+/** Точка на эллипсе основания: A при t=0 в начале координат. */
+function ellipseBasePoint(t: number, phase: number, rx: number, ry: number): { x: number; y: number } {
+  const ang = t + phase;
+  return {
+    x: rx * (Math.cos(ang) - 1),
+    y: ry * Math.sin(ang),
+  };
+}
+
+/** Углы A, B, D нижнего основания на эллипсе при параметре t. */
+function baseCorners(
+  t: number,
+  phi0: number,
+  rx: number,
+  ry: number,
+): { a: { x: number; y: number }; b: { x: number; y: number }; d: { x: number; y: number } } {
+  return {
+    a: ellipseBasePoint(t, 0, rx, ry),
+    b: ellipseBasePoint(t, -phi0, rx, ry),
+    d: ellipseBasePoint(t, -phi0 + Math.PI, rx, ry),
+  };
+}
+
 /**
  * Локальные (u,v,w) → координаты вида (X,Y,Z).
- * AD: (v, 0); AA₁: (kwx·w, kwy·w); AB: (kx·u, ky·u).
+ * Основание — параллелограмм на эллипсе; AA₁ — линейное смещение по w.
  */
 export function localToView(
   local: LocalCoords,
-  { kx, ky, kwx, kwy }: ProjectionCoeffs,
+  { kx, ky, kwx, kwy, yawRad, phi0, rx, ry }: ProjectionCoeffs,
 ): { x: number; y: number; z: number } {
   const { u, v, w } = local;
+  const { a, b, d } = baseCorners(yawRad, phi0, rx, ry);
   const kw = kwySafe(kwy);
+  const ct = Math.cos(yawRad);
+  const st = Math.sin(yawRad);
+  const ur = u * ct - v * st;
+  const vr = u * st + v * ct;
   return {
-    x: v + kx * u + kwx * w,
-    y: kwy * w + ky * u,
-    z: u - kx * v - (ky / kw) * w,
+    x: a.x + u * (b.x - a.x) + v * (d.x - a.x) + kwx * w,
+    y: a.y + u * (b.y - a.y) + v * (d.y - a.y) + kwy * w,
+    z: ur - kx * vr - (ky / kw) * w,
   };
 }
 
 /** Направление луча наблюдения в локальных (u,v,w). */
-export function viewDirectionLocal({ kx, ky, kwx, kwy }: ProjectionCoeffs): LocalCoords {
+export function viewDirectionLocal({ kx, ky, kwx, kwy, yawRad }: ProjectionCoeffs): LocalCoords {
   const kw = kwySafe(kwy);
+  const vBase = -kx + (kwx * ky) / kw;
+  const ct = Math.cos(yawRad);
+  const st = Math.sin(yawRad);
   return {
-    u: 1,
-    v: -kx + (kwx * ky) / kw,
+    u: ct - st * vBase,
+    v: st + ct * vBase,
     w: -ky / kw,
   };
 }
