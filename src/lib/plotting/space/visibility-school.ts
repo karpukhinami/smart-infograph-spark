@@ -5,7 +5,7 @@
 import { getViewK, localToView } from "./camera";
 import { faceById } from "./parallelepiped";
 import type { ParallelepipedFigure, LocalCoords, SpaceViewParams, Vec3 } from "./types";
-import { add, dot, len, scale, sub, worldToLocal } from "./vec3";
+import { add, dotLocal, len, scale, sub, worldToLocal } from "./vec3";
 import type { ResolvedSpaceScene } from "./build";
 import type { LineSplitSegment } from "./visibility";
 
@@ -78,7 +78,7 @@ export function isFaceFrontFacing(faceId: string, k: number): boolean {
   const n = FACE_NORMALS[faceId];
   if (!n) return false;
   const vd = viewDirectionLocal(k);
-  return dot(n, vd) < -SURFACE_EPS;
+  return dotLocal(n, vd) < -SURFACE_EPS;
 }
 
 export function isBodyEdgeVisibleSchool(

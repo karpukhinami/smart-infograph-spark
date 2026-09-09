@@ -20,6 +20,10 @@ export function dot(a: Vec3, b: Vec3): number {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+export function dotLocal(a: LocalCoords, b: LocalCoords): number {
+  return a.u * b.u + a.v * b.v + a.w * b.w;
+}
+
 export function cross(a: Vec3, b: Vec3): Vec3 {
   return {
     x: a.y * b.z - a.z * b.y,
