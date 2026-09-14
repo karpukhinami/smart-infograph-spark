@@ -30,7 +30,7 @@ import {
   type ProjectedPoint,
 } from "./camera";
 import { edgeById, faceById, isParallelepiped, isPyramid, vertexById } from "./figure";
-import { localToCartesian } from "./pyramid";
+import { localToCartesian, refreshPyramidVertices } from "./pyramid";
 import type {
   BuiltSpacePoint,
   LineRegion,
@@ -344,11 +344,14 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
     };
   }
 
-  const basis = computeFigureBasis(data.figure);
-  const projection = getProjectionCoeffs(data.view, data.figure);
+  const figure =
+    isPyramid(data.figure) ? refreshPyramidVertices(data.figure) : data.figure;
+
+  const basis = computeFigureBasis(figure);
+  const projection = getProjectionCoeffs(data.view, figure);
 
   // Встроенные вершины.
-  for (const vertex of data.figure.vertices) {
+  for (const vertex of figure.vertices) {
     const world = localToWorld(vertex.local, basis);
     points.set(vertex.id, { local: { ...vertex.local }, world });
   }
@@ -358,7 +361,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   for (let pass = 0; pass < pending.length + 2 && pending.length; pass += 1) {
     const next: SpacePoint[] = [];
     for (const point of pending) {
-      const result = resolvePoint(point, data.figure, basis, points);
+      const result = resolvePoint(point, figure, basis, points);
       if (result.built) {
         points.set(point.id, result.built);
       } else if (point.lastBuilt) {
@@ -374,22 +377,22 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   }
 
   // Грани параллелепипеда как плоскости (для пересечений и выбора в UI).
-  for (const face of data.figure.faces) {
-    const eq = facePlane(data.figure, face.id, points);
+  for (const face of figure.faces) {
+    const eq = facePlane(figure, face.id, points);
     if (eq) planes.set(face.id, eq);
   }
 
   // Плоскости — два прохода (пересечения прямых могут зависеть от плоскостей).
   for (let pass = 0; pass < 2; pass += 1) {
     for (const plane of data.planes) {
-      const result = resolvePlane(plane, data.figure, points, data.lines, planes);
+      const result = resolvePlane(plane, figure, points, data.lines, planes);
       if (result.eq) planes.set(plane.id, result.eq);
       else if (result.error) planeErrors.set(plane.id, result.error);
     }
   }
 
   for (const line of data.lines) {
-    const carrier = resolveLineCarrier(line, data.figure, points, planes, data.lines);
+    const carrier = resolveLineCarrier(line, figure, points, planes, data.lines);
     if (!carrier) lineErrors.set(line.id, "Прямая не определена.");
   }
 
@@ -401,7 +404,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
       pointErrors.set(point.id, "Прямая не построена.");
       continue;
     }
-    const carrier = resolveLineCarrier(line, data.figure, points, planes, data.lines);
+    const carrier = resolveLineCarrier(line, figure, points, planes, data.lines);
     if (!carrier) {
       pointErrors.set(point.id, "Носитель прямой не найден.");
       continue;
@@ -416,7 +419,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   }
 
   for (const [id, pt] of points) {
-    projected.set(id, projectFromLocalCoeffs(pt.local, pt.world, data.view, projection, data.figure));
+    projected.set(id, projectFromLocalCoeffs(pt.local, pt.world, data.view, projection, figure));
   }
 
   return {

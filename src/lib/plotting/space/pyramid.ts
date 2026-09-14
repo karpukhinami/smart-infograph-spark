@@ -129,6 +129,91 @@ export function pyramidBaseVertexCoeffs(
   return out;
 }
 
+function normalizeAngle0To2Pi(a: number): number {
+  let x = a % (2 * Math.PI);
+  if (x < 0) x += 2 * Math.PI;
+  return x;
+}
+
+/** Равномерные точки вдоль дуги эллипса from→to (выбирается дуга, не содержащая avoidTheta). */
+function ellipseArcEqualPoints(
+  orbit: ConicEllipse,
+  from: number,
+  to: number,
+  count: number,
+  avoidTheta: number,
+): Array<{ x: number; y: number }> {
+  if (count <= 0) return [];
+  if (count === 1) return [ellipsePoint(orbit, from)];
+
+  const target = ellipsePoint(orbit, to);
+  const avoid = normalizeAngle0To2Pi(avoidTheta);
+
+  const walk = (dir: 1 | -1): Array<{ theta: number; s: number; x: number; y: number }> => {
+    const out: Array<{ theta: number; s: number; x: number; y: number }> = [];
+    let s = 0;
+    const step = (dir * 2 * Math.PI) / 4096;
+    let theta = from;
+    let prev = ellipsePoint(orbit, theta);
+    out.push({ theta, s: 0, x: prev.x, y: prev.y });
+    for (let i = 0; i < 4096; i += 1) {
+      theta += step;
+      const p = ellipsePoint(orbit, theta);
+      s += Math.hypot(p.x - prev.x, p.y - prev.y);
+      out.push({ theta, s, x: p.x, y: p.y });
+      prev = p;
+      if (Math.hypot(p.x - target.x, p.y - target.y) < 1e-4) break;
+    }
+    return out;
+  };
+
+  const hitsAvoid = (table: Array<{ theta: number }>): boolean => {
+    for (const row of table) {
+      if (Math.abs(normalizeAngle0To2Pi(row.theta) - avoid) < 0.08) return true;
+    }
+    return false;
+  };
+
+  let table = walk(-1);
+  if (hitsAvoid(table)) {
+    const alt = walk(1);
+    if (!hitsAvoid(alt) && alt.length > 1) table = alt;
+  }
+  const total = table[table.length - 1]?.s ?? 0;
+  if (total < 1e-9) {
+    return Array.from({ length: count }, (_, k) =>
+      ellipsePoint(orbit, from + ((to - from) * k) / Math.max(1, count - 1)),
+    );
+  }
+
+  const out: Array<{ x: number; y: number }> = [];
+  for (let k = 0; k < count; k += 1) {
+    const targetS = (total * k) / (count - 1);
+    let j = 1;
+    while (j < table.length && table[j]!.s < targetS) j += 1;
+    const hi = table[j] ?? table[table.length - 1]!;
+    const lo = table[j - 1] ?? table[0]!;
+    const span = hi.s - lo.s;
+    const t = span > 1e-12 ? (targetS - lo.s) / span : 0;
+    out.push({
+      x: lo.x + t * (hi.x - lo.x),
+      y: lo.y + t * (hi.y - lo.y),
+    });
+  }
+  return out;
+}
+
+/** (x,y) вершин основания из фигуры (декартовы координаты). */
+export function pyramidBaseCartesianFromFigure(figure: PyramidFigure): Array<{ x: number; y: number }> {
+  const n = figure.baseLabels.length;
+  const out: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i < n; i += 1) {
+    const p = getPyramidVertexCartesian(figure, `pyr-v-b${i}`);
+    out.push(p ? { x: p.x, y: p.y } : { x: 0, y: 0 });
+  }
+  return out;
+}
+
 /** n вершин основания на эллипсе с равными шагами по длине дуги, начиная с θ₀. */
 export function ellipseBaseVerticesEqualArc(
   orbit: ConicEllipse,
@@ -236,17 +321,22 @@ export function pyramidBaseScreenAtXY(
   return best ?? baseScr[0] ?? { x: 0, y: 0 };
 }
 
-/** Вершины основания на эллипсе: i-я вершина 3D (угол i·2π/n от +X) → θ_A + i·2π/n. */
+/**
+ * Основание на эллипсе вращения: A = θ_A, B = θ_B, последняя = θ_D;
+ * остальные вершины — равномерно по передней дуге B → последняя (как у параллелепипеда).
+ */
 export function pyramidEllipseBaseScreen(
   orbit: ConicEllipse,
   n: number,
 ): Array<{ x: number; y: number }> {
-  const step = pyramidBaseAngleRad(n);
-  const out: Array<{ x: number; y: number }> = [];
-  for (let i = 0; i < n; i += 1) {
-    out.push(ellipsePoint(orbit, orbit.thetaA + step * i));
+  if (n <= 0) return [];
+  if (n === 1) return [ellipsePoint(orbit, orbit.thetaA)];
+  if (n === 2) {
+    return [ellipsePoint(orbit, orbit.thetaA), ellipsePoint(orbit, orbit.thetaB)];
   }
-  return out;
+  const a = ellipsePoint(orbit, orbit.thetaA);
+  const chain = ellipseArcEqualPoints(orbit, orbit.thetaB, orbit.thetaD, n - 1, orbit.thetaA);
+  return [a, ...chain];
 }
 
 export function createPyramid(

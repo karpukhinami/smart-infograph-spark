@@ -8,9 +8,8 @@ import { isParallelepiped, isPyramid } from "./figure";
 import {
   cartesianToPyramidCoeffs,
   localToCartesian,
-  pyramidBaseRadius,
+  pyramidBaseCartesianFromFigure,
   pyramidBaseScreenAtXY,
-  pyramidBaseVerticesCartesian,
   pyramidEllipseBaseScreen,
   pyramidFrameFromFigure,
   pyramidHeight,
@@ -218,10 +217,8 @@ function pyramidWorldToView(
 ): { x: number; y: number; z: number } {
   const { kwx, kwy, kx, ky, orbit } = coeffs;
   const kw = kwySafe(kwy);
-  const n = figure.baseLabels.length;
-  const R = pyramidBaseRadius(figure.constraints);
   const H = pyramidHeight(figure.constraints);
-  const baseCart = pyramidBaseVerticesCartesian(n, R).map((p) => ({ x: p.x, y: p.y }));
+  const baseCart = pyramidBaseCartesianFromFigure(figure);
   const baseScr = pyramidScreenBase(figure, coeffs);
   const apexAnchor = figure.constraints.apexOnCenter
     ? { x: orbit.cx, y: orbit.cy }
