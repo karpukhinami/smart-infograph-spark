@@ -6,12 +6,11 @@ import {
 } from "./conic-ellipse";
 import { isParallelepiped, isPyramid } from "./figure";
 import {
+  cartesianToPyramidCoeffs,
   ellipseBaseVerticesEqualArc,
   localToCartesian,
-  pyramidBaseRadius,
-  pyramidBaseScreenAtXY,
-  pyramidBaseVerticesCartesian,
-  pyramidHeight,
+  pyramidBaseScreenFromCoeffs,
+  pyramidFrameFromFigure,
 } from "./pyramid";
 import type {
   LocalCoords,
@@ -217,20 +216,18 @@ function pyramidWorldToView(
 ): { x: number; y: number; z: number } {
   const { kwx, kwy, kx, ky, orbit } = coeffs;
   const kw = kwySafe(kwy);
-  const n = figure.baseLabels.length;
-  const R = pyramidBaseRadius(figure.constraints);
-  const H = pyramidHeight(figure.constraints);
+  const frame = pyramidFrameFromFigure(figure);
+  const c = cartesianToPyramidCoeffs(world, frame) ?? { u: 0, v: 0, w: 0 };
   const baseScr = pyramidScreenBase(figure, coeffs);
-  const baseXY = pyramidBaseVerticesCartesian(n, R);
   const apexAnchor = figure.constraints.apexOnCenter
     ? { x: orbit.cx, y: orbit.cy }
     : baseScr[0]!;
-  const atBase = pyramidBaseScreenAtXY(world.x, world.y, baseXY, baseScr);
-  const t = H > 1e-9 ? Math.max(0, Math.min(1, world.z / H)) : 0;
+  const atBase = pyramidBaseScreenFromCoeffs(c.u, c.v, baseScr);
+  const t = Math.max(0, Math.min(1, c.w));
   return {
     x: atBase.x + t * (apexAnchor.x - atBase.x) + kwx * t,
     y: atBase.y + t * (apexAnchor.y - atBase.y) + kwy * t,
-    z: world.x - kx * world.y - (ky / kw) * t,
+    z: c.u - kx * c.v - (ky / kw) * t,
   };
 }
 

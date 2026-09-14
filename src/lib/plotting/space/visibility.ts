@@ -1,6 +1,7 @@
 import { projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
 import { facePlane, type ResolvedSpaceScene } from "./build";
 import { adjacentFaceIds, edgeById, faceById, isPyramid } from "./figure";
+import { pyramidFrameFromFigure } from "./pyramid";
 import type { SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
 import { viewDirectionLocal } from "./camera";
@@ -384,8 +385,12 @@ export function getVisibilityMode(view: SpaceViewParams): "school" | "legacy" {
   return view.visibilityMode ?? "school";
 }
 
-function viewDirectionWorld(resolved: ResolvedSpaceScene): Vec3 {
+function viewDirectionWorld(resolved: ResolvedSpaceScene, figure: SpaceFigure): Vec3 {
   const vd = viewDirectionLocal(resolved.projection);
+  if (isPyramid(figure)) {
+    const { e1, e2, e3 } = pyramidFrameFromFigure(figure);
+    return normalize(add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)));
+  }
   const { e1, e2, e3 } = resolved.basis;
   return normalize(add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)));
 }
@@ -400,7 +405,7 @@ function isFaceFrontFacingWorld(
   const ps = face.vertexIds.map((id) => resolved.points.get(id)?.world).filter(Boolean) as Vec3[];
   if (ps.length < 3) return false;
   const n = normalize(cross(sub(ps[1]!, ps[0]!), sub(ps[2]!, ps[0]!)));
-  return dot(n, viewDirectionWorld(resolved)) < -1e-5;
+  return dot(n, viewDirectionWorld(resolved, figure)) < -1e-5;
 }
 
 function isBodyEdgeVisiblePyramid(

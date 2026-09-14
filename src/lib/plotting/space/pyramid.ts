@@ -9,42 +9,44 @@ import type {
   SpaceVertex,
   Vec3,
 } from "./types";
+import { add, scale, sub, worldToLocal } from "./vec3";
 
-/** Для пирамиды в `local` хранится декартова (x,y,z): u=x, v=y, w=z; начало — центр основания. */
+/** В `local` пирамиды: декартовы (x,y,z) в системе с началом в центре основания. */
 
-export const PYRAMID_DEFAULT_BASE_RADIUS = 1.1;
+export const PYRAMID_BASE_RADIUS = 1;
+export const PYRAMID_HEIGHT = 2;
 
-export function pyramidBaseRadius(constraints: PyramidConstraints): number {
-  const L = PYRAMID_DEFAULT_BASE_RADIUS;
-  return constraints.equilateral ? L : L;
+export function pyramidBaseRadius(_constraints: PyramidConstraints): number {
+  return PYRAMID_BASE_RADIUS;
 }
 
-/** Высота: в 2 раза больше радиуса основания (длина «базового» вектора от центра к вершине). */
-export function pyramidHeight(constraints: PyramidConstraints): number {
-  return 2 * pyramidBaseRadius(constraints);
+export function pyramidHeight(_constraints: PyramidConstraints): number {
+  return PYRAMID_HEIGHT;
 }
 
 export function pyramidBaseAngleRad(n: number): number {
   return (2 * Math.PI) / n;
 }
 
-/** Вершины основания в плоскости z=0; ось X — к 2-й букве (индекс 0), угол 2π/n. */
+/**
+ * Вершины основания z=0, против часовой стрелки: 2-я буква → (R,0,0), далее +360/n.
+ */
 export function pyramidBaseVerticesCartesian(
   n: number,
-  radius: number,
-): Array<{ x: number; y: number }> {
-  const out: Array<{ x: number; y: number }> = [];
+  radius: number = PYRAMID_BASE_RADIUS,
+): Vec3[] {
+  const out: Vec3[] = [];
   for (let i = 0; i < n; i += 1) {
     const ang = pyramidBaseAngleRad(n) * i;
-    out.push({ x: radius * Math.cos(ang), y: radius * Math.sin(ang) });
+    out.push({ x: radius * Math.cos(ang), y: radius * Math.sin(ang), z: 0 });
   }
   return out;
 }
 
 export function pyramidApexCartesian(
   constraints: PyramidConstraints,
-  baseRadius: number,
-  height: number,
+  baseRadius: number = PYRAMID_BASE_RADIUS,
+  height: number = PYRAMID_HEIGHT,
 ): Vec3 {
   if (constraints.apexOnCenter) {
     return { x: 0, y: 0, z: height };
@@ -66,10 +68,65 @@ export function pyramidVertexCartesianCoords(
 ): { apex: Vec3; base: Vec3[] } {
   const R = pyramidBaseRadius(constraints);
   const H = pyramidHeight(constraints);
-  const base2d = pyramidBaseVerticesCartesian(n, R);
-  const base = base2d.map((p) => ({ x: p.x, y: p.y, z: 0 }));
+  const base = pyramidBaseVerticesCartesian(n, R);
   const apex = pyramidApexCartesian(constraints, R, H);
   return { apex, base };
+}
+
+/** Базис от 2-й вершины основания (A): e1→3-я, e2→последняя, e3→1-я (вершина). */
+export interface PyramidABasis {
+  A: Vec3;
+  B: Vec3;
+  last: Vec3;
+  S: Vec3;
+  e1: Vec3;
+  e2: Vec3;
+  e3: Vec3;
+}
+
+export function getPyramidVertexCartesian(figure: PyramidFigure, vertexId: string): Vec3 | null {
+  const v = figure.vertices.find((x) => x.id === vertexId);
+  if (!v) return null;
+  return localToCartesian(v.local);
+}
+
+export function pyramidFrameFromFigure(figure: PyramidFigure): PyramidABasis {
+  const n = figure.baseLabels.length;
+  const A = getPyramidVertexCartesian(figure, `pyr-v-b0`)!;
+  const B = getPyramidVertexCartesian(figure, `pyr-v-b1`)!;
+  const last = getPyramidVertexCartesian(figure, `pyr-v-b${n - 1}`)!;
+  const S = getPyramidVertexCartesian(figure, `pyr-v-apex`)!;
+  const e1 = sub(B, A);
+  const e2 = sub(last, A);
+  const e3 = sub(S, A);
+  return { A, B, last, S, e1, e2, e3 };
+}
+
+/** Коэффициенты (u,v,w): P = A + u·e1 + v·e2 + w·e3; у A (0,0,0), B (1,0,0), last (0,1,0), S (0,0,1). */
+export function cartesianToPyramidCoeffs(P: Vec3, frame: PyramidABasis): LocalCoords | null {
+  return worldToLocal(sub(P, frame.A), { e1: frame.e1, e2: frame.e2, e3: frame.e3 });
+}
+
+export function pyramidCoeffsToCartesian(c: LocalCoords, frame: PyramidABasis): Vec3 {
+  return add(
+    frame.A,
+    add(add(scale(frame.e1, c.u), scale(frame.e2, c.v)), scale(frame.e3, c.w)),
+  );
+}
+
+/** Коэффициенты (u,v) для каждой вершины основания в базисе A. */
+export function pyramidBaseVertexCoeffs(
+  figure: PyramidFigure,
+): Array<{ u: number; v: number }> {
+  const frame = pyramidFrameFromFigure(figure);
+  const n = figure.baseLabels.length;
+  const out: Array<{ u: number; v: number }> = [];
+  for (let i = 0; i < n; i += 1) {
+    const p = getPyramidVertexCartesian(figure, `pyr-v-b${i}`)!;
+    const c = cartesianToPyramidCoeffs(p, frame);
+    out.push({ u: c?.u ?? 0, v: c?.v ?? 0 });
+  }
+  return out;
 }
 
 /** n вершин основания на эллипсе с равными шагами по длине дуги, начиная с θ₀. */
@@ -114,60 +171,19 @@ export function ellipseBaseVerticesEqualArc(
   return out;
 }
 
-export function barycentric2D(
-  p: { x: number; y: number },
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-  c: { x: number; y: number },
-): [number, number, number] | null {
-  const v0 = { x: c.x - a.x, y: c.y - a.y };
-  const v1 = { x: b.x - a.x, y: b.y - a.y };
-  const v2 = { x: p.x - a.x, y: p.y - a.y };
-  const den = v0.x * v1.y - v1.x * v0.y;
-  if (Math.abs(den) < 1e-12) return null;
-  const w1 = (v2.x * v1.y - v1.x * v2.y) / den;
-  const w2 = (v0.x * v2.y - v2.x * v0.y) / den;
-  const w0 = 1 - w1 - w2;
-  return [w0, w1, w2];
-}
-
-/** Точка (x,y) внутри основания — веер от вершины 0. */
-export function pointInBasePolygon2D(
-  x: number,
-  y: number,
-  baseXY: Array<{ x: number; y: number }>,
-): boolean {
-  const n = baseXY.length;
-  if (n < 3) return false;
-  const p = { x, y };
-  for (let i = 1; i < n - 1; i += 1) {
-    const w = barycentric2D(p, baseXY[0]!, baseXY[i]!, baseXY[i + 1]!);
-    if (w && w[0] >= -1e-6 && w[1] >= -1e-6 && w[2] >= -1e-6) return true;
-  }
-  return false;
-}
-
-/** Экранная позиция точки основания по барицентрической интерполяции вершин. */
-export function pyramidBaseScreenAtXY(
-  x: number,
-  y: number,
-  baseXY: Array<{ x: number; y: number }>,
+/** Экранная точка основания: A_scr + u·(B_scr−A_scr) + v·(last_scr−A_scr). */
+export function pyramidBaseScreenFromCoeffs(
+  u: number,
+  v: number,
   baseScr: Array<{ x: number; y: number }>,
 ): { x: number; y: number } {
-  const n = baseXY.length;
-  if (n < 3) return baseScr[0] ?? { x: 0, y: 0 };
-  const p = { x, y };
-  for (let i = 1; i < n - 1; i += 1) {
-    const w = barycentric2D(p, baseXY[0]!, baseXY[i]!, baseXY[i + 1]!);
-    if (w && w[0] >= -1e-6 && w[1] >= -1e-6 && w[2] >= -1e-6) {
-      const [w0, w1, w2] = w;
-      return {
-        x: w0 * baseScr[0]!.x + w1 * baseScr[i]!.x + w2 * baseScr[i + 1]!.x,
-        y: w0 * baseScr[0]!.y + w1 * baseScr[i]!.y + w2 * baseScr[i + 1]!.y,
-      };
-    }
-  }
-  return baseScr[0] ?? { x: 0, y: 0 };
+  const a = baseScr[0] ?? { x: 0, y: 0 };
+  const b = baseScr[1] ?? a;
+  const last = baseScr[baseScr.length - 1] ?? a;
+  return {
+    x: a.x + u * (b.x - a.x) + v * (last.x - a.x),
+    y: a.y + u * (b.y - a.y) + v * (last.y - a.y),
+  };
 }
 
 export function createPyramid(
@@ -230,12 +246,11 @@ export function pyramidApexLocal(figure: PyramidFigure): LocalCoords {
   return cartesianToLocal(apex);
 }
 
-/** Пересчитать декартовы координаты вершин после смены ограничений. */
 export function refreshPyramidVertices(figure: PyramidFigure): PyramidFigure {
   const n = figure.baseLabels.length;
   const { apex, base } = pyramidVertexCartesianCoords(figure.constraints, n);
   const vertices = figure.vertices.map((v) => {
-    if (v.id === "pyr-v-apex" || v.id.startsWith("pyr-v-apex")) {
+    if (v.id.startsWith("pyr-v-apex")) {
       return { ...v, local: cartesianToLocal(apex) };
     }
     const idx = Number(v.id.replace("pyr-v-b", ""));
