@@ -8,9 +8,11 @@ import { isParallelepiped, isPyramid } from "./figure";
 import {
   cartesianToPyramidCoeffs,
   localToCartesian,
+  pyramidApexScreenAnchor,
   pyramidBaseCartesianFromFigure,
   pyramidBaseScreenAtXY,
   pyramidEllipseBaseScreen,
+  pyramidFootOnBaseFromWorld,
   pyramidFrameFromFigure,
   pyramidHeight,
   pyramidProjectOnApexGenerator,
@@ -221,17 +223,15 @@ function pyramidWorldToView(
   const H = pyramidHeight(figure.constraints);
   const baseCart = pyramidBaseCartesianFromFigure(figure);
   const baseScr = pyramidScreenBase(figure, coeffs);
-  const apexAnchor = figure.constraints.apexOnCenter
-    ? { x: orbit.cx, y: orbit.cy }
-    : baseScr[0]!;
-  /** Высота по z: основание z=0, вершина z=H — совпадает с параметром на любом боковом ребре. */
+  const apexAnchor = pyramidApexScreenAnchor(figure, orbit, baseScr);
+  /** Высота по z: основание z=0, вершина z=H — параметр t на любом генераторе S→Q. */
   const t = H > 1e-9 ? Math.max(0, Math.min(1, world.z / H)) : 0;
   const frame = pyramidFrameFromFigure(figure);
-  const foot3 = cartesianToPyramidCoeffs({ x: world.x, y: world.y, z: 0 }, frame) ?? {
-    u: 0,
-    v: 0,
-    w: 0,
-  };
+  const footForDepth = pyramidFootOnBaseFromWorld(world, figure);
+  const foot3 = cartesianToPyramidCoeffs(
+    footForDepth ? { x: footForDepth.x, y: footForDepth.y, z: 0 } : { x: world.x, y: world.y, z: 0 },
+    frame,
+  ) ?? { u: 0, v: 0, w: 0 };
   const lateral = pyramidProjectOnApexGenerator(
     world,
     figure,
@@ -249,7 +249,8 @@ function pyramidWorldToView(
       z: foot3.u - kx * foot3.v - (ky / kw) * t,
     };
   }
-  const atBase = pyramidBaseScreenAtXY(world.x, world.y, baseCart, baseScr);
+  const foot2 = footForDepth ?? { x: world.x, y: world.y };
+  const atBase = pyramidBaseScreenAtXY(foot2.x, foot2.y, baseCart, baseScr);
   return {
     x: atBase.x + t * (apexAnchor.x - atBase.x) + kwx * t,
     y: atBase.y + t * (apexAnchor.y - atBase.y) + kwy * t,

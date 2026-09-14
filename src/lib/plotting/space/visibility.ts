@@ -1,16 +1,15 @@
-import { projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
-import { pointInPolygon2D } from "./visibility-school";
+import { type ProjectedPoint } from "./camera";
 import { facePlane, type ResolvedSpaceScene } from "./build";
-import { adjacentFaceIds, edgeById, faceById, isPyramid } from "./figure";
+import {
+  buildProjectionConvexHull,
+  isBodyEdgeVisibleProjectionHull,
+  type ProjectionHull,
+} from "./convex-hull-visibility";
+import { edgeById, isPyramid } from "./figure";
 import type { LineSplitSegment, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
 import { viewDirectionLocal } from "./camera";
-import {
-  buildFigureSilhouetteGraph,
-  edgeEndpointKey,
-  isBodyEdgeVisibleSchool,
-  splitLineSchoolView,
-} from "./visibility-school";
+import { isBodyEdgeVisibleSchool, splitLineSchoolView } from "./visibility-school";
 
 /** Видимые грани: AA₁D₁D (левая), CDD₁C₁ (задняя), A₁B₁C₁D₁ (верхняя). */
 export const VISIBLE_FACE_IDS = new Set(["f-left", "f-back", "f-top"]);
@@ -393,83 +392,25 @@ export function getVisibilityMode(view: SpaceViewParams): "school" | "legacy" {
   return view.visibilityMode ?? "school";
 }
 
-function viewDirectionWorld(resolved: ResolvedSpaceScene, figure: SpaceFigure): Vec3 {
-  const vd = viewDirectionLocal(resolved.projection);
-  const { e1, e2, e3 } = resolved.basis;
-  return normalize(add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)));
-}
+let projectionHullCacheKey = "";
+let projectionHullCache: ProjectionHull | null = null;
 
-type PyramidVisCache = {
-  interior: Set<string>;
-  silhouetteEdgeKeys: Set<string>;
-};
-
-let pyramidVisCacheKey = "";
-let pyramidVisCache: PyramidVisCache = { interior: new Set(), silhouetteEdgeKeys: new Set() };
-
-function pyramidVisibilityCache(
+function projectionHullForFigure(
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
-): PyramidVisCache {
+): ProjectionHull {
+  const body = resolved.figure ?? figure;
   const p = resolved.projection;
-  const key = `${figure.id}:${view.scale}:${view.visibilityMode}:${p.kx}:${p.ky}:${p.kwx}:${p.kwy}:${p.yawRad}:${p.orbit.thetaA}:${p.orbit.thetaB}`;
-  if (key !== pyramidVisCacheKey) {
-    pyramidVisCacheKey = key;
-    const body = resolved.figure ?? figure;
-    const graph = buildFigureSilhouetteGraph(body, resolved, view);
-    const interior = new Set<string>();
-    if (graph.poly.length >= 3) {
-      for (const v of body.vertices) {
-        if (graph.silhouetteVertexIds.has(v.id)) continue;
-        const pt = resolved.points.get(v.id);
-        if (!pt) continue;
-        const pr = projectFromLocalCoeffs(
-          pt.local,
-          pt.world,
-          view,
-          resolved.projection,
-          body,
-        );
-        if (pointInPolygon2D(pr.x, pr.y, graph.poly)) interior.add(v.id);
-      }
-    }
-    pyramidVisCache = {
-      interior,
-      silhouetteEdgeKeys: graph.silhouetteEdgeKeys,
-    };
+  const key = `${body.id}:${view.scale}:${view.yaw}:${p.kx}:${p.ky}:${p.kwx}:${p.kwy}:${p.yawRad}:${p.orbit.thetaA}:${p.orbit.thetaB}`;
+  if (key !== projectionHullCacheKey || !projectionHullCache) {
+    projectionHullCacheKey = key;
+    projectionHullCache = buildProjectionConvexHull(body, resolved, view);
   }
-  return pyramidVisCache;
+  return projectionHullCache;
 }
 
-function isFaceFrontFacingWorld(
-  faceId: string,
-  figure: SpaceFigure,
-  resolved: ResolvedSpaceScene,
-): boolean {
-  const face = faceById(figure, faceId);
-  if (!face || face.vertexIds.length < 3) return false;
-  const ps = face.vertexIds.map((id) => resolved.points.get(id)?.world).filter(Boolean) as Vec3[];
-  if (ps.length < 3) return false;
-  let n = normalize(cross(sub(ps[1]!, ps[0]!), sub(ps[2]!, ps[0]!)));
-  const center = scale(
-    ps.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
-    1 / ps.length,
-  );
-  const bodyVerts = figure.vertices
-    .map((v) => resolved.points.get(v.id)?.world)
-    .filter(Boolean) as Vec3[];
-  const body = bodyVerts.length
-    ? scale(
-        bodyVerts.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
-        1 / bodyVerts.length,
-      )
-    : { x: 0, y: 0, z: 0 };
-  if (dot(n, sub(center, body)) < 0) n = scale(n, -1);
-  return dot(n, viewDirectionWorld(resolved, figure)) < -1e-5;
-}
-
-/** Силуэт: рёбра «внутренних» вершин — пунктир; контур силуэта — сплошные. */
+/** Пунктир по выпуклой оболочке 2D-проекции вершин. */
 function isBodyEdgeVisiblePyramid(
   edgeId: string,
   figure: SpaceFigure,
@@ -478,12 +419,8 @@ function isBodyEdgeVisiblePyramid(
 ): boolean {
   const edge = edgeById(figure, edgeId);
   if (!edge) return true;
-  const { interior, silhouetteEdgeKeys } = pyramidVisibilityCache(figure, resolved, view);
-  if (silhouetteEdgeKeys.has(edgeEndpointKey(edge.aId, edge.bId))) return true;
-  if (interior.has(edge.aId) || interior.has(edge.bId)) return false;
-  const faceIds = adjacentFaceIds(figure, edgeId);
-  if (faceIds.length === 0) return true;
-  return faceIds.some((fid) => isFaceFrontFacingWorld(fid, figure, resolved));
+  const hull = projectionHullForFigure(figure, resolved, view);
+  return isBodyEdgeVisibleProjectionHull(edge.aId, edge.bId, hull);
 }
 
 /** Видимость ребра тела: school — через грани, legacy — по списку граней. */

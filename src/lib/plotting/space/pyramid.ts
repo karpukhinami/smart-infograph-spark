@@ -236,6 +236,46 @@ export function pyramidBaseCartesianFromFigure(figure: PyramidFigure): Array<{ x
   return out;
 }
 
+/** Вершина S в декартовых координатах (центр основания — начало координат). */
+export function pyramidApexCartesianFromFigure(figure: PyramidFigure): Vec3 {
+  const p = getPyramidVertexCartesian(figure, `pyr-v-apex`);
+  if (p) return p;
+  return pyramidApexCartesian(figure.constraints);
+}
+
+/**
+ * Основание Q точки P на луче S→Q (S — вершина, Q на плоскости z=0).
+ * P = Q + (z/H)·(S − Q)  ⇒  Q_xy = (P_xy − (z/H)·S_xy) / (1 − z/H).
+ */
+export function pyramidFootOnBaseFromWorld(
+  world: Vec3,
+  figure: PyramidFigure,
+): { x: number; y: number } | null {
+  const H = pyramidHeight(figure.constraints);
+  if (H < 1e-9) return null;
+  if (world.z <= 1e-8 || world.z >= H - 1e-8) return null;
+  const S = pyramidApexCartesianFromFigure(figure);
+  const t = world.z / H;
+  const lam = 1 - t;
+  if (lam < 1e-9) return null;
+  return {
+    x: (world.x - t * S.x) / lam,
+    y: (world.y - t * S.y) / lam,
+  };
+}
+
+/** Якорь вершины на экране: центр эллипса или первая вершина основания (S над A). */
+export function pyramidApexScreenAnchor(
+  figure: PyramidFigure,
+  orbit: ConicEllipse,
+  baseScr: Array<{ x: number; y: number }>,
+): { x: number; y: number } {
+  if (figure.constraints.apexOnCenter) {
+    return { x: orbit.cx, y: orbit.cy };
+  }
+  return baseScr[0] ?? { x: orbit.cx, y: orbit.cy };
+}
+
 /** n вершин основания на эллипсе с равными шагами по длине дуги, начиная с θ₀. */
 export function ellipseBaseVerticesEqualArc(
   orbit: ConicEllipse,
@@ -381,7 +421,8 @@ export function pyramidEllipseBaseScreen(
 }
 
 /**
- * Проекция точки на генераторе S→основание (вершина apex над центром): P = (1−λ)S + λQ, Q на основании.
+ * Проекция точки на боковом ребре/грани: P = Q + (z/H)(S − Q), Q на основании, S — вершина.
+ * Работает и для S над центром (S_xy = 0), и для S над вершиной основания.
  */
 export function pyramidProjectOnApexGenerator(
   world: Vec3,
@@ -393,12 +434,11 @@ export function pyramidProjectOnApexGenerator(
   kwx: number,
   kwy: number,
 ): { x: number; y: number } | null {
-  if (!figure.constraints.apexOnCenter || H < 1e-9) return null;
-  if (world.z <= 1e-8 || world.z >= H - 1e-8) return null;
-  const lam = 1 - world.z / H;
-  if (lam < 1e-6) return null;
-  const bx = world.x / lam;
-  const by = world.y / lam;
+  if (H < 1e-9) return null;
+  const foot = pyramidFootOnBaseFromWorld(world, figure);
+  if (!foot) return null;
+  const bx = foot.x;
+  const by = foot.y;
   const tol = 0.04;
 
   for (let i = 0; i < baseCart.length; i += 1) {
