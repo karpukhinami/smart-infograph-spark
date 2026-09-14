@@ -19,6 +19,7 @@ import {
   splitLineForRender,
   type OcclusionContext,
 } from "./visibility";
+import { isPyramid } from "./figure";
 import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
 import { add, len, scale, sub, worldToLocal } from "./vec3";
 
@@ -73,6 +74,10 @@ function drawSegmentWithVisibility(
   }
 }
 
+const PYRAMID_CARRIER_MIN_STEPS = 6;
+const PYRAMID_CARRIER_MAX_STEPS = 28;
+
+/** Параметрическая прямая P(t)=origin+t·dir: на пирамиде проекция криволинейна, рисуем цепочкой коротких отрезков. */
 function drawCarrierWithVisibility(
   origin: Vec3,
   dir: Vec3,
@@ -89,6 +94,35 @@ function drawCarrierWithVisibility(
   parts: string[],
   obstacles: Obstacle[],
 ): void {
+  const span = t1 - t0;
+  if (!(span > 1e-12)) return;
+
+  if (isPyramid(figure)) {
+    const steps = Math.min(
+      PYRAMID_CARRIER_MAX_STEPS,
+      Math.max(PYRAMID_CARRIER_MIN_STEPS, Math.ceil(span * 10)),
+    );
+    for (let i = 0; i < steps; i += 1) {
+      const ta = t0 + (span * i) / steps;
+      const tb = t0 + (span * (i + 1)) / steps;
+      drawSegmentWithVisibility(
+        add(origin, scale(dir, ta)),
+        add(origin, scale(dir, tb)),
+        figure,
+        resolved,
+        view,
+        fit,
+        occlusion,
+        color,
+        width,
+        hiddenDash,
+        parts,
+        obstacles,
+      );
+    }
+    return;
+  }
+
   drawSegmentWithVisibility(
     add(origin, scale(dir, t0)),
     add(origin, scale(dir, t1)),
@@ -463,21 +497,8 @@ function collectFitPoints(
       const b = resolved.points.get(def.bId)?.world;
       if (!a || !b) continue;
       const abLen = len(sub(b, a));
-      if (line.style.visualKind === "line") {
-        const range = computeLineDisplayRange(
-          carrier,
-          resolved.points,
-          0,
-          abLen,
-          data.appearance.lineExtension * abLen,
-          figure,
-        );
-        t0 = range.t0;
-        t1 = range.t1;
-      } else {
-        t0 = 0;
-        t1 = abLen;
-      }
+      t0 = 0;
+      t1 = abLen;
     } else {
       const clip = planeIntersectionSegmentRange(
         carrier,
@@ -491,19 +512,29 @@ function collectFitPoints(
       if (!clip) continue;
       t0 = clip.t0;
       t1 = clip.t1;
-      if (line.style.visualKind === "line") {
+      if (line.style.visualKind === "line" && !isPyramid(figure)) {
         const span = Math.max(t1 - t0, 1e-6);
         const ext = data.appearance.lineExtension * span;
         t0 -= ext;
         t1 += ext;
       }
     }
-    const local0 = worldToLocal(add(carrier.origin, scale(carrier.dir, t0)), resolved.basis);
-    const local1 = worldToLocal(add(carrier.origin, scale(carrier.dir, t1)), resolved.basis);
+    let fitT0 = t0;
+    let fitT1 = t1;
+    if (def.kind === "twoPoints") {
+      const a = resolved.points.get(def.aId)?.world;
+      const b = resolved.points.get(def.bId)?.world;
+      if (a && b) {
+        fitT0 = 0;
+        fitT1 = len(sub(b, a));
+      }
+    }
+    const local0 = worldToLocal(add(carrier.origin, scale(carrier.dir, fitT0)), resolved.basis);
+    const local1 = worldToLocal(add(carrier.origin, scale(carrier.dir, fitT1)), resolved.basis);
     if (local0) {
       const pr = projectFromLocalCoeffs(
         local0,
-        add(carrier.origin, scale(carrier.dir, t0)),
+        add(carrier.origin, scale(carrier.dir, fitT0)),
         data.view,
         resolved.projection,
         figure,
@@ -513,7 +544,7 @@ function collectFitPoints(
     if (local1) {
       const pr = projectFromLocalCoeffs(
         local1,
-        add(carrier.origin, scale(carrier.dir, t1)),
+        add(carrier.origin, scale(carrier.dir, fitT1)),
         data.view,
         resolved.projection,
         figure,

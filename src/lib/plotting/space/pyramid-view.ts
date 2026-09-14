@@ -5,7 +5,6 @@
 import type { ResolvedSpaceScene } from "./build";
 import { viewDirectionLocal, type ProjectionCoeffs } from "./camera";
 import type { ProjectionHull } from "./convex-hull-visibility";
-import { isBodyEdgeVisibleProjectionHull } from "./convex-hull-visibility";
 import { faceById } from "./figure";
 import type { SpaceFigure, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub } from "./vec3";
@@ -54,44 +53,44 @@ function outwardFaceNormalCartesian(
   return n;
 }
 
-/** Запасной вектор к наблюдателю из школьной проекции (меняется с yaw). */
-export function pyramidViewDirectionFromProjection(projection: ProjectionCoeffs): Vec3 {
-  const vd = viewDirectionLocal(projection);
-  return normalize({ x: vd.u, y: vd.v, z: vd.w });
+/** Поворот вокруг оси z (декартовы x,y). */
+export function rotateCartesianZ(v: Vec3, angleRad: number): Vec3 {
+  const c = Math.cos(angleRad);
+  const s = Math.sin(angleRad);
+  return { x: c * v.x - s * v.y, y: s * v.x + c * v.y, z: v.z };
+}
+
+/** Направление на наблюдателя при yaw=0 (школьная проекция), в I-м октанте. */
+export function pyramidObserverDirectionAtYawZero(projection: ProjectionCoeffs): Vec3 {
+  const vd = viewDirectionLocal({ ...projection, yawRad: 0 });
+  let d = normalize({ x: vd.u, y: vd.v, z: vd.w });
+  const oct = { x: 1, y: 1, z: 1 };
+  if (dot(d, oct) < 0) d = scale(d, -1);
+  return d;
 }
 
 /**
- * «Глаз» снаружи видимой части: среднее направление нормалей граней,
- * у которых рёбра на 2D-контуре не скрыты (связь с выпуклой оболочкой).
+ * Наблюдатель в декартовых координатах: при yaw=0 — I-й октант;
+ * при повороте основания на экране на ψ «глаз» в (x,y) вращается на −ψ, высота z сохраняется.
  */
+export function pyramidObserverToViewer(projection: ProjectionCoeffs): Vec3 {
+  const base = pyramidObserverDirectionAtYawZero(projection);
+  return normalize(rotateCartesianZ(base, -projection.yawRad));
+}
+
+/** @deprecated alias */
+export function pyramidViewDirectionFromProjection(projection: ProjectionCoeffs): Vec3 {
+  return pyramidObserverToViewer(projection);
+}
+
 export function buildPyramidObserver(
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   projection: ProjectionCoeffs,
-  hull: ProjectionHull,
+  _hull: ProjectionHull,
 ): PyramidObserver {
   const center = figureBodyCenterCartesian(figure, resolved);
-  let sum = { x: 0, y: 0, z: 0 };
-  let count = 0;
-  for (const face of figure.faces) {
-    let faceVisible = true;
-    for (const edge of figure.edges) {
-      if (!face.vertexIds.includes(edge.aId) || !face.vertexIds.includes(edge.bId)) continue;
-      if (!isBodyEdgeVisibleProjectionHull(edge.aId, edge.bId, hull)) {
-        faceVisible = false;
-        break;
-      }
-    }
-    if (!faceVisible) continue;
-    const n = outwardFaceNormalCartesian(face.id, figure, resolved);
-    if (!n) continue;
-    sum = add(sum, n);
-    count += 1;
-  }
-  const toViewer =
-    count > 0 && len(sum) > 1e-9
-      ? normalize(sum)
-      : pyramidViewDirectionFromProjection(projection);
+  const toViewer = pyramidObserverToViewer(projection);
   const extent =
     figure.vertices
       .map((v) => resolved.points.get(v.id)?.world)
