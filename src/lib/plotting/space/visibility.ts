@@ -413,6 +413,7 @@ function isFaceFrontFacingWorld(
   return dot(n, viewDirectionWorld(resolved, figure)) < -1e-5;
 }
 
+/** Ребро видно, если хотя бы одна смежная грань обращена к наблюдателю. */
 function isBodyEdgeVisiblePyramid(
   edgeId: string,
   figure: SpaceFigure,
@@ -420,10 +421,7 @@ function isBodyEdgeVisiblePyramid(
 ): boolean {
   const faceIds = adjacentFaceIds(figure, edgeId);
   if (faceIds.length === 0) return true;
-  const front = faceIds.filter((fid) => isFaceFrontFacingWorld(fid, figure, resolved));
-  if (front.length === 0) return false;
-  if (front.length === faceIds.length) return true;
-  return front.length > 0;
+  return faceIds.some((fid) => isFaceFrontFacingWorld(fid, figure, resolved));
 }
 
 /** Видимость ребра тела: school — через грани, legacy — по списку граней. */

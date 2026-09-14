@@ -1,5 +1,5 @@
 import { nextId } from "../shared";
-import { ellipseAngleForPoint, ellipsePoint, type ConicEllipse } from "./conic-ellipse";
+import { ellipsePoint, type ConicEllipse } from "./conic-ellipse";
 import type {
   LocalCoords,
   PyramidConstraints,
@@ -133,21 +133,20 @@ function dist2(a: { x: number; y: number }, b: { x: number; y: number }): number
   return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 }
 
-/** Равномерные точки вдоль дуги эллипса from→to; дуга не проходит через avoidPoint (обычно A). */
-function ellipseArcEqualPoints(
+type ArcTable = Array<{ theta: number; s: number; x: number; y: number }>;
+
+function buildEllipseArcTable(
   orbit: ConicEllipse,
   from: number,
   to: number,
-  count: number,
   avoidPoint: { x: number; y: number },
-): Array<{ x: number; y: number }> {
-  if (count <= 0) return [];
+  preferLongArc: boolean,
+): ArcTable {
   const pFrom = ellipsePoint(orbit, from);
   const pTo = ellipsePoint(orbit, to);
-  if (count === 1) return [pFrom];
 
-  const walk = (dir: 1 | -1): Array<{ theta: number; s: number; x: number; y: number }> => {
-    const out: Array<{ theta: number; s: number; x: number; y: number }> = [];
+  const walk = (dir: 1 | -1): ArcTable => {
+    const out: ArcTable = [];
     let s = 0;
     const step = (dir * 2 * Math.PI) / 4096;
     let theta = from;
@@ -177,41 +176,51 @@ function ellipseArcEqualPoints(
   const lenPos = tPos[tPos.length - 1]?.s ?? 0;
   const lenNeg = tNeg[tNeg.length - 1]?.s ?? 0;
   const avoidR2 = 0.02 ** 2;
+  const valid = (table: ArcTable, len: number) =>
+    minDistToAvoid(table) >= avoidR2 && len > 1e-9;
 
-  const score = (table: Array<{ x: number; y: number }>, len: number): number => {
-    const d = minDistToAvoid(table);
-    if (d < avoidR2) return Infinity;
-    return len;
-  };
+  const candidates: Array<{ table: ArcTable; len: number }> = [];
+  if (valid(tPos, lenPos)) candidates.push({ table: tPos, len: lenPos });
+  if (valid(tNeg, lenNeg)) candidates.push({ table: tNeg, len: lenNeg });
+  if (candidates.length === 0) return lenNeg >= lenPos ? tNeg : tPos;
+  if (candidates.length === 1) return candidates[0]!.table;
+  candidates.sort((a, b) => (preferLongArc ? b.len - a.len : a.len - b.len));
+  return candidates[0]!.table;
+}
 
-  let table = score(tNeg, lenNeg) <= score(tPos, lenPos) ? tNeg : tPos;
-  if ((table[table.length - 1]?.s ?? 0) < 1e-9) table = lenNeg >= lenPos ? tNeg : tPos;
-
+function thetaOnArcTable(table: ArcTable, frac: number): number {
   const total = table[table.length - 1]?.s ?? 0;
+  if (total < 1e-9) return table[0]!.theta;
+  const targetS = total * Math.max(0, Math.min(1, frac));
+  let j = 1;
+  while (j < table.length && table[j]!.s < targetS) j += 1;
+  const hi = table[j] ?? table[table.length - 1]!;
+  const lo = table[j - 1] ?? table[0]!;
+  const span = hi.s - lo.s;
+  const t = span > 1e-12 ? (targetS - lo.s) / span : 0;
+  return lo.theta + t * (hi.theta - lo.theta);
+}
+
+/** Равномерные точки вдоль дуги эллипса from→to; дуга не проходит через avoidPoint (обычно A). */
+function ellipseArcEqualPoints(
+  orbit: ConicEllipse,
+  from: number,
+  to: number,
+  count: number,
+  avoidPoint: { x: number; y: number },
+  preferLongArc = false,
+): Array<{ x: number; y: number }> {
+  if (count <= 0) return [];
+  const pFrom = ellipsePoint(orbit, from);
+  const pTo = ellipsePoint(orbit, to);
+  if (count === 1) return [pFrom];
+
+  const table = buildEllipseArcTable(orbit, from, to, avoidPoint, preferLongArc);
   const out: Array<{ x: number; y: number }> = [];
   for (let k = 0; k < count; k += 1) {
-    if (k === 0) {
-      out.push(pFrom);
-      continue;
-    }
-    if (k === count - 1) {
-      out.push(pTo);
-      continue;
-    }
-    const frac = k / (count - 1);
-    if (total < 1e-9) {
-      out.push(ellipsePoint(orbit, from + (to - from) * frac));
-      continue;
-    }
-    const targetS = total * frac;
-    let j = 1;
-    while (j < table.length && table[j]!.s < targetS) j += 1;
-    const hi = table[j] ?? table[table.length - 1]!;
-    const lo = table[j - 1] ?? table[0]!;
-    const span = hi.s - lo.s;
-    const t = span > 1e-12 ? (targetS - lo.s) / span : 0;
-    const theta = lo.theta + t * (hi.theta - lo.theta);
-    out.push(ellipsePoint(orbit, theta));
+    if (k === 0) out.push(pFrom);
+    else if (k === count - 1) out.push(pTo);
+    else out.push(ellipsePoint(orbit, thetaOnArcTable(table, k / (count - 1))));
   }
   return out;
 }
@@ -360,7 +369,7 @@ export function pyramidLastBaseVertexTheta(orbit: ConicEllipse, n: number): numb
 }
 
 /**
- * A @ θ_A, B @ θ_B, последняя (E) — второй сосед A на эллипсе; C… — по передней дуге B → last.
+ * Индекс i ↔ 3D-вершина i: A @ θ_A, B @ θ_B, last @ θ(E), C…D — на длинной дуге B→last (порядок 3D).
  */
 export function pyramidEllipseBaseScreen(
   orbit: ConicEllipse,
@@ -369,19 +378,21 @@ export function pyramidEllipseBaseScreen(
   if (n <= 0) return [];
   const aScr = ellipsePoint(orbit, orbit.thetaA);
   if (n === 1) return [aScr];
-  const bScr = ellipsePoint(orbit, orbit.thetaB);
-  if (n === 2) return [aScr, bScr];
+  if (n === 2) {
+    return [aScr, ellipsePoint(orbit, orbit.thetaB)];
+  }
   const thetaLast = pyramidLastBaseVertexTheta(orbit, n);
-  const lastScr = ellipsePoint(orbit, thetaLast);
-  if (n === 3) return [aScr, bScr, lastScr];
+  const arc = buildEllipseArcTable(orbit, orbit.thetaB, thetaLast, aScr, true);
 
-  const chain = ellipseArcEqualPoints(orbit, orbit.thetaB, thetaLast, n - 1, aScr);
-  chain[0] = bScr;
-  chain[chain.length - 1] = lastScr;
-
-  const out = [aScr, ...chain];
-  for (let i = 0; i < out.length; i += 1) {
-    out[i] = ellipsePoint(orbit, ellipseAngleForPoint(orbit, out[i]!));
+  const out: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i < n; i += 1) {
+    if (i === 0) out.push(aScr);
+    else if (i === 1) out.push(ellipsePoint(orbit, orbit.thetaB));
+    else if (i === n - 1) out.push(ellipsePoint(orbit, thetaLast));
+    else {
+      const frac = (i - 1) / (n - 2);
+      out.push(ellipsePoint(orbit, thetaOnArcTable(arc, frac)));
+    }
   }
   return out;
 }
@@ -483,7 +494,7 @@ export function createPyramid(
     { id: "pyr-f-base", vertexIds: [...baseIds].reverse(), builtin: true },
     ...baseIds.map((id, i) => ({
       id: `pyr-f-side-${i}`,
-      vertexIds: [apexId, id, baseIds[(i + 1) % n]!],
+      vertexIds: [apexId, baseIds[(i + 1) % n]!, id],
       builtin: true as const,
     })),
   ];
