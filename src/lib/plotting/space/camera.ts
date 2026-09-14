@@ -223,18 +223,19 @@ function pyramidWorldToView(
   const apexAnchor = figure.constraints.apexOnCenter
     ? { x: orbit.cx, y: orbit.cy }
     : baseScr[0]!;
-  const atBase = pyramidBaseScreenAtXY(world.x, world.y, baseCart, baseScr);
   /** Высота по z: основание z=0, вершина z=H — совпадает с параметром на любом боковом ребре. */
   const t = H > 1e-9 ? Math.max(0, Math.min(1, world.z / H)) : 0;
   const frame = pyramidFrameFromFigure(figure);
-  const foot = cartesianToPyramidCoeffs(
-    { x: world.x, y: world.y, z: 0 },
-    frame,
-  ) ?? { u: 0, v: 0, w: 0 };
+  const foot3 = cartesianToPyramidCoeffs({ x: world.x, y: world.y, z: 0 }, frame) ?? {
+    u: 0,
+    v: 0,
+    w: 0,
+  };
+  const atBase = pyramidBaseScreenAtXY(world.x, world.y, baseCart, baseScr);
   return {
     x: atBase.x + t * (apexAnchor.x - atBase.x) + kwx * t,
     y: atBase.y + t * (apexAnchor.y - atBase.y) + kwy * t,
-    z: foot.u - kx * foot.v - (ky / kw) * t,
+    z: foot3.u - kx * foot3.v - (ky / kw) * t,
   };
 }
 

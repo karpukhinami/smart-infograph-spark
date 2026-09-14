@@ -1,5 +1,5 @@
 import { nextId } from "../shared";
-import { ellipsePoint, type ConicEllipse } from "./conic-ellipse";
+import { ellipseAngleForPoint, ellipsePoint, type ConicEllipse } from "./conic-ellipse";
 import type {
   LocalCoords,
   PyramidConstraints,
@@ -198,34 +198,20 @@ function ellipseArcEqualPoints(
       out.push(pTo);
       continue;
     }
+    const frac = k / (count - 1);
     if (total < 1e-9) {
-      out.push({
-        x: pFrom.x + (pTo.x - pFrom.x) * (k / (count - 1)),
-        y: pFrom.y + (pTo.y - pFrom.y) * (k / (count - 1)),
-      });
+      out.push(ellipsePoint(orbit, from + (to - from) * frac));
       continue;
     }
-    const targetS = (total * k) / (count - 1);
+    const targetS = total * frac;
     let j = 1;
     while (j < table.length && table[j]!.s < targetS) j += 1;
     const hi = table[j] ?? table[table.length - 1]!;
     const lo = table[j - 1] ?? table[0]!;
     const span = hi.s - lo.s;
     const t = span > 1e-12 ? (targetS - lo.s) / span : 0;
-    const p = { x: lo.x + t * (hi.x - lo.x), y: lo.y + t * (hi.y - lo.y) };
-    if (dist2(p, avoidPoint) < avoidR2) {
-      const bump = (targetS / total) * 0.15 + 0.05;
-      const targetS2 = Math.min(total, targetS + bump * total);
-      let j2 = 1;
-      while (j2 < table.length && table[j2]!.s < targetS2) j2 += 1;
-      const hi2 = table[j2] ?? table[table.length - 1]!;
-      const lo2 = table[j2 - 1] ?? table[0]!;
-      const span2 = hi2.s - lo2.s;
-      const t2 = span2 > 1e-12 ? (targetS2 - lo2.s) / span2 : 0;
-      out.push({ x: lo2.x + t2 * (hi2.x - lo2.x), y: lo2.y + t2 * (hi2.y - lo2.y) });
-    } else {
-      out.push(p);
-    }
+    const theta = lo.theta + t * (hi.theta - lo.theta);
+    out.push(ellipsePoint(orbit, theta));
   }
   return out;
 }
@@ -300,10 +286,21 @@ function barycentric2D(
   return [w0, w1, w2];
 }
 
-/**
- * Экранная позиция точки основания: барицентрика по вершинам (x,y) → baseScr.
- * Гарантирует, что вершина i попадает в baseScr[i] (в отличие от аффинной u,v).
- */
+/** Экранная точка основания: аффинная карта (u,v) в базисе A → экран (как у параллелепипеда). */
+export function pyramidBaseScreenFromCoeffs(
+  u: number,
+  v: number,
+  baseScr: Array<{ x: number; y: number }>,
+): { x: number; y: number } {
+  const a = baseScr[0] ?? { x: 0, y: 0 };
+  const b = baseScr[1] ?? a;
+  const last = baseScr[baseScr.length - 1] ?? a;
+  return {
+    x: a.x + u * (b.x - a.x) + v * (last.x - a.x),
+    y: a.y + u * (b.y - a.y) + v * (last.y - a.y),
+  };
+}
+
 export function pyramidBaseScreenAtXY(
   x: number,
   y: number,
@@ -311,8 +308,16 @@ export function pyramidBaseScreenAtXY(
   baseScr: Array<{ x: number; y: number }>,
 ): { x: number; y: number } {
   const n = baseCart.length;
-  if (n < 3) return baseScr[0] ?? { x: 0, y: 0 };
+  if (n < 1) return { x: 0, y: 0 };
   const p = { x, y };
+  const snap = 1e-5;
+  for (let i = 0; i < n; i += 1) {
+    const c = baseCart[i]!;
+    if ((p.x - c.x) ** 2 + (p.y - c.y) ** 2 < snap ** 2) {
+      return baseScr[i] ?? { x: 0, y: 0 };
+    }
+  }
+  if (n < 3) return baseScr[0] ?? { x: 0, y: 0 };
   const tol = 1e-4;
   for (let i = 1; i < n - 1; i += 1) {
     const w = barycentric2D(p, baseCart[0]!, baseCart[i]!, baseCart[i + 1]!);
@@ -349,25 +354,28 @@ export function pyramidBaseScreenAtXY(
 }
 
 /**
- * Основание на эллипсе вращения: A = θ_A, B = θ_B, последняя = θ_D;
- * остальные вершины — равномерно по передней дуге B → последняя (как у параллелепипеда).
+ * Экранные вершины основания: A,B,last на θ_A, θ_B, θ_D; C… — на передней дуге B→last.
+ * Для отрисовки и аффинной (u,v)-карты: u,v берутся из 3D, экран = A_scr + u(B_scr−A_scr) + v(last_scr−A_scr).
  */
 export function pyramidEllipseBaseScreen(
   orbit: ConicEllipse,
   n: number,
 ): Array<{ x: number; y: number }> {
   if (n <= 0) return [];
-  if (n === 1) return [ellipsePoint(orbit, orbit.thetaA)];
-  if (n === 2) {
-    return [ellipsePoint(orbit, orbit.thetaA), ellipsePoint(orbit, orbit.thetaB)];
-  }
-  const a = ellipsePoint(orbit, orbit.thetaA);
-  const chain = ellipseArcEqualPoints(orbit, orbit.thetaB, orbit.thetaD, n - 1, a);
-  const out = [a, ...chain];
-  for (let i = 1; i < out.length; i += 1) {
-    if (dist2(out[i]!, a) < 0.015 ** 2) {
-      out[i] = ellipsePoint(orbit, orbit.thetaA - (orbit.thetaA - orbit.thetaB) * (i / Math.max(1, n - 1)));
-    }
+  const aScr = ellipsePoint(orbit, orbit.thetaA);
+  if (n === 1) return [aScr];
+  const bScr = ellipsePoint(orbit, orbit.thetaB);
+  if (n === 2) return [aScr, bScr];
+  const lastScr = ellipsePoint(orbit, orbit.thetaD);
+  if (n === 3) return [aScr, bScr, lastScr];
+
+  const chain = ellipseArcEqualPoints(orbit, orbit.thetaB, orbit.thetaD, n - 1, aScr);
+  chain[0] = bScr;
+  chain[chain.length - 1] = lastScr;
+
+  const out = [aScr, ...chain];
+  for (let i = 0; i < out.length; i += 1) {
+    out[i] = ellipsePoint(orbit, ellipseAngleForPoint(orbit, out[i]!));
   }
   return out;
 }
