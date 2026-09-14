@@ -181,37 +181,37 @@ export function SpaceManualPanel() {
               <CardTitle className="text-base">Вид</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {!isPyramid && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Поворот</Label>
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {Math.round(normalizeYawDeg(space3d.view.yaw))}°
-                    </span>
-                  </div>
-                  <div className="relative px-1 pt-1">
-                    <div
-                      className="pointer-events-none absolute top-0 h-2 w-0.5 -translate-x-1/2 rounded-full bg-muted-foreground/70"
-                      style={{ left: "calc(0% + 4px)" }}
-                      title={`Стандартное положение (±${YAW_SNAP_DEG}°)`}
-                    />
-                    <Slider
-                      min={0}
-                      max={360}
-                      step={1}
-                      value={[((space3d.view.yaw % 360) + 360) % 360]}
-                      onValueChange={([value]) => {
-                        if (value === undefined) return;
-                        updateSpaceView({ yaw: normalizeYawDeg(value) });
-                      }}
-                    />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Вращение вокруг вертикальной оси; ∠BAD задаёт форму эллипса основания. У нуля —
-                    стандартный ракурс (липкий ±{YAW_SNAP_DEG}°).
-                  </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Поворот</Label>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {Math.round(normalizeYawDeg(space3d.view.yaw))}°
+                  </span>
                 </div>
-              )}
+                <div className="relative px-1 pt-1">
+                  <div
+                    className="pointer-events-none absolute top-0 h-2 w-0.5 -translate-x-1/2 rounded-full bg-muted-foreground/70"
+                    style={{ left: "calc(0% + 4px)" }}
+                    title={`Стандартное положение (±${YAW_SNAP_DEG}°)`}
+                  />
+                  <Slider
+                    min={0}
+                    max={360}
+                    step={1}
+                    value={[((space3d.view.yaw % 360) + 360) % 360]}
+                    onValueChange={([value]) => {
+                      if (value === undefined) return;
+                      updateSpaceView({ yaw: normalizeYawDeg(value) });
+                    }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {isPyramid
+                    ? "Вращение основания по эллипсу вокруг вертикальной оси; у нуля — стандартный ракурс (липкий ±"
+                    : "Вращение вокруг вертикальной оси; ∠BAD задаёт форму эллипса основания. У нуля — стандартный ракурс (липкий ±"}
+                  {YAW_SNAP_DEG}°).
+                </p>
+              </div>
               <div className="flex items-center justify-between">
                 <Label className="text-xs">Эллипс вращения</Label>
                 <Switch

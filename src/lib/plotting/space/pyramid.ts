@@ -369,12 +369,13 @@ export function pyramidBaseScreenAtXY(
 export function pyramidEllipseBaseScreen(
   orbit: ConicEllipse,
   n: number,
+  yawRad = 0,
 ): Array<{ x: number; y: number }> {
   if (n <= 0) return [];
   const dTheta = pyramidBaseAngleRad(n);
   const out: Array<{ x: number; y: number }> = [];
   for (let i = 0; i < n; i += 1) {
-    out.push(ellipsePoint(orbit, orbit.thetaA + dTheta * i));
+    out.push(ellipsePoint(orbit, orbit.thetaA + yawRad + dTheta * i));
   }
   return out;
 }

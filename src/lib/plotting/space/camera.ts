@@ -150,7 +150,7 @@ export function getProjectionCoeffs(view: SpaceViewParams, figure: SpaceFigure):
     ky: kyView / scaleY,
     kwx: heightScreenX / scaleX,
     kwy: heightScreenY / scaleY,
-    yawRad: isPyramid(figure) ? 0 : (normalizeYawDeg(view.yaw) * Math.PI) / 180,
+    yawRad: (normalizeYawDeg(view.yaw) * Math.PI) / 180,
     orbit,
     phi0,
     rx: orbit.a,
@@ -208,7 +208,7 @@ export function sampleRotationEllipse(
 }
 
 function pyramidScreenBase(figure: PyramidFigure, coeffs: ProjectionCoeffs): Array<{ x: number; y: number }> {
-  return pyramidEllipseBaseScreen(coeffs.orbit, figure.baseLabels.length);
+  return pyramidEllipseBaseScreen(coeffs.orbit, figure.baseLabels.length, coeffs.yawRad);
 }
 
 function pyramidWorldToView(
@@ -377,9 +377,9 @@ export function collectReferenceFitPoints(
   view: SpaceViewParams,
 ): Array<{ x: number; y: number }> {
   const pts: Array<{ x: number; y: number }> = [];
-  const yawSteps = isPyramid(figure) ? 1 : 24;
+  const yawSteps = 24;
   for (let i = 0; i < yawSteps; i += 1) {
-    const yawDeg = isPyramid(figure) ? 0 : (i / yawSteps) * 360;
+    const yawDeg = (i / yawSteps) * 360;
     const coeffs = getProjectionCoeffs({ ...view, yaw: yawDeg }, figure);
     for (const v of figure.vertices) {
       const pr = projectLocal(v.local, view, coeffs, figure);
