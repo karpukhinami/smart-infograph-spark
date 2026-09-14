@@ -78,6 +78,23 @@ function projectVertexRaw(
   return projectFromLocalCoeffs(pt.local, pt.world, view, ctx.projection, figure);
 }
 
+/**
+ * Проекция точки вне тела (наблюдатель и т.п.) — без привязки к рёбрам/вершинам пирамиды.
+ * У пирамиды world = декартовы (x,y,z) модели.
+ */
+export function projectWorldOffFigureBody(
+  world: Vec3,
+  ctx: DisplayProjectionContext,
+  view: SpaceViewParams,
+  figure: SpaceFigure,
+): ProjectedPoint {
+  const body = ctx.figure ?? figure;
+  const local = isPyramid(body)
+    ? { u: world.x, v: world.y, w: world.z }
+    : worldToLocal(world, ctx.basis) ?? { u: 0, v: 0, w: 0 };
+  return projectFromLocalCoeffs(local, world, view, ctx.projection, body);
+}
+
 /** Проекция world-точки для отображения (подписи, точки, сечения). */
 export function projectWorldDisplay(
   world: Vec3,

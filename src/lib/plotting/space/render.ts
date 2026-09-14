@@ -10,7 +10,11 @@ import {
   type ResolvedSpaceScene,
 } from "./build";
 import { fitSpaceProjection, sampleRotationEllipse } from "./camera";
-import { projectWorldDisplay, type DisplayProjectionContext } from "./display-projection";
+import {
+  projectWorldDisplay,
+  projectWorldOffFigureBody,
+  type DisplayProjectionContext,
+} from "./display-projection";
 import { collectVisibleOverlaySegments, isEdgeCoveredOnScreen } from "./edge-overlay";
 import { collectPlaneFillFragments } from "./plane-subdivision";
 import {
@@ -517,7 +521,12 @@ function renderViewConvergenceRays(
     if (aw) anchors.push(aw);
   }
 
-  const pEye = projectWorld(observer.eye, resolved, data.view, fit, figure);
+  const displayCtx = displayCtxFromResolved(resolved);
+  const prEye = projectWorldOffFigureBody(observer.eye, displayCtx, data.view, figure);
+  const pEye = {
+    x: prEye.x * fit.scale + fit.cx,
+    y: prEye.y * fit.scale + fit.cy,
+  };
   const rayLen = Math.max(width, height) * 1.4;
   const stroke =
     'stroke="#B91C1C" stroke-width="1.25" stroke-dasharray="10 7" stroke-linecap="round" stroke-opacity="0.9"';
@@ -527,7 +536,13 @@ function renderViewConvergenceRays(
     let dx = pEye.x - p0.x;
     let dy = pEye.y - p0.y;
     if (Math.hypot(dx, dy) < 2) {
-      const pDir = projectWorld(add(anchorWorld, scale(observer.toViewer, 1)), resolved, data.view, fit, figure);
+      const prDir = projectWorldOffFigureBody(
+        add(anchorWorld, scale(observer.toViewer, 2)),
+        displayCtx,
+        data.view,
+        figure,
+      );
+      const pDir = { x: prDir.x * fit.scale + fit.cx, y: prDir.y * fit.scale + fit.cy };
       dx = pDir.x - p0.x;
       dy = pDir.y - p0.y;
     }
