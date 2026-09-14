@@ -1,5 +1,10 @@
 import { clipLineToConvexPolygon, computeFaceOrPlaneSection, type ResolvedSpaceScene } from "./build";
+import {
+  buildProjectionConvexHull,
+  isPlaneFragmentVisibleProjectionHull,
+} from "./convex-hull-visibility";
 import { projectFromLocalCoeffs } from "./camera";
+import { isPyramid } from "./figure";
 import type { SpaceFigure, SpaceSceneData, Vec3 } from "./types";
 import {
   add,
@@ -178,6 +183,10 @@ export function collectPlaneFillFragments(
 ): PlaneFillFragment[] {
   const builtPlanes = data.planes.filter((p) => p.built && p.style.visible);
   const fragments: PlaneFillFragment[] = [];
+  const hull =
+    isPyramid(figure) && data.view.visibilityMode !== "legacy"
+      ? buildProjectionConvexHull(figure, resolved, data.view)
+      : null;
 
   for (const plane of builtPlanes) {
     const eq = resolved.planes.get(plane.id);
@@ -201,6 +210,7 @@ export function collectPlaneFillFragments(
 
     for (const part of parts) {
       if (part.length < 3) continue;
+      if (hull && !isPlaneFragmentVisibleProjectionHull(part, figure, resolved, hull)) continue;
       fragments.push({
         planeId: plane.id,
         color: plane.style.color,

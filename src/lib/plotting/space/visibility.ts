@@ -3,6 +3,7 @@ import { facePlane, type ResolvedSpaceScene } from "./build";
 import {
   buildProjectionConvexHull,
   isBodyEdgeVisibleProjectionHull,
+  splitLineProjectionHull,
   type ProjectionHull,
 } from "./convex-hull-visibility";
 import { edgeById, faceById, isPyramid } from "./figure";
@@ -450,6 +451,10 @@ export function splitLineForRender(
   const body = resolved.figure ?? figure;
   if (getVisibilityMode(view) === "legacy") {
     return splitLineByVisibility(origin, dir, t0, t1, body, resolved, view, ctx);
+  }
+  if (isPyramid(body)) {
+    const hull = projectionHullForFigure(body, resolved, view);
+    return splitLineProjectionHull(origin, dir, t0, t1, body, resolved, view, hull);
   }
   return splitLineSchoolView(origin, dir, t0, t1, body, resolved, view);
 }

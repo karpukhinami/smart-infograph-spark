@@ -3,7 +3,9 @@
  */
 import { projectFromLocalCoeffs } from "./camera";
 import type { ResolvedSpaceScene } from "./build";
-import type { SpaceFigure, SpaceViewParams } from "./types";
+import { faceById } from "./figure";
+import type { LineSplitSegment, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
+import { add, len, planeFromPoints, planePointDistance, scale, sub } from "./vec3";
 const COLLINEAR_EPS = 1e-9;
 
 function edgeEndpointKey(aId: string, bId: string): string {
@@ -138,12 +140,144 @@ export function buildProjectionConvexHull(
   return { hull, hullEdgeKeys, interiorVertexIds };
 }
 
-/** Ребро сплошное, если оно лежит на выпуклом контуре проекции; «внутренние» вершины — только пунктир. */
+/**
+ * Ребро сплошное, если ни одна вершина не внутри контура;
+ * обе на контуре — сплошное (в т.ч. SA, SB, не только стороны оболочки).
+ */
 export function isBodyEdgeVisibleProjectionHull(
   aId: string,
   bId: string,
   hull: ProjectionHull,
 ): boolean {
   if (hull.interiorVertexIds.has(aId) || hull.interiorVertexIds.has(bId)) return false;
-  return hull.hullEdgeKeys.has(edgeEndpointKey(aId, bId));
+  return true;
+}
+
+/** Грань видима, если все её рёбра сплошные (нет инцидентной «внутренней» вершины). */
+export function isFaceVisibleProjectionHull(
+  faceId: string,
+  figure: SpaceFigure,
+  hull: ProjectionHull,
+): boolean {
+  const face = faceById(figure, faceId);
+  if (!face) return true;
+  for (const edge of figure.edges) {
+    if (!face.vertexIds.includes(edge.aId) || !face.vertexIds.includes(edge.bId)) continue;
+    if (!isBodyEdgeVisibleProjectionHull(edge.aId, edge.bId, hull)) return false;
+  }
+  return true;
+}
+
+export function matchFigureVertexAtWorld(
+  world: Vec3,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  eps = 2e-3,
+): string | null {
+  for (const v of figure.vertices) {
+    const w = resolved.points.get(v.id)?.world;
+    if (w && len(sub(w, world)) <= eps) return v.id;
+  }
+  return null;
+}
+
+function faceWorldPoints(faceId: string, figure: SpaceFigure, resolved: ResolvedSpaceScene): Vec3[] {
+  const face = faceById(figure, faceId);
+  if (!face) return [];
+  return face.vertexIds.map((id) => resolved.points.get(id)?.world).filter(Boolean) as Vec3[];
+}
+
+function cross3(a: Vec3, b: Vec3): Vec3 {
+  return {
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x,
+  };
+}
+
+function pointInFaceTriangle(p: Vec3, verts: Vec3[], eps = 1e-4): boolean {
+  if (verts.length < 3) return false;
+  const [v0, v1, v2] = verts;
+  const plane = planeFromPoints(v0!, v1!, v2!);
+  if (!plane || Math.abs(planePointDistance(p, plane)) > eps) return false;
+  const n = cross3(sub(v1!, v0!), sub(v2!, v0!));
+  let s = 0;
+  for (let i = 0; i < 3; i += 1) {
+    const a = verts[i]!;
+    const b = verts[(i + 1) % 3]!;
+    const cr = cross3(sub(b, a), sub(p, a));
+    const d = cr.x * n.x + cr.y * n.y + cr.z * n.z;
+    if (Math.abs(d) <= eps * eps) continue;
+    if (s === 0) s = Math.sign(d);
+    else if (Math.sign(d) !== s) return false;
+  }
+  return s !== 0;
+}
+
+function pointOnHiddenFace(
+  p: Vec3,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  hull: ProjectionHull,
+): boolean {
+  for (const face of figure.faces) {
+    if (isFaceVisibleProjectionHull(face.id, figure, hull)) continue;
+    const verts = faceWorldPoints(face.id, figure, resolved);
+    if (pointInFaceTriangle(p, verts)) return true;
+  }
+  return false;
+}
+
+/** Видимость отрезка (плоскости, прямые): вершины контура + не лежит на «невидимой» грани. */
+export function isWorldSegmentVisibleProjectionHull(
+  aWorld: Vec3,
+  bWorld: Vec3,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  hull: ProjectionHull,
+): boolean {
+  const aId = matchFigureVertexAtWorld(aWorld, figure, resolved);
+  const bId = matchFigureVertexAtWorld(bWorld, figure, resolved);
+  if (aId && hull.interiorVertexIds.has(aId)) return false;
+  if (bId && hull.interiorVertexIds.has(bId)) return false;
+  if (aId && bId) return isBodyEdgeVisibleProjectionHull(aId, bId, hull);
+
+  const mid = scale(add(aWorld, bWorld), 0.5);
+  if (pointOnHiddenFace(mid, figure, resolved, hull)) return false;
+  return true;
+}
+
+export function splitLineProjectionHull(
+  originWorld: Vec3,
+  dirWorld: Vec3,
+  t0: number,
+  t1: number,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
+  hull: ProjectionHull,
+): LineSplitSegment[] {
+  const a = add(originWorld, scale(dirWorld, t0));
+  const b = add(originWorld, scale(dirWorld, t1));
+  const visible = isWorldSegmentVisibleProjectionHull(a, b, figure, resolved, hull);
+  return [{ a, b, visible }];
+}
+
+/** Центр масс многоугольника — для фильтра заливки плоскости. */
+export function polygonCentroid(vertices: Vec3[]): Vec3 {
+  if (!vertices.length) return { x: 0, y: 0, z: 0 };
+  return scale(
+    vertices.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
+    1 / vertices.length,
+  );
+}
+
+export function isPlaneFragmentVisibleProjectionHull(
+  fragment: Vec3[],
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  hull: ProjectionHull,
+): boolean {
+  if (fragment.length < 3) return true;
+  return !pointOnHiddenFace(polygonCentroid(fragment), figure, resolved, hull);
 }

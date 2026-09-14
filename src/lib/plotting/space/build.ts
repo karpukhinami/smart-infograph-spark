@@ -29,6 +29,7 @@ import {
   type ProjectionCoeffs,
   type ProjectedPoint,
 } from "./camera";
+import { projectWorldDisplay, snapWorldToFigureEdge } from "./display-projection";
 import { edgeById, faceById, isParallelepiped, isPyramid, vertexById } from "./figure";
 import { localToCartesian, refreshPyramidVertices } from "./pyramid";
 import type {
@@ -411,7 +412,10 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
       pointErrors.set(point.id, "Носитель прямой не найден.");
       continue;
     }
-    const world = add(carrier.origin, scale(carrier.dir, def.lineParam));
+    let world = add(carrier.origin, scale(carrier.dir, def.lineParam));
+    if (isPyramid(figure)) {
+      world = snapWorldToFigureEdge(world, figure, points);
+    }
     const local = worldToLocal(world, basis);
     if (!local) {
       pointErrors.set(point.id, "Не удалось вычислить координаты точки.");
@@ -420,8 +424,20 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
     points.set(point.id, { local, world });
   }
 
+  if (isPyramid(figure)) {
+    const vertexIds = new Set(figure.vertices.map((v) => v.id));
+    for (const [id, pt] of points) {
+      if (vertexIds.has(id)) continue;
+      const snapped = snapWorldToFigureEdge(pt.world, figure, points);
+      if (len(sub(snapped, pt.world)) <= 1e-12) continue;
+      const local = worldToLocal(snapped, basis);
+      if (local) points.set(id, { local, world: snapped });
+    }
+  }
+
+  const displayCtx = { basis, projection, points, figure };
   for (const [id, pt] of points) {
-    projected.set(id, projectFromLocalCoeffs(pt.local, pt.world, data.view, projection, figure));
+    projected.set(id, projectWorldDisplay(pt.world, displayCtx, data.view, figure));
   }
 
   return {
@@ -742,7 +758,10 @@ export function computeFaceOrPlaneSection(
       hits.push(b);
     }
     if (da * db < -1e-10) {
-      const p = lerp(a, b, da / (da - db));
+      let p = lerp(a, b, da / (da - db));
+      if (figure && isPyramid(figure)) {
+        p = snapWorldToFigureEdge(p, figure, points);
+      }
       const k = key(p);
       if (!seen.has(k)) {
         seen.add(k);
