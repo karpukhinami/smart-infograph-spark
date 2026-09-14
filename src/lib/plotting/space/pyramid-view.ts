@@ -71,12 +71,11 @@ export function pyramidObserverDirectionAtYawZero(projection: ProjectionCoeffs):
 }
 
 /**
- * Наблюдатель в декартовых координатах: при yaw=0 — I-й октант;
- * при повороте основания на экране на ψ «глаз» в (x,y) вращается на −ψ, высота z сохраняется.
+ * Наблюдатель в декартовых координатах (I-й октант, yaw=0 школьной проекции).
+ * Не вращается при повороте основания на экране — модель крутится, «глаз» в комнате на месте.
  */
 export function pyramidObserverToViewer(projection: ProjectionCoeffs): Vec3 {
-  const base = pyramidObserverDirectionAtYawZero(projection);
-  return normalize(rotateCartesianZ(base, -projection.yawRad));
+  return pyramidObserverDirectionAtYawZero({ ...projection, yawRad: 0 });
 }
 
 /** @deprecated alias */
@@ -120,7 +119,7 @@ export function buildSchoolViewObserver(
     const toViewer = pyramidObserverToViewer(projection);
     return { eye: add(center, scale(toViewer, OBSERVER_DISTANCE_K * extent)), toViewer };
   }
-  const vd = viewDirectionLocal(projection);
+  const vd = viewDirectionLocal({ ...projection, yawRad: 0 });
   const { e1, e2, e3 } = resolved.basis;
   const toViewer = normalize(
     add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)),
