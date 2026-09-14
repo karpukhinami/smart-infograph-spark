@@ -13,6 +13,7 @@ import {
   pyramidBaseVerticesCartesian,
   pyramidEllipseBaseScreen,
   pyramidFrameFromFigure,
+  pyramidHeight,
 } from "./pyramid";
 import type {
   LocalCoords,
@@ -217,21 +218,26 @@ function pyramidWorldToView(
 ): { x: number; y: number; z: number } {
   const { kwx, kwy, kx, ky, orbit } = coeffs;
   const kw = kwySafe(kwy);
-  const frame = pyramidFrameFromFigure(figure);
-  const c = cartesianToPyramidCoeffs(world, frame) ?? { u: 0, v: 0, w: 0 };
   const n = figure.baseLabels.length;
   const R = pyramidBaseRadius(figure.constraints);
+  const H = pyramidHeight(figure.constraints);
   const baseCart = pyramidBaseVerticesCartesian(n, R).map((p) => ({ x: p.x, y: p.y }));
   const baseScr = pyramidScreenBase(figure, coeffs);
   const apexAnchor = figure.constraints.apexOnCenter
     ? { x: orbit.cx, y: orbit.cy }
     : baseScr[0]!;
   const atBase = pyramidBaseScreenAtXY(world.x, world.y, baseCart, baseScr);
-  const t = Math.max(0, Math.min(1, c.w));
+  /** Высота по z: основание z=0, вершина z=H — совпадает с параметром на любом боковом ребре. */
+  const t = H > 1e-9 ? Math.max(0, Math.min(1, world.z / H)) : 0;
+  const frame = pyramidFrameFromFigure(figure);
+  const foot = cartesianToPyramidCoeffs(
+    { x: world.x, y: world.y, z: 0 },
+    frame,
+  ) ?? { u: 0, v: 0, w: 0 };
   return {
     x: atBase.x + t * (apexAnchor.x - atBase.x) + kwx * t,
     y: atBase.y + t * (apexAnchor.y - atBase.y) + kwy * t,
-    z: c.u - kx * c.v - (ky / kw) * t,
+    z: foot.u - kx * foot.v - (ky / kw) * t,
   };
 }
 

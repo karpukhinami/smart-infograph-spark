@@ -201,9 +201,10 @@ export function pyramidBaseScreenAtXY(
   const n = baseCart.length;
   if (n < 3) return baseScr[0] ?? { x: 0, y: 0 };
   const p = { x, y };
+  const tol = 1e-4;
   for (let i = 1; i < n - 1; i += 1) {
     const w = barycentric2D(p, baseCart[0]!, baseCart[i]!, baseCart[i + 1]!);
-    if (w && w[0] >= -1e-6 && w[1] >= -1e-6 && w[2] >= -1e-6) {
+    if (w && w[0] >= -tol && w[1] >= -tol && w[2] >= -tol) {
       const [w0, w1, w2] = w;
       return {
         x: w0 * baseScr[0]!.x + w1 * baseScr[i]!.x + w2 * baseScr[i + 1]!.x,
@@ -211,18 +212,39 @@ export function pyramidBaseScreenAtXY(
       };
     }
   }
-  return baseScr[0] ?? { x: 0, y: 0 };
+  let bestDist = Infinity;
+  let best: { x: number; y: number } | null = null;
+  for (let i = 0; i < n; i += 1) {
+    const j = (i + 1) % n;
+    const a = baseCart[i]!;
+    const b = baseCart[j]!;
+    const abx = b.x - a.x;
+    const aby = b.y - a.y;
+    const len2 = abx * abx + aby * aby;
+    const t = len2 > 1e-12 ? Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2)) : 0;
+    const qx = a.x + t * abx;
+    const qy = a.y + t * aby;
+    const d = (p.x - qx) ** 2 + (p.y - qy) ** 2;
+    if (d < bestDist) {
+      bestDist = d;
+      best = {
+        x: baseScr[i]!.x + t * (baseScr[j]!.x - baseScr[i]!.x),
+        y: baseScr[i]!.y + t * (baseScr[j]!.y - baseScr[i]!.y),
+      };
+    }
+  }
+  return best ?? baseScr[0] ?? { x: 0, y: 0 };
 }
 
-/** Вершины основания на эллипсе: A → θ_A, далее против часовой (как в 3D), шаг 2π/n. */
+/** Вершины основания на эллипсе: i-я вершина 3D (угол i·2π/n от +X) → θ_A + i·2π/n. */
 export function pyramidEllipseBaseScreen(
   orbit: ConicEllipse,
   n: number,
 ): Array<{ x: number; y: number }> {
+  const step = pyramidBaseAngleRad(n);
   const out: Array<{ x: number; y: number }> = [];
   for (let i = 0; i < n; i += 1) {
-    const theta = orbit.thetaA - (pyramidBaseAngleRad(n) * i);
-    out.push(ellipsePoint(orbit, theta));
+    out.push(ellipsePoint(orbit, orbit.thetaA + step * i));
   }
   return out;
 }
