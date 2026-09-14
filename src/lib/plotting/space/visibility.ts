@@ -1,11 +1,11 @@
-import { type ProjectedPoint } from "./camera";
+import { projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
 import { facePlane, type ResolvedSpaceScene } from "./build";
 import {
   buildProjectionConvexHull,
   isBodyEdgeVisibleProjectionHull,
   type ProjectionHull,
 } from "./convex-hull-visibility";
-import { edgeById, isPyramid } from "./figure";
+import { edgeById, faceById, isPyramid } from "./figure";
 import type { LineSplitSegment, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
 import { viewDirectionLocal } from "./camera";

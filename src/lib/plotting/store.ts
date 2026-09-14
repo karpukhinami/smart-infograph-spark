@@ -52,6 +52,8 @@ import {
   buildSpaceSceneData,
   createAuxiliaryLineForPoint,
   createFigureFromInput,
+  figureVertexInputString,
+  resolvePointLabelInput,
   defaultParallelepipedConstraints,
   defaultPyramidConstraints,
   createPlaneIntersectionEndpoints,
@@ -1110,7 +1112,12 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     }
     const result = applySpaceBuild({
       ...state.scene,
-      space3d: { ...data, figure, figureDirty: false },
+      space3d: {
+        ...data,
+        figure,
+        baseVerticesInput: figureVertexInputString(figure),
+        figureDirty: false,
+      },
     });
     set({ scene: result.scene, status: result.status });
   },
@@ -1134,7 +1141,13 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     }
     const result = applySpaceBuild({
       ...state.scene,
-      space3d: { ...data, figureConstraints, figure, figureDirty: false },
+      space3d: {
+        ...data,
+        figureConstraints,
+        figure,
+        baseVerticesInput: figureVertexInputString(figure),
+        figureDirty: false,
+      },
     });
     set({ scene: result.scene, status: result.status });
   },
@@ -1209,7 +1222,9 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       if (aux) lines = [...lines, aux];
     }
 
-    const label = draft.label.trim() || nextFreePointLabel(data, data.figure);
+    const label = draft.label.trim()
+      ? resolvePointLabelInput(draft.label, data, data.figure)
+      : nextFreePointLabel(data, data.figure);
     const point = createSpacePoint(data.points.length + 1, definition, label);
     point.built = true;
 

@@ -1,6 +1,7 @@
 import { nextId, DEFAULT_APPEARANCE, PLOT_PALETTE } from "../shared";
 import { computeSpaceViewFit, DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
 import { parseBaseVertexLabels, parsePyramidVertexLabels, formatVertexLabel } from "./parse-vertices";
+import { nextAvailableVertexLabel, normalizeUserPointLabel } from "./vertex-label-normalize";
 import { faceDisplayLabel } from "./figure";
 import { createParallelepiped } from "./parallelepiped";
 import { createPyramid } from "./pyramid";
@@ -165,6 +166,14 @@ export function defaultParallelepipedConstraints(): ParallelepipedConstraints {
   return { rectangular: true, equilateral: false, badAngleDeg: 35 };
 }
 
+/** Строка вершин для поля ввода после нормализации подписей. */
+export function figureVertexInputString(figure: SpaceFigure): string {
+  if (figure.kind === "pyramid") {
+    return [figure.apexLabel, ...figure.baseLabels].join(", ");
+  }
+  return figure.baseLabels.join(", ");
+}
+
 export function createFigureFromInput(
   shapeKind: SpaceShapeKind,
   input: string,
@@ -226,18 +235,18 @@ export function collectUsedPointLabels(
 /** Первая свободная латинская буква; при исчерпании — буква с индексом. */
 export function nextFreePointLabel(data: SpaceSceneData, figure: SpaceFigure): string {
   const used = collectUsedPointLabels(data, figure);
-  for (let c = 65; c <= 90; c += 1) {
-    const ch = String.fromCharCode(c);
-    if (!used.has(ch)) return ch;
-  }
-  for (let sub = 1; sub < 20; sub += 1) {
-    for (let c = 65; c <= 90; c += 1) {
-      const ch = String.fromCharCode(c);
-      const label = formatVertexLabel(ch, sub);
-      if (!used.has(label)) return label;
-    }
-  }
-  return formatVertexLabel("M", data.points.length + 1);
+  return nextAvailableVertexLabel(used);
+}
+
+/** Нормализует введённую подпись точки с учётом занятых имён. */
+export function resolvePointLabelInput(
+  raw: string,
+  data: SpaceSceneData,
+  figure: SpaceFigure,
+): string {
+  const used = collectUsedPointLabels(data, figure);
+  const normalized = normalizeUserPointLabel(raw, used);
+  return normalized || nextAvailableVertexLabel(used);
 }
 
 export function findLineThroughPoints(
