@@ -13,6 +13,7 @@ import {
   pyramidEllipseBaseScreen,
   pyramidFrameFromFigure,
   pyramidHeight,
+  pyramidProjectOnApexGenerator,
 } from "./pyramid";
 import type {
   LocalCoords,
@@ -231,6 +232,23 @@ function pyramidWorldToView(
     v: 0,
     w: 0,
   };
+  const lateral = pyramidProjectOnApexGenerator(
+    world,
+    figure,
+    baseCart,
+    baseScr,
+    apexAnchor,
+    H,
+    kwx,
+    kwy,
+  );
+  if (lateral) {
+    return {
+      x: lateral.x,
+      y: lateral.y,
+      z: foot3.u - kx * foot3.v - (ky / kw) * t,
+    };
+  }
   const atBase = pyramidBaseScreenAtXY(world.x, world.y, baseCart, baseScr);
   return {
     x: atBase.x + t * (apexAnchor.x - atBase.x) + kwx * t,

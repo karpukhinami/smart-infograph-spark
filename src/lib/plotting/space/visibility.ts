@@ -1,7 +1,6 @@
 import { projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
 import { facePlane, type ResolvedSpaceScene } from "./build";
 import { adjacentFaceIds, edgeById, faceById, isPyramid } from "./figure";
-import { pyramidFrameFromFigure } from "./pyramid";
 import type { SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
 import { viewDirectionLocal } from "./camera";
@@ -38,7 +37,7 @@ interface ScreenVert {
 
 interface OccluderFace {
   id: string;
-  verts: [ScreenVert, ScreenVert, ScreenVert, ScreenVert];
+  verts: ScreenVert[];
   area: number;
 }
 
@@ -78,12 +77,12 @@ function quadArea2D(v: ScreenVert[]): number {
   return Math.abs(area) * 0.5;
 }
 
-function pointInQuad2D(px: number, py: number, verts: ScreenVert[]): boolean {
-  if (verts.length < 4) return false;
+function pointInConvexPoly2D(px: number, py: number, verts: ScreenVert[]): boolean {
+  if (verts.length < 3) return false;
   let sign = 0;
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < verts.length; i += 1) {
     const a = verts[i]!;
-    const b = verts[(i + 1) % 4]!;
+    const b = verts[(i + 1) % verts.length]!;
     const cross = (b.x - a.x) * (py - a.y) - (b.y - a.y) * (px - a.x);
     if (Math.abs(cross) < 1e-12) continue;
     if (sign === 0) sign = Math.sign(cross);
@@ -94,6 +93,18 @@ function pointInQuad2D(px: number, py: number, verts: ScreenVert[]): boolean {
 
 /** Бilinear depth на четырёхугольнике грани. */
 function depthOnFace(px: number, py: number, verts: ScreenVert[]): number {
+  if (verts.length === 3) {
+    const [v0, v1, v2] = verts;
+    const den =
+      (v1!.y - v2!.y) * (v0!.x - v2!.x) + (v2!.x - v1!.x) * (v0!.y - v2!.y);
+    if (Math.abs(den) < 1e-12) return (v0!.depth + v1!.depth + v2!.depth) / 3;
+    const w0 =
+      ((v1!.y - v2!.y) * (px - v2!.x) + (v2!.x - v1!.x) * (py - v2!.y)) / den;
+    const w1 =
+      ((v2!.y - v0!.y) * (px - v2!.x) + (v0!.x - v2!.x) * (py - v2!.y)) / den;
+    const w2 = 1 - w0 - w1;
+    return w0 * v0!.depth + w1 * v1!.depth + w2 * v2!.depth;
+  }
   const [v0, v1, v2, v3] = verts;
   const denom = (v2!.x - v0!.x) * (v3!.y - v0!.y) - (v2!.y - v0!.y) * (v3!.x - v0!.x);
   if (Math.abs(denom) < 1e-12) {
@@ -130,13 +141,11 @@ export function buildOcclusionContext(
       })
       .filter(Boolean) as ScreenVert[];
     if (raw.length < 3) continue;
-    if (raw.length === 3) raw.push(raw[2]!);
-    if (raw.length !== 4) continue;
-    const area = quadArea2D(raw);
+    const area = quadArea2D(raw.length === 3 ? [...raw, raw[0]!] : raw);
     if (area < MIN_FACE_AREA) continue;
     ctx.faces.push({
       id: face.id,
-      verts: raw as [ScreenVert, ScreenVert, ScreenVert, ScreenVert],
+      verts: raw,
       area,
     });
   }
@@ -162,7 +171,7 @@ export function buildOcclusionContext(
 export function frontSurfaceDepth(px: number, py: number, ctx: OcclusionContext): number | null {
   let best: number | null = null;
   for (const face of ctx.faces) {
-    if (!pointInQuad2D(px, py, face.verts)) continue;
+    if (!pointInConvexPoly2D(px, py, face.verts)) continue;
     const z = depthOnFace(px, py, face.verts);
     if (best === null || z < best) best = z;
   }
@@ -387,10 +396,6 @@ export function getVisibilityMode(view: SpaceViewParams): "school" | "legacy" {
 
 function viewDirectionWorld(resolved: ResolvedSpaceScene, figure: SpaceFigure): Vec3 {
   const vd = viewDirectionLocal(resolved.projection);
-  if (isPyramid(figure)) {
-    const { e1, e2, e3 } = pyramidFrameFromFigure(figure);
-    return normalize(add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)));
-  }
   const { e1, e2, e3 } = resolved.basis;
   return normalize(add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)));
 }
@@ -413,7 +418,12 @@ function isBodyEdgeVisiblePyramid(
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
 ): boolean {
-  return adjacentFaceIds(figure, edgeId).some((fid) => isFaceFrontFacingWorld(fid, figure, resolved));
+  const faceIds = adjacentFaceIds(figure, edgeId);
+  if (faceIds.length === 0) return true;
+  const front = faceIds.filter((fid) => isFaceFrontFacingWorld(fid, figure, resolved));
+  if (front.length === 0) return false;
+  if (front.length === faceIds.length) return true;
+  return front.length > 0;
 }
 
 /** Видимость ребра тела: school — через грани, legacy — по списку граней. */

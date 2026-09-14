@@ -353,9 +353,14 @@ export function pyramidBaseScreenAtXY(
   return best ?? baseScr[0] ?? { x: 0, y: 0 };
 }
 
+/** θ последней вершины основания (сосед A с другой стороны от B): не θ_D параллелепипеда, кроме n=4. */
+export function pyramidLastBaseVertexTheta(orbit: ConicEllipse, n: number): number {
+  if (n === 4) return orbit.thetaD;
+  return 2 * orbit.thetaA - orbit.thetaB;
+}
+
 /**
- * Экранные вершины основания: A,B,last на θ_A, θ_B, θ_D; C… — на передней дуге B→last.
- * Для отрисовки и аффинной (u,v)-карты: u,v берутся из 3D, экран = A_scr + u(B_scr−A_scr) + v(last_scr−A_scr).
+ * A @ θ_A, B @ θ_B, последняя (E) — второй сосед A на эллипсе; C… — по передней дуге B → last.
  */
 export function pyramidEllipseBaseScreen(
   orbit: ConicEllipse,
@@ -366,10 +371,11 @@ export function pyramidEllipseBaseScreen(
   if (n === 1) return [aScr];
   const bScr = ellipsePoint(orbit, orbit.thetaB);
   if (n === 2) return [aScr, bScr];
-  const lastScr = ellipsePoint(orbit, orbit.thetaD);
+  const thetaLast = pyramidLastBaseVertexTheta(orbit, n);
+  const lastScr = ellipsePoint(orbit, thetaLast);
   if (n === 3) return [aScr, bScr, lastScr];
 
-  const chain = ellipseArcEqualPoints(orbit, orbit.thetaB, orbit.thetaD, n - 1, aScr);
+  const chain = ellipseArcEqualPoints(orbit, orbit.thetaB, thetaLast, n - 1, aScr);
   chain[0] = bScr;
   chain[chain.length - 1] = lastScr;
 
@@ -378,6 +384,65 @@ export function pyramidEllipseBaseScreen(
     out[i] = ellipsePoint(orbit, ellipseAngleForPoint(orbit, out[i]!));
   }
   return out;
+}
+
+/**
+ * Проекция точки на генераторе S→основание (вершина apex над центром): P = (1−λ)S + λQ, Q на основании.
+ */
+export function pyramidProjectOnApexGenerator(
+  world: Vec3,
+  figure: PyramidFigure,
+  baseCart: Array<{ x: number; y: number }>,
+  baseScr: Array<{ x: number; y: number }>,
+  apexAnchor: { x: number; y: number },
+  H: number,
+  kwx: number,
+  kwy: number,
+): { x: number; y: number } | null {
+  if (!figure.constraints.apexOnCenter || H < 1e-9) return null;
+  if (world.z <= 1e-8 || world.z >= H - 1e-8) return null;
+  const lam = 1 - world.z / H;
+  if (lam < 1e-6) return null;
+  const bx = world.x / lam;
+  const by = world.y / lam;
+  const tol = 0.04;
+
+  for (let i = 0; i < baseCart.length; i += 1) {
+    const c = baseCart[i]!;
+    if ((bx - c.x) ** 2 + (by - c.y) ** 2 < tol * tol) {
+      const s = baseScr[i]!;
+      const t = world.z / H;
+      return {
+        x: s.x + t * (apexAnchor.x - s.x) + kwx * t,
+        y: s.y + t * (apexAnchor.y - s.y) + kwy * t,
+      };
+    }
+  }
+
+  for (let i = 0; i < baseCart.length; i += 1) {
+    const j = (i + 1) % baseCart.length;
+    const a = baseCart[i]!;
+    const b = baseCart[j]!;
+    const abx = b.x - a.x;
+    const aby = b.y - a.y;
+    const len2 = abx * abx + aby * aby;
+    if (len2 < 1e-12) continue;
+    const u = ((bx - a.x) * abx + (by - a.y) * aby) / len2;
+    if (u < -0.02 || u > 1.02) continue;
+    const uu = Math.max(0, Math.min(1, u));
+    const px = a.x + uu * abx;
+    const py = a.y + uu * aby;
+    if ((bx - px) ** 2 + (by - py) ** 2 > tol * tol) continue;
+    const sa = baseScr[i]!;
+    const sb = baseScr[j]!;
+    const s = { x: sa.x + uu * (sb.x - sa.x), y: sa.y + uu * (sb.y - sa.y) };
+    const t = world.z / H;
+    return {
+      x: s.x + t * (apexAnchor.x - s.x) + kwx * t,
+      y: s.y + t * (apexAnchor.y - s.y) + kwy * t,
+    };
+  }
+  return null;
 }
 
 export function createPyramid(
@@ -415,7 +480,7 @@ export function createPyramid(
   }
 
   const faces: SpaceFace[] = [
-    { id: "pyr-f-base", vertexIds: [...baseIds], builtin: true },
+    { id: "pyr-f-base", vertexIds: [...baseIds].reverse(), builtin: true },
     ...baseIds.map((id, i) => ({
       id: `pyr-f-side-${i}`,
       vertexIds: [apexId, id, baseIds[(i + 1) % n]!],
