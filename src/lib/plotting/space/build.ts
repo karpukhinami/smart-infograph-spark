@@ -51,6 +51,8 @@ export interface ResolvedSpaceScene {
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 };
   /** Коэффициенты текущей 2D-проекции (view layer). */
   projection: ProjectionCoeffs;
+  /** Актуальная геометрия тела (для пирамиды — после refreshPyramidVertices). */
+  figure?: SpaceFigure;
   points: Map<string, BuiltSpacePoint>;
   projected: Map<string, ProjectedPoint>;
   planes: Map<string, PlaneEq>;
@@ -425,6 +427,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   return {
     basis,
     projection,
+    figure,
     points,
     projected,
     planes,
@@ -546,12 +549,38 @@ function orderSectionByFaceWalk(
   return null;
 }
 
-/** Упорядочить вершины сечения: соседние лежат на одной грани параллелепипеда. */
-export function orderSectionPolygon(
+function orderSectionByPlaneAngle(
   hits: Vec3[],
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): Vec3[] {
   if (hits.length <= 2) return hits;
+  const tagged = hits.map((w) => ({ w, l: worldToLocal(w, basis)! }));
+  const n = cross(sub(tagged[1]!.w, tagged[0]!.w), sub(tagged[2]!.w, tagged[0]!.w));
+  if (len(n) < 1e-9) return hits;
+  const nn = normalize(n);
+  let e1 = normalize(sub(tagged[1]!.w, tagged[0]!.w));
+  if (len(cross(e1, nn)) < 1e-9) e1 = normalize(sub(tagged[2]!.w, tagged[0]!.w));
+  const e2 = normalize(cross(nn, e1));
+  const origin = tagged[0]!.w;
+  const cx =
+    tagged.reduce((s, t) => s + dot(sub(t.w, origin), e1), 0) / tagged.length;
+  const cy =
+    tagged.reduce((s, t) => s + dot(sub(t.w, origin), e2), 0) / tagged.length;
+  return [...hits].sort((p1, p2) => {
+    const a1 = Math.atan2(dot(sub(p1, origin), e2) - cy, dot(sub(p1, origin), e1) - cx);
+    const a2 = Math.atan2(dot(sub(p2, origin), e2) - cy, dot(sub(p2, origin), e1) - cx);
+    return a1 - a2;
+  });
+}
+
+/** Упорядочить вершины сечения: соседние лежат на одной грани параллелепипеда. */
+export function orderSectionPolygon(
+  hits: Vec3[],
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+  figure?: SpaceFigure,
+): Vec3[] {
+  if (hits.length <= 2) return hits;
+  if (figure && isPyramid(figure)) return orderSectionByPlaneAngle(hits, basis);
   const tagged = hits.map((w) => ({ w, l: worldToLocal(w, basis)! }));
 
   const walked = orderSectionByFaceWalk(tagged);
@@ -722,7 +751,7 @@ export function computeFaceOrPlaneSection(
     }
   }
   if (hits.length < 3) return hits.length ? hits : null;
-  return orderSectionPolygon(hits, basis);
+  return orderSectionPolygon(hits, basis, figure);
 }
 
 export function facePlane(
@@ -1018,7 +1047,16 @@ export function computePlaneHelperSegments(
 
   for (const target of sources) {
     if (len(sub(target, support)) < 1e-6) continue;
-    const clipped = clipHelperOutsideFigure(support, target, basis, figure, points);
+    let clipped = clipHelperOutsideFigure(support, target, basis, figure, points);
+    if (
+      !clipped &&
+      figure &&
+      isPyramid(figure) &&
+      points &&
+      !isPointInsideParallelepiped(support, figure, points)
+    ) {
+      clipped = { from: support, to: target };
+    }
     if (!clipped) continue;
     const k = key(clipped.from, clipped.to);
     if (seen.has(k)) continue;

@@ -2,12 +2,11 @@
  * Школьная фиксированная проекция и видимость (u,v,w + kx, ky).
  * Альтернатива legacy-режиму в visibility.ts.
  */
-import { localToView, viewDirectionLocal, type ProjectionCoeffs } from "./camera";
+import { localToView, projectFromLocalCoeffs, viewDirectionLocal, type ProjectionCoeffs } from "./camera";
 import { adjacentFaceIds, faceById, isParallelepiped } from "./figure";
-import type { LocalCoords, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
+import type { LineSplitSegment, LocalCoords, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, cross, dot, dotLocal, len, normalize, scale, sub, worldToLocal } from "./vec3";
 import type { ResolvedSpaceScene } from "./build";
-import type { LineSplitSegment } from "./visibility";
 
 const T_EPS = 1e-7;
 const SURFACE_EPS = 1e-5;
@@ -238,18 +237,49 @@ function viewDirectionWorld(resolved: ResolvedSpaceScene, figure: SpaceFigure): 
   return normalize(add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)));
 }
 
+function figureBodyCenter(figure: SpaceFigure, resolved: ResolvedSpaceScene): Vec3 {
+  const ps = figure.vertices
+    .map((v) => resolved.points.get(v.id)?.world)
+    .filter(Boolean) as Vec3[];
+  if (!ps.length) return { x: 0, y: 0, z: 0 };
+  return scale(
+    ps.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
+    1 / ps.length,
+  );
+}
+
+function outwardFaceNormal(
+  faceId: string,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+): Vec3 | null {
+  const face = faceById(figure, faceId);
+  if (!face || face.vertexIds.length < 3) return null;
+  const ps = face.vertexIds.map((id) => resolved.points.get(id)?.world).filter(Boolean) as Vec3[];
+  if (ps.length < 3) return null;
+  let n = normalize(cross(sub(ps[1]!, ps[0]!), sub(ps[2]!, ps[0]!)));
+  const center = scale(
+    ps.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
+    1 / ps.length,
+  );
+  const body = figureBodyCenter(figure, resolved);
+  if (dot(n, sub(center, body)) < 0) n = scale(n, -1);
+  return n;
+}
+
 function isFaceFrontFacingFigure(
   faceId: string,
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
 ): boolean {
   if (isParallelepiped(figure)) return isFaceFrontFacing(faceId, resolved.projection);
-  const face = faceById(figure, faceId);
-  if (!face || face.vertexIds.length < 3) return false;
-  const ps = face.vertexIds.map((id) => resolved.points.get(id)?.world).filter(Boolean) as Vec3[];
-  if (ps.length < 3) return false;
-  const n = normalize(cross(sub(ps[1]!, ps[0]!), sub(ps[2]!, ps[0]!)));
+  const n = outwardFaceNormal(faceId, figure, resolved);
+  if (!n) return false;
   return dot(n, viewDirectionWorld(resolved, figure)) < -1e-5;
+}
+
+export function edgeEndpointKey(aId: string, bId: string): string {
+  return aId < bId ? `${aId}|${bId}` : `${bId}|${aId}`;
 }
 
 function edgeSilhouetteFacePair(figure: SpaceFigure, edgeId: string): [string, string] | null {
@@ -270,8 +300,8 @@ function vertexScreenForSilhouette(
 ): { x: number; y: number } | null {
   const pt = resolved.points.get(id);
   if (!pt) return null;
-  const scr = projectLocalForScreen(pt.local, view, resolved.projection, figure);
-  return { x: scr.x, y: scr.y };
+  const pr = projectFromLocalCoeffs(pt.local, pt.world, view, resolved.projection, figure);
+  return { x: pr.x, y: pr.y };
 }
 
 function pointInQuad2D(px: number, py: number, verts: Array<{ x: number; y: number }>): boolean {
@@ -287,7 +317,7 @@ function pointInQuad2D(px: number, py: number, verts: Array<{ x: number; y: numb
   return sign !== 0;
 }
 
-function pointInPolygon2D(px: number, py: number, verts: Array<{ x: number; y: number }>): boolean {
+export function pointInPolygon2D(px: number, py: number, verts: Array<{ x: number; y: number }>): boolean {
   if (verts.length < 3) return false;
   let inside = false;
   for (let i = 0, j = verts.length - 1; i < verts.length; j = i++) {
@@ -381,9 +411,14 @@ export function buildFigureSilhouetteGraph(
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
-): { poly: Array<{ x: number; y: number }>; silhouetteVertexIds: Set<string> } {
+): {
+  poly: Array<{ x: number; y: number }>;
+  silhouetteVertexIds: Set<string>;
+  silhouetteEdgeKeys: Set<string>;
+} {
   const adj = new Map<string, string[]>();
   const coords = new Map<string, { x: number; y: number }>();
+  const silhouetteEdgeKeys = new Set<string>();
 
   for (const edge of figure.edges) {
     const pair = edgeSilhouetteFacePair(figure, edge.id);
@@ -394,6 +429,7 @@ export function buildFigureSilhouetteGraph(
     )
       continue;
     const { aId, bId } = edge;
+    silhouetteEdgeKeys.add(edgeEndpointKey(aId, bId));
     if (!adj.has(aId)) adj.set(aId, []);
     if (!adj.has(bId)) adj.set(bId, []);
     adj.get(aId)!.push(bId);
@@ -407,7 +443,7 @@ export function buildFigureSilhouetteGraph(
   }
 
   const silhouetteVertexIds = new Set(coords.keys());
-  if (adj.size < 3) return { poly: [], silhouetteVertexIds };
+  if (adj.size < 3) return { poly: [], silhouetteVertexIds, silhouetteEdgeKeys };
 
   const start = [...adj.keys()].sort((a, b) => {
     const pa = coords.get(a)!;
@@ -451,7 +487,7 @@ export function buildFigureSilhouetteGraph(
     prev = cur;
     cur = next;
   }
-  return { poly, silhouetteVertexIds };
+  return { poly, silhouetteVertexIds, silhouetteEdgeKeys };
 }
 
 /** Вершины, чья проекция строго внутри 2D-силуэта (не на контуре). */
@@ -460,12 +496,13 @@ export function silhouetteInteriorVertexIds(
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
 ): Set<string> {
-  const { poly, silhouetteVertexIds } = buildFigureSilhouetteGraph(figure, resolved, view);
+  const body = resolved.figure ?? figure;
+  const { poly, silhouetteVertexIds } = buildFigureSilhouetteGraph(body, resolved, view);
   if (poly.length < 3) return new Set();
   const interior = new Set<string>();
-  for (const v of figure.vertices) {
+  for (const v of body.vertices) {
     if (silhouetteVertexIds.has(v.id)) continue;
-    const s = vertexScreenForSilhouette(v.id, figure, resolved, view);
+    const s = vertexScreenForSilhouette(v.id, body, resolved, view);
     if (!s) continue;
     if (pointInPolygon2D(s.x, s.y, poly)) interior.add(v.id);
   }

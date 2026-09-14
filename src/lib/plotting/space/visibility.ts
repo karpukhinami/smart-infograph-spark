@@ -1,12 +1,14 @@
 import { projectFromLocalCoeffs, type ProjectedPoint } from "./camera";
+import { pointInPolygon2D } from "./visibility-school";
 import { facePlane, type ResolvedSpaceScene } from "./build";
 import { adjacentFaceIds, edgeById, faceById, isPyramid } from "./figure";
-import type { SpaceFigure, SpaceViewParams, Vec3 } from "./types";
+import type { LineSplitSegment, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
 import { viewDirectionLocal } from "./camera";
 import {
+  buildFigureSilhouetteGraph,
+  edgeEndpointKey,
   isBodyEdgeVisibleSchool,
-  silhouetteInteriorVertexIds,
   splitLineSchoolView,
 } from "./visibility-school";
 
@@ -24,11 +26,7 @@ export function isBodyEdgeVisible(edgeId: string, figure: SpaceFigure): boolean 
   return false;
 }
 
-export interface LineSplitSegment {
-  a: Vec3;
-  b: Vec3;
-  visible: boolean;
-}
+export type { LineSplitSegment };
 
 interface ScreenVert {
   x: number;
@@ -401,6 +399,49 @@ function viewDirectionWorld(resolved: ResolvedSpaceScene, figure: SpaceFigure): 
   return normalize(add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)));
 }
 
+type PyramidVisCache = {
+  interior: Set<string>;
+  silhouetteEdgeKeys: Set<string>;
+};
+
+let pyramidVisCacheKey = "";
+let pyramidVisCache: PyramidVisCache = { interior: new Set(), silhouetteEdgeKeys: new Set() };
+
+function pyramidVisibilityCache(
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
+): PyramidVisCache {
+  const p = resolved.projection;
+  const key = `${figure.id}:${view.scale}:${view.visibilityMode}:${p.kx}:${p.ky}:${p.kwx}:${p.kwy}:${p.yawRad}:${p.orbit.thetaA}:${p.orbit.thetaB}`;
+  if (key !== pyramidVisCacheKey) {
+    pyramidVisCacheKey = key;
+    const body = resolved.figure ?? figure;
+    const graph = buildFigureSilhouetteGraph(body, resolved, view);
+    const interior = new Set<string>();
+    if (graph.poly.length >= 3) {
+      for (const v of body.vertices) {
+        if (graph.silhouetteVertexIds.has(v.id)) continue;
+        const pt = resolved.points.get(v.id);
+        if (!pt) continue;
+        const pr = projectFromLocalCoeffs(
+          pt.local,
+          pt.world,
+          view,
+          resolved.projection,
+          body,
+        );
+        if (pointInPolygon2D(pr.x, pr.y, graph.poly)) interior.add(v.id);
+      }
+    }
+    pyramidVisCache = {
+      interior,
+      silhouetteEdgeKeys: graph.silhouetteEdgeKeys,
+    };
+  }
+  return pyramidVisCache;
+}
+
 function isFaceFrontFacingWorld(
   faceId: string,
   figure: SpaceFigure,
@@ -410,27 +451,25 @@ function isFaceFrontFacingWorld(
   if (!face || face.vertexIds.length < 3) return false;
   const ps = face.vertexIds.map((id) => resolved.points.get(id)?.world).filter(Boolean) as Vec3[];
   if (ps.length < 3) return false;
-  const n = normalize(cross(sub(ps[1]!, ps[0]!), sub(ps[2]!, ps[0]!)));
+  let n = normalize(cross(sub(ps[1]!, ps[0]!), sub(ps[2]!, ps[0]!)));
+  const center = scale(
+    ps.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
+    1 / ps.length,
+  );
+  const bodyVerts = figure.vertices
+    .map((v) => resolved.points.get(v.id)?.world)
+    .filter(Boolean) as Vec3[];
+  const body = bodyVerts.length
+    ? scale(
+        bodyVerts.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
+        1 / bodyVerts.length,
+      )
+    : { x: 0, y: 0, z: 0 };
+  if (dot(n, sub(center, body)) < 0) n = scale(n, -1);
   return dot(n, viewDirectionWorld(resolved, figure)) < -1e-5;
 }
 
-let pyramidInteriorCacheKey = "";
-let pyramidInteriorCache = new Set<string>();
-
-function pyramidInteriorVertexIds(
-  figure: SpaceFigure,
-  resolved: ResolvedSpaceScene,
-  view: SpaceViewParams,
-): Set<string> {
-  const key = `${figure.id}:${view.scale}:${view.visibilityMode}:${resolved.projection.kx}:${resolved.projection.ky}`;
-  if (key !== pyramidInteriorCacheKey) {
-    pyramidInteriorCacheKey = key;
-    pyramidInteriorCache = silhouetteInteriorVertexIds(figure, resolved, view);
-  }
-  return pyramidInteriorCache;
-}
-
-/** Силуэт: рёбра «внутренних» вершин — пунктир; иначе — по передней грани. */
+/** Силуэт: рёбра «внутренних» вершин — пунктир; контур силуэта — сплошные. */
 function isBodyEdgeVisiblePyramid(
   edgeId: string,
   figure: SpaceFigure,
@@ -439,7 +478,8 @@ function isBodyEdgeVisiblePyramid(
 ): boolean {
   const edge = edgeById(figure, edgeId);
   if (!edge) return true;
-  const interior = pyramidInteriorVertexIds(figure, resolved, view);
+  const { interior, silhouetteEdgeKeys } = pyramidVisibilityCache(figure, resolved, view);
+  if (silhouetteEdgeKeys.has(edgeEndpointKey(edge.aId, edge.bId))) return true;
   if (interior.has(edge.aId) || interior.has(edge.bId)) return false;
   const faceIds = adjacentFaceIds(figure, edgeId);
   if (faceIds.length === 0) return true;
@@ -453,7 +493,8 @@ export function isBodyEdgeVisibleForRender(
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
 ): boolean {
-  if (isPyramid(figure)) return isBodyEdgeVisiblePyramid(edgeId, figure, resolved, view);
+  const body = resolved.figure ?? figure;
+  if (isPyramid(body)) return isBodyEdgeVisiblePyramid(edgeId, body, resolved, view);
   if (getVisibilityMode(view) === "legacy") return isBodyEdgeVisible(edgeId, figure);
   return isBodyEdgeVisibleSchool(edgeId, figure, resolved.projection);
 }
@@ -469,8 +510,9 @@ export function splitLineForRender(
   view: SpaceViewParams,
   ctx?: OcclusionContext,
 ): LineSplitSegment[] {
+  const body = resolved.figure ?? figure;
   if (getVisibilityMode(view) === "legacy") {
-    return splitLineByVisibility(origin, dir, t0, t1, figure, resolved, view, ctx);
+    return splitLineByVisibility(origin, dir, t0, t1, body, resolved, view, ctx);
   }
-  return splitLineSchoolView(origin, dir, t0, t1, figure, resolved, view);
+  return splitLineSchoolView(origin, dir, t0, t1, body, resolved, view);
 }

@@ -489,8 +489,8 @@ function collectFitPoints(
 
 export function renderSpaceSvg(data: SpaceSceneData): string | null {
   if (!data.figure) return null;
-  const figure = data.figure;
   const resolved = buildSpaceScene(data);
+  const figure = resolved.figure ?? data.figure;
   const a = data.appearance;
 
   const hasFixedFit =

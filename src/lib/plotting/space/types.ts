@@ -30,6 +30,13 @@ export interface Vec3 {
   z: number;
 }
 
+/** Участок 3D-отрезка после разбиения по видимости. */
+export interface LineSplitSegment {
+  a: Vec3;
+  b: Vec3;
+  visible: boolean;
+}
+
 export interface SpaceVertex {
   id: string;
   /** Отображаемое имя: A, B, C₁ … */
