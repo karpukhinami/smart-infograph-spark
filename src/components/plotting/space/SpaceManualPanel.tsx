@@ -219,6 +219,18 @@ export function SpaceManualPanel() {
                   onCheckedChange={(checked) => updateSpaceView({ showRotationEllipse: checked })}
                 />
               </div>
+              <div className="flex items-center justify-between rounded-md border border-border p-2">
+                <div className="space-y-0.5">
+                  <Label className="text-xs">Лучи точки обзора</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Прямые за пределы кадра к условному «глазу» (сход параллельных лучей зрения).
+                  </p>
+                </div>
+                <Switch
+                  checked={space3d.view.showViewConvergenceRays ?? false}
+                  onCheckedChange={(checked) => updateSpaceView({ showViewConvergenceRays: checked })}
+                />
+              </div>
               {isPyramid && (
                 <p className="text-[11px] text-muted-foreground">
                   Контур, в который вписано основание; угол «плохого» ребра задаёт наклон, как у

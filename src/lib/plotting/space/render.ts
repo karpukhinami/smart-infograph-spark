@@ -20,6 +20,7 @@ import {
   type OcclusionContext,
 } from "./visibility";
 import { isPyramid } from "./figure";
+import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
 import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
 import { add, len, scale, sub, worldToLocal } from "./vec3";
 
@@ -497,6 +498,58 @@ function renderPlane(
   renderPlaneHelperLines(plane, section, data, figure, resolved, fit, occlusion, parts, obstacles);
 }
 
+/** Отладочные лучи: от центра (и вершины пирамиды) через экран к проекции «глаза». */
+function renderViewConvergenceRays(
+  data: SpaceSceneData,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  fit: { scale: number; cx: number; cy: number },
+  width: number,
+  height: number,
+  parts: string[],
+): void {
+  const observer = buildSchoolViewObserver(figure, resolved, resolved.projection);
+  const anchors: Vec3[] = [figureBodyCenterWorld(figure, resolved)];
+  if (isPyramid(figure)) {
+    const apex = figure.vertices.find((v) => v.id.startsWith("pyr-v-apex"));
+    const aw = apex ? resolved.points.get(apex.id)?.world : null;
+    if (aw) anchors.push(aw);
+  }
+
+  const pEye = projectWorld(observer.eye, resolved, data.view, fit, figure);
+  const rayLen = Math.max(width, height) * 1.3;
+  const stroke =
+    'stroke="#B91C1C" stroke-width="1.25" stroke-dasharray="10 7" stroke-linecap="round" stroke-opacity="0.9"';
+
+  for (const anchorWorld of anchors) {
+    const p0 = projectWorld(anchorWorld, resolved, data.view, fit, figure);
+    let dx = pEye.x - p0.x;
+    let dy = pEye.y - p0.y;
+    if (Math.hypot(dx, dy) < 2) {
+      const p1 = projectWorld(
+        add(anchorWorld, scale(observer.toViewer, 0.5)),
+        resolved,
+        data.view,
+        fit,
+        figure,
+      );
+      dx = p1.x - p0.x;
+      dy = p1.y - p0.y;
+    }
+    const l = Math.hypot(dx, dy) || 1;
+    const ux = dx / l;
+    const uy = dy / l;
+    parts.push(
+      `<line x1="${round(p0.x - ux * rayLen)}" y1="${round(p0.y - uy * rayLen)}" x2="${round(p0.x + ux * rayLen)}" y2="${round(p0.y + uy * rayLen)}" fill="none" ${stroke}/>`,
+    );
+  }
+
+  parts.push(
+    `<circle cx="${round(pEye.x)}" cy="${round(pEye.y)}" r="5" fill="none" stroke="#B91C1C" stroke-width="1.25"/>`,
+    `<circle cx="${round(pEye.x)}" cy="${round(pEye.y)}" r="1.75" fill="#B91C1C"/>`,
+  );
+}
+
 function collectFitPoints(
   data: SpaceSceneData,
   figure: SpaceFigure,
@@ -707,6 +760,10 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     parts.push(
       `<circle cx="${round(px)}" cy="${round(py)}" r="${a.pointRadius}" fill="${point.style.color}" stroke="${point.style.color}" stroke-width="2"/>`,
     );
+  }
+
+  if (data.view.showViewConvergenceRays) {
+    renderViewConvergenceRays(data, figure, resolved, fit, a.width, a.height, parts);
   }
 
   parts.push(`<g>${renderLabels(data, figure, resolved, obstacles, fit, a)}</g>`);

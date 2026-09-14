@@ -244,6 +244,8 @@ export interface SpaceViewParams {
   visibilityMode?: "school" | "legacy";
   /** Заливка плоскостей с учётом глубины (разбиение по линиям пересечения). */
   planeFillByDepth?: boolean;
+  /** Отладка: лучи зрения «за кадр» к условной точке обзора. */
+  showViewConvergenceRays?: boolean;
 }
 
 export interface SpaceAppearance {

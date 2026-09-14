@@ -5,7 +5,7 @@
 import type { ResolvedSpaceScene } from "./build";
 import { viewDirectionLocal, type ProjectionCoeffs } from "./camera";
 import type { ProjectionHull } from "./convex-hull-visibility";
-import { faceById } from "./figure";
+import { faceById, isPyramid } from "./figure";
 import type { SpaceFigure, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub } from "./vec3";
 
@@ -83,6 +83,15 @@ export function pyramidViewDirectionFromProjection(projection: ProjectionCoeffs)
   return pyramidObserverToViewer(projection);
 }
 
+function observerExtent(figure: SpaceFigure, resolved: ResolvedSpaceScene, center: Vec3): number {
+  return (
+    figure.vertices
+      .map((v) => resolved.points.get(v.id)?.world)
+      .filter(Boolean)
+      .reduce((m, w) => Math.max(m, len(sub(w!, center))), 0) || 1
+  );
+}
+
 export function buildPyramidObserver(
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
@@ -91,13 +100,35 @@ export function buildPyramidObserver(
 ): PyramidObserver {
   const center = figureBodyCenterCartesian(figure, resolved);
   const toViewer = pyramidObserverToViewer(projection);
-  const extent =
-    figure.vertices
-      .map((v) => resolved.points.get(v.id)?.world)
-      .filter(Boolean)
-      .reduce((m, w) => Math.max(m, len(sub(w!, center))), 0) || 1;
-  const eye = add(center, scale(toViewer, OBSERVER_SCALE * extent));
+  const eye = add(center, scale(toViewer, OBSERVER_SCALE * observerExtent(figure, resolved, center)));
   return { eye, toViewer };
+}
+
+/** Условный «глаз» школьной проекции (пирамида — декартов z-↔yaw, параллелепипед — viewDirectionLocal). */
+export function buildSchoolViewObserver(
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  projection: ProjectionCoeffs,
+): PyramidObserver {
+  const center = figureBodyCenterCartesian(figure, resolved);
+  const extent = observerExtent(figure, resolved, center);
+  if (isPyramid(figure)) {
+    const toViewer = pyramidObserverToViewer(projection);
+    return { eye: add(center, scale(toViewer, OBSERVER_SCALE * extent)), toViewer };
+  }
+  const vd = viewDirectionLocal(projection);
+  const { e1, e2, e3 } = resolved.basis;
+  const toViewer = normalize(
+    add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)),
+  );
+  return { eye: add(center, scale(toViewer, OBSERVER_SCALE * extent)), toViewer };
+}
+
+export function figureBodyCenterWorld(
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+): Vec3 {
+  return figureBodyCenterCartesian(figure, resolved);
 }
 
 /** Больше значение — точка дальше от наблюдателя вдоль луча обзора. */
