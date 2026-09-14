@@ -6,6 +6,7 @@ import type { ResolvedSpaceScene } from "./build";
 import { viewDirectionLocal, type ProjectionCoeffs } from "./camera";
 import type { ProjectionHull } from "./convex-hull-visibility";
 import { faceById, isPyramid } from "./figure";
+import { localToCartesian } from "./pyramid";
 import type { SpaceFigure, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub } from "./vec3";
 
@@ -64,20 +65,43 @@ export function rotateCartesianZ(v: Vec3, angleRad: number): Vec3 {
   return { x: c * v.x - s * v.y, y: s * v.x + c * v.y, z: v.z };
 }
 
-/** Направление на наблюдателя при yaw=0 (школьная проекция), в I-м октанте. */
-export function pyramidObserverDirectionAtYawZero(projection: ProjectionCoeffs): Vec3 {
-  const vd = viewDirectionLocal({ ...projection, yawRad: 0 });
-  let d = normalize({ x: vd.u, y: vd.v, z: vd.w });
+/** Направление луча наблюдения в декартовых (x,y,z) модели пирамиды. */
+export function viewDirectionCartesian(projection: ProjectionCoeffs): Vec3 {
+  const vd = viewDirectionLocal(projection);
+  let d = normalize(localToCartesian(vd));
   const oct = { x: 1, y: 1, z: 1 };
   if (dot(d, oct) < 0) d = scale(d, -1);
   return d;
 }
 
+/** Направление на наблюдателя при yaw=0 (школьная проекция), в I-м октанте. */
+export function pyramidObserverDirectionAtYawZero(projection: ProjectionCoeffs): Vec3 {
+  return viewDirectionCartesian({ ...projection, yawRad: 0 });
+}
+
+/** Расстояние «глаза» от центра тела (эталон при yaw=0 — точка (4,4,1)). */
+export function pyramidObserverDistanceFromCenter(
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+): number {
+  const center = figureBodyCenterCartesian(figure, resolved);
+  return len(sub(PYRAMID_OBSERVER_EYE_AT_YAW_ZERO, center));
+}
+
 /**
- * Глаз наблюдателя: при yaw=0 — (4,4,1); при повороте основания на ψ вокруг z на −ψ.
+ * Глаз: при yaw=0 — ровно (4,4,1); при повороте — та же дальность вдоль оси школьной проекции (viewDirection).
  */
-export function pyramidObserverEyePosition(yawRad: number): Vec3 {
-  return rotateCartesianZ(PYRAMID_OBSERVER_EYE_AT_YAW_ZERO, -yawRad);
+export function pyramidObserverEyePosition(
+  projection: ProjectionCoeffs,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+): Vec3 {
+  const center = figureBodyCenterCartesian(figure, resolved);
+  if (Math.abs(projection.yawRad) < 1e-9) {
+    return { ...PYRAMID_OBSERVER_EYE_AT_YAW_ZERO };
+  }
+  const dist = pyramidObserverDistanceFromCenter(figure, resolved);
+  return add(center, scale(viewDirectionCartesian(projection), dist));
 }
 
 function pyramidObserverFromFixedEye(
@@ -86,10 +110,8 @@ function pyramidObserverFromFixedEye(
   projection: ProjectionCoeffs,
 ): PyramidObserver {
   const center = figureBodyCenterCartesian(figure, resolved);
-  const eye = pyramidObserverEyePosition(projection.yawRad);
-  const delta = sub(eye, center);
-  const d = len(delta);
-  const toViewer = d > 1e-9 ? scale(delta, 1 / d) : normalize(sub(eye, { x: 0, y: 0, z: 0 }));
+  const eye = pyramidObserverEyePosition(projection, figure, resolved);
+  const toViewer = viewDirectionCartesian(projection);
   return { eye, toViewer };
 }
 
@@ -97,9 +119,13 @@ function pyramidObserverFromFixedEye(
 export function pyramidObserverToViewer(
   projection: ProjectionCoeffs,
   bodyCenter: Vec3 = { x: 0, y: 0, z: 0.4 },
+  figure?: SpaceFigure,
+  resolved?: ResolvedSpaceScene,
 ): Vec3 {
-  const eye = pyramidObserverEyePosition(projection.yawRad);
-  return normalize(sub(eye, bodyCenter));
+  if (figure && resolved) {
+    return viewDirectionCartesian(projection);
+  }
+  return normalize(sub(PYRAMID_OBSERVER_EYE_AT_YAW_ZERO, bodyCenter));
 }
 
 /** @deprecated alias */
@@ -154,9 +180,9 @@ export function figureBodyCenterWorld(
   return figureBodyCenterCartesian(figure, resolved);
 }
 
-/** Больше значение — точка дальше от наблюдателя вдоль луча обзора. */
+/** Глубина вдоль оси школьной проекции (согласована с `projectLocal` / depth на чертеже). */
 export function cartesianDepthFromObserver(p: Vec3, observer: PyramidObserver): number {
-  return dot(sub(p, observer.eye), scale(observer.toViewer, -1));
+  return dot(p, observer.toViewer) - dot(observer.eye, observer.toViewer);
 }
 
 function pointInTriangle3D(p: Vec3, verts: Vec3[], eps = SURFACE_EPS): boolean {

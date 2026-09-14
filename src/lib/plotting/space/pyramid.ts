@@ -318,6 +318,41 @@ export function ellipseBaseVerticesEqualArc(
   return out;
 }
 
+/** Точка (x,y) над/под основанием внутри многоугольника основания (с допуском). */
+export function pointInPyramidBaseFootprint(
+  x: number,
+  y: number,
+  figure: PyramidFigure,
+  margin = 1e-3,
+): boolean {
+  const baseCart = pyramidBaseCartesianFromFigure(figure);
+  const n = baseCart.length;
+  if (n < 3) return false;
+  const p = { x, y };
+  const tol = margin;
+  for (let i = 1; i < n - 1; i += 1) {
+    const w = barycentric2D(p, baseCart[0]!, baseCart[i]!, baseCart[i + 1]!);
+    if (w && w[0] >= -tol && w[1] >= -tol && w[2] >= -tol) return true;
+  }
+  return false;
+}
+
+/** Проекция «по генератору S→Q» только для точек внутри пирамиды (не для «глаза» снаружи). */
+export function pyramidWorldUsesLateralProjection(world: Vec3, figure: PyramidFigure): boolean {
+  const H = pyramidHeight(figure.constraints);
+  if (world.z < -1e-4 || world.z > H + 1e-4) return false;
+  if (Math.abs(world.z) <= 1e-4) {
+    return pointInPyramidBaseFootprint(world.x, world.y, figure, 0.02);
+  }
+  if (Math.abs(world.z - H) <= 1e-4) {
+    const apex = pyramidApexCartesianFromFigure(figure);
+    return pointInPyramidBaseFootprint(apex.x, apex.y, figure, 0.05);
+  }
+  const foot = pyramidFootOnBaseFromWorld(world, figure);
+  if (!foot) return false;
+  return pointInPyramidBaseFootprint(foot.x, foot.y, figure, 0.02);
+}
+
 function barycentric2D(
   p: { x: number; y: number },
   a: { x: number; y: number },

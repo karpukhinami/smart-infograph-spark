@@ -16,6 +16,7 @@ import {
   pyramidFrameFromFigure,
   pyramidHeight,
   pyramidProjectOnApexGenerator,
+  pyramidWorldUsesLateralProjection,
 } from "./pyramid";
 import type {
   LocalCoords,
@@ -232,16 +233,18 @@ function pyramidWorldToView(
     footForDepth ? { x: footForDepth.x, y: footForDepth.y, z: 0 } : { x: world.x, y: world.y, z: 0 },
     frame,
   ) ?? { u: 0, v: 0, w: 0 };
-  const lateral = pyramidProjectOnApexGenerator(
-    world,
-    figure,
-    baseCart,
-    baseScr,
-    apexAnchor,
-    H,
-    kwx,
-    kwy,
-  );
+  const lateral = pyramidWorldUsesLateralProjection(world, figure)
+    ? pyramidProjectOnApexGenerator(
+        world,
+        figure,
+        baseCart,
+        baseScr,
+        apexAnchor,
+        H,
+        kwx,
+        kwy,
+      )
+    : null;
   if (lateral) {
     return {
       x: lateral.x,

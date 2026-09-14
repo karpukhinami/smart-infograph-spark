@@ -527,8 +527,9 @@ function renderViewConvergenceRays(
     let dx = pEye.x - p0.x;
     let dy = pEye.y - p0.y;
     if (Math.hypot(dx, dy) < 2) {
-      dx = -observer.toViewer.x;
-      dy = -observer.toViewer.y;
+      const pDir = projectWorld(add(anchorWorld, scale(observer.toViewer, 1)), resolved, data.view, fit, figure);
+      dx = pDir.x - p0.x;
+      dy = pDir.y - p0.y;
     }
     const l = Math.hypot(dx, dy) || 1;
     const ux = dx / l;
