@@ -898,6 +898,52 @@ function isOnBoxBoundary(local: LocalCoords, eps = 1e-3): boolean {
   );
 }
 
+function pointOnConvexFace(
+  p: Vec3,
+  faceVertexIds: string[],
+  points: Map<string, BuiltSpacePoint>,
+  eps = 1e-4,
+): boolean {
+  const verts = faceVertexIds.map((id) => points.get(id)?.world).filter(Boolean) as Vec3[];
+  if (verts.length < 3) return false;
+  const plane = planeFromPoints(verts[0]!, verts[1]!, verts[2]!);
+  if (!plane || Math.abs(planePointDistance(p, plane)) > eps) return false;
+  let sign = 0;
+  for (let i = 0; i < verts.length; i += 1) {
+    const a = verts[i]!;
+    const b = verts[(i + 1) % verts.length]!;
+    const edge = sub(b, a);
+    const toP = sub(p, a);
+    const crossVal = dot(cross(edge, toP), plane.normal);
+    if (Math.abs(crossVal) < eps * eps) continue;
+    if (sign === 0) sign = Math.sign(crossVal);
+    else if (Math.sign(crossVal) !== sign) return false;
+  }
+  return sign !== 0;
+}
+
+/** Первое пересечение отрезка support→target с поверхностью выпуклого многогранника (s ∈ (0,1]). */
+function firstPolyhedronBoundaryParam(
+  support: Vec3,
+  target: Vec3,
+  figure: SpaceFigure,
+  points: Map<string, BuiltSpacePoint>,
+): number | null {
+  if (isPointInsideParallelepiped(support, figure, points)) return null;
+  let best: number | null = null;
+  for (const face of figure.faces) {
+    const plane = facePlane(figure, face.id, points);
+    if (!plane) continue;
+    const hit = segmentPlaneIntersection(support, target, plane);
+    if (!hit) continue;
+    const s = paramOnLine(support, target, hit);
+    if (s <= 1e-6 || s > 1 + 1e-6) continue;
+    if (!pointOnConvexFace(hit, face.vertexIds, points)) continue;
+    if (best === null || s < best) best = s;
+  }
+  return best;
+}
+
 /** Первое пересечение отрезка [a→b] с границей параллелепипеда (параметр t ∈ (0,1]). */
 function firstBoxBoundaryHit(a: LocalCoords, b: LocalCoords): number | null {
   const du = b.u - a.u;
@@ -925,21 +971,28 @@ function firstBoxBoundaryHit(a: LocalCoords, b: LocalCoords): number | null {
   return best;
 }
 
-/** Часть отрезка support→target, лежащая вне параллелепипеда. */
+/** Часть отрезка support→target, лежащая вне тела. */
 function clipHelperOutsideFigure(
   support: Vec3,
   target: Vec3,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+  figure?: SpaceFigure,
+  points?: Map<string, BuiltSpacePoint>,
 ): { from: Vec3; to: Vec3 } | null {
   const a = worldToLocal(support, basis);
   const b = worldToLocal(target, basis);
   if (!a || !b) return null;
-  if (isLocalInsideFigure(a)) return null;
-
-  const tHit = firstBoxBoundaryHit(a, b);
-  if (tHit === null) return null;
+  if (isLocalInsideFigure(a, figure)) return null;
 
   const dir = sub(target, support);
+  let tHit: number | null = null;
+  if (figure && isPyramid(figure) && points) {
+    tHit = firstPolyhedronBoundaryParam(support, target, figure, points);
+  } else {
+    tHit = firstBoxBoundaryHit(a, b);
+  }
+  if (tHit === null) return null;
+
   const hit = add(support, scale(dir, tHit));
   if (len(sub(hit, support)) < 1e-6) return null;
   return { from: support, to: hit };
@@ -953,6 +1006,8 @@ export function computePlaneHelperSegments(
   support: Vec3,
   planeEq: PlaneEq,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+  figure?: SpaceFigure,
+  points?: Map<string, BuiltSpacePoint>,
 ): Array<{ from: Vec3; to: Vec3 }> {
   if (section.length < 3) return [];
   const sources = tangentSectionVerticesFromSupport(section, support, planeEq);
@@ -963,7 +1018,7 @@ export function computePlaneHelperSegments(
 
   for (const target of sources) {
     if (len(sub(target, support)) < 1e-6) continue;
-    const clipped = clipHelperOutsideFigure(support, target, basis);
+    const clipped = clipHelperOutsideFigure(support, target, basis, figure, points);
     if (!clipped) continue;
     const k = key(clipped.from, clipped.to);
     if (seen.has(k)) continue;

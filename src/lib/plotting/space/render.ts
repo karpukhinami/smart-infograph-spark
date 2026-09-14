@@ -335,7 +335,14 @@ function renderPlaneOutlines(
   const helperWidth = edgeWidth / 2;
   const supports = getPlaneOutsideSupportPoints(plane, resolved.points, resolved.basis, figure);
   for (const support of supports) {
-    const helpers = computePlaneHelperSegments(section, support, planeEq, resolved.basis);
+    const helpers = computePlaneHelperSegments(
+      section,
+      support,
+      planeEq,
+      resolved.basis,
+      figure,
+      resolved.points,
+    );
     for (const seg of helpers) {
       drawSegmentWithVisibility(
         seg.from,

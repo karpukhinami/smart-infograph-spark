@@ -6,6 +6,7 @@ import { add, cross, dot, len, normalize, scale, sub, worldToLocal, type PlaneEq
 import { viewDirectionLocal } from "./camera";
 import {
   isBodyEdgeVisibleSchool,
+  silhouetteInteriorVertexIds,
   splitLineSchoolView,
 } from "./visibility-school";
 
@@ -413,12 +414,33 @@ function isFaceFrontFacingWorld(
   return dot(n, viewDirectionWorld(resolved, figure)) < -1e-5;
 }
 
-/** Ребро видно, если хотя бы одна смежная грань обращена к наблюдателю. */
+let pyramidInteriorCacheKey = "";
+let pyramidInteriorCache = new Set<string>();
+
+function pyramidInteriorVertexIds(
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
+): Set<string> {
+  const key = `${figure.id}:${view.scale}:${view.visibilityMode}:${resolved.projection.kx}:${resolved.projection.ky}`;
+  if (key !== pyramidInteriorCacheKey) {
+    pyramidInteriorCacheKey = key;
+    pyramidInteriorCache = silhouetteInteriorVertexIds(figure, resolved, view);
+  }
+  return pyramidInteriorCache;
+}
+
+/** Силуэт: рёбра «внутренних» вершин — пунктир; иначе — по передней грани. */
 function isBodyEdgeVisiblePyramid(
   edgeId: string,
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
 ): boolean {
+  const edge = edgeById(figure, edgeId);
+  if (!edge) return true;
+  const interior = pyramidInteriorVertexIds(figure, resolved, view);
+  if (interior.has(edge.aId) || interior.has(edge.bId)) return false;
   const faceIds = adjacentFaceIds(figure, edgeId);
   if (faceIds.length === 0) return true;
   return faceIds.some((fid) => isFaceFrontFacingWorld(fid, figure, resolved));
@@ -431,7 +453,7 @@ export function isBodyEdgeVisibleForRender(
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
 ): boolean {
-  if (isPyramid(figure)) return isBodyEdgeVisiblePyramid(edgeId, figure, resolved);
+  if (isPyramid(figure)) return isBodyEdgeVisiblePyramid(edgeId, figure, resolved, view);
   if (getVisibilityMode(view) === "legacy") return isBodyEdgeVisible(edgeId, figure);
   return isBodyEdgeVisibleSchool(edgeId, figure, resolved.projection);
 }
@@ -447,7 +469,7 @@ export function splitLineForRender(
   view: SpaceViewParams,
   ctx?: OcclusionContext,
 ): LineSplitSegment[] {
-  if (isPyramid(figure) || getVisibilityMode(view) === "legacy") {
+  if (getVisibilityMode(view) === "legacy") {
     return splitLineByVisibility(origin, dir, t0, t1, figure, resolved, view, ctx);
   }
   return splitLineSchoolView(origin, dir, t0, t1, figure, resolved, view);
