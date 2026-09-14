@@ -30,7 +30,7 @@ import {
   type ProjectedPoint,
 } from "./camera";
 import { edgeById, faceById, isParallelepiped, isPyramid, vertexById } from "./figure";
-import { baseLocalToFanFromUV, pyramidBaseUV } from "./pyramid";
+import { localToCartesian } from "./pyramid";
 import type {
   BuiltSpacePoint,
   LineRegion,
@@ -773,11 +773,13 @@ export function isLocalInsideFigure(local: LocalCoords, figure?: SpaceFigure): b
       local.w <= 1 + LOCAL_UNIT_EPS
     );
   }
-  if (local.w < -LOCAL_UNIT_EPS || local.w > 1 + LOCAL_UNIT_EPS) return false;
-  if (local.w > 1 - LOCAL_UNIT_EPS) {
-    return Math.hypot(local.u, local.v) < LOCAL_UNIT_EPS * 10;
+  const world = localToCartesian(local);
+  const points = new Map<string, BuiltSpacePoint>();
+  for (const v of figure.vertices) {
+    const w = localToCartesian(v.local);
+    points.set(v.id, { local: { ...v.local }, world: w });
   }
-  return baseLocalToFanFromUV(local.u, local.v, pyramidBaseUV(figure.baseLabels.length)) !== null;
+  return isPointInsideParallelepiped(world, figure, points);
 }
 
 /** ID точек, задающих плоскость (не прямые). */

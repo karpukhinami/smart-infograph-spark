@@ -5,7 +5,14 @@ import {
   type ConicEllipse,
 } from "./conic-ellipse";
 import { isParallelepiped, isPyramid } from "./figure";
-import { ellipseBaseVerticesEqualArc } from "./pyramid";
+import {
+  ellipseBaseVerticesEqualArc,
+  localToCartesian,
+  pyramidBaseRadius,
+  pyramidBaseScreenAtXY,
+  pyramidBaseVerticesCartesian,
+  pyramidHeight,
+} from "./pyramid";
 import type {
   LocalCoords,
   ParallelepipedConstraints,
@@ -203,18 +210,27 @@ function pyramidScreenBase(figure: PyramidFigure, coeffs: ProjectionCoeffs): Arr
   return ellipseBaseVerticesEqualArc(coeffs.orbit, n, coeffs.orbit.thetaA);
 }
 
-/** Аффинно: A + u·(B−A) + v·(last−A) на экране — согласовано с 3D-базисом. */
-function pyramidBaseAt(
-  u: number,
-  v: number,
-  baseScr: Array<{ x: number; y: number }>,
-): { x: number; y: number } {
-  const a = baseScr[0] ?? { x: 0, y: 0 };
-  const b = baseScr[1] ?? a;
-  const last = baseScr[baseScr.length - 1] ?? a;
+function pyramidWorldToView(
+  world: Vec3,
+  coeffs: ProjectionCoeffs,
+  figure: PyramidFigure,
+): { x: number; y: number; z: number } {
+  const { kwx, kwy, kx, ky, orbit } = coeffs;
+  const kw = kwySafe(kwy);
+  const n = figure.baseLabels.length;
+  const R = pyramidBaseRadius(figure.constraints);
+  const H = pyramidHeight(figure.constraints);
+  const baseScr = pyramidScreenBase(figure, coeffs);
+  const baseXY = pyramidBaseVerticesCartesian(n, R);
+  const apexAnchor = figure.constraints.apexOnCenter
+    ? { x: orbit.cx, y: orbit.cy }
+    : baseScr[0]!;
+  const atBase = pyramidBaseScreenAtXY(world.x, world.y, baseXY, baseScr);
+  const t = H > 1e-9 ? Math.max(0, Math.min(1, world.z / H)) : 0;
   return {
-    x: a.x + u * (b.x - a.x) + v * (last.x - a.x),
-    y: a.y + u * (b.y - a.y) + v * (last.y - a.y),
+    x: atBase.x + t * (apexAnchor.x - atBase.x) + kwx * t,
+    y: atBase.y + t * (apexAnchor.y - atBase.y) + kwy * t,
+    z: world.x - kx * world.y - (ky / kw) * t,
   };
 }
 
@@ -223,20 +239,7 @@ function pyramidLocalToView(
   coeffs: ProjectionCoeffs,
   figure: PyramidFigure,
 ): { x: number; y: number; z: number } {
-  const { kwx, kwy, kx, ky, orbit } = coeffs;
-  const kw = kwySafe(kwy);
-  const n = figure.baseLabels.length;
-  const baseScr = pyramidScreenBase(figure, coeffs);
-  const apexAnchor = figure.constraints.apexOnCenter
-    ? { x: orbit.cx, y: orbit.cy }
-    : baseScr[0]!;
-  const atBase = pyramidBaseAt(local.u, local.v, baseScr);
-  const w = local.w;
-  return {
-    x: atBase.x + w * (apexAnchor.x - atBase.x) + kwx * w,
-    y: atBase.y + w * (apexAnchor.y - atBase.y) + kwy * w,
-    z: local.u - kx * local.v - (ky / kw) * w,
-  };
+  return pyramidWorldToView(localToCartesian(local), coeffs, figure);
 }
 
 /**

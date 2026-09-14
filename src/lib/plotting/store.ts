@@ -75,6 +75,7 @@ import type {
   SpaceShapeKind,
 } from "./space/types";
 import { clampRegionParam, defaultLineParam } from "./space/build";
+import { refreshPyramidVertices } from "./space/pyramid";
 
 export interface SpacePointDraft {
   mode: "onLine" | "onFace";
@@ -1127,7 +1128,10 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       return;
     }
 
-    const figure = { ...data.figure, constraints: { ...figureConstraints } } as typeof data.figure;
+    let figure = { ...data.figure, constraints: { ...figureConstraints } } as typeof data.figure;
+    if (figure.kind === "pyramid") {
+      figure = refreshPyramidVertices(figure);
+    }
     const result = applySpaceBuild({
       ...state.scene,
       space3d: { ...data, figureConstraints, figure, figureDirty: false },
