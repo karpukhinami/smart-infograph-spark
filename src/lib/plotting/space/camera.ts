@@ -7,9 +7,11 @@ import {
 import { isParallelepiped, isPyramid } from "./figure";
 import {
   cartesianToPyramidCoeffs,
-  ellipseBaseVerticesEqualArc,
   localToCartesian,
-  pyramidBaseScreenFromCoeffs,
+  pyramidBaseRadius,
+  pyramidBaseScreenAtXY,
+  pyramidBaseVerticesCartesian,
+  pyramidEllipseBaseScreen,
   pyramidFrameFromFigure,
 } from "./pyramid";
 import type {
@@ -205,8 +207,7 @@ export function sampleRotationEllipse(
 }
 
 function pyramidScreenBase(figure: PyramidFigure, coeffs: ProjectionCoeffs): Array<{ x: number; y: number }> {
-  const n = figure.baseLabels.length;
-  return ellipseBaseVerticesEqualArc(coeffs.orbit, n, coeffs.orbit.thetaA);
+  return pyramidEllipseBaseScreen(coeffs.orbit, figure.baseLabels.length);
 }
 
 function pyramidWorldToView(
@@ -218,11 +219,14 @@ function pyramidWorldToView(
   const kw = kwySafe(kwy);
   const frame = pyramidFrameFromFigure(figure);
   const c = cartesianToPyramidCoeffs(world, frame) ?? { u: 0, v: 0, w: 0 };
+  const n = figure.baseLabels.length;
+  const R = pyramidBaseRadius(figure.constraints);
+  const baseCart = pyramidBaseVerticesCartesian(n, R).map((p) => ({ x: p.x, y: p.y }));
   const baseScr = pyramidScreenBase(figure, coeffs);
   const apexAnchor = figure.constraints.apexOnCenter
     ? { x: orbit.cx, y: orbit.cy }
     : baseScr[0]!;
-  const atBase = pyramidBaseScreenFromCoeffs(c.u, c.v, baseScr);
+  const atBase = pyramidBaseScreenAtXY(world.x, world.y, baseCart, baseScr);
   const t = Math.max(0, Math.min(1, c.w));
   return {
     x: atBase.x + t * (apexAnchor.x - atBase.x) + kwx * t,

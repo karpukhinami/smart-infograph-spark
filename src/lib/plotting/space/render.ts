@@ -511,7 +511,7 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     projectWorldForFit,
   );
 
-  if (data.view.showRotationEllipse && figure.kind !== "pyramid") {
+  if (data.view.showRotationEllipse) {
     const ellipsePts = sampleRotationEllipse(resolved.projection);
     const d = ellipsePts
       .map((p) => {

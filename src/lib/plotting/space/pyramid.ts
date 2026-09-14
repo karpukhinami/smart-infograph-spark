@@ -171,19 +171,60 @@ export function ellipseBaseVerticesEqualArc(
   return out;
 }
 
-/** Экранная точка основания: A_scr + u·(B_scr−A_scr) + v·(last_scr−A_scr). */
-export function pyramidBaseScreenFromCoeffs(
-  u: number,
-  v: number,
+function barycentric2D(
+  p: { x: number; y: number },
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  c: { x: number; y: number },
+): [number, number, number] | null {
+  const v0 = { x: c.x - a.x, y: c.y - a.y };
+  const v1 = { x: b.x - a.x, y: b.y - a.y };
+  const v2 = { x: p.x - a.x, y: p.y - a.y };
+  const den = v0.x * v1.y - v1.x * v0.y;
+  if (Math.abs(den) < 1e-12) return null;
+  const w1 = (v2.x * v1.y - v1.x * v2.y) / den;
+  const w2 = (v0.x * v2.y - v2.x * v0.y) / den;
+  const w0 = 1 - w1 - w2;
+  return [w0, w1, w2];
+}
+
+/**
+ * Экранная позиция точки основания: барицентрика по вершинам (x,y) → baseScr.
+ * Гарантирует, что вершина i попадает в baseScr[i] (в отличие от аффинной u,v).
+ */
+export function pyramidBaseScreenAtXY(
+  x: number,
+  y: number,
+  baseCart: Array<{ x: number; y: number }>,
   baseScr: Array<{ x: number; y: number }>,
 ): { x: number; y: number } {
-  const a = baseScr[0] ?? { x: 0, y: 0 };
-  const b = baseScr[1] ?? a;
-  const last = baseScr[baseScr.length - 1] ?? a;
-  return {
-    x: a.x + u * (b.x - a.x) + v * (last.x - a.x),
-    y: a.y + u * (b.y - a.y) + v * (last.y - a.y),
-  };
+  const n = baseCart.length;
+  if (n < 3) return baseScr[0] ?? { x: 0, y: 0 };
+  const p = { x, y };
+  for (let i = 1; i < n - 1; i += 1) {
+    const w = barycentric2D(p, baseCart[0]!, baseCart[i]!, baseCart[i + 1]!);
+    if (w && w[0] >= -1e-6 && w[1] >= -1e-6 && w[2] >= -1e-6) {
+      const [w0, w1, w2] = w;
+      return {
+        x: w0 * baseScr[0]!.x + w1 * baseScr[i]!.x + w2 * baseScr[i + 1]!.x,
+        y: w0 * baseScr[0]!.y + w1 * baseScr[i]!.y + w2 * baseScr[i + 1]!.y,
+      };
+    }
+  }
+  return baseScr[0] ?? { x: 0, y: 0 };
+}
+
+/** Вершины основания на эллипсе: A → θ_A, далее против часовой (как в 3D), шаг 2π/n. */
+export function pyramidEllipseBaseScreen(
+  orbit: ConicEllipse,
+  n: number,
+): Array<{ x: number; y: number }> {
+  const out: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i < n; i += 1) {
+    const theta = orbit.thetaA - (pyramidBaseAngleRad(n) * i);
+    out.push(ellipsePoint(orbit, theta));
+  }
+  return out;
 }
 
 export function createPyramid(
