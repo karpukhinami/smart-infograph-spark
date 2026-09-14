@@ -5,6 +5,7 @@ import { projectFromLocalCoeffs } from "./camera";
 import type { ResolvedSpaceScene } from "./build";
 import { locatePointOnFigureEdge } from "./display-projection";
 import { faceById, isPyramid } from "./figure";
+import type { PyramidFigure } from "./types";
 import type { BuiltSpacePoint } from "./build";
 import {
   buildPyramidObserver,
@@ -101,9 +102,81 @@ export type ProjectionHull = {
   hullEdgeKeys: Set<string>;
   /** Вершины строго внутри оболочки (не на границе). */
   interiorVertexIds: Set<string>;
+  /**
+   * Если interior пуст: единственное пунктирное ребро тела (ребро основания
+   * между крайней левой и крайней правой вершинами основания на чертеже).
+   */
+  soleDashedBodyEdgeKey: string | null;
   /** Наблюдатель в декартовых координатах (пирамида). */
   pyramidObserver?: PyramidObserver;
 };
+
+function isBaseVertexId(id: string): boolean {
+  return id.startsWith("pyr-v-b");
+}
+
+function baseVertexIndex(id: string): number {
+  return Number(id.replace("pyr-v-b", ""));
+}
+
+/** Ребро основания между min x и max x (среди вершин основания); иначе единственное ребро основания вне 2D-контура. */
+function computeSoleDashedBaseEdgeKey(
+  figure: SpaceFigure,
+  projected: ScreenVertex[],
+  hullEdgeKeys: Set<string>,
+): string | null {
+  const basePts = projected.filter((p) => isBaseVertexId(p.id));
+  if (basePts.length < 2) return null;
+
+  let left = basePts[0]!;
+  let right = basePts[0]!;
+  for (const p of basePts) {
+    if (p.x < left.x - 1e-9 || (Math.abs(p.x - left.x) <= 1e-9 && p.y < left.y)) left = p;
+    if (p.x > right.x + 1e-9 || (Math.abs(p.x - right.x) <= 1e-9 && p.y > right.y)) right = p;
+  }
+  if (left.id === right.id) return null;
+
+  const directKey = edgeEndpointKey(left.id, right.id);
+  for (const e of figure.edges) {
+    if (!e.id.startsWith("pyr-e-b")) continue;
+    if (edgeEndpointKey(e.aId, e.bId) === directKey) return directKey;
+  }
+
+  const hiddenBaseKeys = figure.edges
+    .filter((e) => e.id.startsWith("pyr-e-b"))
+    .map((e) => edgeEndpointKey(e.aId, e.bId))
+    .filter((k) => !hullEdgeKeys.has(k));
+  if (hiddenBaseKeys.length === 1) return hiddenBaseKeys[0]!;
+
+  const n = (figure as PyramidFigure).baseLabels.length;
+  const li = baseVertexIndex(left.id);
+  const ri = baseVertexIndex(right.id);
+  if (!Number.isFinite(li) || !Number.isFinite(ri) || n < 3) {
+    return hiddenBaseKeys[0] ?? null;
+  }
+
+  const collectArc = (from: number, to: number, step: number): string[] => {
+    const keys: string[] = [];
+    let i = from;
+    for (let guard = 0; guard <= n && i !== to; guard += 1) {
+      const j = (i + step + n) % n;
+      keys.push(edgeEndpointKey(`pyr-v-b${i}`, `pyr-v-b${j}`));
+      i = j;
+    }
+    return keys;
+  };
+
+  const arcA = collectArc(li, ri, 1);
+  const arcB = collectArc(li, ri, -1);
+  const offA = arcA.filter((k) => !hullEdgeKeys.has(k));
+  const offB = arcB.filter((k) => !hullEdgeKeys.has(k));
+  if (offA.length === 1) return offA[0]!;
+  if (offB.length === 1) return offB[0]!;
+  if (offA.length > 0 && offB.length === 0) return offA[0]!;
+  if (offB.length > 0 && offA.length === 0) return offB[0]!;
+
+  return hiddenBaseKeys[0] ?? null;
+}
 
 export function buildProjectionConvexHull(
   figure: SpaceFigure,
@@ -146,28 +219,41 @@ export function buildProjectionConvexHull(
     if (pointStrictlyInsideConvexPoly(p.x, p.y, hullPoly)) interiorVertexIds.add(p.id);
   }
 
+  let soleDashedBodyEdgeKey: string | null = null;
+  if (isPyramid(body) && interiorVertexIds.size === 0) {
+    soleDashedBodyEdgeKey = computeSoleDashedBaseEdgeKey(body, projected, hullEdgeKeys);
+  }
+
   const pyramidObserver =
     isPyramid(body)
       ? buildPyramidObserver(body, resolved, resolved.projection, {
           hull,
           hullEdgeKeys,
           interiorVertexIds,
+          soleDashedBodyEdgeKey,
         })
       : undefined;
 
-  return { hull, hullEdgeKeys, interiorVertexIds, pyramidObserver };
+  return { hull, hullEdgeKeys, interiorVertexIds, soleDashedBodyEdgeKey, pyramidObserver };
 }
 
 /**
  * Ребро сплошное, если ни одна вершина не внутри контура;
- * обе на контуре — сплошное (в т.ч. SA, SB, не только стороны оболочки).
+ * при пустом interior — пунктиром только soleDashedBodyEdgeKey;
+ * иначе пунктир, если инцидентна «внутренней» вершине.
  */
 export function isBodyEdgeVisibleProjectionHull(
   aId: string,
   bId: string,
   hull: ProjectionHull,
 ): boolean {
-  if (hull.interiorVertexIds.has(aId) || hull.interiorVertexIds.has(bId)) return false;
+  if (hull.interiorVertexIds.size > 0) {
+    if (hull.interiorVertexIds.has(aId) || hull.interiorVertexIds.has(bId)) return false;
+    return true;
+  }
+  if (hull.soleDashedBodyEdgeKey) {
+    return edgeEndpointKey(aId, bId) !== hull.soleDashedBodyEdgeKey;
+  }
   return true;
 }
 

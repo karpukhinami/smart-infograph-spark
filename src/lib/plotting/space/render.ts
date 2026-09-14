@@ -27,6 +27,27 @@ function round(n: number): string {
   return String(Number(n.toFixed(2)));
 }
 
+/** Треугольный наконечник в конце вектора (как стрелка оси на координатной плоскости). */
+function vectorArrowheadPolygon(
+  tipX: number,
+  tipY: number,
+  dirX: number,
+  dirY: number,
+  arrowSize: number,
+): string {
+  const l = Math.hypot(dirX, dirY) || 1;
+  const ux = dirX / l;
+  const uy = dirY / l;
+  const half = arrowSize * 0.225;
+  const bx = tipX - ux * arrowSize;
+  const by = tipY - uy * arrowSize;
+  const x1 = bx - uy * half;
+  const y1 = by + ux * half;
+  const x2 = bx + uy * half;
+  const y2 = by - ux * half;
+  return `${round(tipX)},${round(tipY)} ${round(x1)},${round(y1)} ${round(x2)},${round(y2)}`;
+}
+
 function escapeText(v: string): string {
   return String(v ?? "")
     .replace(/&/g, "&amp;")
@@ -241,9 +262,20 @@ function renderLineObject(
     if (!(abLen > 1e-9)) return;
     origin = a;
     dir = scale(ab, 1 / abLen);
-    if (line.style.visualKind === "segment" || line.style.visualKind === "vector") {
+    if (line.style.visualKind === "segment") {
       t0 = 0;
       t1 = abLen;
+    } else if (line.style.visualKind === "vector") {
+      t0 = 0;
+      const pA = projectWorld(a, resolved, data.view, fit, figure);
+      const pB = projectWorld(b, resolved, data.view, fit, figure);
+      const dx = pB.x - pA.x;
+      const dy = pB.y - pA.y;
+      const screenLen = Math.hypot(dx, dy);
+      const arrow = data.appearance.arrowSize;
+      const trimRatio =
+        screenLen > arrow + 2 ? Math.max(0.05, (screenLen - arrow) / screenLen) : 0.88;
+      t1 = abLen * trimRatio;
     } else {
       const range = computeLineDisplayRange(
         { origin, dir },
@@ -296,19 +328,19 @@ function renderLineObject(
   );
 
   if (line.style.visualKind === "vector" && def.kind === "twoPoints") {
+    const a = resolved.points.get(def.aId)?.world;
     const b = resolved.points.get(def.bId)?.world;
-    if (b) {
-      const p2 = projectWorld(b, resolved, data.view, fit, figure);
-      const a = resolved.points.get(def.aId)?.world;
-      if (a) {
-        const p1 = projectWorld(a, resolved, data.view, fit, figure);
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        const l = Math.hypot(dx, dy) || 1;
-        parts.push(
-          `<polygon points="${round(p2.x)},${round(p2.y)} ${round(p2.x - (dx / l) * 10 - 4)},${round(p2.y - (dy / l) * 10 - 3)} ${round(p2.x - (dx / l) * 10 - 4)},${round(p2.y - (dy / l) * 10 + 3)}" fill="${line.style.color}"/>`,
-        );
-      }
+    if (a && b) {
+      const pTip = projectWorld(b, resolved, data.view, fit, figure);
+      const pTail = projectWorld(a, resolved, data.view, fit, figure);
+      const poly = vectorArrowheadPolygon(
+        pTip.x,
+        pTip.y,
+        pTip.x - pTail.x,
+        pTip.y - pTail.y,
+        data.appearance.arrowSize,
+      );
+      parts.push(`<polygon points="${poly}" fill="${line.style.color}"/>`);
     }
   }
 }

@@ -259,6 +259,8 @@ export interface SpaceAppearance {
   pointRadius: number;
   lineWidth: number;
   lineExtension: number;
+  /** Размер наконечника вектора (как стрелка оси на плоскости), px. */
+  arrowSize: number;
   planeFillOpacity: number;
 }
 

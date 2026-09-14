@@ -47,6 +47,7 @@ export const DEFAULT_SPACE_APPEARANCE: SpaceAppearance = {
   pointRadius: DEFAULT_APPEARANCE.pointRadius,
   lineWidth: DEFAULT_APPEARANCE.graphWidth,
   lineExtension: 0.35,
+  arrowSize: DEFAULT_APPEARANCE.arrowSize,
   planeFillOpacity: 0.5,
 };
 
