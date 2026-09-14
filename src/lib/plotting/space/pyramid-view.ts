@@ -10,7 +10,8 @@ import type { SpaceFigure, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub } from "./vec3";
 
 const SURFACE_EPS = 1e-4;
-const OBSERVER_SCALE = 6;
+/** Расстояние «глаза» от центра ≈ k·размер фигуры (для подписи/отладки; порядок по глубине от направления не зависит). */
+const OBSERVER_DISTANCE_K = 2;
 
 export type PyramidObserver = {
   /** Положение «глаза» в декартовых координатах. */
@@ -100,7 +101,10 @@ export function buildPyramidObserver(
 ): PyramidObserver {
   const center = figureBodyCenterCartesian(figure, resolved);
   const toViewer = pyramidObserverToViewer(projection);
-  const eye = add(center, scale(toViewer, OBSERVER_SCALE * observerExtent(figure, resolved, center)));
+  const eye = add(
+    center,
+    scale(toViewer, OBSERVER_DISTANCE_K * observerExtent(figure, resolved, center)),
+  );
   return { eye, toViewer };
 }
 
@@ -114,14 +118,14 @@ export function buildSchoolViewObserver(
   const extent = observerExtent(figure, resolved, center);
   if (isPyramid(figure)) {
     const toViewer = pyramidObserverToViewer(projection);
-    return { eye: add(center, scale(toViewer, OBSERVER_SCALE * extent)), toViewer };
+    return { eye: add(center, scale(toViewer, OBSERVER_DISTANCE_K * extent)), toViewer };
   }
   const vd = viewDirectionLocal(projection);
   const { e1, e2, e3 } = resolved.basis;
   const toViewer = normalize(
     add(add(scale(e1, vd.u), scale(e2, vd.v)), scale(e3, vd.w)),
   );
-  return { eye: add(center, scale(toViewer, OBSERVER_SCALE * extent)), toViewer };
+  return { eye: add(center, scale(toViewer, OBSERVER_DISTANCE_K * extent)), toViewer };
 }
 
 export function figureBodyCenterWorld(

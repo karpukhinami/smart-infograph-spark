@@ -509,44 +509,49 @@ function renderViewConvergenceRays(
   parts: string[],
 ): void {
   const observer = buildSchoolViewObserver(figure, resolved, resolved.projection);
-  const anchors: Vec3[] = [figureBodyCenterWorld(figure, resolved)];
+  const centerWorld = figureBodyCenterWorld(figure, resolved);
+  const anchors: Vec3[] = [centerWorld];
   if (isPyramid(figure)) {
     const apex = figure.vertices.find((v) => v.id.startsWith("pyr-v-apex"));
     const aw = apex ? resolved.points.get(apex.id)?.world : null;
     if (aw) anchors.push(aw);
   }
 
-  const pEye = projectWorld(observer.eye, resolved, data.view, fit, figure);
+  /** Направление лучей зрения на экране: toViewer в 3D, не proj(далёкого eye). */
+  const pCenter = projectWorld(centerWorld, resolved, data.view, fit, figure);
+  const pViewStep = projectWorld(
+    add(centerWorld, scale(observer.toViewer, 0.35)),
+    resolved,
+    data.view,
+    fit,
+    figure,
+  );
+  let dx = pViewStep.x - pCenter.x;
+  let dy = pViewStep.y - pCenter.y;
+  if (Math.hypot(dx, dy) < 1e-6) {
+    dx = 0;
+    dy = -1;
+  }
   const rayLen = Math.max(width, height) * 1.3;
+  const l = Math.hypot(dx, dy) || 1;
+  const ux = dx / l;
+  const uy = dy / l;
   const stroke =
     'stroke="#B91C1C" stroke-width="1.25" stroke-dasharray="10 7" stroke-linecap="round" stroke-opacity="0.9"';
 
   for (const anchorWorld of anchors) {
     const p0 = projectWorld(anchorWorld, resolved, data.view, fit, figure);
-    let dx = pEye.x - p0.x;
-    let dy = pEye.y - p0.y;
-    if (Math.hypot(dx, dy) < 2) {
-      const p1 = projectWorld(
-        add(anchorWorld, scale(observer.toViewer, 0.5)),
-        resolved,
-        data.view,
-        fit,
-        figure,
-      );
-      dx = p1.x - p0.x;
-      dy = p1.y - p0.y;
-    }
-    const l = Math.hypot(dx, dy) || 1;
-    const ux = dx / l;
-    const uy = dy / l;
     parts.push(
       `<line x1="${round(p0.x - ux * rayLen)}" y1="${round(p0.y - uy * rayLen)}" x2="${round(p0.x + ux * rayLen)}" y2="${round(p0.y + uy * rayLen)}" fill="none" ${stroke}/>`,
     );
   }
 
+  const eye = observer.eye;
+  const tipX = Math.min(width - 8, pCenter.x + ux * 48);
+  const tipY = Math.min(height - 8, pCenter.y + uy * 48);
   parts.push(
-    `<circle cx="${round(pEye.x)}" cy="${round(pEye.y)}" r="5" fill="none" stroke="#B91C1C" stroke-width="1.25"/>`,
-    `<circle cx="${round(pEye.x)}" cy="${round(pEye.y)}" r="1.75" fill="#B91C1C"/>`,
+    `<circle cx="${round(tipX)}" cy="${round(tipY)}" r="4" fill="none" stroke="#B91C1C" stroke-width="1.25"/>`,
+    `<text x="${round(tipX + 6)}" y="${round(tipY - 6)}" font-size="10" fill="#B91C1C" font-family="sans-serif">E (${round(eye.x)}, ${round(eye.y)}, ${round(eye.z)})</text>`,
   );
 }
 
