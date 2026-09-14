@@ -362,37 +362,19 @@ export function pyramidBaseScreenAtXY(
   return best ?? baseScr[0] ?? { x: 0, y: 0 };
 }
 
-/** θ последней вершины основания (сосед A с другой стороны от B): не θ_D параллелепипеда, кроме n=4. */
-export function pyramidLastBaseVertexTheta(orbit: ConicEllipse, n: number): number {
-  if (n === 4) return orbit.thetaD;
-  return 2 * orbit.thetaA - orbit.thetaB;
-}
-
 /**
- * Индекс i ↔ 3D-вершина i: A @ θ_A, B @ θ_B, last @ θ(E), C…D — на длинной дуге B→last (порядок 3D).
+ * Вершины основания на эллипсе: полярный угол θ_i = θ_A + i·(2π/n), i=0…n−1,
+ * обход **против часовой** (как 3D: A → B → C … от +X).
  */
 export function pyramidEllipseBaseScreen(
   orbit: ConicEllipse,
   n: number,
 ): Array<{ x: number; y: number }> {
   if (n <= 0) return [];
-  const aScr = ellipsePoint(orbit, orbit.thetaA);
-  if (n === 1) return [aScr];
-  if (n === 2) {
-    return [aScr, ellipsePoint(orbit, orbit.thetaB)];
-  }
-  const thetaLast = pyramidLastBaseVertexTheta(orbit, n);
-  const arc = buildEllipseArcTable(orbit, orbit.thetaB, thetaLast, aScr, true);
-
+  const dTheta = pyramidBaseAngleRad(n);
   const out: Array<{ x: number; y: number }> = [];
   for (let i = 0; i < n; i += 1) {
-    if (i === 0) out.push(aScr);
-    else if (i === 1) out.push(ellipsePoint(orbit, orbit.thetaB));
-    else if (i === n - 1) out.push(ellipsePoint(orbit, thetaLast));
-    else {
-      const frac = (i - 1) / (n - 2);
-      out.push(ellipsePoint(orbit, thetaOnArcTable(arc, frac)));
-    }
+    out.push(ellipsePoint(orbit, orbit.thetaA + dTheta * i));
   }
   return out;
 }
