@@ -10,8 +10,11 @@ import type { SpaceFigure, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub } from "./vec3";
 
 const SURFACE_EPS = 1e-4;
-/** Расстояние «глаза» от центра ≈ k·размер фигуры (для подписи/отладки; порядок по глубине от направления не зависит). */
+/** Расстояние «глаза» от центра параллелепипеда (пирамида — фиксированные координаты ниже). */
 const OBSERVER_DISTANCE_K = 2;
+
+/** Положение глаза при yaw=0 (декартовы x,y,z модели пирамиды). */
+export const PYRAMID_OBSERVER_EYE_AT_YAW_ZERO: Vec3 = { x: 4, y: 4, z: 1 };
 
 export type PyramidObserver = {
   /** Положение «глаза» в декартовых координатах. */
@@ -71,16 +74,40 @@ export function pyramidObserverDirectionAtYawZero(projection: ProjectionCoeffs):
 }
 
 /**
- * Наблюдатель в декартовых координатах (I-й октант, yaw=0 школьной проекции).
- * Не вращается при повороте основания на экране — модель крутится, «глаз» в комнате на месте.
+ * Глаз наблюдателя: при yaw=0 — (4,4,1); при повороте основания на ψ вокруг z на −ψ.
  */
-export function pyramidObserverToViewer(projection: ProjectionCoeffs): Vec3 {
-  return pyramidObserverDirectionAtYawZero({ ...projection, yawRad: 0 });
+export function pyramidObserverEyePosition(yawRad: number): Vec3 {
+  return rotateCartesianZ(PYRAMID_OBSERVER_EYE_AT_YAW_ZERO, -yawRad);
+}
+
+function pyramidObserverFromFixedEye(
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  projection: ProjectionCoeffs,
+): PyramidObserver {
+  const center = figureBodyCenterCartesian(figure, resolved);
+  const eye = pyramidObserverEyePosition(projection.yawRad);
+  const delta = sub(eye, center);
+  const d = len(delta);
+  const toViewer = d > 1e-9 ? scale(delta, 1 / d) : normalize(sub(eye, { x: 0, y: 0, z: 0 }));
+  return { eye, toViewer };
+}
+
+/** Единичный вектор center → eye (для совместимости). */
+export function pyramidObserverToViewer(
+  projection: ProjectionCoeffs,
+  bodyCenter: Vec3 = { x: 0, y: 0, z: 0.4 },
+): Vec3 {
+  const eye = pyramidObserverEyePosition(projection.yawRad);
+  return normalize(sub(eye, bodyCenter));
 }
 
 /** @deprecated alias */
-export function pyramidViewDirectionFromProjection(projection: ProjectionCoeffs): Vec3 {
-  return pyramidObserverToViewer(projection);
+export function pyramidViewDirectionFromProjection(
+  projection: ProjectionCoeffs,
+  bodyCenter?: Vec3,
+): Vec3 {
+  return pyramidObserverToViewer(projection, bodyCenter);
 }
 
 function observerExtent(figure: SpaceFigure, resolved: ResolvedSpaceScene, center: Vec3): number {
@@ -98,13 +125,7 @@ export function buildPyramidObserver(
   projection: ProjectionCoeffs,
   _hull: ProjectionHull,
 ): PyramidObserver {
-  const center = figureBodyCenterCartesian(figure, resolved);
-  const toViewer = pyramidObserverToViewer(projection);
-  const eye = add(
-    center,
-    scale(toViewer, OBSERVER_DISTANCE_K * observerExtent(figure, resolved, center)),
-  );
-  return { eye, toViewer };
+  return pyramidObserverFromFixedEye(figure, resolved, projection);
 }
 
 /** Условный «глаз» школьной проекции (пирамида — декартов z-↔yaw, параллелепипед — viewDirectionLocal). */
@@ -116,8 +137,7 @@ export function buildSchoolViewObserver(
   const center = figureBodyCenterCartesian(figure, resolved);
   const extent = observerExtent(figure, resolved, center);
   if (isPyramid(figure)) {
-    const toViewer = pyramidObserverToViewer(projection);
-    return { eye: add(center, scale(toViewer, OBSERVER_DISTANCE_K * extent)), toViewer };
+    return pyramidObserverFromFixedEye(figure, resolved, projection);
   }
   const vd = viewDirectionLocal({ ...projection, yawRad: 0 });
   const { e1, e2, e3 } = resolved.basis;

@@ -223,7 +223,7 @@ export function SpaceManualPanel() {
                 <div className="space-y-0.5">
                   <Label className="text-xs">Лучи точки обзора</Label>
                   <p className="text-[11px] text-muted-foreground">
-                    Лучи от фигуры к проекции «глаза» (фиксирован в модели, не крутится с поворотом).
+                    Лучи к проекции глаза: (4,4,1) при yaw=0, при повороте основания — вращение на −ψ вокруг z.
                   </p>
                 </div>
                 <Switch
