@@ -129,32 +129,29 @@ export function pyramidBaseVertexCoeffs(
   return out;
 }
 
-function normalizeAngle0To2Pi(a: number): number {
-  let x = a % (2 * Math.PI);
-  if (x < 0) x += 2 * Math.PI;
-  return x;
+function dist2(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 }
 
-/** Равномерные точки вдоль дуги эллипса from→to (выбирается дуга, не содержащая avoidTheta). */
+/** Равномерные точки вдоль дуги эллипса from→to; дуга не проходит через avoidPoint (обычно A). */
 function ellipseArcEqualPoints(
   orbit: ConicEllipse,
   from: number,
   to: number,
   count: number,
-  avoidTheta: number,
+  avoidPoint: { x: number; y: number },
 ): Array<{ x: number; y: number }> {
   if (count <= 0) return [];
-  if (count === 1) return [ellipsePoint(orbit, from)];
-
-  const target = ellipsePoint(orbit, to);
-  const avoid = normalizeAngle0To2Pi(avoidTheta);
+  const pFrom = ellipsePoint(orbit, from);
+  const pTo = ellipsePoint(orbit, to);
+  if (count === 1) return [pFrom];
 
   const walk = (dir: 1 | -1): Array<{ theta: number; s: number; x: number; y: number }> => {
     const out: Array<{ theta: number; s: number; x: number; y: number }> = [];
     let s = 0;
     const step = (dir * 2 * Math.PI) / 4096;
     let theta = from;
-    let prev = ellipsePoint(orbit, theta);
+    let prev = pFrom;
     out.push({ theta, s: 0, x: prev.x, y: prev.y });
     for (let i = 0; i < 4096; i += 1) {
       theta += step;
@@ -162,32 +159,52 @@ function ellipseArcEqualPoints(
       s += Math.hypot(p.x - prev.x, p.y - prev.y);
       out.push({ theta, s, x: p.x, y: p.y });
       prev = p;
-      if (Math.hypot(p.x - target.x, p.y - target.y) < 1e-4) break;
+      if (Math.hypot(p.x - pTo.x, p.y - pTo.y) < 1e-4) break;
     }
     return out;
   };
 
-  const hitsAvoid = (table: Array<{ theta: number }>): boolean => {
+  const minDistToAvoid = (table: Array<{ x: number; y: number }>): number => {
+    let d = Infinity;
     for (const row of table) {
-      if (Math.abs(normalizeAngle0To2Pi(row.theta) - avoid) < 0.08) return true;
+      d = Math.min(d, dist2(row, avoidPoint));
     }
-    return false;
+    return d;
   };
 
-  let table = walk(-1);
-  if (hitsAvoid(table)) {
-    const alt = walk(1);
-    if (!hitsAvoid(alt) && alt.length > 1) table = alt;
-  }
-  const total = table[table.length - 1]?.s ?? 0;
-  if (total < 1e-9) {
-    return Array.from({ length: count }, (_, k) =>
-      ellipsePoint(orbit, from + ((to - from) * k) / Math.max(1, count - 1)),
-    );
-  }
+  const tPos = walk(1);
+  const tNeg = walk(-1);
+  const lenPos = tPos[tPos.length - 1]?.s ?? 0;
+  const lenNeg = tNeg[tNeg.length - 1]?.s ?? 0;
+  const avoidR2 = 0.02 ** 2;
 
+  const score = (table: Array<{ x: number; y: number }>, len: number): number => {
+    const d = minDistToAvoid(table);
+    if (d < avoidR2) return Infinity;
+    return len;
+  };
+
+  let table = score(tNeg, lenNeg) <= score(tPos, lenPos) ? tNeg : tPos;
+  if ((table[table.length - 1]?.s ?? 0) < 1e-9) table = lenNeg >= lenPos ? tNeg : tPos;
+
+  const total = table[table.length - 1]?.s ?? 0;
   const out: Array<{ x: number; y: number }> = [];
   for (let k = 0; k < count; k += 1) {
+    if (k === 0) {
+      out.push(pFrom);
+      continue;
+    }
+    if (k === count - 1) {
+      out.push(pTo);
+      continue;
+    }
+    if (total < 1e-9) {
+      out.push({
+        x: pFrom.x + (pTo.x - pFrom.x) * (k / (count - 1)),
+        y: pFrom.y + (pTo.y - pFrom.y) * (k / (count - 1)),
+      });
+      continue;
+    }
     const targetS = (total * k) / (count - 1);
     let j = 1;
     while (j < table.length && table[j]!.s < targetS) j += 1;
@@ -195,10 +212,20 @@ function ellipseArcEqualPoints(
     const lo = table[j - 1] ?? table[0]!;
     const span = hi.s - lo.s;
     const t = span > 1e-12 ? (targetS - lo.s) / span : 0;
-    out.push({
-      x: lo.x + t * (hi.x - lo.x),
-      y: lo.y + t * (hi.y - lo.y),
-    });
+    const p = { x: lo.x + t * (hi.x - lo.x), y: lo.y + t * (hi.y - lo.y) };
+    if (dist2(p, avoidPoint) < avoidR2) {
+      const bump = (targetS / total) * 0.15 + 0.05;
+      const targetS2 = Math.min(total, targetS + bump * total);
+      let j2 = 1;
+      while (j2 < table.length && table[j2]!.s < targetS2) j2 += 1;
+      const hi2 = table[j2] ?? table[table.length - 1]!;
+      const lo2 = table[j2 - 1] ?? table[0]!;
+      const span2 = hi2.s - lo2.s;
+      const t2 = span2 > 1e-12 ? (targetS2 - lo2.s) / span2 : 0;
+      out.push({ x: lo2.x + t2 * (hi2.x - lo2.x), y: lo2.y + t2 * (hi2.y - lo2.y) });
+    } else {
+      out.push(p);
+    }
   }
   return out;
 }
@@ -335,8 +362,14 @@ export function pyramidEllipseBaseScreen(
     return [ellipsePoint(orbit, orbit.thetaA), ellipsePoint(orbit, orbit.thetaB)];
   }
   const a = ellipsePoint(orbit, orbit.thetaA);
-  const chain = ellipseArcEqualPoints(orbit, orbit.thetaB, orbit.thetaD, n - 1, orbit.thetaA);
-  return [a, ...chain];
+  const chain = ellipseArcEqualPoints(orbit, orbit.thetaB, orbit.thetaD, n - 1, a);
+  const out = [a, ...chain];
+  for (let i = 1; i < out.length; i += 1) {
+    if (dist2(out[i]!, a) < 0.015 ** 2) {
+      out[i] = ellipsePoint(orbit, orbit.thetaA - (orbit.thetaA - orbit.thetaB) * (i / Math.max(1, n - 1)));
+    }
+  }
+  return out;
 }
 
 export function createPyramid(
