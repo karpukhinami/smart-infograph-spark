@@ -5,6 +5,7 @@ import {
 } from "./convex-hull-visibility";
 import { projectFromLocalCoeffs } from "./camera";
 import { isPyramid } from "./figure";
+import { cartesianDepthFromObserver } from "./pyramid-view";
 import type { SpaceFigure, SpaceSceneData, Vec3 } from "./types";
 import {
   add,
@@ -159,10 +160,17 @@ function meanFragmentDepth(
   resolved: ResolvedSpaceScene,
   view: SpaceSceneData["view"],
   figure: SpaceFigure,
+  hull: ReturnType<typeof buildProjectionConvexHull> | null,
 ): number {
   let sum = 0;
   let count = 0;
+  const observer = hull?.pyramidObserver;
   for (const world of vertices) {
+    if (observer && isPyramid(figure)) {
+      sum += cartesianDepthFromObserver(world, observer);
+      count += 1;
+      continue;
+    }
     const local = worldToLocal(world, resolved.basis);
     if (!local) continue;
     const pr = projectFromLocalCoeffs(local, world, view, resolved.projection, figure);
@@ -215,7 +223,7 @@ export function collectPlaneFillFragments(
         planeId: plane.id,
         color: plane.style.color,
         vertices: part,
-        depth: meanFragmentDepth(part, resolved, data.view, figure),
+        depth: meanFragmentDepth(part, resolved, data.view, figure, hull),
       });
     }
   }

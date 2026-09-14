@@ -3,7 +3,13 @@
  */
 import { projectFromLocalCoeffs } from "./camera";
 import type { ResolvedSpaceScene } from "./build";
-import { faceById } from "./figure";
+import { faceById, isPyramid } from "./figure";
+import {
+  buildPyramidObserver,
+  isSegmentInsidePyramidVolume,
+  isStrictlyInsidePyramidVolume,
+  type PyramidObserver,
+} from "./pyramid-view";
 import type { LineSplitSegment, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, len, planeFromPoints, planePointDistance, scale, sub } from "./vec3";
 const COLLINEAR_EPS = 1e-9;
@@ -94,6 +100,8 @@ export type ProjectionHull = {
   hullEdgeKeys: Set<string>;
   /** Вершины строго внутри оболочки (не на границе). */
   interiorVertexIds: Set<string>;
+  /** Наблюдатель в декартовых координатах (пирамида). */
+  pyramidObserver?: PyramidObserver;
 };
 
 export function buildProjectionConvexHull(
@@ -137,7 +145,16 @@ export function buildProjectionConvexHull(
     if (pointStrictlyInsideConvexPoly(p.x, p.y, hullPoly)) interiorVertexIds.add(p.id);
   }
 
-  return { hull, hullEdgeKeys, interiorVertexIds };
+  const pyramidObserver =
+    isPyramid(body)
+      ? buildPyramidObserver(body, resolved, resolved.projection, {
+          hull,
+          hullEdgeKeys,
+          interiorVertexIds,
+        })
+      : undefined;
+
+  return { hull, hullEdgeKeys, interiorVertexIds, pyramidObserver };
 }
 
 /**
@@ -242,6 +259,8 @@ export function isWorldSegmentVisibleProjectionHull(
   if (bId && hull.interiorVertexIds.has(bId)) return false;
   if (aId && bId) return isBodyEdgeVisibleProjectionHull(aId, bId, hull);
 
+  if (isSegmentInsidePyramidVolume(aWorld, bWorld, figure, resolved)) return false;
+
   const mid = scale(add(aWorld, bWorld), 0.5);
   if (pointOnHiddenFace(mid, figure, resolved, hull)) return false;
   return true;
@@ -279,5 +298,7 @@ export function isPlaneFragmentVisibleProjectionHull(
   hull: ProjectionHull,
 ): boolean {
   if (fragment.length < 3) return true;
-  return !pointOnHiddenFace(polygonCentroid(fragment), figure, resolved, hull);
+  const c = polygonCentroid(fragment);
+  if (isStrictlyInsidePyramidVolume(c, figure, resolved)) return false;
+  return !pointOnHiddenFace(c, figure, resolved, hull);
 }
