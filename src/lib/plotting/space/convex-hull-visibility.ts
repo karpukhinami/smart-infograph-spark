@@ -3,11 +3,12 @@
  */
 import { projectFromLocalCoeffs } from "./camera";
 import type { ResolvedSpaceScene } from "./build";
+import { locatePointOnFigureEdge } from "./display-projection";
 import { faceById, isPyramid } from "./figure";
+import type { BuiltSpacePoint } from "./build";
 import {
   buildPyramidObserver,
   isSegmentInsidePyramidVolume,
-  isStrictlyInsidePyramidVolume,
   type PyramidObserver,
 } from "./pyramid-view";
 import type { LineSplitSegment, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
@@ -231,6 +232,17 @@ function pointInFaceTriangle(p: Vec3, verts: Vec3[], eps = 1e-4): boolean {
   return s !== 0;
 }
 
+function isPointOnHiddenBodyEdge(
+  world: Vec3,
+  figure: SpaceFigure,
+  points: Map<string, BuiltSpacePoint>,
+  hull: ProjectionHull,
+): boolean {
+  const on = locatePointOnFigureEdge(world, figure, points);
+  if (!on) return false;
+  return !isBodyEdgeVisibleProjectionHull(on.aId, on.bId, hull);
+}
+
 function pointOnHiddenFace(
   p: Vec3,
   figure: SpaceFigure,
@@ -258,6 +270,13 @@ export function isWorldSegmentVisibleProjectionHull(
   if (aId && hull.interiorVertexIds.has(aId)) return false;
   if (bId && hull.interiorVertexIds.has(bId)) return false;
   if (aId && bId) return isBodyEdgeVisibleProjectionHull(aId, bId, hull);
+
+  if (
+    isPointOnHiddenBodyEdge(aWorld, figure, resolved.points, hull) &&
+    isPointOnHiddenBodyEdge(bWorld, figure, resolved.points, hull)
+  ) {
+    return false;
+  }
 
   if (isSegmentInsidePyramidVolume(aWorld, bWorld, figure, resolved)) return false;
 
@@ -299,6 +318,5 @@ export function isPlaneFragmentVisibleProjectionHull(
 ): boolean {
   if (fragment.length < 3) return true;
   const c = polygonCentroid(fragment);
-  if (isStrictlyInsidePyramidVolume(c, figure, resolved)) return false;
   return !pointOnHiddenFace(c, figure, resolved, hull);
 }

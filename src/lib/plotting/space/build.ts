@@ -471,7 +471,11 @@ export function computeLineDisplayRange(
   tMin: number,
   tMax: number,
   extension: number,
+  figure?: SpaceFigure,
 ): { t0: number; t1: number } {
+  if (figure && isPyramid(figure)) {
+    return { t0: tMin - extension, t1: tMax + extension };
+  }
   let lo = tMin;
   let hi = tMax;
   for (const pt of points.values()) {

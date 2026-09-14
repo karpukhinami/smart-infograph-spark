@@ -217,6 +217,7 @@ function renderLineObject(
         0,
         abLen,
         data.appearance.lineExtension * abLen,
+        figure,
       );
       t0 = range.t0;
       t1 = range.t1;
@@ -469,6 +470,7 @@ function collectFitPoints(
           0,
           abLen,
           data.appearance.lineExtension * abLen,
+          figure,
         );
         t0 = range.t0;
         t1 = range.t1;
