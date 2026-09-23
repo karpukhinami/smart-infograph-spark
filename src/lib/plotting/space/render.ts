@@ -522,6 +522,25 @@ function renderPlane(
  * область их взаимного перекрытия). Рисуется пунктиром, независимо от
  * окклюзии — как обозначение самого факта пересечения.
  */
+/** Смешивает два HEX-цвета (среднее по каналам) — для линии пересечения двух плоскостей. */
+function blendHexColors(colorA: string, colorB: string): string {
+  const parse = (c: string): [number, number, number] | null => {
+    const m = /^#([0-9a-fA-F]{6})$/.exec(c.trim());
+    if (!m) return null;
+    const hex = m[1]!;
+    return [
+      parseInt(hex.slice(0, 2), 16),
+      parseInt(hex.slice(2, 4), 16),
+      parseInt(hex.slice(4, 6), 16),
+    ];
+  };
+  const a = parse(colorA);
+  const b = parse(colorB);
+  if (!a || !b) return colorA;
+  const mix = a.map((v, i) => Math.round((v + b[i]!) / 2));
+  return `#${mix.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
 function renderPlaneIntersectionMarkers(
   data: SpaceSceneData,
   figure: SpaceFigure,
@@ -531,16 +550,14 @@ function renderPlaneIntersectionMarkers(
 ): void {
   const builtPlanes = data.planes.filter((p) => p.built && p.style.visible);
   /**
-   * Свой (мелкий) пунктир, а НЕ `data.appearance.hiddenDash` («20 14» —
-   * рассчитан на длинные скрытые рёбра тела): отрезок пересечения плоскостей
-   * часто короче одного штриха такого пунктира и рисовался бы визуально
-   * сплошным, без видимых промежутков — отсюда жалоба «непонятная тонкая
-   * линия» вместо чёткого пунктира. Ширина и цвет — заметно отличаются от
-   * рёбер тела, чтобы линию нельзя было спутать с контуром фигуры.
+   * Свой (более редкий) пунктир, а НЕ `data.appearance.hiddenDash` («20 14» —
+   * рассчитан на длинные скрытые рёбра тела, штрих длиннее самого отрезка
+   * пересечения). Цвет — смесь цветов обеих плоскостей (не чёрный/серый),
+   * чтобы линия была видна как «след» именно этих двух плоскостей, а не
+   * служебная разметка.
    */
-  const width = Math.max(1.5, data.appearance.lineWidth * 0.9);
-  const markerDash = "5 4";
-  const markerColor = "#1F2937";
+  const width = Math.max(1.5, data.appearance.lineWidth * 0.85);
+  const markerDash = "11 8";
   const pyramid = isPyramid(figure);
   for (let i = 0; i < builtPlanes.length; i += 1) {
     for (let j = i + 1; j < builtPlanes.length; j += 1) {
@@ -549,6 +566,7 @@ function renderPlaneIntersectionMarkers(
       const eqA = resolved.planes.get(planeA.id);
       const eqB = resolved.planes.get(planeB.id);
       if (!eqA || !eqB) continue;
+      const markerColor = blendHexColors(planeA.style.color, planeB.style.color);
       const carrier = intersectPlanes(eqA, eqB);
       if (!carrier) continue;
       const clip = planeIntersectionSegmentRange(

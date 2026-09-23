@@ -48,7 +48,13 @@ export const DEFAULT_SPACE_APPEARANCE: SpaceAppearance = {
   lineWidth: DEFAULT_APPEARANCE.graphWidth,
   lineExtension: 0.35,
   arrowSize: DEFAULT_APPEARANCE.arrowSize,
-  planeFillOpacity: 0.5,
+  // Достаточно плотная заливка: при разбиении плоскости на фрагменты по
+  // глубине их экранные проекции нередко перекрываются (см. render.ts) —
+  // при полупрозрачной заливке 0.5 в зоне перекрытия оба цвета смешиваются
+  // почти поровну, и ближний фрагмент визуально не «побеждает» дальний.
+  // При такой непрозрачности верхний (ближний) фрагмент чётко перекрывает
+  // нижний, а сквозь заливку всё равно видны линии и точки чертежа.
+  planeFillOpacity: 0.82,
 };
 
 export function createSpaceSceneData(): SpaceSceneData {
