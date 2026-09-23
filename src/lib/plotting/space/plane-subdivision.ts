@@ -1,7 +1,13 @@
-import { computeFaceOrPlaneSection, type ResolvedSpaceScene } from "./build";
+import {
+  computeFaceOrPlaneSection,
+  planeIntersectionSegmentRange,
+  type ResolvedSpaceScene,
+} from "./build";
 import { worldViewSortDepth } from "./camera";
 import type { PlaneFillDepthMode, SpaceFigure, SpaceSceneData, Vec3 } from "./types";
-import { add, dot, len, planePointDistance, scale, sub, type PlaneEq } from "./vec3";
+import { add, dot, intersectPlanes, len, planePointDistance, scale, sub, type PlaneEq } from "./vec3";
+
+export type ScreenProjectFn = (world: Vec3) => { x: number; y: number };
 
 export interface PlaneFillFragment {
   planeId: string;
@@ -138,53 +144,100 @@ function fragmentSortDepth(
   return worldViewSortDepth(c, resolved.basis, resolved.projection, figure, mode);
 }
 
-function meanHalfSpaceSign(vertices: Vec3[], cuttingPlane: PlaneEq): number {
-  let sum = 0;
-  for (const v of vertices) sum += planePointDistance(v, cuttingPlane);
-  return sum / Math.max(vertices.length, 1);
+function sideOfScreenLine(
+  p: { x: number; y: number },
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
 }
 
-const DEPTH_REPAIR_DELTA = 0.02;
-
 /**
- * У двух пересекающихся плоскостей «кто сверху» должен меняться по разные стороны
- * линии пересечения. Если оба куска одной плоскости оказываются ближе — пересчёт/подправка.
+ * Сверка по **проекции**: слева/справа от линии пересечения на экране.
+ * Меньший depth = ближе = рисуется сверху. С одной стороны линии «победитель»
+ * не должен совпадать с другой стороной; если одна плоскость выигрывает обе —
+ * сдвигаем depth на одной стороне так, чтобы порядок перевернулся.
  */
-function reconcileTwoPlaneFragmentDepths(
+function reconcileTwoPlaneFragmentsByScreenSide(
   fragments: PlaneFillFragment[],
   planeAId: string,
   planeBId: string,
   eqA: PlaneEq,
   eqB: PlaneEq,
-  resolved: ResolvedSpaceScene,
   figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  project: ScreenProjectFn,
 ): void {
-  const aFrags = fragments.filter((f) => f.planeId === planeAId);
-  const bFrags = fragments.filter((f) => f.planeId === planeBId);
-  if (aFrags.length !== 2 || bFrags.length !== 2) return;
+  const carrier = intersectPlanes(eqA, eqB);
+  if (!carrier) return;
+  const clip = planeIntersectionSegmentRange(
+    carrier,
+    planeAId,
+    planeBId,
+    figure,
+    resolved.points,
+    resolved.planes,
+    resolved.basis,
+  );
+  if (!clip || clip.t1 - clip.t0 < 1e-9) return;
 
-  const aPos = aFrags.find((f) => meanHalfSpaceSign(f.vertices, eqB) >= 0);
-  const aNeg = aFrags.find((f) => meanHalfSpaceSign(f.vertices, eqB) < 0);
-  const bPos = bFrags.find((f) => meanHalfSpaceSign(f.vertices, eqA) >= 0);
-  const bNeg = bFrags.find((f) => meanHalfSpaceSign(f.vertices, eqA) < 0);
-  if (!aPos || !aNeg || !bPos || !bNeg) return;
+  const w0 = add(carrier.origin, scale(carrier.dir, clip.t0));
+  const w1 = add(carrier.origin, scale(carrier.dir, clip.t1));
+  const s0 = project(w0);
+  const s1 = project(w1);
+  const lineLen = Math.hypot(s1.x - s0.x, s1.y - s0.y);
+  if (!(lineLen > 1e-6)) return;
 
-  const wedge1: [PlaneFillFragment, PlaneFillFragment] = [aPos, bNeg];
-  const wedge2: [PlaneFillFragment, PlaneFillFragment] = [aNeg, bPos];
+  const pairFrags = fragments.filter(
+    (f) => f.planeId === planeAId || f.planeId === planeBId,
+  );
 
-  const diff = (fa: PlaneFillFragment, fb: PlaneFillFragment) => fa.depth - fb.depth;
-  let d1 = diff(wedge1[0], wedge1[1]);
-  let d2 = diff(wedge2[0], wedge2[1]);
+  const classifySide = (frag: PlaneFillFragment): "left" | "right" | "on" => {
+    const c = polygonBarycenter(frag.vertices);
+    const cross = sideOfScreenLine(project(c), s0, s1);
+    const tol = 1e-4 * lineLen;
+    if (Math.abs(cross) <= tol) return "on";
+    return cross > 0 ? "left" : "right";
+  };
 
-  if (d1 * d2 <= 1e-12) return;
+  const bySide = (side: "left" | "right") =>
+    pairFrags.filter((f) => classifySide(f) === side);
 
-  const bump = DEPTH_REPAIR_DELTA;
-  if (d1 > 0 && d2 > 0) {
-    wedge2[0].depth += bump;
-    wedge2[1].depth -= bump;
-  } else if (d1 < 0 && d2 < 0) {
-    wedge1[0].depth += bump;
-    wedge1[1].depth -= bump;
+  const winnerOnSide = (sideFrags: PlaneFillFragment[]): string | null => {
+    const aOn = sideFrags.filter((f) => f.planeId === planeAId);
+    const bOn = sideFrags.filter((f) => f.planeId === planeBId);
+    if (!aOn.length || !bOn.length) return null;
+    const minA = Math.min(...aOn.map((f) => f.depth));
+    const minB = Math.min(...bOn.map((f) => f.depth));
+    return minA < minB ? planeAId : planeBId;
+  };
+
+  const leftFrags = bySide("left");
+  const rightFrags = bySide("right");
+  const winLeft = winnerOnSide(leftFrags);
+  const winRight = winnerOnSide(rightFrags);
+  if (!winLeft || !winRight || winLeft !== winRight) return;
+
+  const depths = pairFrags.map((f) => f.depth);
+  const span = Math.max(...depths) - Math.min(...depths);
+  const bump = Math.max(0.08, span * 0.6 + 0.02);
+  const loser = winLeft === planeAId ? planeBId : planeAId;
+
+  const fixSide = (sideFrags: PlaneFillFragment[]) => {
+    for (const f of sideFrags) {
+      if (f.planeId === winLeft) f.depth += bump;
+      if (f.planeId === loser) f.depth -= bump;
+    }
+  };
+
+  /** Переворачиваем порядок на стороне, где больше площадь перекрытия (обычно «право»). */
+  if (rightFrags.some((f) => f.planeId === planeAId) && rightFrags.some((f) => f.planeId === planeBId)) {
+    fixSide(rightFrags);
+  } else if (
+    leftFrags.some((f) => f.planeId === planeAId) &&
+    leftFrags.some((f) => f.planeId === planeBId)
+  ) {
+    fixSide(leftFrags);
   }
 }
 
@@ -196,6 +249,7 @@ export function collectPlaneFillFragments(
   data: SpaceSceneData,
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
+  screenProject?: ScreenProjectFn,
 ): PlaneFillFragment[] {
   const builtPlanes = data.planes.filter((p) => p.built && p.style.visible);
   const depthMode: PlaneFillDepthMode = data.view.planeFillDepthMode ?? "plane";
@@ -233,14 +287,25 @@ export function collectPlaneFillFragments(
     }
   }
 
-  for (let i = 0; i < builtPlanes.length; i += 1) {
-    for (let j = i + 1; j < builtPlanes.length; j += 1) {
-      const pa = builtPlanes[i]!;
-      const pb = builtPlanes[j]!;
-      const eqA = resolved.planes.get(pa.id);
-      const eqB = resolved.planes.get(pb.id);
-      if (!eqA || !eqB) continue;
-      reconcileTwoPlaneFragmentDepths(fragments, pa.id, pb.id, eqA, eqB, resolved, figure);
+  if (screenProject) {
+    for (let i = 0; i < builtPlanes.length; i += 1) {
+      for (let j = i + 1; j < builtPlanes.length; j += 1) {
+        const pa = builtPlanes[i]!;
+        const pb = builtPlanes[j]!;
+        const eqA = resolved.planes.get(pa.id);
+        const eqB = resolved.planes.get(pb.id);
+        if (!eqA || !eqB) continue;
+        reconcileTwoPlaneFragmentsByScreenSide(
+          fragments,
+          pa.id,
+          pb.id,
+          eqA,
+          eqB,
+          figure,
+          resolved,
+          screenProject,
+        );
+      }
     }
   }
 

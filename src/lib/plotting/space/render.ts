@@ -830,7 +830,9 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
   }
 
   if (data.view.planeFillByDepth) {
-    const fragments = collectPlaneFillFragments(data, figure, resolved);
+    const fragments = collectPlaneFillFragments(data, figure, resolved, (world) =>
+      projectWorld(world, resolved, data.view, fit, figure),
+    );
     const planeById = new Map(data.planes.map((p) => [p.id, p]));
     /** При разбиении по глубине фрагменты часто перекрываются на экране — нужна плотная заливка. */
     const planeFillOpacity = Math.max(a.planeFillOpacity, 0.82);
