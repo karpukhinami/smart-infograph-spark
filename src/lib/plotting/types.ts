@@ -224,6 +224,7 @@ export interface SceneTangent {
 
 export interface PlotScene {
   version: 1;
+  /** Режим вкладки при загрузке JSON: line | plane | space. */
   space: PlotSpace;
   /** equal — квадратная сетка (алгебра); independent — независимые шкалы (физика и т. п.). */
   axisScaleMode: AxisScaleMode;

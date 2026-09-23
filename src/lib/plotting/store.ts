@@ -78,6 +78,7 @@ import type {
 } from "./space/types";
 import { clampRegionParam, defaultLineParam } from "./space/build";
 import { refreshPyramidVertices } from "./space/pyramid";
+import { deserializeSpaceSceneData } from "./space/serialize";
 
 export interface SpacePointDraft {
   mode: "onLine" | "onFace";
@@ -960,9 +961,33 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const base = createScene();
     const input = (raw ?? {}) as Partial<PlotScene> & {
       grid?: Partial<GridSpec> & { followAxisStep?: boolean; stepX?: string; stepY?: string };
+      space3d?: unknown;
     };
     const legacyGrid = input.grid ?? {};
     const isLine = input.space === "line";
+    const isSpace =
+      input.space === "space" || (input.space3d != null && typeof input.space3d === "object" && !isLine);
+    if (isSpace) {
+      const spaceDefaults = createSpacePlotScene();
+      const space3d = deserializeSpaceSceneData(input.space3d ?? {});
+      const scene: PlotScene = {
+        ...spaceDefaults,
+        ...input,
+        version: 1,
+        space: "space",
+        appearance: input.appearance
+          ? { ...spaceDefaults.appearance, ...input.appearance }
+          : spaceDefaults.appearance,
+        graphs: [],
+        points: [],
+        tangents: input.tangents ?? [],
+        customColors: input.customColors ?? [],
+        line: null,
+        space3d,
+      };
+      commitImportedScene(set, scene);
+      return;
+    }
     const scene: PlotScene = isLine
       ? (() => {
           const lineBase = createLineScene().line!;
