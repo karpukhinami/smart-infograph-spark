@@ -24,7 +24,6 @@ import {
   type OcclusionContext,
 } from "./visibility";
 import { isPyramid } from "./figure";
-import { pyramidForwardScreenAnchor } from "./pyramid";
 import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
 import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
 import { add, len, scale, sub, worldToLocal } from "./vec3";
@@ -534,26 +533,27 @@ function renderViewConvergenceRays(
   const displayCtx = displayCtxFromResolved(resolved);
   /**
    * «Глаз» — фиксированный читатель чертежа: его экранное положение не должно
-   * зависеть от поворота основания (yaw).
-   *
-   * Для пирамиды НЕ используем общую аффинную формулу (u,v,w)→(x,y,z) для
-   * точки типа (4,4,1): у неё нет однозначного «вперёд» — эллипс основания
-   * на чертеже подогнан произвольно (поворот/наклон зависят от подгонки
-   * orbit), поэтому такая точка может спроецироваться в любую сторону, в том
-   * числе НАРУЖУ от фигуры, а не к зрителю (это и была причина «улетает
-   * вправо за кадр»). Вместо этого берём точку на луче «вершина S → центр
-   * основания», продолженную ЗА основание — она лежит в тех же (уже заведомо
-   * правильно расположенных) экранных координатах фигуры, поэтому направление
-   * «вперёд/к зрителю» гарантированно верное. Заморожено на yaw=0, чтобы не
-   * вращаться при повороте.
+   * зависеть от поворота основания (yaw) и не должно определяться через
+   * геометрию самой фигуры (эллипс основания/вершину) — это оказалось
+   * ненадёжно дважды подряд:
+   *  1) общая аффинная формула (u,v,w)→(x,y,z) для точки типа (4,4,1) не имеет
+   *     однозначного «вперёд» (эллипс подогнан произвольно) — стреляла в
+   *     произвольную сторону, вплоть до «за кадр»;
+   *  2) луч «вершина S → центр основания», продолженный наружу, ВЫРОЖДАЕТСЯ
+   *     в почти нулевой вектор для пирамид с вершиной над центром основания
+   *     (частый случай): экранная «база» апекса (без учёта высоты) совпадает
+   *     с центром эллипса основания, а центроид ЧЁТНОГО числа вершин основания
+   *     на эллипсе — тоже центр эллипса, так что «S → центр» — вектор длины
+   *     ~0, и вся точка сваливалась внутрь фигуры.
+   * Поэтому здесь просто фиксированная точка у нижнего края холста, по центру:
+   * подгонка сцены (`fitSpaceProjection`) и так кладёт фигуру по центру
+   * по ширине и основанием ближе к низу, так что «низ холста» надёжно
+   * означает «к зрителю/вперёд» для любой фигуры, без зависимости от yaw,
+   * формы основания или положения вершины.
    */
   let pEye: { x: number; y: number };
   if (isPyramid(figure)) {
-    const raw = pyramidForwardScreenAnchor(figure, resolved.projection.orbit);
-    pEye = {
-      x: raw.x * data.view.scale * fit.scale + fit.cx,
-      y: -raw.y * data.view.scale * fit.scale + fit.cy,
-    };
+    pEye = { x: width / 2, y: height * 0.94 };
   } else {
     const prEye = projectWorldOffFigureBody(
       observer.eye,
@@ -580,10 +580,13 @@ function renderViewConvergenceRays(
   }
 
   const eye = observer.eye;
+  const eyeLabel = isPyramid(figure)
+    ? `к зрителю (глаз ≈ (${round(eye.x)}, ${round(eye.y)}, ${round(eye.z)}))`
+    : `глаз (${round(eye.x)}, ${round(eye.y)}, ${round(eye.z)})`;
   parts.push(
     `<circle cx="${round(pEye.x)}" cy="${round(pEye.y)}" r="5" fill="none" stroke="#B91C1C" stroke-width="1.25"/>`,
     `<circle cx="${round(pEye.x)}" cy="${round(pEye.y)}" r="2" fill="#B91C1C"/>`,
-    `<text x="${round(pEye.x + 7)}" y="${round(pEye.y - 8)}" font-size="10" fill="#B91C1C" font-family="sans-serif">глаз (${round(eye.x)}, ${round(eye.y)}, ${round(eye.z)})</text>`,
+    `<text x="${round(pEye.x + 7)}" y="${round(pEye.y - 8)}" font-size="10" fill="#B91C1C" font-family="sans-serif">${eyeLabel}</text>`,
   );
 }
 
