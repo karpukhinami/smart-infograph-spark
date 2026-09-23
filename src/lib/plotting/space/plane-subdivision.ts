@@ -114,10 +114,18 @@ export function subdividePlaneSection(
   return fragments;
 }
 
+/** Глубина в точке world — та же, что у `projectWorldDisplay(...).depth`. */
+function depthAtPoint(
+  world: Vec3,
+  resolved: ResolvedSpaceScene,
+  figure: SpaceFigure,
+): number {
+  return worldViewSortDepth(world, resolved.basis, resolved.projection, figure);
+}
+
 /**
- * Средняя глубина фрагмента — та же `z`, что у `localToView` / `projectWorldDisplay`
- * (для пирамиды — `pyramidCartesianDepth`, для параллелепипеда — аффинная школьная
- * ось). Меньше значение — ближе к наблюдателю.
+ * Средняя глубина по вершинам фрагмента (меньше — ближе к наблюдателю).
+ * SVG не «считает» глубину сам: мы сами сортируем `<polygon>` и рисуем от дальних к ближним.
  */
 function meanFragmentDepth(
   vertices: Vec3[],
@@ -125,12 +133,75 @@ function meanFragmentDepth(
   figure: SpaceFigure,
 ): number {
   let sum = 0;
-  let count = 0;
-  for (const world of vertices) {
-    sum += worldViewSortDepth(world, resolved.basis, resolved.projection, figure);
-    count += 1;
+  for (const world of vertices) sum += depthAtPoint(world, resolved, figure);
+  return vertices.length ? sum / vertices.length : 0;
+}
+
+function minFragmentDepth(
+  vertices: Vec3[],
+  resolved: ResolvedSpaceScene,
+  figure: SpaceFigure,
+): number {
+  let min = Infinity;
+  for (const world of vertices) min = Math.min(min, depthAtPoint(world, resolved, figure));
+  return Number.isFinite(min) ? min : 0;
+}
+
+function meanHalfSpaceSign(vertices: Vec3[], cuttingPlane: PlaneEq): number {
+  let sum = 0;
+  for (const v of vertices) sum += planePointDistance(v, cuttingPlane);
+  return sum / Math.max(vertices.length, 1);
+}
+
+const DEPTH_REPAIR_DELTA = 0.02;
+
+/**
+ * У двух пересекающихся плоскостей «кто сверху» должен меняться по разные стороны
+ * линии пересечения. Если оба куска одной плоскости оказываются ближе — пересчёт/подправка.
+ */
+function reconcileTwoPlaneFragmentDepths(
+  fragments: PlaneFillFragment[],
+  planeAId: string,
+  planeBId: string,
+  eqA: PlaneEq,
+  eqB: PlaneEq,
+  resolved: ResolvedSpaceScene,
+  figure: SpaceFigure,
+): void {
+  const aFrags = fragments.filter((f) => f.planeId === planeAId);
+  const bFrags = fragments.filter((f) => f.planeId === planeBId);
+  if (aFrags.length !== 2 || bFrags.length !== 2) return;
+
+  const aPos = aFrags.find((f) => meanHalfSpaceSign(f.vertices, eqB) >= 0);
+  const aNeg = aFrags.find((f) => meanHalfSpaceSign(f.vertices, eqB) < 0);
+  const bPos = bFrags.find((f) => meanHalfSpaceSign(f.vertices, eqA) >= 0);
+  const bNeg = bFrags.find((f) => meanHalfSpaceSign(f.vertices, eqA) < 0);
+  if (!aPos || !aNeg || !bPos || !bNeg) return;
+
+  const wedge1: [PlaneFillFragment, PlaneFillFragment] = [aPos, bNeg];
+  const wedge2: [PlaneFillFragment, PlaneFillFragment] = [aNeg, bPos];
+
+  const diff = (fa: PlaneFillFragment, fb: PlaneFillFragment) => fa.depth - fb.depth;
+  let d1 = diff(wedge1[0], wedge1[1]);
+  let d2 = diff(wedge2[0], wedge2[1]);
+
+  if (d1 * d2 <= 1e-12) return;
+
+  for (const f of [...wedge1, ...wedge2]) {
+    f.depth = minFragmentDepth(f.vertices, resolved, figure);
   }
-  return count ? sum / count : 0;
+  d1 = diff(wedge1[0], wedge1[1]);
+  d2 = diff(wedge2[0], wedge2[1]);
+  if (d1 * d2 <= 1e-12) return;
+
+  const bump = DEPTH_REPAIR_DELTA;
+  if (d1 > 0 && d2 > 0) {
+    wedge2[0].depth += bump;
+    wedge2[1].depth -= bump;
+  } else if (d1 < 0 && d2 < 0) {
+    wedge1[0].depth += bump;
+    wedge1[1].depth -= bump;
+  }
 }
 
 /**
@@ -174,6 +245,17 @@ export function collectPlaneFillFragments(
         depth: meanFragmentDepth(part, resolved, figure),
         originalSection: section,
       });
+    }
+  }
+
+  for (let i = 0; i < builtPlanes.length; i += 1) {
+    for (let j = i + 1; j < builtPlanes.length; j += 1) {
+      const pa = builtPlanes[i]!;
+      const pb = builtPlanes[j]!;
+      const eqA = resolved.planes.get(pa.id);
+      const eqB = resolved.planes.get(pb.id);
+      if (!eqA || !eqB) continue;
+      reconcileTwoPlaneFragmentDepths(fragments, pa.id, pb.id, eqA, eqB, resolved, figure);
     }
   }
 

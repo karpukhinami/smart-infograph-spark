@@ -26,7 +26,7 @@ import {
 import { isPyramid } from "./figure";
 import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
 import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
-import { add, dot, intersectPlanes, len, planePointDistance, scale, sub, worldToLocal } from "./vec3";
+import { add, intersectPlanes, len, scale, sub, worldToLocal } from "./vec3";
 
 function round(n: number): string {
   return String(Number(n.toFixed(2)));
@@ -79,6 +79,8 @@ function drawSegmentWithVisibility(
   parts: string[],
   obstacles: Obstacle[],
   strokeOpacity?: number,
+  /** В режиме заливки по глубине скрытые куски не рисуем — пунктир только на линии пересечения. */
+  skipHiddenSegments = false,
 ): void {
   const dir = sub(bWorld, aWorld);
   const abLen = len(dir);
@@ -90,6 +92,7 @@ function drawSegmentWithVisibility(
       ? ` stroke-opacity="${strokeOpacity}"`
       : "";
   for (const seg of segments) {
+    if (skipHiddenSegments && !seg.visible) continue;
     const p1 = projectWorld(seg.a, resolved, view, fit, figure);
     const p2 = projectWorld(seg.b, resolved, view, fit, figure);
     const dash = seg.visible ? "" : ` stroke-dasharray="${hiddenDash}"`;
@@ -386,6 +389,7 @@ function renderPlaneSectionEdges(
    * настоящей границей плоскости и не должен отображаться как линия.
    */
   boundaryRef?: Vec3[],
+  fillByDepth = false,
 ): void {
   const edgeWidth = data.appearance.lineWidth;
   for (let i = 0; i < section.length; i += 1) {
@@ -405,6 +409,8 @@ function renderPlaneSectionEdges(
       data.appearance.hiddenDash,
       parts,
       obstacles,
+      undefined,
+      fillByDepth,
     );
   }
 }
@@ -541,50 +547,6 @@ function blendHexColors(colorA: string, colorB: string): string {
   return `#${mix.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
-/** Запасной отрезок пересечения: вершины обоих сечений, лежащие на обеих плоскостях (напр. B, G). */
-function planeIntersectionSegmentFromSectionVertices(
-  carrier: { origin: Vec3; dir: Vec3 },
-  planeAId: string,
-  planeBId: string,
-  figure: SpaceFigure,
-  resolved: ResolvedSpaceScene,
-): { t0: number; t1: number } | null {
-  const eqA = resolved.planes.get(planeAId);
-  const eqB = resolved.planes.get(planeBId);
-  if (!eqA || !eqB) return null;
-  const secA = computeFaceOrPlaneSection(
-    planeAId,
-    figure,
-    resolved.points,
-    resolved.planes,
-    resolved.basis,
-  );
-  const secB = computeFaceOrPlaneSection(
-    planeBId,
-    figure,
-    resolved.points,
-    resolved.planes,
-    resolved.basis,
-  );
-  if (!secA?.length || !secB?.length) return null;
-  const eps = 1e-4;
-  const onBoth = (p: Vec3) =>
-    Math.abs(planePointDistance(p, eqA)) <= eps && Math.abs(planePointDistance(p, eqB)) <= eps;
-  const key = (p: Vec3) => `${p.x.toFixed(5)}:${p.y.toFixed(5)}:${p.z.toFixed(5)}`;
-  const seen = new Set<string>();
-  const pts: Vec3[] = [];
-  for (const p of [...secA, ...secB]) {
-    if (!onBoth(p)) continue;
-    const k = key(p);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    pts.push(p);
-  }
-  if (pts.length < 2) return null;
-  const ts = pts.map((p) => dot(sub(p, carrier.origin), carrier.dir));
-  return { t0: Math.min(...ts), t1: Math.max(...ts) };
-}
-
 function renderPlaneIntersectionMarkers(
   data: SpaceSceneData,
   figure: SpaceFigure,
@@ -622,15 +584,6 @@ function renderPlaneIntersectionMarkers(
         resolved.planes,
         resolved.basis,
       );
-      if (!clip) {
-        clip = planeIntersectionSegmentFromSectionVertices(
-          carrier,
-          planeA.id,
-          planeB.id,
-          figure,
-          resolved,
-        );
-      }
       if (!clip || clip.t1 - clip.t0 < 1e-9) continue;
       const steps = pyramid ? 16 : 1;
       const pts: string[] = [];
@@ -905,20 +858,8 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
         parts,
         obstacles,
         fragment.originalSection,
+        true,
       );
-    }
-    for (const plane of data.planes) {
-      if (!plane.style.visible || !plane.built) continue;
-      const section = computeFaceOrPlaneSection(
-        plane.id,
-        figure,
-        resolved.points,
-        resolved.planes,
-        resolved.basis,
-      );
-      if (section && section.length >= 3) {
-        renderPlaneHelperLines(plane, section, data, figure, resolved, fit, occlusion, parts, obstacles);
-      }
     }
   } else {
     for (const plane of data.planes) {
