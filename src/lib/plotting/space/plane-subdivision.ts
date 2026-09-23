@@ -1,8 +1,5 @@
 import { clipLineToConvexPolygon, computeFaceOrPlaneSection, type ResolvedSpaceScene } from "./build";
-import { buildProjectionConvexHull, deriveHullDepthAxis } from "./convex-hull-visibility";
-import { projectFromLocalCoeffs } from "./camera";
-import { projectWorldDisplay, type DisplayProjectionContext } from "./display-projection";
-import { isPyramid } from "./figure";
+import { genericAffineLocalToView } from "./camera";
 import type { SpaceFigure, SpaceSceneData, Vec3 } from "./types";
 import {
   add,
@@ -196,44 +193,28 @@ export function subdividePlaneSection(
   return fragments;
 }
 
-function meanFragmentDepth(
-  vertices: Vec3[],
-  resolved: ResolvedSpaceScene,
-  view: SpaceSceneData["view"],
-  figure: SpaceFigure,
-  /**
-   * Ось глубины, выведенная из видимости тела (`deriveHullDepthAxis`) — если
-   * задана, используется вместо школьной модели пирамиды: глубина = проекция
-   * мировой точки на эту ось (меньше — дальше от «дальнего» центра, то есть
-   * ближе к зрителю). Это согласованный с уже нарисованным контуром способ,
-   * в отличие от фиксированного (4,4,1), не привязанного к текущему повороту.
-   */
-  hullDepthAxis?: Vec3 | null,
-): number {
+/**
+ * Средняя глубина фрагмента по «школьной» аффинной формуле
+ * `z = ur − kx·vr − (ky/kw)·w` (та же, что и `genericAffineLocalToView` для
+ * параллелепипеда) — меньше значение, ближе к зрителю.
+ *
+ * Почему это, а не (4,4,1)-глаз и не ось, выведенная из видимости вершин тела:
+ * kx, ky, kwx, kwy — это ИМЕННО те коэффициенты, которыми построен сам эллипс
+ * основания (`buildRotationEllipse(kxView, kyView, adLen)` в camera.ts) — то
+ * есть направление «вглубь» здесь не угадано и не выведено из дискретной
+ * классификации вершин, а взято непосредственно из параметров, определяющих
+ * форму нарисованной проекции. Для пирамиды локальные (u,v,w) совпадают с
+ * мировыми декартовыми координатами (см. `computePyramidCartesianBasis`),
+ * поэтому формула применяется к world-точкам сечения без изменений — точно
+ * так же, как к вершинам параллелепипеда.
+ */
+function meanFragmentDepth(vertices: Vec3[], resolved: ResolvedSpaceScene): number {
   let sum = 0;
   let count = 0;
-  const body = resolved.figure ?? figure;
-  const displayCtx: DisplayProjectionContext = {
-    basis: resolved.basis,
-    projection: resolved.projection,
-    points: resolved.points,
-    figure: body,
-  };
   for (const world of vertices) {
-    if (hullDepthAxis) {
-      sum += dot(world, hullDepthAxis);
-      count += 1;
-      continue;
-    }
-    const pr = isPyramid(body)
-      ? projectWorldDisplay(world, displayCtx, view, body)
-      : (() => {
-          const local = worldToLocal(world, resolved.basis);
-          if (!local) return null;
-          return projectFromLocalCoeffs(local, world, view, resolved.projection, body);
-        })();
-    if (!pr) continue;
-    sum += pr.depth;
+    const local = worldToLocal(world, resolved.basis);
+    if (!local) continue;
+    sum += genericAffineLocalToView(local, resolved.projection).z;
     count += 1;
   }
   return count ? sum / count : 0;
@@ -250,11 +231,6 @@ export function collectPlaneFillFragments(
 ): PlaneFillFragment[] {
   const builtPlanes = data.planes.filter((p) => p.built && p.style.visible);
   const fragments: PlaneFillFragment[] = [];
-  const hull =
-    isPyramid(figure) && data.view.visibilityMode !== "legacy"
-      ? buildProjectionConvexHull(figure, resolved, data.view)
-      : null;
-  const hullDepthAxis = hull ? deriveHullDepthAxis(figure, resolved, hull) : null;
 
   for (const plane of builtPlanes) {
     const eq = resolved.planes.get(plane.id);
@@ -282,7 +258,7 @@ export function collectPlaneFillFragments(
         planeId: plane.id,
         color: plane.style.color,
         vertices: part,
-        depth: meanFragmentDepth(part, resolved, data.view, figure, hullDepthAxis),
+        depth: meanFragmentDepth(part, resolved),
         originalSection: section,
       });
     }

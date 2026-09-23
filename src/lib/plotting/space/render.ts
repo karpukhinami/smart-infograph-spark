@@ -530,7 +530,17 @@ function renderPlaneIntersectionMarkers(
   parts: string[],
 ): void {
   const builtPlanes = data.planes.filter((p) => p.built && p.style.visible);
-  const width = Math.max(1, data.appearance.lineWidth * 0.7);
+  /**
+   * Свой (мелкий) пунктир, а НЕ `data.appearance.hiddenDash` («20 14» —
+   * рассчитан на длинные скрытые рёбра тела): отрезок пересечения плоскостей
+   * часто короче одного штриха такого пунктира и рисовался бы визуально
+   * сплошным, без видимых промежутков — отсюда жалоба «непонятная тонкая
+   * линия» вместо чёткого пунктира. Ширина и цвет — заметно отличаются от
+   * рёбер тела, чтобы линию нельзя было спутать с контуром фигуры.
+   */
+  const width = Math.max(1.5, data.appearance.lineWidth * 0.9);
+  const markerDash = "5 4";
+  const markerColor = "#1F2937";
   const pyramid = isPyramid(figure);
   for (let i = 0; i < builtPlanes.length; i += 1) {
     for (let j = i + 1; j < builtPlanes.length; j += 1) {
@@ -560,7 +570,7 @@ function renderPlaneIntersectionMarkers(
         pts.push(`${round(p.x)},${round(p.y)}`);
       }
       parts.push(
-        `<polyline points="${pts.join(" ")}" fill="none" stroke="${data.appearance.edgeColor}" stroke-width="${width}" stroke-dasharray="${data.appearance.hiddenDash}" stroke-linecap="round"/>`,
+        `<polyline points="${pts.join(" ")}" fill="none" stroke="${markerColor}" stroke-width="${width}" stroke-dasharray="${markerDash}" stroke-linecap="round"/>`,
       );
     }
   }
