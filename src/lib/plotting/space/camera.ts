@@ -13,6 +13,7 @@ import {
   pyramidEllipseBaseScreen,
   pyramidFootOnBaseFromWorld,
   pyramidHeight,
+  pyramidObserverEyePosition,
   pyramidProjectOnApexGenerator,
   pyramidWorldUsesLateralProjection,
 } from "./pyramid";
@@ -213,22 +214,24 @@ function pyramidScreenBase(figure: PyramidFigure, coeffs: ProjectionCoeffs): Arr
 }
 
 /**
- * Глубина пирамиды — тот же линейный функционал от декартовых координат, что и
- * у параллелепипеда (`z = ur − kx·vr − (ky/kw)·w`), но применённый напрямую к
- * world (x,y,z) пирамиды (local ≡ world). Это делает depth настоящей аффинной
- * функцией позиции — глобально согласованной для сортировки заливок, — в
- * отличие от прежнего варианта через центральную проекцию на основание
- * (foot = P спроецирована из S на z=0), который был нелинеен (деление на
- * 1−t) и не учитывал yaw, из-за чего порядок «дальше/ближе» был случайным.
+ * Глубина пирамиды: проекция world-точки на ось «центр тела → глаз наблюдателя»
+ * (тот же «глаз» (4,4,1) с поворотом −yaw, что и у отладочных лучей обзора).
+ * Это настоящая линейная функция world-координат — глобально согласованная для
+ * сортировки заливок, — в отличие от прежнего варианта через центральную
+ * проекцию на основание (нелинейно из-за деления на 1−t) и не учитывавшего yaw.
+ * От абстрактной оси kx/ky (используется для параллелепипеда) она отличается
+ * тем, что соответствует РЕАЛЬНОЙ точке обзора пирамиды, а не углу наклона
+ * рёбер на чертеже — так порядок «дальше/ближе» совпадает с тем, что нарисовано
+ * (сходящиеся к вершине S рёбра рассчитаны на взгляд именно из этой точки).
  */
 function pyramidCartesianDepth(world: Vec3, coeffs: ProjectionCoeffs): number {
-  const { kx, ky, kwy, yawRad } = coeffs;
-  const kw = kwySafe(kwy);
-  const ct = Math.cos(yawRad);
-  const st = Math.sin(yawRad);
-  const xr = world.x * ct - world.y * st;
-  const yr = world.x * st + world.y * ct;
-  return xr - kx * yr - (ky / kw) * world.z;
+  const eye = pyramidObserverEyePosition(coeffs.yawRad);
+  const eyeLen = Math.hypot(eye.x, eye.y, eye.z) || 1;
+  const ux = eye.x / eyeLen;
+  const uy = eye.y / eyeLen;
+  const uz = eye.z / eyeLen;
+  // Меньше = ближе к наблюдателю: точки в направлении глаза имеют больший dot(P,u).
+  return -(world.x * ux + world.y * uy + world.z * uz);
 }
 
 function pyramidWorldToView(
@@ -278,14 +281,18 @@ function pyramidLocalToView(
 }
 
 /**
- * Локальные (u,v,w) → координаты вида (X,Y,Z).
+ * Общая аффинная («косоугольная») проекция (u,v,w) → (X,Y,Z): та же формула, что
+ * у параллелепипеда. В отличие от `pyramidWorldToView` (сходящиеся к вершине S
+ * рёбра, экранная позиция через полигон основания — корректна только рядом с
+ * телом), это ПОЛНОСТЬЮ линейное отображение всего пространства без полигонов
+ * и «ближайшего ребра» — гладкое и непрерывное для ЛЮБОЙ точки, включая далёкие
+ * от тела (наблюдатель, отладочные лучи). Именно поэтому «глаз» пирамиды нужно
+ * проецировать через эту функцию, а не через школьную модель самой фигуры.
  */
-export function localToView(
+export function genericAffineLocalToView(
   local: LocalCoords,
   coeffs: ProjectionCoeffs,
-  figure?: SpaceFigure,
 ): { x: number; y: number; z: number } {
-  if (figure && isPyramid(figure)) return pyramidLocalToView(local, coeffs, figure);
   const { u, v, w } = local;
   const { kx, ky, kwx, kwy, yawRad, orbit } = coeffs;
   const kw = kwySafe(kwy);
@@ -299,6 +306,18 @@ export function localToView(
     y: a.y + u * (b.y - a.y) + v * (d.y - a.y) + kwy * w,
     z: ur - kx * vr - (ky / kw) * w,
   };
+}
+
+/**
+ * Локальные (u,v,w) → координаты вида (X,Y,Z).
+ */
+export function localToView(
+  local: LocalCoords,
+  coeffs: ProjectionCoeffs,
+  figure?: SpaceFigure,
+): { x: number; y: number; z: number } {
+  if (figure && isPyramid(figure)) return pyramidLocalToView(local, coeffs, figure);
+  return genericAffineLocalToView(local, coeffs);
 }
 
 /** Направление луча наблюдения в локальных (u,v,w). */

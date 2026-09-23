@@ -569,6 +569,24 @@ export function createPyramid(
   };
 }
 
+/** Поворот вокруг оси z (декартовы x,y). */
+export function rotateCartesianZ(v: Vec3, angleRad: number): Vec3 {
+  const c = Math.cos(angleRad);
+  const s = Math.sin(angleRad);
+  return { x: c * v.x - s * v.y, y: s * v.x + c * v.y, z: v.z };
+}
+
+/** Положение глаза при yaw=0 (декартовы x,y,z модели пирамиды, центр основания — начало координат). */
+export const PYRAMID_OBSERVER_EYE_AT_YAW_ZERO: Vec3 = { x: 4, y: 4, z: 1 };
+
+/**
+ * Глаз наблюдателя: при yaw=0 — (4,4,1); при повороте основания на ψ — поворот
+ * этой точки на −ψ вокруг z (эквивалент орбиты камеры на +ψ вокруг неподвижного тела).
+ */
+export function pyramidObserverEyePosition(yawRad: number): Vec3 {
+  return rotateCartesianZ(PYRAMID_OBSERVER_EYE_AT_YAW_ZERO, -yawRad);
+}
+
 export function pyramidApexLocal(figure: PyramidFigure): LocalCoords {
   const { apex } = pyramidVertexCartesianCoords(figure.constraints, figure.baseLabels.length);
   return cartesianToLocal(apex);

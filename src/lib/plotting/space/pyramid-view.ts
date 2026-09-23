@@ -6,15 +6,19 @@ import type { ResolvedSpaceScene } from "./build";
 import { viewDirectionLocal, type ProjectionCoeffs } from "./camera";
 import type { ProjectionHull } from "./convex-hull-visibility";
 import { faceById, isPyramid } from "./figure";
+import {
+  PYRAMID_OBSERVER_EYE_AT_YAW_ZERO,
+  pyramidObserverEyePosition,
+  rotateCartesianZ,
+} from "./pyramid";
 import type { SpaceFigure, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub } from "./vec3";
 
-const SURFACE_EPS = 1e-4;
-/** Расстояние «глаза» от центра параллелепипеда (пирамида — фиксированные координаты ниже). */
-const OBSERVER_DISTANCE_K = 2;
+export { PYRAMID_OBSERVER_EYE_AT_YAW_ZERO, pyramidObserverEyePosition, rotateCartesianZ };
 
-/** Положение глаза при yaw=0 (декартовы x,y,z модели пирамиды). */
-export const PYRAMID_OBSERVER_EYE_AT_YAW_ZERO: Vec3 = { x: 4, y: 4, z: 1 };
+const SURFACE_EPS = 1e-4;
+/** Расстояние «глаза» от центра параллелепипеда (пирамида — фиксированные координаты в pyramid.ts). */
+const OBSERVER_DISTANCE_K = 2;
 
 export type PyramidObserver = {
   /** Положение «глаза» в декартовых координатах. */
@@ -57,13 +61,6 @@ function outwardFaceNormalCartesian(
   return n;
 }
 
-/** Поворот вокруг оси z (декартовы x,y). */
-export function rotateCartesianZ(v: Vec3, angleRad: number): Vec3 {
-  const c = Math.cos(angleRad);
-  const s = Math.sin(angleRad);
-  return { x: c * v.x - s * v.y, y: s * v.x + c * v.y, z: v.z };
-}
-
 /** Направление на наблюдателя при yaw=0 (школьная проекция), в I-м октанте. */
 export function pyramidObserverDirectionAtYawZero(projection: ProjectionCoeffs): Vec3 {
   const vd = viewDirectionLocal({ ...projection, yawRad: 0 });
@@ -71,13 +68,6 @@ export function pyramidObserverDirectionAtYawZero(projection: ProjectionCoeffs):
   const oct = { x: 1, y: 1, z: 1 };
   if (dot(d, oct) < 0) d = scale(d, -1);
   return d;
-}
-
-/**
- * Глаз наблюдателя: при yaw=0 — (4,4,1); при повороте основания на ψ — поворот точки на −ψ вокруг z.
- */
-export function pyramidObserverEyePosition(yawRad: number): Vec3 {
-  return rotateCartesianZ(PYRAMID_OBSERVER_EYE_AT_YAW_ZERO, -yawRad);
 }
 
 function pyramidObserverFromFixedEye(

@@ -2,7 +2,12 @@
  * Единая 2D-проекция для чертежа: на пирамиде точки на рёбрах тела
  * лежат на отрезке между проекциями концов (как отрисовка рёбер).
  */
-import { projectFromLocalCoeffs, type ProjectedPoint, type ProjectionCoeffs } from "./camera";
+import {
+  genericAffineLocalToView,
+  projectFromLocalCoeffs,
+  type ProjectedPoint,
+  type ProjectionCoeffs,
+} from "./camera";
 import type { BuiltSpacePoint } from "./build";
 import { isPyramid } from "./figure";
 import type { SpaceFigure, SpaceViewParams, Vec3 } from "./types";
@@ -79,8 +84,12 @@ function projectVertexRaw(
 }
 
 /**
- * Проекция точки вне тела (наблюдатель и т.п.) — без привязки к рёбрам/вершинам пирамиды.
- * У пирамиды world = декартовы (x,y,z) модели.
+ * Проекция точки вне тела (наблюдатель, отладочные лучи) — общей гладкой
+ * аффинной формулой, БЕЗ школьной модели пирамиды (полигон основания,
+ * центральная проекция через вершину S). Та модель корректна только для точек
+ * на/рядом с телом: для далёких точек она проецирует через «ближайшее ребро»
+ * основания, из-за чего экранная позиция скачет/«залипает» на рёбрах при
+ * повороте. Здесь — обычное непрерывное отображение всего пространства.
  */
 export function projectWorldOffFigureBody(
   world: Vec3,
@@ -89,10 +98,9 @@ export function projectWorldOffFigureBody(
   figure: SpaceFigure,
 ): ProjectedPoint {
   const body = ctx.figure ?? figure;
-  const local = isPyramid(body)
-    ? { u: world.x, v: world.y, w: world.z }
-    : worldToLocal(world, ctx.basis) ?? { u: 0, v: 0, w: 0 };
-  return projectFromLocalCoeffs(local, world, view, ctx.projection, body);
+  const local = isPyramid(body) ? { u: world.x, v: world.y, w: world.z } : worldToLocal(world, ctx.basis) ?? { u: 0, v: 0, w: 0 };
+  const { x, y, z } = genericAffineLocalToView(local, ctx.projection);
+  return { x: x * view.scale, y: -y * view.scale, depth: z, world };
 }
 
 /** Проекция world-точки для отображения (подписи, точки, сечения). */
