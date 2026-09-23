@@ -6,14 +6,12 @@ import {
 } from "./conic-ellipse";
 import { isParallelepiped, isPyramid } from "./figure";
 import {
-  cartesianToPyramidCoeffs,
   localToCartesian,
   pyramidApexScreenAnchor,
   pyramidBaseCartesianFromFigure,
   pyramidBaseScreenAtXY,
   pyramidEllipseBaseScreen,
   pyramidFootOnBaseFromWorld,
-  pyramidFrameFromFigure,
   pyramidHeight,
   pyramidProjectOnApexGenerator,
   pyramidWorldUsesLateralProjection,
@@ -214,25 +212,39 @@ function pyramidScreenBase(figure: PyramidFigure, coeffs: ProjectionCoeffs): Arr
   return pyramidEllipseBaseScreen(coeffs.orbit, figure.baseLabels.length, coeffs.yawRad);
 }
 
+/**
+ * Глубина пирамиды — тот же линейный функционал от декартовых координат, что и
+ * у параллелепипеда (`z = ur − kx·vr − (ky/kw)·w`), но применённый напрямую к
+ * world (x,y,z) пирамиды (local ≡ world). Это делает depth настоящей аффинной
+ * функцией позиции — глобально согласованной для сортировки заливок, — в
+ * отличие от прежнего варианта через центральную проекцию на основание
+ * (foot = P спроецирована из S на z=0), который был нелинеен (деление на
+ * 1−t) и не учитывал yaw, из-за чего порядок «дальше/ближе» был случайным.
+ */
+function pyramidCartesianDepth(world: Vec3, coeffs: ProjectionCoeffs): number {
+  const { kx, ky, kwy, yawRad } = coeffs;
+  const kw = kwySafe(kwy);
+  const ct = Math.cos(yawRad);
+  const st = Math.sin(yawRad);
+  const xr = world.x * ct - world.y * st;
+  const yr = world.x * st + world.y * ct;
+  return xr - kx * yr - (ky / kw) * world.z;
+}
+
 function pyramidWorldToView(
   world: Vec3,
   coeffs: ProjectionCoeffs,
   figure: PyramidFigure,
 ): { x: number; y: number; z: number } {
-  const { kwx, kwy, kx, ky, orbit } = coeffs;
-  const kw = kwySafe(kwy);
+  const { kwx, kwy, orbit } = coeffs;
   const H = pyramidHeight(figure.constraints);
   const baseCart = pyramidBaseCartesianFromFigure(figure);
   const baseScr = pyramidScreenBase(figure, coeffs);
   const apexAnchor = pyramidApexScreenAnchor(figure, orbit, baseScr);
   /** Высота по z: основание z=0, вершина z=H — параметр t на любом генераторе S→Q. */
   const t = H > 1e-9 ? Math.max(0, Math.min(1, world.z / H)) : 0;
-  const frame = pyramidFrameFromFigure(figure);
   const footForDepth = pyramidFootOnBaseFromWorld(world, figure);
-  const foot3 = cartesianToPyramidCoeffs(
-    footForDepth ? { x: footForDepth.x, y: footForDepth.y, z: 0 } : { x: world.x, y: world.y, z: 0 },
-    frame,
-  ) ?? { u: 0, v: 0, w: 0 };
+  const depth = pyramidCartesianDepth(world, coeffs);
   const lateral = pyramidWorldUsesLateralProjection(world, figure)
     ? pyramidProjectOnApexGenerator(
         world,
@@ -246,18 +258,14 @@ function pyramidWorldToView(
       )
     : null;
   if (lateral) {
-    return {
-      x: lateral.x,
-      y: lateral.y,
-      z: foot3.u - kx * foot3.v - (ky / kw) * t,
-    };
+    return { x: lateral.x, y: lateral.y, z: depth };
   }
   const foot2 = footForDepth ?? { x: world.x, y: world.y };
   const atBase = pyramidBaseScreenAtXY(foot2.x, foot2.y, baseCart, baseScr);
   return {
     x: atBase.x + t * (apexAnchor.x - atBase.x) + kwx * t,
     y: atBase.y + t * (apexAnchor.y - atBase.y) + kwy * t,
-    z: foot3.u - kx * foot3.v - (ky / kw) * t,
+    z: depth,
   };
 }
 
