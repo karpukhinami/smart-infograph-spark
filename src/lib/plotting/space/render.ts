@@ -24,6 +24,7 @@ import {
   type OcclusionContext,
 } from "./visibility";
 import { isPyramid } from "./figure";
+import { pyramidForwardScreenAnchor } from "./pyramid";
 import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
 import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
 import { add, len, scale, sub, worldToLocal } from "./vec3";
@@ -533,41 +534,43 @@ function renderViewConvergenceRays(
   const displayCtx = displayCtxFromResolved(resolved);
   /**
    * «Глаз» — фиксированный читатель чертежа: его экранное положение не должно
-   * зависеть от поворота основания (yaw). Обычная `displayCtx.projection`
-   * несёт ТЕКУЩИЙ (вращающийся) yaw — тот же, что заставляет вершины фигуры
-   * визуально «крутиться» на экране; если спроецировать через него точку вне
-   * тела, она будет крутиться вместе с основанием, а не оставаться на месте
-   * (это и была причина «прилипания»/скачков луча). Поэтому здесь используется
-   * копия проекции с yawRad=0 — экранная позиция глаза от неё не зависит.
+   * зависеть от поворота основания (yaw).
+   *
+   * Для пирамиды НЕ используем общую аффинную формулу (u,v,w)→(x,y,z) для
+   * точки типа (4,4,1): у неё нет однозначного «вперёд» — эллипс основания
+   * на чертеже подогнан произвольно (поворот/наклон зависят от подгонки
+   * orbit), поэтому такая точка может спроецироваться в любую сторону, в том
+   * числе НАРУЖУ от фигуры, а не к зрителю (это и была причина «улетает
+   * вправо за кадр»). Вместо этого берём точку на луче «вершина S → центр
+   * основания», продолженную ЗА основание — она лежит в тех же (уже заведомо
+   * правильно расположенных) экранных координатах фигуры, поэтому направление
+   * «вперёд/к зрителю» гарантированно верное. Заморожено на yaw=0, чтобы не
+   * вращаться при повороте.
    */
-  const fixedEyeCtx: DisplayProjectionContext = {
-    ...displayCtx,
-    projection: { ...displayCtx.projection, yawRad: 0 },
-  };
-  const prEye = projectWorldOffFigureBody(observer.eye, fixedEyeCtx, data.view, figure);
-  const pEye = {
-    x: prEye.x * fit.scale + fit.cx,
-    y: prEye.y * fit.scale + fit.cy,
-  };
+  let pEye: { x: number; y: number };
+  if (isPyramid(figure)) {
+    const raw = pyramidForwardScreenAnchor(figure, resolved.projection.orbit);
+    pEye = {
+      x: raw.x * data.view.scale * fit.scale + fit.cx,
+      y: -raw.y * data.view.scale * fit.scale + fit.cy,
+    };
+  } else {
+    const prEye = projectWorldOffFigureBody(
+      observer.eye,
+      { ...displayCtx, projection: { ...displayCtx.projection, yawRad: 0 } },
+      data.view,
+      figure,
+    );
+    pEye = { x: prEye.x * fit.scale + fit.cx, y: prEye.y * fit.scale + fit.cy };
+  }
   const rayLen = Math.max(width, height) * 1.4;
   const stroke =
     'stroke="#B91C1C" stroke-width="1.25" stroke-dasharray="10 7" stroke-linecap="round" stroke-opacity="0.9"';
 
   for (const anchorWorld of anchors) {
     const p0 = projectWorld(anchorWorld, resolved, data.view, fit, figure);
-    let dx = pEye.x - p0.x;
-    let dy = pEye.y - p0.y;
-    if (Math.hypot(dx, dy) < 2) {
-      const prDir = projectWorldOffFigureBody(
-        add(anchorWorld, scale(observer.toViewer, 2)),
-        fixedEyeCtx,
-        data.view,
-        figure,
-      );
-      const pDir = { x: prDir.x * fit.scale + fit.cx, y: prDir.y * fit.scale + fit.cy };
-      dx = pDir.x - p0.x;
-      dy = pDir.y - p0.y;
-    }
+    const dx = pEye.x - p0.x;
+    const dy = pEye.y - p0.y;
     const l = Math.hypot(dx, dy) || 1;
     const ux = dx / l;
     const uy = dy / l;

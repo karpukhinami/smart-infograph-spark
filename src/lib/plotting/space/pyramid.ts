@@ -456,6 +456,40 @@ export function pyramidEllipseBaseScreen(
 }
 
 /**
+ * Экранная точка «вперёд» (в сторону зрителя) для отладочных лучей обзора:
+ * точка на луче S → центр основания, продолженном ЗА основание, наружу.
+ *
+ * Почему не через общую аффинную формулу (u,v,w)→(x,y,z) для точки типа (4,4,1):
+ * у той формулы нет однозначного «вперёд» — эллипс основания на чертеже может
+ * быть повёрнут/перекошен как угодно (зависит от подгонки orbit), поэтому
+ * произвольное направление (u,v) может спроецироваться КУДА УГОДНО, в том
+ * числе за пределы картинки в сторону, противоположную зрителю. А вершина S и
+ * все точки основания УЖЕ гарантированно расположены на чертеже правильно
+ * (это и есть сама фигура) — беря направление «от S сквозь центр основания и
+ * дальше» в ТЕХ ЖЕ сырых экранных координатах, мы автоматически получаем
+ * направление «вперёд», не выясняя ориентацию эллипса отдельно.
+ *
+ * Заморожено на yaw=0 (см. `pyramidEllipseBaseScreen`), чтобы точка не
+ * вращалась вместе с основанием при повороте.
+ */
+export function pyramidForwardScreenAnchor(
+  figure: PyramidFigure,
+  orbit: ConicEllipse,
+  extendFactor = 2.2,
+): { x: number; y: number } {
+  const n = figure.baseLabels.length;
+  const baseScr = pyramidEllipseBaseScreen(orbit, n, 0);
+  const apexAnchor = pyramidApexScreenAnchor(figure, orbit, baseScr);
+  if (!baseScr.length) return apexAnchor;
+  const cx = baseScr.reduce((s, p) => s + p.x, 0) / baseScr.length;
+  const cy = baseScr.reduce((s, p) => s + p.y, 0) / baseScr.length;
+  return {
+    x: apexAnchor.x + extendFactor * (cx - apexAnchor.x),
+    y: apexAnchor.y + extendFactor * (cy - apexAnchor.y),
+  };
+}
+
+/**
  * Проекция точки на боковом ребре/грани: P = Q + (z/H)(S − Q), Q на основании, S — вершина.
  * Работает и для S над центром (S_xy = 0), и для S над вершиной основания.
  */
