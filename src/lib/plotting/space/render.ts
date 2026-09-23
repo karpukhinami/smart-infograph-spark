@@ -16,7 +16,7 @@ import {
   type DisplayProjectionContext,
 } from "./display-projection";
 import { collectVisibleOverlaySegments, isEdgeCoveredOnScreen } from "./edge-overlay";
-import { collectPlaneFillFragments } from "./plane-subdivision";
+import { collectPlaneFillFragments, isSegmentOnPolygonBoundary } from "./plane-subdivision";
 import {
   buildOcclusionContext,
   isBodyEdgeVisibleForRender,
@@ -378,11 +378,20 @@ function renderPlaneSectionEdges(
   occlusion: OcclusionContext,
   parts: string[],
   obstacles: Obstacle[],
+  /**
+   * Если передано — рисуются только те рёбра `section`, которые лежат на
+   * границе этого исходного (неразбитого) сечения. Нужно для фрагментов,
+   * полученных делением сечения линией пересечения с другой плоскостью:
+   * такое деление добавляет технический «разрез», который не является
+   * настоящей границей плоскости и не должен отображаться как линия.
+   */
+  boundaryRef?: Vec3[],
 ): void {
   const edgeWidth = data.appearance.lineWidth;
   for (let i = 0; i < section.length; i += 1) {
     const a = section[i]!;
     const b = section[(i + 1) % section.length]!;
+    if (boundaryRef && !isSegmentOnPolygonBoundary(a, b, boundaryRef)) continue;
     drawSegmentWithVisibility(
       a,
       b,
@@ -738,6 +747,7 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
         occlusion,
         parts,
         obstacles,
+        fragment.originalSection,
       );
     }
     for (const plane of data.planes) {

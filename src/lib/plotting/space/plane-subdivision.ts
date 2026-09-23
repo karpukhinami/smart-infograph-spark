@@ -26,6 +26,13 @@ export interface PlaneFillFragment {
   vertices: Vec3[];
   /** Средняя глубина проекции: меньше — ближе к наблюдателю. */
   depth: number;
+  /**
+   * Исходное (неразбитое) сечение плоскости — по нему определяется, какие
+   * рёбра фрагмента являются настоящей границей плоскости, а какие —
+   * технические «разрезы», появившиеся при делении на фрагменты для
+   * подсчёта глубины (их не нужно рисовать как линии).
+   */
+  originalSection: Vec3[];
 }
 
 interface Point2D {
@@ -129,6 +136,43 @@ function splitConvexPolygonByLine3D(
   return split.map((part) => part.map((p) => from2D(p, origin, e1, e2)));
 }
 
+/**
+ * Проверяет, лежит ли отрезок [a,b] на одном из рёбер исходного многоугольника
+ * `section` (в пределах его длины). Используется, чтобы отличить настоящие
+ * границы сечения плоскости от «разрезов», добавленных при делении фрагмента
+ * линией пересечения с другой плоскостью — такие разрезы не являются частью
+ * контура плоскости и не должны отображаться как линия.
+ */
+export function isSegmentOnPolygonBoundary(
+  a: Vec3,
+  b: Vec3,
+  section: Vec3[],
+  eps = 1e-4,
+): boolean {
+  const n = section.length;
+  for (let i = 0; i < n; i += 1) {
+    const p0 = section[i]!;
+    const p1 = section[(i + 1) % n]!;
+    const full = sub(p1, p0);
+    const edgeLen = len(full);
+    if (edgeLen < 1e-9) continue;
+    const dir = scale(full, 1 / edgeLen);
+
+    const da = sub(a, p0);
+    const db = sub(b, p0);
+    const ta = dot(da, dir);
+    const tb = dot(db, dir);
+    const perpA = sub(da, scale(dir, ta));
+    const perpB = sub(db, scale(dir, tb));
+    if (len(perpA) > eps || len(perpB) > eps) continue;
+
+    const lo = Math.min(ta, tb);
+    const hi = Math.max(ta, tb);
+    if (lo >= -eps && hi <= edgeLen + eps) return true;
+  }
+  return false;
+}
+
 /** Делит сечение плоскости на части линиями пересечения с другими плоскостями. */
 export function subdividePlaneSection(
   section: Vec3[],
@@ -229,6 +273,7 @@ export function collectPlaneFillFragments(
         color: plane.style.color,
         vertices: part,
         depth: meanFragmentDepth(part, resolved, data.view, figure),
+        originalSection: section,
       });
     }
   }
