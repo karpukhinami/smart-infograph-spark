@@ -79,6 +79,7 @@ export type SpaceViewParamsJson = Pick<
   | "scaleY"
   | "visibilityMode"
   | "planeFillByDepth"
+  | "planeFillDepthMode"
   | "showRotationEllipse"
   | "showViewConvergenceRays"
 >;
@@ -94,6 +95,7 @@ function stripViewForExport(view: SpaceViewParams): SpaceViewParamsJson {
     scaleY: view.scaleY,
     visibilityMode: view.visibilityMode,
     planeFillByDepth: view.planeFillByDepth,
+    planeFillDepthMode: view.planeFillDepthMode,
     showRotationEllipse: view.showRotationEllipse,
     showViewConvergenceRays: view.showViewConvergenceRays,
   };

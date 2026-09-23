@@ -1,5 +1,7 @@
 /** Пространственная сцена: семантическое описание 3D-объектов. */
 
+export type PlaneFillDepthMode = "eye" | "plane";
+
 export type SpaceShapeKind =
   | "parallelepiped"
   | "pyramid"
@@ -244,6 +246,12 @@ export interface SpaceViewParams {
   visibilityMode?: "school" | "legacy";
   /** Заливка плоскостей с учётом глубины (разбиение по линиям пересечения). */
   planeFillByDepth?: boolean;
+  /**
+   * Как считать глубину для сортировки заливок:
+   * - `eye` — пирамида: вдоль луча к «глазу» (4,4,1); параллелепипед: школьная ось (без глаза).
+   * - `plane` — расстояние до вертикальной плоскости изображения (нормаль крутится с yaw).
+   */
+  planeFillDepthMode?: PlaneFillDepthMode;
   /** Отладка: лучи зрения «за кадр» к условной точке обзора. */
   showViewConvergenceRays?: boolean;
 }

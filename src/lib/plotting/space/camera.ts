@@ -25,10 +25,11 @@ import type {
   SpaceFigure,
   SpaceFigureConstraints,
   SpaceSceneData,
+  PlaneFillDepthMode,
   SpaceViewParams,
   Vec3,
 } from "./types";
-import { worldToLocal } from "./vec3";
+import { add, dot, len, normalize, scale, sub, worldToLocal } from "./vec3";
 
 export interface ProjectedPoint {
   x: number;
@@ -321,22 +322,73 @@ export function localToView(
   return genericAffineLocalToView(local, coeffs);
 }
 
+function localViewDirToWorld(
+  vd: LocalCoords,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+  figure: SpaceFigure,
+): Vec3 {
+  if (isPyramid(figure)) return { x: vd.u, y: vd.v, z: vd.w };
+  return add(add(scale(basis.e1, vd.u), scale(basis.e2, vd.v)), scale(basis.e3, vd.w));
+}
+
+function figureUpWorld(basis: { e1: Vec3; e2: Vec3; e3: Vec3 }, figure: SpaceFigure): Vec3 {
+  return isPyramid(figure) ? { x: 0, y: 0, z: 1 } : basis.e3;
+}
+
 /**
- * Глубина world-точки для сортировки заливок плоскостей — совпадает с `depth`
- * в `projectFromLocalCoeffs` / `projectWorldDisplay`, иначе порядок фрагментов
- * не соответствует нарисованной проекции (особенно у пирамиды при повороте).
+ * Расстояние до вертикальной «плоскости монитора» (содержит ось «вверх»),
+ * нормаль в горизонтали крутится с yaw вместе с направлением взгляда на чертёж.
+ * Меньше — ближе к наблюдателю.
+ */
+export function monitorPlaneSortDepth(
+  world: Vec3,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+  projection: ProjectionCoeffs,
+  figure: SpaceFigure,
+): number {
+  const vd = viewDirectionLocal(projection);
+  let dir = localViewDirToWorld(vd, basis, figure);
+  const up = figureUpWorld(basis, figure);
+  const upLen2 = dot(up, up);
+  if (upLen2 > 1e-12) {
+    dir = sub(dir, scale(up, dot(dir, up) / upLen2));
+  }
+  const dirLen = len(dir);
+  if (!(dirLen > 1e-12)) return 0;
+  const n = scale(dir, 1 / dirLen);
+  return -dot(world, n);
+}
+
+/** Школьная глубина параллелепипеда — только аффинная ось, без «глаза». */
+function parallelepipedSchoolSortDepth(
+  world: Vec3,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+  projection: ProjectionCoeffs,
+): number {
+  const local = worldToLocal(world, basis);
+  if (!local) return 0;
+  return genericAffineLocalToView(local, projection).z;
+}
+
+/**
+ * Глубина world-точки для сортировки заливок плоскостей.
+ * `eye`: пирамида — луч к «глазу»; параллелепипед — школьная ось (как изначально).
+ * `plane`: обе фигуры — до вертикальной плоскости изображения.
  */
 export function worldViewSortDepth(
   world: Vec3,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
   projection: ProjectionCoeffs,
   figure: SpaceFigure,
+  mode: PlaneFillDepthMode = "eye",
 ): number {
-  const local = isPyramid(figure)
-    ? { u: world.x, v: world.y, w: world.z }
-    : worldToLocal(world, basis);
-  if (!local) return 0;
-  return localToView(local, projection, figure).z;
+  if (mode === "plane") {
+    return monitorPlaneSortDepth(world, basis, projection, figure);
+  }
+  if (isPyramid(figure)) {
+    return pyramidCartesianDepth(world, projection);
+  }
+  return parallelepipedSchoolSortDepth(world, basis, projection);
 }
 
 /** Направление луча наблюдения в локальных (u,v,w). */
@@ -389,6 +441,7 @@ export const DEFAULT_SPACE_VIEW: SpaceViewParams = {
   heightLength: DEFAULT_HEIGHT_LENGTH,
   visibilityMode: "school",
   planeFillByDepth: false,
+  planeFillDepthMode: "plane",
 };
 
 export function fitProjection(

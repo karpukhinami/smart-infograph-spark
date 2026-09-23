@@ -1,13 +1,13 @@
 import { computeFaceOrPlaneSection, type ResolvedSpaceScene } from "./build";
 import { worldViewSortDepth } from "./camera";
-import type { SpaceFigure, SpaceSceneData, Vec3 } from "./types";
+import type { PlaneFillDepthMode, SpaceFigure, SpaceSceneData, Vec3 } from "./types";
 import { add, dot, len, planePointDistance, scale, sub, type PlaneEq } from "./vec3";
 
 export interface PlaneFillFragment {
   planeId: string;
   color: string;
   vertices: Vec3[];
-  /** Средняя глубина проекции: меньше — ближе к наблюдателю. */
+  /** Глубина в барицентре фрагмента: меньше — ближе к наблюдателю. */
   depth: number;
   /**
    * Исходное (неразбитое) сечение плоскости — по нему определяется, какие
@@ -114,37 +114,28 @@ export function subdividePlaneSection(
   return fragments;
 }
 
-/** Глубина в точке world — та же, что у `projectWorldDisplay(...).depth`. */
-function depthAtPoint(
-  world: Vec3,
-  resolved: ResolvedSpaceScene,
-  figure: SpaceFigure,
-): number {
-  return worldViewSortDepth(world, resolved.basis, resolved.projection, figure);
+function polygonBarycenter(vertices: Vec3[]): Vec3 {
+  let sx = 0;
+  let sy = 0;
+  let sz = 0;
+  for (const v of vertices) {
+    sx += v.x;
+    sy += v.y;
+    sz += v.z;
+  }
+  const n = Math.max(vertices.length, 1);
+  return { x: sx / n, y: sy / n, z: sz / n };
 }
 
-/**
- * Средняя глубина по вершинам фрагмента (меньше — ближе к наблюдателю).
- * SVG не «считает» глубину сам: мы сами сортируем `<polygon>` и рисуем от дальних к ближним.
- */
-function meanFragmentDepth(
+/** Глубина фрагмента — в барицентре многоугольника (режим задаётся в `planeFillDepthMode`). */
+function fragmentSortDepth(
   vertices: Vec3[],
   resolved: ResolvedSpaceScene,
   figure: SpaceFigure,
+  mode: PlaneFillDepthMode,
 ): number {
-  let sum = 0;
-  for (const world of vertices) sum += depthAtPoint(world, resolved, figure);
-  return vertices.length ? sum / vertices.length : 0;
-}
-
-function minFragmentDepth(
-  vertices: Vec3[],
-  resolved: ResolvedSpaceScene,
-  figure: SpaceFigure,
-): number {
-  let min = Infinity;
-  for (const world of vertices) min = Math.min(min, depthAtPoint(world, resolved, figure));
-  return Number.isFinite(min) ? min : 0;
+  const c = polygonBarycenter(vertices);
+  return worldViewSortDepth(c, resolved.basis, resolved.projection, figure, mode);
 }
 
 function meanHalfSpaceSign(vertices: Vec3[], cuttingPlane: PlaneEq): number {
@@ -187,13 +178,6 @@ function reconcileTwoPlaneFragmentDepths(
 
   if (d1 * d2 <= 1e-12) return;
 
-  for (const f of [...wedge1, ...wedge2]) {
-    f.depth = minFragmentDepth(f.vertices, resolved, figure);
-  }
-  d1 = diff(wedge1[0], wedge1[1]);
-  d2 = diff(wedge2[0], wedge2[1]);
-  if (d1 * d2 <= 1e-12) return;
-
   const bump = DEPTH_REPAIR_DELTA;
   if (d1 > 0 && d2 > 0) {
     wedge2[0].depth += bump;
@@ -214,6 +198,7 @@ export function collectPlaneFillFragments(
   resolved: ResolvedSpaceScene,
 ): PlaneFillFragment[] {
   const builtPlanes = data.planes.filter((p) => p.built && p.style.visible);
+  const depthMode: PlaneFillDepthMode = data.view.planeFillDepthMode ?? "plane";
   const fragments: PlaneFillFragment[] = [];
 
   for (const plane of builtPlanes) {
@@ -242,7 +227,7 @@ export function collectPlaneFillFragments(
         planeId: plane.id,
         color: plane.style.color,
         vertices: part,
-        depth: meanFragmentDepth(part, resolved, figure),
+        depth: fragmentSortDepth(part, resolved, figure, depthMode),
         originalSection: section,
       });
     }
