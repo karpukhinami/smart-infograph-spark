@@ -70,13 +70,22 @@ export function pyramidObserverDirectionAtYawZero(projection: ProjectionCoeffs):
   return d;
 }
 
+/**
+ * Наблюдатель для ОТЛАДОЧНОЙ ВИЗУАЛИЗАЦИИ (лучи к «глазу»): «глаз» — это
+ * фиксированный читатель чертежа, а не часть вращающейся модели. Поэтому его
+ * положение НЕ поворачивается вместе с yaw — оно всегда (4,4,1), как при yaw=0.
+ * (Для расчёта ГЛУБИНЫ заливок используется отдельная, действительно
+ * yaw-зависимая функция `pyramidObserverEyePosition` из camera.ts —
+ * там поворот на −yaw корректен и даёт согласованную сортировку по глубине;
+ * см. `pyramidCartesianDepth`. Это два разных назначения одной идеи «глаза».)
+ */
 function pyramidObserverFromFixedEye(
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   projection: ProjectionCoeffs,
 ): PyramidObserver {
   const center = figureBodyCenterCartesian(figure, resolved);
-  const eye = pyramidObserverEyePosition(projection.yawRad);
+  const eye = PYRAMID_OBSERVER_EYE_AT_YAW_ZERO;
   const delta = sub(eye, center);
   const d = len(delta);
   const toViewer = d > 1e-9 ? scale(delta, 1 / d) : pyramidObserverDirectionAtYawZero(projection);

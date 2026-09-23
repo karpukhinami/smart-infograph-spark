@@ -531,7 +531,20 @@ function renderViewConvergenceRays(
   }
 
   const displayCtx = displayCtxFromResolved(resolved);
-  const prEye = projectWorldOffFigureBody(observer.eye, displayCtx, data.view, figure);
+  /**
+   * «Глаз» — фиксированный читатель чертежа: его экранное положение не должно
+   * зависеть от поворота основания (yaw). Обычная `displayCtx.projection`
+   * несёт ТЕКУЩИЙ (вращающийся) yaw — тот же, что заставляет вершины фигуры
+   * визуально «крутиться» на экране; если спроецировать через него точку вне
+   * тела, она будет крутиться вместе с основанием, а не оставаться на месте
+   * (это и была причина «прилипания»/скачков луча). Поэтому здесь используется
+   * копия проекции с yawRad=0 — экранная позиция глаза от неё не зависит.
+   */
+  const fixedEyeCtx: DisplayProjectionContext = {
+    ...displayCtx,
+    projection: { ...displayCtx.projection, yawRad: 0 },
+  };
+  const prEye = projectWorldOffFigureBody(observer.eye, fixedEyeCtx, data.view, figure);
   const pEye = {
     x: prEye.x * fit.scale + fit.cx,
     y: prEye.y * fit.scale + fit.cy,
@@ -547,7 +560,7 @@ function renderViewConvergenceRays(
     if (Math.hypot(dx, dy) < 2) {
       const prDir = projectWorldOffFigureBody(
         add(anchorWorld, scale(observer.toViewer, 2)),
-        displayCtx,
+        fixedEyeCtx,
         data.view,
         figure,
       );
