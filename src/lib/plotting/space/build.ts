@@ -486,29 +486,44 @@ export function computeLineDisplayRange(
   return { t0: lo - extension, t1: hi + extension };
 }
 
-/** Точка внутри выпуклого четырёхугольника в 3D. */
+const POINT_IN_POLYGON_3D_EPS = 1e-4;
+
+/** Точка внутри треугольника (компланарна и по одну сторону всех трёх рёбер). */
+function pointInTriangle3D(p: Vec3, v0: Vec3, v1: Vec3, v2: Vec3, eps = POINT_IN_POLYGON_3D_EPS): boolean {
+  const n = cross(sub(v1, v0), sub(v2, v0));
+  const nLen = len(n);
+  if (nLen < 1e-12) return false;
+  const nn = scale(n, 1 / nLen);
+  if (Math.abs(dot(sub(p, v0), nn)) > eps) return false;
+  const verts = [v0, v1, v2];
+  let sign = 0;
+  for (let i = 0; i < 3; i += 1) {
+    const a = verts[i]!;
+    const b = verts[(i + 1) % 3]!;
+    const cr = cross(sub(b, a), sub(p, a));
+    const d = dot(cr, nn);
+    if (Math.abs(d) <= eps * eps) continue;
+    if (sign === 0) sign = Math.sign(d);
+    else if (Math.sign(d) !== sign) return false;
+  }
+  return true;
+}
+
+/**
+ * Точка внутри выпуклого многоугольника любой длины в 3D (веерная триангуляция
+ * от первой вершины — как для граней/сечений пирамиды с n>4 вершинами).
+ * Прежняя версия жёстко предполагала четырёхугольник (использовала только
+ * 3 вершины и формулу параллелограмма), из-за чего для 5–7-угольных сечений
+ * (шестиугольное основание) `clipLineToConvexPolygon` мог ошибочно решать,
+ * пересекает ли линия фрагмент — отсюда неверная сортировка/деление заливок.
+ */
 function pointInPolygon3D(p: Vec3, polygon: Vec3[]): boolean {
   if (polygon.length < 3) return false;
-  const v0 = polygon[0]!;
-  const v1 = polygon[1]!;
-  const v2 = polygon[2]!;
-  const n = cross(sub(v1, v0), sub(v2, v0));
-  if (len(n) < 1e-9) return false;
-  const nn = normalize(n);
-  if (Math.abs(dot(sub(p, v0), nn)) > 1e-4) return false;
-  const e1 = sub(v1, v0);
-  const e2 = sub(polygon[polygon.length === 4 ? 3 : 2]!, v0);
-  const a = dot(e1, e1);
-  const b = dot(e1, e2);
-  const c = dot(e2, e2);
-  const toP = sub(p, v0);
-  const d = dot(e1, toP);
-  const e = dot(e2, toP);
-  const denom = a * c - b * b;
-  if (Math.abs(denom) < 1e-9) return false;
-  const u = (d * c - b * e) / denom;
-  const v = (a * e - b * d) / denom;
-  return u >= -0.02 && v >= -0.02 && u + v <= 1.02;
+  if (polygon.length === 3) return pointInTriangle3D(p, polygon[0]!, polygon[1]!, polygon[2]!);
+  for (let i = 1; i + 1 < polygon.length; i += 1) {
+    if (pointInTriangle3D(p, polygon[0]!, polygon[i]!, polygon[i + 1]!)) return true;
+  }
+  return false;
 }
 
 const FACE_EPS = 1e-4;
