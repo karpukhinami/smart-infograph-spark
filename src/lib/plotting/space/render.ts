@@ -847,7 +847,12 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
         renderPlaneHelperLines(plane, section, data, figure, resolved, fit, occlusion, parts, obstacles);
       }
     }
-    renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
+    // Явная линия пересечения — только для пирамиды (её просили конкретно там).
+    // Для параллелепипеда это поведение задокументировано в UI как «линии
+    // пересечения не рисуются», менять его никто не просил.
+    if (isPyramid(figure)) {
+      renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
+    }
   } else {
     for (const plane of data.planes) {
       renderPlane(plane, data, figure, resolved, fit, occlusion, parts, obstacles);

@@ -291,7 +291,9 @@ export function SpaceManualPanel() {
                 <div className="space-y-0.5">
                   <Label className="text-xs">Рассчитать глубину</Label>
                   <p className="text-[11px] text-muted-foreground">
-                    Заливка плоскостей по глубине; линии их пересечения не рисуются.
+                    {isPyramid
+                      ? "Заливка плоскостей по глубине; линия их пересечения показывается пунктиром."
+                      : "Заливка плоскостей по глубине; линии их пересечения не рисуются."}
                   </p>
                 </div>
                 <Switch
