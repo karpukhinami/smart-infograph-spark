@@ -1,6 +1,7 @@
 import { clipLineToConvexPolygon, computeFaceOrPlaneSection, type ResolvedSpaceScene } from "./build";
 import {
   buildProjectionConvexHull,
+  deriveHullDepthAxis,
   isPlaneFragmentVisibleProjectionHull,
 } from "./convex-hull-visibility";
 import { projectFromLocalCoeffs } from "./camera";
@@ -204,6 +205,14 @@ function meanFragmentDepth(
   resolved: ResolvedSpaceScene,
   view: SpaceSceneData["view"],
   figure: SpaceFigure,
+  /**
+   * Ось глубины, выведенная из видимости тела (`deriveHullDepthAxis`) — если
+   * задана, используется вместо школьной модели пирамиды: глубина = проекция
+   * мировой точки на эту ось (меньше — дальше от «дальнего» центра, то есть
+   * ближе к зрителю). Это согласованный с уже нарисованным контуром способ,
+   * в отличие от фиксированного (4,4,1), не привязанного к текущему повороту.
+   */
+  hullDepthAxis?: Vec3 | null,
 ): number {
   let sum = 0;
   let count = 0;
@@ -215,6 +224,11 @@ function meanFragmentDepth(
     figure: body,
   };
   for (const world of vertices) {
+    if (hullDepthAxis) {
+      sum += dot(world, hullDepthAxis);
+      count += 1;
+      continue;
+    }
     const pr = isPyramid(body)
       ? projectWorldDisplay(world, displayCtx, view, body)
       : (() => {
@@ -244,6 +258,7 @@ export function collectPlaneFillFragments(
     isPyramid(figure) && data.view.visibilityMode !== "legacy"
       ? buildProjectionConvexHull(figure, resolved, data.view)
       : null;
+  const hullDepthAxis = hull ? deriveHullDepthAxis(figure, resolved, hull) : null;
 
   for (const plane of builtPlanes) {
     const eq = resolved.planes.get(plane.id);
@@ -272,7 +287,7 @@ export function collectPlaneFillFragments(
         planeId: plane.id,
         color: plane.style.color,
         vertices: part,
-        depth: meanFragmentDepth(part, resolved, data.view, figure),
+        depth: meanFragmentDepth(part, resolved, data.view, figure, hullDepthAxis),
         originalSection: section,
       });
     }
