@@ -738,16 +738,47 @@ function clipCarrierToFigure(
 
 export function planeIntersectionSegmentRange(
   carrier: { origin: Vec3; dir: Vec3 },
-  _planeAId: string,
-  _planeBId: string,
+  planeAId: string,
+  planeBId: string,
   figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
-  _planeEqs: Map<string, PlaneEq>,
+  planeEqs: Map<string, PlaneEq>,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): { t0: number; t1: number } | null {
-  const clip = clipCarrierToFigure(carrier, figure, points, basis);
-  if (!clip || clip.t1 - clip.t0 < 1e-9) return null;
-  return clip;
+  let t0 = -Infinity;
+  let t1 = Infinity;
+
+  if (isParallelepiped(figure)) {
+    const clip = clipCarrierToUnitCube(carrier, basis);
+    if (!clip) return null;
+    t0 = clip.t0;
+    t1 = clip.t1;
+  } else {
+    const body = clipCarrierToFigure(carrier, figure, points, basis);
+    if (!body) return null;
+    t0 = body.t0;
+    t1 = body.t1;
+  }
+
+  /** Отрезок пересечения внутри обеих заливок (сечений), а не только внутри объёма тела. */
+  for (const planeId of [planeAId, planeBId]) {
+    const section = computeFaceOrPlaneSection(
+      planeId,
+      figure,
+      points,
+      planeEqs,
+      basis,
+    );
+    if (!section || section.length < 3) continue;
+    const sec = clipLineToConvexPolygon(carrier.origin, carrier.dir, section);
+    if (sec) {
+      t0 = Math.max(t0, sec.t0);
+      t1 = Math.min(t1, sec.t1);
+    }
+  }
+
+  if (t1 - t0 < 1e-9) return null;
+  return { t0, t1 };
 }
 
 export function computeFaceOrPlaneSection(

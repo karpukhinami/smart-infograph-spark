@@ -26,7 +26,7 @@ import {
 import { isPyramid } from "./figure";
 import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
 import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
-import { add, intersectPlanes, len, scale, sub, worldToLocal } from "./vec3";
+import { add, dot, intersectPlanes, len, planePointDistance, scale, sub, worldToLocal } from "./vec3";
 
 function round(n: number): string {
   return String(Number(n.toFixed(2)));
@@ -541,6 +541,50 @@ function blendHexColors(colorA: string, colorB: string): string {
   return `#${mix.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
+/** Запасной отрезок пересечения: вершины обоих сечений, лежащие на обеих плоскостях (напр. B, G). */
+function planeIntersectionSegmentFromSectionVertices(
+  carrier: { origin: Vec3; dir: Vec3 },
+  planeAId: string,
+  planeBId: string,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+): { t0: number; t1: number } | null {
+  const eqA = resolved.planes.get(planeAId);
+  const eqB = resolved.planes.get(planeBId);
+  if (!eqA || !eqB) return null;
+  const secA = computeFaceOrPlaneSection(
+    planeAId,
+    figure,
+    resolved.points,
+    resolved.planes,
+    resolved.basis,
+  );
+  const secB = computeFaceOrPlaneSection(
+    planeBId,
+    figure,
+    resolved.points,
+    resolved.planes,
+    resolved.basis,
+  );
+  if (!secA?.length || !secB?.length) return null;
+  const eps = 1e-4;
+  const onBoth = (p: Vec3) =>
+    Math.abs(planePointDistance(p, eqA)) <= eps && Math.abs(planePointDistance(p, eqB)) <= eps;
+  const key = (p: Vec3) => `${p.x.toFixed(5)}:${p.y.toFixed(5)}:${p.z.toFixed(5)}`;
+  const seen = new Set<string>();
+  const pts: Vec3[] = [];
+  for (const p of [...secA, ...secB]) {
+    if (!onBoth(p)) continue;
+    const k = key(p);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    pts.push(p);
+  }
+  if (pts.length < 2) return null;
+  const ts = pts.map((p) => dot(sub(p, carrier.origin), carrier.dir));
+  return { t0: Math.min(...ts), t1: Math.max(...ts) };
+}
+
 function renderPlaneIntersectionMarkers(
   data: SpaceSceneData,
   figure: SpaceFigure,
@@ -556,8 +600,8 @@ function renderPlaneIntersectionMarkers(
    * чтобы линия была видна как «след» именно этих двух плоскостей, а не
    * служебная разметка.
    */
-  const width = Math.max(1.5, data.appearance.lineWidth * 0.85);
-  const markerDash = "11 8";
+  const width = Math.max(2.2, data.appearance.lineWidth);
+  const markerDash = "14 10";
   const pyramid = isPyramid(figure);
   for (let i = 0; i < builtPlanes.length; i += 1) {
     for (let j = i + 1; j < builtPlanes.length; j += 1) {
@@ -569,7 +613,7 @@ function renderPlaneIntersectionMarkers(
       const markerColor = blendHexColors(planeA.style.color, planeB.style.color);
       const carrier = intersectPlanes(eqA, eqB);
       if (!carrier) continue;
-      const clip = planeIntersectionSegmentRange(
+      let clip = planeIntersectionSegmentRange(
         carrier,
         planeA.id,
         planeB.id,
@@ -578,7 +622,16 @@ function renderPlaneIntersectionMarkers(
         resolved.planes,
         resolved.basis,
       );
-      if (!clip) continue;
+      if (!clip) {
+        clip = planeIntersectionSegmentFromSectionVertices(
+          carrier,
+          planeA.id,
+          planeB.id,
+          figure,
+          resolved,
+        );
+      }
+      if (!clip || clip.t1 - clip.t0 < 1e-9) continue;
       const steps = pyramid ? 16 : 1;
       const pts: string[] = [];
       for (let s = 0; s <= steps; s += 1) {
@@ -892,11 +945,11 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     renderViewConvergenceRays(data, figure, resolved, fit, a.width, a.height, parts);
   }
 
+  parts.push(`<g>${renderLabels(data, figure, resolved, obstacles, fit, a)}</g>`);
+
   if (data.view.planeFillByDepth) {
     renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
   }
-
-  parts.push(`<g>${renderLabels(data, figure, resolved, obstacles, fit, a)}</g>`);
 
   const w = round(a.width);
   const h = round(a.height);
