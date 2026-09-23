@@ -1,5 +1,5 @@
 import { clipLineToConvexPolygon, computeFaceOrPlaneSection, type ResolvedSpaceScene } from "./build";
-import { genericAffineLocalToView } from "./camera";
+import { worldViewSortDepth } from "./camera";
 import type { SpaceFigure, SpaceSceneData, Vec3 } from "./types";
 import {
   add,
@@ -10,7 +10,6 @@ import {
   normalize,
   scale,
   sub,
-  worldToLocal,
   type PlaneEq,
 } from "./vec3";
 
@@ -194,27 +193,19 @@ export function subdividePlaneSection(
 }
 
 /**
- * Средняя глубина фрагмента по «школьной» аффинной формуле
- * `z = ur − kx·vr − (ky/kw)·w` (та же, что и `genericAffineLocalToView` для
- * параллелепипеда) — меньше значение, ближе к зрителю.
- *
- * Почему это, а не (4,4,1)-глаз и не ось, выведенная из видимости вершин тела:
- * kx, ky, kwx, kwy — это ИМЕННО те коэффициенты, которыми построен сам эллипс
- * основания (`buildRotationEllipse(kxView, kyView, adLen)` в camera.ts) — то
- * есть направление «вглубь» здесь не угадано и не выведено из дискретной
- * классификации вершин, а взято непосредственно из параметров, определяющих
- * форму нарисованной проекции. Для пирамиды локальные (u,v,w) совпадают с
- * мировыми декартовыми координатами (см. `computePyramidCartesianBasis`),
- * поэтому формула применяется к world-точкам сечения без изменений — точно
- * так же, как к вершинам параллелепипеда.
+ * Средняя глубина фрагмента — та же `z`, что у `localToView` / `projectWorldDisplay`
+ * (для пирамиды — `pyramidCartesianDepth`, для параллелепипеда — аффинная школьная
+ * ось). Меньше значение — ближе к наблюдателю.
  */
-function meanFragmentDepth(vertices: Vec3[], resolved: ResolvedSpaceScene): number {
+function meanFragmentDepth(
+  vertices: Vec3[],
+  resolved: ResolvedSpaceScene,
+  figure: SpaceFigure,
+): number {
   let sum = 0;
   let count = 0;
   for (const world of vertices) {
-    const local = worldToLocal(world, resolved.basis);
-    if (!local) continue;
-    sum += genericAffineLocalToView(local, resolved.projection).z;
+    sum += worldViewSortDepth(world, resolved.basis, resolved.projection, figure);
     count += 1;
   }
   return count ? sum / count : 0;
@@ -258,7 +249,7 @@ export function collectPlaneFillFragments(
         planeId: plane.id,
         color: plane.style.color,
         vertices: part,
-        depth: meanFragmentDepth(part, resolved),
+        depth: meanFragmentDepth(part, resolved, figure),
         originalSection: section,
       });
     }

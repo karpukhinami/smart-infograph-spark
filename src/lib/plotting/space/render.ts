@@ -826,13 +826,15 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
   if (data.view.planeFillByDepth) {
     const fragments = collectPlaneFillFragments(data, figure, resolved);
     const planeById = new Map(data.planes.map((p) => [p.id, p]));
+    /** При разбиении по глубине фрагменты часто перекрываются на экране — нужна плотная заливка. */
+    const planeFillOpacity = Math.max(a.planeFillOpacity, 0.82);
     for (const fragment of fragments) {
       const plane = planeById.get(fragment.planeId);
       if (!plane?.built || !plane.style.visible) continue;
       renderPlaneFillPolygon(
         fragment.vertices,
         fragment.color,
-        a.planeFillOpacity,
+        planeFillOpacity,
         data,
         figure,
         resolved,
@@ -865,8 +867,6 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
         renderPlaneHelperLines(plane, section, data, figure, resolved, fit, occlusion, parts, obstacles);
       }
     }
-    // Явная линия пересечения плоскостей — для обеих фигур.
-    renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
   } else {
     for (const plane of data.planes) {
       renderPlane(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
@@ -890,6 +890,10 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
 
   if (data.view.showViewConvergenceRays) {
     renderViewConvergenceRays(data, figure, resolved, fit, a.width, a.height, parts);
+  }
+
+  if (data.view.planeFillByDepth) {
+    renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
   }
 
   parts.push(`<g>${renderLabels(data, figure, resolved, obstacles, fit, a)}</g>`);

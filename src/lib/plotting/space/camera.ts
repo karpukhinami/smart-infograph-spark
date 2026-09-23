@@ -28,6 +28,7 @@ import type {
   SpaceViewParams,
   Vec3,
 } from "./types";
+import { worldToLocal } from "./vec3";
 
 export interface ProjectedPoint {
   x: number;
@@ -318,6 +319,24 @@ export function localToView(
 ): { x: number; y: number; z: number } {
   if (figure && isPyramid(figure)) return pyramidLocalToView(local, coeffs, figure);
   return genericAffineLocalToView(local, coeffs);
+}
+
+/**
+ * Глубина world-точки для сортировки заливок плоскостей — совпадает с `depth`
+ * в `projectFromLocalCoeffs` / `projectWorldDisplay`, иначе порядок фрагментов
+ * не соответствует нарисованной проекции (особенно у пирамиды при повороте).
+ */
+export function worldViewSortDepth(
+  world: Vec3,
+  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
+  projection: ProjectionCoeffs,
+  figure: SpaceFigure,
+): number {
+  const local = isPyramid(figure)
+    ? { u: world.x, v: world.y, w: world.z }
+    : worldToLocal(world, basis);
+  if (!local) return 0;
+  return localToView(local, projection, figure).z;
 }
 
 /** Направление луча наблюдения в локальных (u,v,w). */
