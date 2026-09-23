@@ -745,22 +745,18 @@ export function planeIntersectionSegmentRange(
   planeEqs: Map<string, PlaneEq>,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): { t0: number; t1: number } | null {
-  let t0 = -Infinity;
-  let t1 = Infinity;
-
+  let bodyClip: { t0: number; t1: number } | null;
   if (isParallelepiped(figure)) {
-    const clip = clipCarrierToUnitCube(carrier, basis);
-    if (!clip) return null;
-    t0 = clip.t0;
-    t1 = clip.t1;
+    bodyClip = clipCarrierToUnitCube(carrier, basis);
   } else {
-    const body = clipCarrierToFigure(carrier, figure, points, basis);
-    if (!body) return null;
-    t0 = body.t0;
-    t1 = body.t1;
+    bodyClip = clipCarrierToFigure(carrier, figure, points, basis);
   }
+  if (!bodyClip || bodyClip.t1 - bodyClip.t0 < 1e-9) return null;
 
-  /** Отрезок пересечения внутри обеих заливок (сечений), а не только внутри объёма тела. */
+  let t0 = bodyClip.t0;
+  let t1 = bodyClip.t1;
+
+  /** Ужимаем до части линии, лежащей в обоих сечениях заливки. */
   for (const planeId of [planeAId, planeBId]) {
     const section = computeFaceOrPlaneSection(
       planeId,
@@ -777,7 +773,10 @@ export function planeIntersectionSegmentRange(
     }
   }
 
-  if (t1 - t0 < 1e-9) return null;
+  if (t1 - t0 < 1e-9) {
+    /** clipLineToConvexPolygon иногда даёт несовместимые t — тогда хотя бы отрезок внутри тела. */
+    return bodyClip;
+  }
   return { t0, t1 };
 }
 
