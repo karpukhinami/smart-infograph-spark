@@ -223,7 +223,9 @@ export function SpaceManualPanel() {
                 <div className="space-y-0.5">
                   <Label className="text-xs">Лучи точки обзора</Label>
                   <p className="text-[11px] text-muted-foreground">
-                    Лучи к проекции глаза: (4,4,1) при yaw=0, при повороте основания — вращение на −ψ вокруг z.
+                    {isPyramid
+                      ? "Отладка: лучи к условной точке обзора чертежа (не часть построения). Глаз: (4,4,1) при yaw=0, при повороте основания — вращение на −ψ вокруг z."
+                      : "Отладка: лучи к условной точке обзора чертежа (не часть построения)."}
                   </p>
                 </div>
                 <Switch
@@ -291,9 +293,7 @@ export function SpaceManualPanel() {
                 <div className="space-y-0.5">
                   <Label className="text-xs">Рассчитать глубину</Label>
                   <p className="text-[11px] text-muted-foreground">
-                    {isPyramid
-                      ? "Заливка плоскостей по глубине; линия их пересечения показывается пунктиром."
-                      : "Заливка плоскостей по глубине; линии их пересечения не рисуются."}
+                    Заливка плоскостей по глубине; линия их пересечения показывается пунктиром.
                   </p>
                 </div>
                 <Switch
