@@ -1,9 +1,5 @@
 import { clipLineToConvexPolygon, computeFaceOrPlaneSection, type ResolvedSpaceScene } from "./build";
-import {
-  buildProjectionConvexHull,
-  deriveHullDepthAxis,
-  isPlaneFragmentVisibleProjectionHull,
-} from "./convex-hull-visibility";
+import { buildProjectionConvexHull, deriveHullDepthAxis } from "./convex-hull-visibility";
 import { projectFromLocalCoeffs } from "./camera";
 import { projectWorldDisplay, type DisplayProjectionContext } from "./display-projection";
 import { isPyramid } from "./figure";
@@ -282,7 +278,6 @@ export function collectPlaneFillFragments(
 
     for (const part of parts) {
       if (part.length < 3) continue;
-      if (hull && !isPlaneFragmentVisibleProjectionHull(part, figure, resolved, hull)) continue;
       fragments.push({
         planeId: plane.id,
         color: plane.style.color,

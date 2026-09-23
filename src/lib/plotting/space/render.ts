@@ -26,7 +26,7 @@ import {
 import { isPyramid } from "./figure";
 import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
 import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
-import { add, len, scale, sub, worldToLocal } from "./vec3";
+import { add, intersectPlanes, len, scale, sub, worldToLocal } from "./vec3";
 
 function round(n: number): string {
   return String(Number(n.toFixed(2)));
@@ -511,6 +511,61 @@ function renderPlane(
   renderPlaneHelperLines(plane, section, data, figure, resolved, fit, occlusion, parts, obstacles);
 }
 
+/**
+ * Явная линия пересечения каждой пары построенных видимых плоскостей —
+ * рисуется ОДИН раз на пару (в отличие от служебных «разрезов» фрагментов
+ * заливки, которые не рисуются вовсе, см. `isSegmentOnPolygonBoundary`).
+ * Это подлинная прямая пересечения плоскостей внутри тела: `intersectPlanes`
+ * даёт несущую прямую, `planeIntersectionSegmentRange` обрезает её по телу —
+ * а поскольку обе плоскости являются сечениями ЭТОГО ЖЕ тела, отрезок внутри
+ * тела автоматически лежит в сечении обеих плоскостей (это и есть видимая
+ * область их взаимного перекрытия). Рисуется пунктиром, независимо от
+ * окклюзии — как обозначение самого факта пересечения.
+ */
+function renderPlaneIntersectionMarkers(
+  data: SpaceSceneData,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  fit: { scale: number; cx: number; cy: number },
+  parts: string[],
+): void {
+  const builtPlanes = data.planes.filter((p) => p.built && p.style.visible);
+  const width = Math.max(1, data.appearance.lineWidth * 0.7);
+  const pyramid = isPyramid(figure);
+  for (let i = 0; i < builtPlanes.length; i += 1) {
+    for (let j = i + 1; j < builtPlanes.length; j += 1) {
+      const planeA = builtPlanes[i]!;
+      const planeB = builtPlanes[j]!;
+      const eqA = resolved.planes.get(planeA.id);
+      const eqB = resolved.planes.get(planeB.id);
+      if (!eqA || !eqB) continue;
+      const carrier = intersectPlanes(eqA, eqB);
+      if (!carrier) continue;
+      const clip = planeIntersectionSegmentRange(
+        carrier,
+        planeA.id,
+        planeB.id,
+        figure,
+        resolved.points,
+        resolved.planes,
+        resolved.basis,
+      );
+      if (!clip) continue;
+      const steps = pyramid ? 16 : 1;
+      const pts: string[] = [];
+      for (let s = 0; s <= steps; s += 1) {
+        const t = clip.t0 + ((clip.t1 - clip.t0) * s) / steps;
+        const w = add(carrier.origin, scale(carrier.dir, t));
+        const p = projectWorld(w, resolved, data.view, fit, figure);
+        pts.push(`${round(p.x)},${round(p.y)}`);
+      }
+      parts.push(
+        `<polyline points="${pts.join(" ")}" fill="none" stroke="${data.appearance.edgeColor}" stroke-width="${width}" stroke-dasharray="${data.appearance.hiddenDash}" stroke-linecap="round"/>`,
+      );
+    }
+  }
+}
+
 /** Отладочные лучи: от центра (и вершины пирамиды) через экран к проекции «глаза». */
 function renderViewConvergenceRays(
   data: SpaceSceneData,
@@ -782,6 +837,7 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
         renderPlaneHelperLines(plane, section, data, figure, resolved, fit, occlusion, parts, obstacles);
       }
     }
+    renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
   } else {
     for (const plane of data.planes) {
       renderPlane(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
