@@ -1450,15 +1450,23 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       const endpoints = createPlaneIntersectionEndpoints({ ...data, lines }, line);
       if (endpoints.length) {
         points = [...points, ...endpoints];
-        if (line.definition.kind === "planeIntersection") {
-          line.definition = {
-            ...line.definition,
-            endpointAId: endpoints[0]?.id,
-            endpointBId: endpoints[1]?.id,
-          };
-        }
-        lines = [...data.lines, line];
       }
+      if (line.definition.kind === "planeIntersection") {
+        const pairKey = [line.definition.planeAId, line.definition.planeBId].sort().join(":");
+        const pairPoints = points
+          .filter((point) => point.definition.kind === "planeIntersectionBoundary"
+            && [point.definition.planeAId, point.definition.planeBId].sort().join(":") === pairKey)
+          .sort((a, b) => {
+            if (a.definition.kind !== "planeIntersectionBoundary" || b.definition.kind !== "planeIntersectionBoundary") return 0;
+            return a.definition.endpoint - b.definition.endpoint;
+          });
+        line.definition = {
+          ...line.definition,
+          endpointAId: pairPoints[0]?.id,
+          endpointBId: pairPoints[1]?.id,
+        };
+      }
+      lines = [...data.lines, line];
     }
     const result = applySpaceBuild({
       ...state.scene,

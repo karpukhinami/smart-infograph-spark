@@ -233,10 +233,14 @@ export function derivedPointChoices(data: SpaceSceneData): DerivedPointChoice[] 
   for (const plane of builtPlanes) {
     const eq = resolved.planes.get(plane.id);
     if (!eq) continue;
+    const seenHits: Vec3[] = [];
     for (const edge of data.figure.edges) {
       const a = resolved.points.get(edge.aId)?.world;
       const b = resolved.points.get(edge.bId)?.world;
-      if (!a || !b || !segmentPlaneIntersection(a, b, eq)) continue;
+      if (!a || !b) continue;
+      const hit = segmentPlaneIntersection(a, b, eq);
+      if (!hit || seenHits.some((existing) => len(sub(existing, hit)) <= 1e-7)) continue;
+      seenHits.push(hit);
       const alreadyAdded = data.points.some((point) =>
         point.definition.kind === "planeEdgeIntersection"
         && point.definition.planeId === plane.id
@@ -343,6 +347,13 @@ export function createDerivedPoints(data: SpaceSceneData, choice: DerivedPointCh
   const result: SpacePoint[] = [];
   let working = data;
   for (const endpoint of [0, 1] as const) {
+    const exists = working.points.some((point) =>
+      point.definition.kind === "planeIntersectionBoundary"
+      && planePairKey(point.definition.planeAId, point.definition.planeBId)
+        === planePairKey(choice.planeAId, choice.planeBId)
+      && point.definition.endpoint === endpoint,
+    );
+    if (exists) continue;
     const point = createSpacePoint(working.points.length + 1, {
       kind: "planeIntersectionBoundary",
       planeAId: choice.planeAId,
