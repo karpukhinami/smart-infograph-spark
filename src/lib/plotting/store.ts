@@ -1450,11 +1450,13 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       const endpoints = createPlaneIntersectionEndpoints({ ...data, lines }, line);
       if (endpoints.length) {
         points = [...points, ...endpoints];
-        line.definition = {
-          ...line.definition,
-          endpointAId: endpoints[0]?.id,
-          endpointBId: endpoints[1]?.id,
-        };
+        if (line.definition.kind === "planeIntersection") {
+          line.definition = {
+            ...line.definition,
+            endpointAId: endpoints[0]?.id,
+            endpointBId: endpoints[1]?.id,
+          };
+        }
         lines = [...data.lines, line];
       }
     }

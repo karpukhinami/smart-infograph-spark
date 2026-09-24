@@ -12,7 +12,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { usePlotStore } from "@/lib/plotting/store";
-import { faceChoices, lineChoices, planeChoices, pointChoices } from "@/lib/plotting/space/scene";
+import { derivedPointChoices, faceChoices, lineChoices, planeChoices, pointChoices } from "@/lib/plotting/space/scene";
 import type { LineRegion } from "@/lib/plotting/space/types";
 
 const REGION_OPTIONS: Array<{ value: LineRegion; label: string }> = [
@@ -34,6 +34,7 @@ export function SpacePointDraftPanel() {
   const faces = faceChoices(space3d);
   const lines = lineChoices(space3d);
   const planes = planeChoices(space3d);
+  const derived = derivedPointChoices(space3d);
 
   return (
     <div className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
@@ -41,7 +42,7 @@ export function SpacePointDraftPanel() {
         <Label className="text-xs text-muted-foreground">Как задаётся точка</Label>
         <Select
           value={draft.mode}
-          onValueChange={(v) => update({ mode: v as "onLine" | "onFace" | "linePlaneIntersection" })}
+          onValueChange={(v) => update({ mode: v as "onLine" | "onFace" | "linePlaneIntersection" | "fromConstruction" })}
         >
           <SelectTrigger className="bg-background">
             <SelectValue />
@@ -50,6 +51,7 @@ export function SpacePointDraftPanel() {
             <SelectItem value="onLine">на прямой</SelectItem>
             <SelectItem value="onFace">на грани</SelectItem>
             <SelectItem value="linePlaneIntersection">пересечение прямой и плоскости</SelectItem>
+            <SelectItem value="fromConstruction">из построений</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -217,6 +219,23 @@ export function SpacePointDraftPanel() {
               </SelectContent>
             </Select>
           </div>
+        </div>
+      )}
+
+      {draft.mode === "fromConstruction" && (
+        <div className="space-y-1">
+          <Label className="text-xs">Построение</Label>
+          <Select value={draft.derivedId} onValueChange={(derivedId) => update({ derivedId })}>
+            <SelectTrigger className="h-8 bg-background text-xs">
+              <SelectValue placeholder="Выберите пересечение" />
+            </SelectTrigger>
+            <SelectContent>
+              {derived.map((choice) => (
+                <SelectItem key={choice.id} value={choice.id}>{choice.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {!derived.length && <p className="text-xs text-muted-foreground">Доступных пересечений пока нет.</p>}
         </div>
       )}
 
