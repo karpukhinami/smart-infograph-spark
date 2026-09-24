@@ -379,33 +379,11 @@ function renderPlaneFillPolygon(
   parts: string[],
 ): void {
   if (vertices.length < 3) return;
-  if (isPyramid(figure)) {
-    const midpoint = (a: Vec3, b: Vec3): Vec3 => scale(add(a, b), 0.5);
-    const renderTriangle = (a: Vec3, b: Vec3, c: Vec3, level: number): void => {
-      if (level > 0) {
-        const ab = midpoint(a, b);
-        const bc = midpoint(b, c);
-        const ca = midpoint(c, a);
-        renderTriangle(a, ab, ca, level - 1);
-        renderTriangle(ab, b, bc, level - 1);
-        renderTriangle(ca, bc, c, level - 1);
-        renderTriangle(ab, bc, ca, level - 1);
-        return;
-      }
-      const screenPts = [a, b, c].map((w) => projectWorld(w, resolved, data.view, fit, figure));
-      const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
-      tris.push(`<polygon points="${poly}"/>`);
-    };
-    const tris: string[] = [];
-    for (let i = 1; i + 1 < vertices.length; i += 1) {
-      renderTriangle(vertices[0]!, vertices[i]!, vertices[i + 1]!, 2);
-    }
-    // Непрозрачные треугольники внутри группы с общей прозрачностью: швы не накладываются.
-    parts.push(
-      `<g opacity="${fillOpacity}" fill="${color}" stroke="${color}" stroke-width="0.8" stroke-linejoin="round">${tris.join("")}</g>`,
-    );
-    return;
-  }
+  // Фрагмент уже является итоговым многоугольником после всех попарных
+  // пересечений. Нельзя повторно триангулировать его для пирамиды: её
+  // школьная проекция нелинейна вне рёбер тела, поэтому независимо
+  // спроецированные внутренние точки треугольников могут выйти за экранный
+  // контур фрагмента и дать ложные клинья. Заливаем ровно контур его вершин.
   const screenPts = vertices.map((w) => projectWorld(w, resolved, data.view, fit, figure));
   const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
   parts.push(
