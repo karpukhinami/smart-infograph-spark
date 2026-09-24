@@ -416,8 +416,8 @@ export function worldViewSortDepth(
 }
 
 /** Направление луча наблюдения в локальных (u,v,w). */
-export function viewDirectionLocal({ kx, ky, kwx, kwy, yawRad }: ProjectionCoeffs): LocalCoords {
-  return affineProjectionDepthAxis({ kx, ky, kwx, kwy, yawRad } as ProjectionCoeffs);
+export function viewDirectionLocal(projection: ProjectionCoeffs): LocalCoords {
+  return affineProjectionDepthAxis(projection);
 }
 
 export function projectLocal(
