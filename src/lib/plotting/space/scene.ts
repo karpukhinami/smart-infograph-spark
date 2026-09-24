@@ -13,7 +13,7 @@ import {
   planeIntersectionSegmentRange,
   resolveLineCarrier,
 } from "./build";
-import { cross, len, sub } from "./vec3";
+import { add, cross, intersectPlanes, len, scale, segmentPlaneIntersection, sub } from "./vec3";
 import type {
   LineRegion,
   ParallelepipedConstraints,
@@ -199,6 +199,140 @@ export interface SpaceBuildReport {
   errors: string[];
 }
 
+export type DerivedPointChoice =
+  | { id: string; label: string; kind: "planeEdge"; planeId: string; edgeId: string }
+  | { id: string; label: string; kind: "planePair"; planeAId: string; planeBId: string };
+
+export type DerivedLineChoice = {
+  id: string;
+  label: string;
+  planeAId: string;
+  planeBId: string;
+};
+
+function canonicalPlanePair(aId: string, bId: string): [string, string] {
+  return aId < bId ? [aId, bId] : [bId, aId];
+}
+
+function planePairKey(aId: string, bId: string): string {
+  const [first, second] = canonicalPlanePair(aId, bId);
+  return `planes:${first}:${second}`;
+}
+
+function planeDisplayLabel(data: SpaceSceneData, id: string): string {
+  const plane = data.planes.find((item) => item.id === id);
+  return plane?.label.trim() || (plane ? `П${plane.index}` : "?");
+}
+
+export function derivedPointChoices(data: SpaceSceneData): DerivedPointChoice[] {
+  if (!data.figure) return [];
+  const resolved = buildSpaceScene(data);
+  const choices: DerivedPointChoice[] = [];
+  const builtPlanes = data.planes.filter((plane) => plane.built && resolved.planes.has(plane.id));
+
+  for (const plane of builtPlanes) {
+    const eq = resolved.planes.get(plane.id);
+    if (!eq) continue;
+    for (const edge of data.figure.edges) {
+      const a = resolved.points.get(edge.aId)?.world;
+      const b = resolved.points.get(edge.bId)?.world;
+      if (!a || !b || !segmentPlaneIntersection(a, b, eq)) continue;
+      const alreadyAdded = data.points.some((point) =>
+        point.definition.kind === "planeEdgeIntersection"
+        && point.definition.planeId === plane.id
+        && point.definition.edgeId === edge.id,
+      );
+      if (alreadyAdded) continue;
+      choices.push({
+        id: `edge:${plane.id}:${edge.id}`,
+        label: `${planeDisplayLabel(data, plane.id)} ∩ ${getPointLabel(edge.aId, data, data.figure)}${getPointLabel(edge.bId, data, data.figure)}`,
+        kind: "planeEdge",
+        planeId: plane.id,
+        edgeId: edge.id,
+      });
+    }
+  }
+
+  for (let i = 0; i < builtPlanes.length; i += 1) {
+    const first = builtPlanes[i]!;
+    for (let j = i + 1; j < builtPlanes.length; j += 1) {
+      const second = builtPlanes[j]!;
+      const [planeAId, planeBId] = canonicalPlanePair(first.id, second.id);
+      const aEq = resolved.planes.get(planeAId);
+      const bEq = resolved.planes.get(planeBId);
+      if (!aEq || !bEq) continue;
+      const carrier = intersectPlanes(aEq, bEq);
+      if (!carrier) continue;
+      const range = planeIntersectionSegmentRange(
+        carrier,
+        planeAId,
+        planeBId,
+        data.figure,
+        resolved.points,
+        resolved.planes,
+        resolved.basis,
+      );
+      if (!range) continue;
+      const endpoints = data.points.filter((point) =>
+        point.definition.kind === "planeIntersectionBoundary"
+        && planePairKey(point.definition.planeAId, point.definition.planeBId) === planePairKey(planeAId, planeBId),
+      );
+      if (endpoints.length >= 2) continue;
+      choices.push({
+        id: planePairKey(planeAId, planeBId),
+        label: `${planeDisplayLabel(data, planeAId)} ∩ ${planeDisplayLabel(data, planeBId)} → две граничные точки`,
+        kind: "planePair",
+        planeAId,
+        planeBId,
+      });
+    }
+  }
+  return choices;
+}
+
+export function derivedLineChoices(data: SpaceSceneData): DerivedLineChoice[] {
+  return derivedPointChoices(data)
+    .filter((choice): choice is Extract<DerivedPointChoice, { kind: "planePair" }> => choice.kind === "planePair")
+    .filter((choice) => !data.lines.some((line) =>
+      line.definition.kind === "planeIntersection"
+      && planePairKey(line.definition.planeAId, line.definition.planeBId) === choice.id,
+    ))
+    .map((choice) => ({
+      id: choice.id,
+      label: choice.label.replace(" → две граничные точки", ""),
+      planeAId: choice.planeAId,
+      planeBId: choice.planeBId,
+    }));
+}
+
+export function createDerivedPoints(data: SpaceSceneData, choice: DerivedPointChoice): SpacePoint[] {
+  if (!data.figure) return [];
+  if (choice.kind === "planeEdge") {
+    const point = createSpacePoint(data.points.length + 1, {
+      kind: "planeEdgeIntersection",
+      planeId: choice.planeId,
+      edgeId: choice.edgeId,
+    }, nextFreePointLabel(data, data.figure));
+    point.built = true;
+    return [point];
+  }
+
+  const result: SpacePoint[] = [];
+  let working = data;
+  for (const endpoint of [0, 1] as const) {
+    const point = createSpacePoint(working.points.length + 1, {
+      kind: "planeIntersectionBoundary",
+      planeAId: choice.planeAId,
+      planeBId: choice.planeBId,
+      endpoint,
+    }, nextFreePointLabel(working, data.figure));
+    point.built = true;
+    result.push(point);
+    working = { ...working, points: [...working.points, point] };
+  }
+  return result;
+}
+
 export function autoLineLabel(
   line: SpaceLine,
   data: SpaceSceneData,
@@ -324,41 +458,16 @@ export function createPlaneIntersectionEndpoints(
   const withLine = data.lines.some((l) => l.id === line.id)
     ? data
     : { ...data, lines: [...data.lines, line] };
-  const resolved = buildSpaceScene(withLine);
-  const carrier = resolveLineCarrier(
-    line,
-    data.figure,
-    resolved.points,
-    resolved.planes,
-    withLine.lines,
-  );
-  if (!carrier) return [];
-
-  const clip = planeIntersectionSegmentRange(
-    carrier,
+  const [planeAId, planeBId] = canonicalPlanePair(
     line.definition.planeAId,
     line.definition.planeBId,
-    data.figure,
-    resolved.points,
-    resolved.planes,
-    resolved.basis,
   );
-  if (!clip) return [];
-
-  const endpoints: SpacePoint[] = [];
-  let working = data;
-  for (const t of [clip.t0, clip.t1]) {
-    const label = nextFreePointLabel(working, data.figure);
-    const point = createSpacePoint(
-      working.points.length + 1,
-      { kind: "onSpaceLine", lineId: line.id, lineParam: t },
-      label,
-    );
-    point.style.color = line.style.color;
-    point.built = true;
-    endpoints.push(point);
-    working = { ...working, points: [...working.points, point] };
-  }
+  const choice = derivedPointChoices(withLine).find((item) =>
+    item.kind === "planePair" && item.planeAId === planeAId && item.planeBId === planeBId,
+  );
+  if (!choice || choice.kind !== "planePair") return [];
+  const endpoints = createDerivedPoints(data, choice);
+  for (const point of endpoints) point.style.color = line.style.color;
   return endpoints;
 }
 
