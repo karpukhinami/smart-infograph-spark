@@ -296,13 +296,8 @@ export function genericAffineLocalToView(
   coeffs: ProjectionCoeffs,
 ): { x: number; y: number; z: number } {
   const { u, v, w } = local;
-  const { kx, ky, kwx, kwy, yawRad, orbit } = coeffs;
-  const kw = kwySafe(kwy);
+  const { kwx, kwy, yawRad, orbit } = coeffs;
   const { a, b, d } = baseCorners(orbit, yawRad);
-  const ct = Math.cos(yawRad);
-  const st = Math.sin(yawRad);
-  const ur = u * ct - v * st;
-  const vr = u * st + v * ct;
   const xu = b.x - a.x;
   const xv = d.x - a.x;
   const yu = b.y - a.y;
@@ -316,15 +311,9 @@ export function genericAffineLocalToView(
     v: kwx * yu - xu * kwy,
     w: xu * yv - xv * yu,
   };
-  const legacyAxis = { u: ct - kx * st, v: -st - kx * ct, w: -ky / kw };
-  if (
-    depthAxis.u * legacyAxis.u +
-      depthAxis.v * legacyAxis.v +
-      depthAxis.w * legacyAxis.w <
-    0
-  ) {
-    depthAxis = { u: -depthAxis.u, v: -depthAxis.v, w: -depthAxis.w };
-  }
+  // Порядок векторного произведения фиксирован и непрерывен на всей орбите:
+  // знак нельзя повторно выбирать по старой оси — именно это давало инверсию
+  // после прохождения противоположной половины оборота.
   const depthLength = Math.hypot(depthAxis.u, depthAxis.v, depthAxis.w) || 1;
   return {
     x: a.x + u * xu + v * xv + kwx * w,
