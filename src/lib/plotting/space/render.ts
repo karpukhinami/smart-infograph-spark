@@ -22,6 +22,7 @@ import {
   isBodyEdgeVisibleForRender,
   splitLineByVisibility,
   splitLineForRender,
+  pointInFace3D,
   type OcclusionContext,
 } from "./visibility";
 import { isPyramid } from "./figure";
@@ -145,6 +146,8 @@ function drawSegmentWithVisibility(
   useSurfaceDepth = false,
   /** Совпадающая с ребром тела граница обязана повторять его штрих. */
   inheritBodyEdgeStroke = false,
+  /** Явная видимость несущей грани, когда она геометрически известна. */
+  forcedVisibility?: boolean,
 ): void {
   const dir = sub(bWorld, aWorld);
   const abLen = len(dir);
@@ -155,7 +158,9 @@ function drawSegmentWithVisibility(
       inheritedProjectedBodyEdgeVisibility(aWorld, bWorld, figure, resolved, view, fit)
     : null;
   const segments =
-    bodyEdgeVisibility !== null
+    forcedVisibility !== undefined
+      ? [{ a: aWorld, b: bWorld, visible: forcedVisibility }]
+      : bodyEdgeVisibility !== null
       ? [{ a: aWorld, b: bWorld, visible: bodyEdgeVisibility }]
       : useSurfaceDepth
         ? splitLineByVisibility(aWorld, unit, 0, abLen, figure, resolved, view, occlusion)
@@ -174,6 +179,34 @@ function drawSegmentWithVisibility(
     );
     obstacles.push(lineObstacle(p1.x, p1.y, p2.x, p2.y, seg.visible ? "curve" : "helper"));
   }
+}
+
+/**
+ * Граница сечения лежит на конкретной грани тела. Для пирамиды её штрих
+ * должен следовать видимости этой грани, а не повторной проверке глубины
+ * произвольной точки на уже спроецированном рисунке.
+ */
+function pyramidSectionBoundaryVisibility(
+  a: Vec3,
+  b: Vec3,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceSceneData["view"],
+): boolean | undefined {
+  if (!isPyramid(figure)) return undefined;
+  for (const face of figure.faces) {
+    if (!pointInFace3D(a, face.vertexIds, resolved.points) || !pointInFace3D(b, face.vertexIds, resolved.points)) {
+      continue;
+    }
+    const visible = figure.edges.some(
+      (edge) =>
+        face.vertexIds.includes(edge.aId) &&
+        face.vertexIds.includes(edge.bId) &&
+        isBodyEdgeVisibleForRender(edge.id, figure, resolved, view),
+    );
+    if (visible) return true;
+  }
+  return false;
 }
 
 const PYRAMID_CARRIER_MIN_STEPS = 6;
@@ -710,6 +743,7 @@ function renderPlanesByDepth(
           false,
           isPyramid(figure),
           true,
+          pyramidSectionBoundaryVisibility(a, b, figure, resolved, data.view),
         );
         continue;
       }
