@@ -809,62 +809,11 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
   }
 
   if (data.view.planeFillByDepth) {
-    const fragments = collectPlaneFillFragments(data, figure, resolved, (world) =>
-      projectWorldWithDepth(world, resolved, data.view, fit, figure),
-    );
-    const planeById = new Map(data.planes.map((p) => [p.id, p]));
-    /** При разбиении по глубине фрагменты часто перекрываются на экране — нужна плотная заливка. */
-    const planeFillOpacity = Math.max(a.planeFillOpacity, 0.82);
-    for (const fragment of fragments) {
-      const plane = planeById.get(fragment.planeId);
-      if (!plane?.built || !plane.style.visible) continue;
-      renderPlaneFillPolygon(
-        fragment.vertices,
-        fragment.color,
-        planeFillOpacity,
-        data,
-        figure,
-        resolved,
-        fit,
-        parts,
-      );
-    }
-    // Контур каждого сечения рисуется один раз. Технические границы фрагментов
-    // вообще не попадают в SVG, поэтому при трёх плоскостях не возникает швов.
-    for (const plane of data.planes) {
-      if (!plane.built || !plane.style.visible) continue;
-      const section = computeFaceOrPlaneSection(
-        plane.id,
-        figure,
-        resolved.points,
-        resolved.planes,
-        resolved.basis,
-      );
-      if (!section || section.length < 3) continue;
-      renderPlaneSectionEdges(
-        section,
-        plane,
-        data,
-        figure,
-        resolved,
-        fit,
-        occlusion,
-        parts,
-        obstacles,
-        true,
-      );
-      // В режиме глубины показываем только истинные попарные пересечения ниже.
-      // Вспомогательные линии от опорных точек визуально выдавали себя за
-      // дополнительные пересечения, особенно у трёх плоскостей.
-    }
+    renderPlanesByDepth(data, figure, resolved, fit, occlusion, parts, obstacles);
   } else {
     for (const plane of data.planes) {
       renderPlane(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
     }
-  }
-
-  if (data.view.planeFillByDepth) {
-    renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
   }
 
   for (const line of data.lines) {
