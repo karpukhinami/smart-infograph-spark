@@ -700,85 +700,52 @@ export function clipLineToPolygon(
 }
 
 /**
- * Отрезок прямой пересечения двух плоскостей внутри параллелепипеда.
- * Носитель клипируется к кубу (u,v,w) ∈ [0,1]³ в афинных координатах; t₀, t₁ — крайние точки.
+ * Две фиксированные граничные точки прямой внутри фигуры.
+ * Для пирамиды они получаются только из пересечений носителя с плоскостями
+ * граней и проверки, что найденная точка действительно принадлежит грани.
  */
-function clipCarrierToFigure(
+function carrierBoundaryRangeFromFaces(
   carrier: { origin: Vec3; dir: Vec3 },
   figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
-  basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): { t0: number; t1: number } | null {
-  if (isParallelepiped(figure)) return clipCarrierToUnitCube(carrier, basis);
-  const bodyVertices = figure.vertices
-    .map((vertex) => points.get(vertex.id)?.world)
-    .filter(Boolean) as Vec3[];
-  if (!bodyVertices.length) return null;
-  const bodyCenter = scale(
-    bodyVertices.reduce((sum, vertex) => add(sum, vertex), { x: 0, y: 0, z: 0 }),
-    1 / bodyVertices.length,
-  );
-  let t0 = -Infinity;
-  let t1 = Infinity;
+  const hits: number[] = [];
   for (const face of figure.faces) {
     const plane = facePlane(figure, face.id, points);
     if (!plane) continue;
-    const ws = face.vertexIds.map((id) => points.get(id)?.world).filter(Boolean) as Vec3[];
-    if (ws.length < 3) continue;
-    const insideSign = Math.sign(planePointDistance(bodyCenter, plane));
-    if (insideSign === 0) continue;
-    const d0 = insideSign * (dot(plane.normal, carrier.origin) + plane.d);
-    const dd = insideSign * dot(plane.normal, carrier.dir);
-    if (Math.abs(dd) < 1e-12) {
-      if (d0 < -1e-6) return null;
-      continue;
-    }
-    const tHit = -d0 / dd;
-    if (dd > 0) t0 = Math.max(t0, tHit);
-    else t1 = Math.min(t1, tHit);
+    const denominator = dot(plane.normal, carrier.dir);
+    if (Math.abs(denominator) < 1e-10) continue;
+    const t = -(dot(plane.normal, carrier.origin) + plane.d) / denominator;
+    const hit = add(carrier.origin, scale(carrier.dir, t));
+    if (!pointOnConvexFace(hit, face.vertexIds, points)) continue;
+    if (!hits.some((value) => Math.abs(value - t) <= 1e-7)) hits.push(t);
   }
-  if (t0 > t1 + 1e-9) return null;
-  return { t0, t1 };
+  if (hits.length < 2) return null;
+  hits.sort((a, b) => a - b);
+  const t0 = hits[0]!;
+  const t1 = hits[hits.length - 1]!;
+  return t1 - t0 > 1e-9 ? { t0, t1 } : null;
 }
 
+/**
+ * Канонический отрезок пересечения двух плоскостей внутри тела.
+ * После нахождения прямой здесь нет дополнительных сужений по сечениям:
+ * её концы определяет исключительно граница самой фигуры.
+ */
 export function planeIntersectionSegmentRange(
   carrier: { origin: Vec3; dir: Vec3 },
-  planeAId: string,
-  planeBId: string,
+  _planeAId: string,
+  _planeBId: string,
   figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
-  planeEqs: Map<string, PlaneEq>,
+  _planeEqs: Map<string, PlaneEq>,
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): { t0: number; t1: number } | null {
-  let bodyClip: { t0: number; t1: number } | null;
   if (isParallelepiped(figure)) {
-    bodyClip = clipCarrierToUnitCube(carrier, basis);
-  } else {
-    bodyClip = clipCarrierToFigure(carrier, figure, points, basis);
+    const range = clipCarrierToUnitCube(carrier, basis);
+    return range && range.t1 - range.t0 > 1e-9 ? range : null;
   }
-  if (!bodyClip || bodyClip.t1 - bodyClip.t0 < 1e-9) return null;
-
-  let t0 = bodyClip.t0;
-  let t1 = bodyClip.t1;
-
-  /** Ужимаем до части линии, лежащей в обоих сечениях заливки. */
-  for (const planeId of [planeAId, planeBId]) {
-    const section = computeFaceOrPlaneSection(
-      planeId,
-      figure,
-      points,
-      planeEqs,
-      basis,
-    );
-    if (!section || section.length < 3) return null;
-    const sec = clipLineToConvexPolygon(carrier.origin, carrier.dir, section);
-    if (!sec) return null;
-    t0 = Math.max(t0, sec.t0);
-    t1 = Math.min(t1, sec.t1);
-  }
-
-  if (t1 - t0 < 1e-9) return null;
-  return { t0, t1 };
+  return carrierBoundaryRangeFromFaces(carrier, figure, points);
 }
 
 export function computeFaceOrPlaneSection(
@@ -1017,7 +984,7 @@ function pointOnConvexFace(
     if (sign === 0) sign = Math.sign(crossVal);
     else if (Math.sign(crossVal) !== sign) return false;
   }
-  return sign !== 0;
+  return true;
 }
 
 /** Первое пересечение отрезка support→target с поверхностью выпуклого многогранника (s ∈ (0,1]). */

@@ -716,10 +716,10 @@ function renderPlanesByDepth(
     }
   }
 
-  // Пересечения строятся только из конкретных пар плоскостей. Мы намеренно
-  // не определяем принадлежность по вершинам фрагментов: при трёх плоскостях
-  // общий узел или близкие численные координаты могли ошибочно связать ребро
-  // одной пары с третьей плоскостью и породить посторонний пунктир.
+  // Для каждой конкретной пары используем только две зафиксированные точки,
+  // в которых её прямая пересекает грани тела. Автоматическая линия всегда
+  // пунктирная: видимость, совпадение с рёбрами и экранные эвристики здесь
+  // намеренно не участвуют.
   for (let i = 0; i < visiblePlanes.length; i += 1) {
     const first = visiblePlanes[i]!;
     const firstEq = resolved.planes.get(first.id);
@@ -744,14 +744,10 @@ function renderPlanesByDepth(
       const b = add(carrier.origin, scale(carrier.dir, range.t1));
       const pa = projectWorld(a, resolved, data.view, fit, figure);
       const pb = projectWorld(b, resolved, data.view, fit, figure);
-      const bodyEdgeVisibility =
-        inheritedBodyEdgeVisibility(a, b, figure, resolved, data.view) ??
-        inheritedProjectedBodyEdgeVisibility(a, b, figure, resolved, data.view, fit);
-      const dash = bodyEdgeVisibility === true ? "" : ` stroke-dasharray="${data.appearance.hiddenDash}"`;
       parts.push(
-        `<line x1="${round(pa.x)}" y1="${round(pa.y)}" x2="${round(pb.x)}" y2="${round(pb.y)}" stroke="${first.style.color}" stroke-width="${width}"${dash} stroke-linecap="round"/>`,
+        `<line x1="${round(pa.x)}" y1="${round(pa.y)}" x2="${round(pb.x)}" y2="${round(pb.y)}" stroke="${first.style.color}" stroke-width="${width}" stroke-dasharray="${data.appearance.hiddenDash}" stroke-linecap="round"/>`,
       );
-      obstacles.push(lineObstacle(pa.x, pa.y, pb.x, pb.y, bodyEdgeVisibility === true ? "curve" : "helper"));
+      obstacles.push(lineObstacle(pa.x, pa.y, pb.x, pb.y, "helper"));
     }
   }
 }
