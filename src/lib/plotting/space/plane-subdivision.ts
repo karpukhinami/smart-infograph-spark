@@ -28,13 +28,29 @@ export interface PlaneFillFragment {
   depth: number;
 }
 
-const WORLD_EPS = 1e-7;
+const WORLD_EPS = 1e-5;
 const AREA_EPS = 1e-10;
 const SCREEN_EPS = 1e-6;
 const DEPTH_EPS = 1e-7;
 
 function samePoint(a: Vec3, b: Vec3, eps = WORLD_EPS): boolean {
   return len(sub(a, b)) <= eps;
+}
+
+function canonicalPoint(point: Vec3, eps: number): Vec3 {
+  const snap = (value: number) => Math.round(value / eps) * eps;
+  return { x: snap(point.x), y: snap(point.y), z: snap(point.z) };
+}
+
+function polygonScale(vertices: Vec3[]): number {
+  if (vertices.length < 2) return 1;
+  let diameter = 0;
+  for (let i = 0; i < vertices.length; i += 1) {
+    for (let j = i + 1; j < vertices.length; j += 1) {
+      diameter = Math.max(diameter, len(sub(vertices[i]!, vertices[j]!)));
+    }
+  }
+  return Math.max(diameter, 1);
 }
 
 /** Удаляет дубли и точки на прямой, которые накапливаются после нескольких разрезов. */
@@ -98,7 +114,9 @@ function splitConvexPolygonByHalfSpace(
     if (dc >= -eps) pos.push(cur);
     if (dc <= eps) neg.push(cur);
     if ((dc > eps && dn < -eps) || (dc < -eps && dn > eps)) {
-      const hit = add(cur, scale(sub(next, cur), dc / (dc - dn)));
+      // Одна и та же вершина пересечения должна получаться бит-в-бит одинаковой
+      // при разрезании обеих плоскостей и при последующих разрезах.
+      const hit = canonicalPoint(add(cur, scale(sub(next, cur), dc / (dc - dn))), eps);
       pos.push(hit);
       neg.push(hit);
     }
@@ -114,15 +132,18 @@ export function subdividePlaneSection(
   planeEq: PlaneEq,
   otherPlaneEqs: PlaneEq[],
 ): Vec3[][] {
-  let fragments: Vec3[][] = [normalizePolygon(section)];
+  const scaleRef = polygonScale(section);
+  const linearEps = Math.max(WORLD_EPS, scaleRef * 1e-6);
+  const areaEps = Math.max(AREA_EPS, scaleRef * scaleRef * 1e-8);
+  let fragments: Vec3[][] = [normalizePolygon(section.map((point) => canonicalPoint(point, linearEps)))];
   for (const otherEq of otherPlaneEqs) {
     const next = fragments.flatMap((fragment) =>
-      splitConvexPolygonByHalfSpace(fragment, otherEq, planeEq),
+      splitConvexPolygonByHalfSpace(fragment, otherEq, planeEq, linearEps),
     );
     if (next.length) fragments = next;
   }
   return fragments.filter(
-    (fragment) => fragment.length >= 3 && polygonArea3D(fragment, planeEq.normal) > AREA_EPS,
+    (fragment) => fragment.length >= 3 && polygonArea3D(fragment, planeEq.normal) > areaEps,
   );
 }
 
