@@ -515,6 +515,19 @@ export function newPointOnFace(data: SpaceSceneData, faceId: string, label: stri
   }, label);
 }
 
+export function newPointAtLinePlaneIntersection(
+  data: SpaceSceneData,
+  lineId: string,
+  planeId: string,
+  label: string,
+): SpacePoint {
+  return createSpacePoint(data.points.length + 1, {
+    kind: "linePlaneIntersection",
+    lineId,
+    planeId,
+  }, label);
+}
+
 export function updatePointRegion(point: SpacePoint, region: LineRegion): SpacePoint {
   if (point.definition.kind !== "onLine") return point;
   return {

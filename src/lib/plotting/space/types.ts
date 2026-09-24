@@ -134,11 +134,20 @@ export type PointOnSpaceLineDefinition = {
   lineParam: number;
 };
 
+export type PointAtLinePlaneIntersectionDefinition = {
+  kind: "linePlaneIntersection";
+  /** Ребро тела или построенная дополнительная прямая. */
+  lineId: string;
+  /** Грань тела или построенная дополнительная плоскость. */
+  planeId: string;
+};
+
 export type SpacePointDefinition =
   | { kind: "builtin"; vertexId: string }
   | PointOnLineDefinition
   | PointOnFaceDefinition
-  | PointOnSpaceLineDefinition;
+  | PointOnSpaceLineDefinition
+  | PointAtLinePlaneIntersectionDefinition;
 
 export interface SpacePointStyle {
   color: string;

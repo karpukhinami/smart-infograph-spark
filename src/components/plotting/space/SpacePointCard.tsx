@@ -16,7 +16,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { ColorDot } from "../ColorDot";
 import { usePlotStore } from "@/lib/plotting/store";
-import { pointChoices } from "@/lib/plotting/space/scene";
+import { lineChoices, planeChoices, pointChoices } from "@/lib/plotting/space/scene";
 import type { LineRegion, SpacePoint } from "@/lib/plotting/space/types";
 
 const REGION_OPTIONS: Array<{ value: LineRegion; label: string }> = [
@@ -36,6 +36,8 @@ export function SpacePointCard({ point }: { point: SpacePoint }) {
 
   if (!space3d?.figure) return null;
   const choices = pointChoices(space3d);
+  const lines = lineChoices(space3d);
+  const planes = planeChoices(space3d);
   const def = point.definition;
 
   return (
@@ -52,7 +54,13 @@ export function SpacePointCard({ point }: { point: SpacePoint }) {
               onChange={(e) => updateSpacePoint(point.id, { label: e.target.value })}
             />
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-              {def.kind === "onLine" ? "на прямой" : def.kind === "onFace" ? "на грани" : ""}
+              {def.kind === "onLine"
+                ? "на прямой"
+                : def.kind === "onFace"
+                  ? "на грани"
+                  : def.kind === "linePlaneIntersection"
+                    ? "пересечение прямой и плоскости"
+                    : ""}
               {!point.built ? " · не построена" : point.dirty ? " · изменена" : ""}
               {point.error ? ` · ${point.error}` : ""}
             </span>
@@ -199,6 +207,42 @@ export function SpacePointCard({ point }: { point: SpacePoint }) {
                     <SelectItem value="center">Центр</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+            {def.kind === "linePlaneIntersection" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Прямая</Label>
+                  <Select
+                    value={def.lineId}
+                    onValueChange={(lineId) => updateSpacePoint(point.id, {
+                      definition: { ...def, lineId },
+                    })}
+                  >
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {lines.map((line) => (
+                        <SelectItem key={line.id} value={line.id}>{line.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Плоскость</Label>
+                  <Select
+                    value={def.planeId}
+                    onValueChange={(planeId) => updateSpacePoint(point.id, {
+                      definition: { ...def, planeId },
+                    })}
+                  >
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {planes.map((plane) => (
+                        <SelectItem key={plane.id} value={plane.id}>{plane.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
             {(point.dirty || point.error || !point.built) && (
