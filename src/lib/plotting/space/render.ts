@@ -26,7 +26,7 @@ import {
 import { isPyramid } from "./figure";
 import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
 import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
-import { add, intersectPlanes, len, scale, sub, worldToLocal } from "./vec3";
+import { add, dot, intersectPlanes, len, scale, sub, worldToLocal } from "./vec3";
 
 function round(n: number): string {
   return String(Number(n.toFixed(2)));
@@ -523,58 +523,142 @@ function renderPlane(
   renderPlaneHelperLines(plane, section, data, figure, resolved, fit, occlusion, parts, obstacles);
 }
 
+function pointSegDist(p: Vec3, a: Vec3, b: Vec3): number {
+  const ab = sub(b, a);
+  const l2 = dot(ab, ab);
+  if (l2 < 1e-18) return len(sub(p, a));
+  const t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / l2));
+  return len(sub(p, add(a, scale(ab, t))));
+}
+
+/** Непрозрачность заливки плоскостей в режиме глубины. */
+const DEPTH_PLANE_FILL_OPACITY = 0.32;
+
 /**
- * Явная линия пересечения каждой пары построенных видимых плоскостей —
- * рисуется ОДИН раз на пару. Служебные границы фрагментов заливки не рисуются.
- * Это подлинная прямая пересечения плоскостей внутри тела: `intersectPlanes`
- * даёт несущую прямую, `planeIntersectionSegmentRange` обрезает её по телу —
- * а поскольку обе плоскости являются сечениями ЭТОГО ЖЕ тела, отрезок внутри
- * тела автоматически лежит в сечении обеих плоскостей (это и есть видимая
- * область их взаимного перекрытия). Рисуется пунктиром, независимо от
- * окклюзии — как обозначение самого факта пересечения.
+ * Рисование плоскостей «художником» от дальних фрагментов к ближним.
+ * Каждый фрагмент заливается и сразу получает свои рёбра: либо часть контура
+ * сечения, либо отрезок пересечения с другой плоскостью (ровно сторона
+ * многоугольника-фрагмента). Ближние фрагменты, нарисованные позже, своей
+ * заливкой приглушают линии, лежащие за ними.
  */
-function renderPlaneIntersectionMarkers(
+function renderPlanesByDepth(
   data: SpaceSceneData,
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   fit: { scale: number; cx: number; cy: number },
+  occlusion: OcclusionContext,
   parts: string[],
+  obstacles: Obstacle[],
 ): void {
-  const builtPlanes = data.planes.filter((p) => p.built && p.style.visible);
+  const visiblePlanes = data.planes.filter((p) => p.built && p.style.visible);
+  const order = new Map(visiblePlanes.map((p, i) => [p.id, i]));
+  const planeById = new Map(visiblePlanes.map((p) => [p.id, p]));
+  const sections = new Map<string, Vec3[]>();
+  const eqs = new Map<string, { n: Vec3; d: number }>();
+  let sizeRef = 0;
+  for (const plane of visiblePlanes) {
+    const section = computeFaceOrPlaneSection(
+      plane.id,
+      figure,
+      resolved.points,
+      resolved.planes,
+      resolved.basis,
+    );
+    if (section && section.length >= 3) {
+      sections.set(plane.id, section);
+      for (const v of section) sizeRef = Math.max(sizeRef, len(sub(v, section[0]!)));
+    }
+    const eq = resolved.planes.get(plane.id);
+    if (eq) {
+      const nl = len(eq.normal);
+      if (nl > 1e-12) eqs.set(plane.id, { n: scale(eq.normal, 1 / nl), d: eq.d / nl });
+    }
+  }
+  const eps = Math.max(1e-6, sizeRef * 1e-5);
+  const onPlane = (p: Vec3, id: string) => {
+    const e = eqs.get(id);
+    return !!e && Math.abs(dot(e.n, p) + e.d) < eps;
+  };
+  const onBoundary = (a: Vec3, b: Vec3, section: Vec3[]) => {
+    for (let i = 0; i < section.length; i += 1) {
+      const s0 = section[i]!;
+      const s1 = section[(i + 1) % section.length]!;
+      if (pointSegDist(a, s0, s1) < eps && pointSegDist(b, s0, s1) < eps) return true;
+    }
+    return false;
+  };
+
+  const fragments = collectPlaneFillFragments(data, figure, resolved, (world) =>
+    projectWorldWithDepth(world, resolved, data.view, fit, figure),
+  );
   const width = data.appearance.lineWidth;
-  const markerDash = data.appearance.hiddenDash;
-  const pyramid = isPyramid(figure);
-  for (let i = 0; i < builtPlanes.length; i += 1) {
-    for (let j = i + 1; j < builtPlanes.length; j += 1) {
-      const planeA = builtPlanes[i]!;
-      const planeB = builtPlanes[j]!;
-      const eqA = resolved.planes.get(planeA.id);
-      const eqB = resolved.planes.get(planeB.id);
-      if (!eqA || !eqB) continue;
-      const markerColor = planeA.style.color;
-      const carrier = intersectPlanes(eqA, eqB);
-      if (!carrier) continue;
-      const clip = planeIntersectionSegmentRange(
-        carrier,
-        planeA.id,
-        planeB.id,
-        figure,
-        resolved.points,
-        resolved.planes,
-        resolved.basis,
-      );
-      if (!clip || clip.t1 - clip.t0 < 1e-9) continue;
-      const steps = pyramid ? 16 : 1;
-      const pts: string[] = [];
-      for (let s = 0; s <= steps; s += 1) {
-        const t = clip.t0 + ((clip.t1 - clip.t0) * s) / steps;
-        const w = add(carrier.origin, scale(carrier.dir, t));
-        const p = projectWorld(w, resolved, data.view, fit, figure);
-        pts.push(`${round(p.x)},${round(p.y)}`);
+  const drawnBoundary = new Set<string>();
+  const key = (a: Vec3, b: Vec3) => {
+    const pa = projectWorld(a, resolved, data.view, fit, figure);
+    const pb = projectWorld(b, resolved, data.view, fit, figure);
+    const s1 = `${Math.round(pa.x * 2)},${Math.round(pa.y * 2)}`;
+    const s2 = `${Math.round(pb.x * 2)},${Math.round(pb.y * 2)}`;
+    return s1 < s2 ? `${s1}|${s2}` : `${s2}|${s1}`;
+  };
+
+  for (const fragment of fragments) {
+    const plane = planeById.get(fragment.planeId);
+    if (!plane) continue;
+    renderPlaneFillPolygon(
+      fragment.vertices,
+      fragment.color,
+      DEPTH_PLANE_FILL_OPACITY,
+      data,
+      figure,
+      resolved,
+      fit,
+      parts,
+    );
+    const section = sections.get(plane.id);
+    const vs = fragment.vertices;
+    for (let i = 0; i < vs.length; i += 1) {
+      const a = vs[i]!;
+      const b = vs[(i + 1) % vs.length]!;
+      if (len(sub(b, a)) < eps) continue;
+      if (section && onBoundary(a, b, section)) {
+        const k = `${plane.id}:${key(a, b)}`;
+        if (drawnBoundary.has(k)) continue;
+        drawnBoundary.add(k);
+        drawSegmentWithVisibility(
+          a,
+          b,
+          figure,
+          resolved,
+          data.view,
+          fit,
+          occlusion,
+          plane.style.color,
+          width,
+          data.appearance.hiddenDash,
+          parts,
+          obstacles,
+        );
+        continue;
       }
+      // Сторона фрагмента на линии пересечения с другой плоскостью.
+      let other: SpacePlane | null = null;
+      for (const cand of visiblePlanes) {
+        if (cand.id === plane.id) continue;
+        if (onPlane(a, cand.id) && onPlane(b, cand.id)) {
+          other = cand;
+          break;
+        }
+      }
+      if (!other) continue;
+      const first =
+        (order.get(plane.id) ?? 0) < (order.get(other.id) ?? 0) ? plane : other;
+      const pa = projectWorld(a, resolved, data.view, fit, figure);
+      const pb = projectWorld(b, resolved, data.view, fit, figure);
+      // Рисуется у каждого соседнего фрагмента: последний (ближний) ложится сверху.
       parts.push(
-        `<polyline points="${pts.join(" ")}" fill="none" stroke="${markerColor}" stroke-width="${width}" stroke-dasharray="${markerDash}" stroke-linecap="round"/>`,
+        `<line x1="${round(pa.x)}" y1="${round(pa.y)}" x2="${round(pb.x)}" y2="${round(pb.y)}" stroke="${first.style.color}" stroke-width="${width}" stroke-dasharray="${data.appearance.hiddenDash}" stroke-linecap="round"/>`,
       );
+      obstacles.push(lineObstacle(pa.x, pa.y, pb.x, pb.y, "helper"));
     }
   }
 }
@@ -809,62 +893,11 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
   }
 
   if (data.view.planeFillByDepth) {
-    const fragments = collectPlaneFillFragments(data, figure, resolved, (world) =>
-      projectWorldWithDepth(world, resolved, data.view, fit, figure),
-    );
-    const planeById = new Map(data.planes.map((p) => [p.id, p]));
-    /** При разбиении по глубине фрагменты часто перекрываются на экране — нужна плотная заливка. */
-    const planeFillOpacity = Math.max(a.planeFillOpacity, 0.82);
-    for (const fragment of fragments) {
-      const plane = planeById.get(fragment.planeId);
-      if (!plane?.built || !plane.style.visible) continue;
-      renderPlaneFillPolygon(
-        fragment.vertices,
-        fragment.color,
-        planeFillOpacity,
-        data,
-        figure,
-        resolved,
-        fit,
-        parts,
-      );
-    }
-    // Контур каждого сечения рисуется один раз. Технические границы фрагментов
-    // вообще не попадают в SVG, поэтому при трёх плоскостях не возникает швов.
-    for (const plane of data.planes) {
-      if (!plane.built || !plane.style.visible) continue;
-      const section = computeFaceOrPlaneSection(
-        plane.id,
-        figure,
-        resolved.points,
-        resolved.planes,
-        resolved.basis,
-      );
-      if (!section || section.length < 3) continue;
-      renderPlaneSectionEdges(
-        section,
-        plane,
-        data,
-        figure,
-        resolved,
-        fit,
-        occlusion,
-        parts,
-        obstacles,
-        true,
-      );
-      // В режиме глубины показываем только истинные попарные пересечения ниже.
-      // Вспомогательные линии от опорных точек визуально выдавали себя за
-      // дополнительные пересечения, особенно у трёх плоскостей.
-    }
+    renderPlanesByDepth(data, figure, resolved, fit, occlusion, parts, obstacles);
   } else {
     for (const plane of data.planes) {
       renderPlane(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
     }
-  }
-
-  if (data.view.planeFillByDepth) {
-    renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
   }
 
   for (const line of data.lines) {
