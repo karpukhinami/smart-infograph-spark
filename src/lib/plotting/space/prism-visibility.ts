@@ -1,11 +1,11 @@
 /**
- * Видимость рёбер призмы: глубина граней сравнивается только там, где их
- * экранные проекции перекрываются по внутренности (общие точки на границе
- * не считаются). Не использует выпуклую оболочку пирамиды.
+ * Видимость рёбер призмы: глубина сравнивается только у не смежных граней,
+ * у которых проекции перекрываются по внутренности (не по границе). Смежные
+ * в 3D грани (общее ребро) глубину друг с другом не сравнивают.
  */
 import type { ResolvedSpaceScene } from "./build";
 import { projectFromLocalCoeffs, worldViewSortDepth } from "./camera";
-import { adjacentFaceIds, edgeById } from "./figure";
+import { adjacentFaceIds, edgeById, faceById, facesShareEdge } from "./figure";
 import type { PrismFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, scale } from "./vec3";
 import { isFaceFrontFacingFigure } from "./visibility-school";
@@ -13,12 +13,12 @@ import { isFaceFrontFacingFigure } from "./visibility-school";
 const DEPTH_EPS = 1e-5;
 const BOUNDARY_EPS = 1e-5;
 
-type ScreenPoly = Array<{ x: number; y: number }>;
+type ScreenVert = { x: number; y: number; depth: number };
+type ScreenPoly = ScreenVert[];
 
 interface PrismVisibilityState {
-  faceDepths: Map<string, number>;
-  faceScreen: Map<string, ScreenPoly>;
   faceVisible: Map<string, boolean>;
+  edgeVisible: Map<string, boolean>;
 }
 
 let prismVisCacheKey = "";
@@ -57,7 +57,6 @@ function distPointToSegment2D(
   return Math.hypot(px - (ax + t * abx), py - (ay + t * aby));
 }
 
-/** Строго внутри выпуклого многоугольника (точки на рёбрах и в вершинах — нет). */
 function pointStrictlyInsidePoly(px: number, py: number, poly: ScreenPoly): boolean {
   if (poly.length < 3) return false;
   let sign = 0;
@@ -79,10 +78,10 @@ function pointStrictlyInsidePoly(px: number, py: number, poly: ScreenPoly): bool
 }
 
 function bilinearPoint(
-  v0: { x: number; y: number },
-  v1: { x: number; y: number },
-  v2: { x: number; y: number },
-  v3: { x: number; y: number },
+  v0: ScreenVert,
+  v1: ScreenVert,
+  v2: ScreenVert,
+  v3: ScreenVert,
   u: number,
   v: number,
 ): { x: number; y: number } {
@@ -91,7 +90,6 @@ function bilinearPoint(
   return { x: a.x + v * (b.x - a.x), y: a.y + v * (b.y - a.y) };
 }
 
-/** Несколько точек гарантированно внутри грани (не на границе), если грань невырождена. */
 function interiorSamples(poly: ScreenPoly): Array<{ x: number; y: number }> {
   if (poly.length === 3) {
     const [v0, v1, v2] = poly;
@@ -113,14 +111,47 @@ function interiorSamples(poly: ScreenPoly): Array<{ x: number; y: number }> {
   return [];
 }
 
-/** Есть ли общая внутренняя область в экранной проекции (касание только по ребру/вершине — нет). */
-export function facesHaveInteriorScreenOverlap(polyA: ScreenPoly, polyB: ScreenPoly): boolean {
+/** Точка, лежащая строго внутри обеих проекций (если есть). */
+function findInteriorOverlapSample(polyA: ScreenPoly, polyB: ScreenPoly): { x: number; y: number } | null {
   for (const p of [...interiorSamples(polyA), ...interiorSamples(polyB)]) {
     if (pointStrictlyInsidePoly(p.x, p.y, polyA) && pointStrictlyInsidePoly(p.x, p.y, polyB)) {
-      return true;
+      return p;
     }
   }
-  return false;
+  return null;
+}
+
+export function facesHaveInteriorScreenOverlap(polyA: ScreenPoly, polyB: ScreenPoly): boolean {
+  return findInteriorOverlapSample(polyA, polyB) !== null;
+}
+
+function depthAtScreenPoint(px: number, py: number, poly: ScreenPoly): number | null {
+  if (poly.length === 3) {
+    const [v0, v1, v2] = poly;
+    const den =
+      (v1!.y - v2!.y) * (v0!.x - v2!.x) + (v2!.x - v1!.x) * (v0!.y - v2!.y);
+    if (Math.abs(den) < 1e-12) return (v0!.depth + v1!.depth + v2!.depth) / 3;
+    const w0 =
+      ((v1!.y - v2!.y) * (px - v2!.x) + (v2!.x - v1!.x) * (py - v2!.y)) / den;
+    const w1 =
+      ((v2!.y - v0!.y) * (px - v2!.x) + (v0!.x - v2!.x) * (py - v2!.y)) / den;
+    const w2 = 1 - w0 - w1;
+    if (w0 < -1e-7 || w1 < -1e-7 || w2 < -1e-7) return null;
+    return w0 * v0!.depth + w1 * v1!.depth + w2 * v2!.depth;
+  }
+  if (poly.length >= 4) {
+    const [v0, v1, v2, v3] = poly;
+    const denom = (v2!.x - v0!.x) * (v3!.y - v0!.y) - (v2!.y - v0!.y) * (v3!.x - v0!.x);
+    if (Math.abs(denom) < 1e-12) {
+      return (v0!.depth + v1!.depth + v2!.depth + v3!.depth) * 0.25;
+    }
+    const u = ((px - v0!.x) * (v3!.y - v0!.y) - (py - v0!.y) * (v3!.x - v0!.x)) / denom;
+    const v = ((px - v0!.x) * (v1!.y - v0!.y) - (py - v0!.y) * (v1!.x - v0!.x)) / denom;
+    const d0 = v0!.depth + u * (v1!.depth - v0!.depth) + v * (v3!.depth - v0!.depth);
+    const d1 = v0!.depth + u * (v2!.depth - v0!.depth) + v * (v3!.depth - v0!.depth);
+    return (d0 + d1) * 0.5;
+  }
+  return null;
 }
 
 export function computePrismFaceDepths(
@@ -156,7 +187,7 @@ function buildFaceScreenPolys(
         const pt = resolved.points.get(id);
         if (!pt) return null;
         const pr = projectFromLocalCoeffs(pt.local, pt.world, view, resolved.projection, figure);
-        return { x: pr.x, y: pr.y };
+        return { x: pr.x, y: pr.y, depth: pr.depth };
       })
       .filter(Boolean) as ScreenPoly;
     if (poly.length >= 3) out.set(face.id, poly);
@@ -168,55 +199,79 @@ function isFaceVisibleWithOverlapRules(
   faceId: string,
   figure: PrismFigure,
   resolved: ResolvedSpaceScene,
-  faceDepths: Map<string, number>,
   faceScreen: Map<string, ScreenPoly>,
 ): boolean {
   if (!isFaceFrontFacingFigure(faceId, figure, resolved)) return false;
   const polyF = faceScreen.get(faceId);
   if (!polyF) return false;
-  const dF = faceDepths.get(faceId) ?? Number.POSITIVE_INFINITY;
 
   for (const other of figure.faces) {
     if (other.id === faceId) continue;
+    if (facesShareEdge(figure, faceId, other.id)) continue;
     if (!isFaceFrontFacingFigure(other.id, figure, resolved)) continue;
     const polyG = faceScreen.get(other.id);
     if (!polyG) continue;
-    if (!facesHaveInteriorScreenOverlap(polyF, polyG)) continue;
-    const dG = faceDepths.get(other.id) ?? Number.POSITIVE_INFINITY;
+    const sample = findInteriorOverlapSample(polyF, polyG);
+    if (!sample) continue;
+    const dF = depthAtScreenPoint(sample.x, sample.y, polyF);
+    const dG = depthAtScreenPoint(sample.x, sample.y, polyG);
+    if (dF === null || dG === null) continue;
     if (dG < dF - DEPTH_EPS) return false;
   }
   return true;
+}
+
+function buildEdgeVisibility(
+  figure: PrismFigure,
+  faceVisible: Map<string, boolean>,
+): Map<string, boolean> {
+  const edgeVisible = new Map<string, boolean>();
+  for (const edge of figure.edges) {
+    const adj = adjacentFaceIds(figure, edge.id);
+    let visible = false;
+    for (const faceId of adj) {
+      if (faceVisible.get(faceId)) {
+        visible = true;
+        break;
+      }
+    }
+    edgeVisible.set(edge.id, visible);
+  }
+
+  for (const face of figure.faces) {
+    if (!faceVisible.get(face.id)) continue;
+    for (const edge of figure.edges) {
+      if (!face.vertexIds.includes(edge.aId) || !face.vertexIds.includes(edge.bId)) continue;
+      edgeVisible.set(edge.id, true);
+    }
+  }
+  return edgeVisible;
 }
 
 function buildPrismVisibilityState(
   figure: PrismFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
-  faceDepths?: Map<string, number>,
 ): PrismVisibilityState {
-  const depths = faceDepths ?? computePrismFaceDepths(figure, resolved, view);
   const faceScreen = buildFaceScreenPolys(figure, resolved, view);
   const faceVisible = new Map<string, boolean>();
   for (const face of figure.faces) {
     faceVisible.set(
       face.id,
-      isFaceVisibleWithOverlapRules(face.id, figure, resolved, depths, faceScreen),
+      isFaceVisibleWithOverlapRules(face.id, figure, resolved, faceScreen),
     );
   }
-  return { faceDepths: depths, faceScreen, faceVisible };
+  const edgeVisible = buildEdgeVisibility(figure, faceVisible);
+  return { faceVisible, edgeVisible };
 }
 
 function prismVisibilityState(
   figure: PrismFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
-  faceDepths?: Map<string, number>,
 ): PrismVisibilityState {
-  if (faceDepths) {
-    return buildPrismVisibilityState(figure, resolved, view, faceDepths);
-  }
   const p = resolved.projection;
-  const key = `${figure.id}:${view.scale}:${view.yaw}:${p.kx}:${p.ky}:${p.yawRad}`;
+  const key = `${figure.id}:${view.scale}:${view.yaw}:${p.kx}:${p.ky}:${p.yawRad}:${figure.faces.length}:${figure.edges.length}`;
   if (key !== prismVisCacheKey || !prismVisCache) {
     prismVisCacheKey = key;
     prismVisCache = buildPrismVisibilityState(figure, resolved, view);
@@ -224,28 +279,17 @@ function prismVisibilityState(
   return prismVisCache;
 }
 
-/**
- * Сплошное, если хотя бы одна смежная грань передняя и не прикрыта другой
- * передней гранью в общей внутренней области проекции.
- */
 export function isBodyEdgeVisiblePrism(
   edgeId: string,
   figure: PrismFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
-  faceDepths?: Map<string, number>,
+  _faceDepths?: Map<string, number>,
 ): boolean {
   const edge = edgeById(figure, edgeId);
   if (!edge) return true;
-
-  const state = prismVisibilityState(figure, resolved, view, faceDepths);
-  const adjacent = adjacentFaceIds(figure, edgeId);
-
-  if (adjacent.length === 0) return true;
-  for (const faceId of adjacent) {
-    if (state.faceVisible.get(faceId)) return true;
-  }
-  return false;
+  const state = prismVisibilityState(figure, resolved, view);
+  return state.edgeVisible.get(edgeId) ?? true;
 }
 
 export function isFaceVisiblePrism(
@@ -253,8 +297,9 @@ export function isFaceVisiblePrism(
   figure: PrismFigure,
   resolved: ResolvedSpaceScene,
   view: SpaceViewParams,
-  faceDepths?: Map<string, number>,
+  _faceDepths?: Map<string, number>,
 ): boolean {
-  const state = prismVisibilityState(figure, resolved, view, faceDepths);
+  if (!faceById(figure, faceId)) return false;
+  const state = prismVisibilityState(figure, resolved, view);
   return state.faceVisible.get(faceId) ?? false;
 }

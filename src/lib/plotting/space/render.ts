@@ -878,6 +878,12 @@ function renderBodyEdgesInFrontOfPlanes(
     const unique = breakpoints.filter((value, index) => index === 0 || value - breakpoints[index - 1]! > 1e-7);
     const visible = isBodyEdgeVisibleForRender(edge.id, figure, resolved, data.view);
     const dash = visible ? "" : ` stroke-dasharray="${data.appearance.hiddenDash}"`;
+    if (visible) {
+      parts.push(
+        `<line x1="${round(a.x)}" y1="${round(a.y)}" x2="${round(b.x)}" y2="${round(b.y)}" stroke="${data.appearance.edgeColor}" stroke-width="${data.appearance.edgeWidth}" stroke-linecap="round"/>`,
+      );
+      continue;
+    }
     for (let i = 0; i + 1 < unique.length; i += 1) {
       const t0 = unique[i]!;
       const t1 = unique[i + 1]!;

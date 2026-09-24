@@ -17,6 +17,19 @@ export function faceDisplayLabel(figure: SpaceFigure, face: SpaceFace): string {
   return labels.join("");
 }
 
+/** Две грани имеют общее ребро (две общие вершины). */
+export function facesShareEdge(figure: SpaceFigure, faceIdA: string, faceIdB: string): boolean {
+  const fa = faceById(figure, faceIdA);
+  const fb = faceById(figure, faceIdB);
+  if (!fa || !fb) return false;
+  const setA = new Set(fa.vertexIds);
+  let shared = 0;
+  for (const id of fb.vertexIds) {
+    if (setA.has(id)) shared += 1;
+  }
+  return shared >= 2;
+}
+
 /** Грани, смежные с ребром. */
 export function adjacentFaceIds(figure: SpaceFigure, edgeId: string): string[] {
   const edge = edgeById(figure, edgeId);
