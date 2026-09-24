@@ -158,6 +158,11 @@ function resolvePoint(
     return { built: null, error: null };
   }
 
+  if (def.kind === "linePlaneIntersection") {
+    // Прямые и плоскости разрешаются после первого прохода по точкам.
+    return { built: null, error: null };
+  }
+
   if (def.kind === "onFace") {
     if (def.placement === "center") {
       const face = faceById(figure, def.faceId);
@@ -400,6 +405,37 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   }
 
   for (const point of data.points) {
+    if (point.definition.kind === "linePlaneIntersection") {
+      const def = point.definition;
+      const carrier = resolveCarrierRef(def.lineId, figure, points, planes, data.lines);
+      if (!carrier) {
+        pointErrors.set(point.id, "Выбранная прямая не построена.");
+        continue;
+      }
+      const plane = planes.get(def.planeId);
+      if (!plane) {
+        pointErrors.set(point.id, "Выбранная плоскость не построена.");
+        continue;
+      }
+      const world = linePlaneIntersection(
+        carrier.origin,
+        add(carrier.origin, carrier.dir),
+        plane,
+      );
+      if (!world) {
+        pointErrors.set(point.id, "Прямая параллельна плоскости или лежит в ней.");
+        continue;
+      }
+      const local = worldToLocal(world, basis);
+      if (!local) {
+        pointErrors.set(point.id, "Не удалось вычислить координаты точки.");
+        continue;
+      }
+      points.set(point.id, { local, world });
+      pointErrors.delete(point.id);
+      continue;
+    }
+
     if (point.definition.kind !== "onSpaceLine") continue;
     const def = point.definition;
     const line = data.lines.find((l) => l.id === def.lineId);

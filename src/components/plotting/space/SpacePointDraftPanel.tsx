@@ -12,7 +12,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { usePlotStore } from "@/lib/plotting/store";
-import { faceChoices, pointChoices } from "@/lib/plotting/space/scene";
+import { faceChoices, lineChoices, planeChoices, pointChoices } from "@/lib/plotting/space/scene";
 import type { LineRegion } from "@/lib/plotting/space/types";
 
 const REGION_OPTIONS: Array<{ value: LineRegion; label: string }> = [
@@ -32,6 +32,8 @@ export function SpacePointDraftPanel() {
   if (!draft || !space3d?.figure) return null;
   const choices = pointChoices(space3d);
   const faces = faceChoices(space3d);
+  const lines = lineChoices(space3d);
+  const planes = planeChoices(space3d);
 
   return (
     <div className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
@@ -39,7 +41,7 @@ export function SpacePointDraftPanel() {
         <Label className="text-xs text-muted-foreground">Как задаётся точка</Label>
         <Select
           value={draft.mode}
-          onValueChange={(v) => update({ mode: v as "onLine" | "onFace" })}
+          onValueChange={(v) => update({ mode: v as "onLine" | "onFace" | "linePlaneIntersection" })}
         >
           <SelectTrigger className="bg-background">
             <SelectValue />
@@ -47,6 +49,7 @@ export function SpacePointDraftPanel() {
           <SelectContent>
             <SelectItem value="onLine">на прямой</SelectItem>
             <SelectItem value="onFace">на грани</SelectItem>
+            <SelectItem value="linePlaneIntersection">пересечение прямой и плоскости</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -184,6 +187,37 @@ export function SpacePointDraftPanel() {
             </Select>
           </div>
         </>
+      )}
+
+      {draft.mode === "linePlaneIntersection" && (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Прямая</Label>
+            <Select value={draft.lineId} onValueChange={(lineId) => update({ lineId })}>
+              <SelectTrigger className="h-8 bg-background text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {lines.map((line) => (
+                  <SelectItem key={line.id} value={line.id}>{line.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Плоскость</Label>
+            <Select value={draft.planeId} onValueChange={(planeId) => update({ planeId })}>
+              <SelectTrigger className="h-8 bg-background text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {planes.map((plane) => (
+                  <SelectItem key={plane.id} value={plane.id}>{plane.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}

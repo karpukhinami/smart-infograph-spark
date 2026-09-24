@@ -81,7 +81,7 @@ import { refreshPyramidVertices } from "./space/pyramid";
 import { deserializeSpaceSceneData } from "./space/serialize";
 
 export interface SpacePointDraft {
-  mode: "onLine" | "onFace";
+  mode: "onLine" | "onFace" | "linePlaneIntersection";
   label: string;
   pointAId: string;
   pointBId: string;
@@ -92,6 +92,8 @@ export interface SpacePointDraft {
   lineParam: number;
   faceId: string;
   placement: "arbitrary" | "center";
+  lineId: string;
+  planeId: string;
 }
 
 export interface SpaceLineDraft {
@@ -1190,6 +1192,8 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const data = get().scene.space3d;
     if (!data?.figure) return;
     const verts = data.figure.vertices;
+    const firstLineId = data.figure.edges[0]?.id ?? data.lines.find((line) => line.built)?.id ?? "";
+    const firstPlaneId = data.figure.faces[0]?.id ?? data.planes.find((plane) => plane.built)?.id ?? "";
     set({
       spacePointDraft: {
         mode: "onLine",
@@ -1203,6 +1207,8 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
         lineParam: defaultLineParam("between"),
         faceId: data.figure.faces[0]!.id,
         placement: "arbitrary",
+        lineId: firstLineId,
+        planeId: firstPlaneId,
       },
       spacePointDraftError: null,
     });
@@ -1234,13 +1240,19 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
             ratioB: draft.ratioB,
             lineParam: draft.lineParam,
           } satisfies PointOnLineDefinition)
-        : ({
+        : draft.mode === "onFace"
+          ? ({
             kind: "onFace" as const,
             faceId: draft.faceId,
             placement: draft.placement,
             faceU: 0.35,
             faceV: 0.35,
-          });
+          })
+          : ({
+              kind: "linePlaneIntersection" as const,
+              lineId: draft.lineId,
+              planeId: draft.planeId,
+            });
 
     let lines = data.lines;
     if (definition.kind === "onLine") {
