@@ -770,18 +770,14 @@ export function planeIntersectionSegmentRange(
       planeEqs,
       basis,
     );
-    if (!section || section.length < 3) continue;
+    if (!section || section.length < 3) return null;
     const sec = clipLineToConvexPolygon(carrier.origin, carrier.dir, section);
-    if (sec) {
-      t0 = Math.max(t0, sec.t0);
-      t1 = Math.min(t1, sec.t1);
-    }
+    if (!sec) return null;
+    t0 = Math.max(t0, sec.t0);
+    t1 = Math.min(t1, sec.t1);
   }
 
-  if (t1 - t0 < 1e-9) {
-    /** clipLineToConvexPolygon иногда даёт несовместимые t — тогда хотя бы отрезок внутри тела. */
-    return bodyClip;
-  }
+  if (t1 - t0 < 1e-9) return null;
   return { t0, t1 };
 }
 

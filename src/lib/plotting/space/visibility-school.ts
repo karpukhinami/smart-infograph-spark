@@ -756,4 +756,3 @@ export function splitLineSchoolView(
   return mergeAdjacent(segments);
 }
 
-export { FRONT_FACE_IDS, EDGE_FACES };

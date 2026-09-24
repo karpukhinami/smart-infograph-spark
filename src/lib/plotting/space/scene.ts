@@ -13,7 +13,7 @@ import {
   planeIntersectionSegmentRange,
   resolveLineCarrier,
 } from "./build";
-import { cross, len, sub, type Vec3 } from "./vec3";
+import { cross, len, sub } from "./vec3";
 import type {
   LineRegion,
   ParallelepipedConstraints,
@@ -28,6 +28,7 @@ import type {
   SpacePlane,
   SpacePlaneDefinition,
   SpacePoint,
+  Vec3,
   SpacePointDefinition,
   SpaceSceneData,
 } from "./types";

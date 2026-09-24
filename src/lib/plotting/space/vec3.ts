@@ -85,9 +85,7 @@ export function computePyramidCartesianBasis(): { e1: Vec3; e2: Vec3; e3: Vec3 }
 
 export function computeFigureBasis(figure: SpaceFigure): { e1: Vec3; e2: Vec3; e3: Vec3 } {
   if (isParallelepiped(figure)) return computeBasis(figure.constraints);
-  if (isPyramid(figure)) return computePyramidCartesianBasis();
-  const c = figure.constraints as import("./types").ParallelepipedConstraints;
-  return computeBasis(c);
+  return computePyramidCartesianBasis();
 }
 
 export function faceNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {

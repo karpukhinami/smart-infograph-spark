@@ -8,9 +8,8 @@ import {
   type ProjectedPoint,
   type ProjectionCoeffs,
 } from "./camera";
-import type { BuiltSpacePoint } from "./build";
 import { isPyramid } from "./figure";
-import type { SpaceFigure, SpaceViewParams, Vec3 } from "./types";
+import type { BuiltSpacePoint, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, len, paramOnLine, scale, sub, worldToLocal } from "./vec3";
 
 export type DisplayProjectionContext = {
