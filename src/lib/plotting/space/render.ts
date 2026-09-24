@@ -525,8 +525,7 @@ function renderPlane(
 
 /**
  * Явная линия пересечения каждой пары построенных видимых плоскостей —
- * рисуется ОДИН раз на пару (в отличие от служебных «разрезов» фрагментов
- * заливки, которые не рисуются вовсе, см. `isSegmentOnPolygonBoundary`).
+ * рисуется ОДИН раз на пару. Служебные границы фрагментов заливки не рисуются.
  * Это подлинная прямая пересечения плоскостей внутри тела: `intersectPlanes`
  * даёт несущую прямую, `planeIntersectionSegmentRange` обрезает её по телу —
  * а поскольку обе плоскости являются сечениями ЭТОГО ЖЕ тела, отрезок внутри
@@ -862,6 +861,10 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     }
   }
 
+  if (data.view.planeFillByDepth) {
+    renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
+  }
+
   for (const line of data.lines) {
     renderLineObject(line, data, figure, resolved, fit, occlusion, parts, obstacles);
   }
@@ -882,10 +885,6 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
   }
 
   parts.push(`<g>${renderLabels(data, figure, resolved, obstacles, fit, a)}</g>`);
-
-  if (data.view.planeFillByDepth) {
-    renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
-  }
 
   const w = round(a.width);
   const h = round(a.height);
