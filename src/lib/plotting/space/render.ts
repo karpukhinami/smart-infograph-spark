@@ -151,7 +151,8 @@ function drawSegmentWithVisibility(
   if (!(abLen > 1e-9)) return;
   const unit = scale(dir, 1 / abLen);
   const bodyEdgeVisibility = inheritBodyEdgeStroke
-    ? inheritedBodyEdgeVisibility(aWorld, bWorld, figure, resolved, view)
+    ? inheritedBodyEdgeVisibility(aWorld, bWorld, figure, resolved, view) ??
+      inheritedProjectedBodyEdgeVisibility(aWorld, bWorld, figure, resolved, view, fit)
     : null;
   const segments =
     bodyEdgeVisibility !== null
