@@ -379,33 +379,11 @@ function renderPlaneFillPolygon(
   parts: string[],
 ): void {
   if (vertices.length < 3) return;
-  if (isPyramid(figure)) {
-    const midpoint = (a: Vec3, b: Vec3): Vec3 => scale(add(a, b), 0.5);
-    const renderTriangle = (a: Vec3, b: Vec3, c: Vec3, level: number): void => {
-      if (level > 0) {
-        const ab = midpoint(a, b);
-        const bc = midpoint(b, c);
-        const ca = midpoint(c, a);
-        renderTriangle(a, ab, ca, level - 1);
-        renderTriangle(ab, b, bc, level - 1);
-        renderTriangle(ca, bc, c, level - 1);
-        renderTriangle(ab, bc, ca, level - 1);
-        return;
-      }
-      const screenPts = [a, b, c].map((w) => projectWorld(w, resolved, data.view, fit, figure));
-      const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
-      tris.push(`<polygon points="${poly}"/>`);
-    };
-    const tris: string[] = [];
-    for (let i = 1; i + 1 < vertices.length; i += 1) {
-      renderTriangle(vertices[0]!, vertices[i]!, vertices[i + 1]!, 2);
-    }
-    // Непрозрачные треугольники внутри группы с общей прозрачностью: швы не накладываются.
-    parts.push(
-      `<g opacity="${fillOpacity}" fill="${color}" stroke="${color}" stroke-width="0.8" stroke-linejoin="round">${tris.join("")}</g>`,
-    );
-    return;
-  }
+  // Фрагмент уже является итоговым многоугольником после всех попарных
+  // пересечений. Нельзя повторно триангулировать его для пирамиды: её
+  // школьная проекция нелинейна вне рёбер тела, поэтому независимо
+  // спроецированные внутренние точки треугольников могут выйти за экранный
+  // контур фрагмента и дать ложные клинья. Заливаем ровно контур его вершин.
   const screenPts = vertices.map((w) => projectWorld(w, resolved, data.view, fit, figure));
   const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
   parts.push(
@@ -578,10 +556,8 @@ function renderPlanesByDepth(
   obstacles: Obstacle[],
 ): void {
   const visiblePlanes = data.planes.filter((p) => p.built && p.style.visible);
-  const order = new Map(visiblePlanes.map((p, i) => [p.id, i]));
   const planeById = new Map(visiblePlanes.map((p) => [p.id, p]));
   const sections = new Map<string, Vec3[]>();
-  const eqs = new Map<string, { n: Vec3; d: number }>();
   let sizeRef = 0;
   for (const plane of visiblePlanes) {
     const section = computeFaceOrPlaneSection(
@@ -595,17 +571,8 @@ function renderPlanesByDepth(
       sections.set(plane.id, section);
       for (const v of section) sizeRef = Math.max(sizeRef, len(sub(v, section[0]!)));
     }
-    const eq = resolved.planes.get(plane.id);
-    if (eq) {
-      const nl = len(eq.normal);
-      if (nl > 1e-12) eqs.set(plane.id, { n: scale(eq.normal, 1 / nl), d: eq.d / nl });
-    }
   }
   const eps = Math.max(1e-6, sizeRef * 1e-5);
-  const onPlane = (p: Vec3, id: string) => {
-    const e = eqs.get(id);
-    return !!e && Math.abs(dot(e.n, p) + e.d) < eps;
-  };
   const onBoundary = (a: Vec3, b: Vec3, section: Vec3[]) => {
     for (let i = 0; i < section.length; i += 1) {
       const s0 = section[i]!;
@@ -667,21 +634,37 @@ function renderPlanesByDepth(
         );
         continue;
       }
-      // Сторона фрагмента на линии пересечения с другой плоскостью.
-      let other: SpacePlane | null = null;
-      for (const cand of visiblePlanes) {
-        if (cand.id === plane.id) continue;
-        if (onPlane(a, cand.id) && onPlane(b, cand.id)) {
-          other = cand;
-          break;
-        }
-      }
-      if (!other) continue;
-      const first =
-        (order.get(plane.id) ?? 0) < (order.get(other.id) ?? 0) ? plane : other;
+    }
+  }
+
+  // Пересечения строятся только из конкретных пар плоскостей. Мы намеренно
+  // не определяем принадлежность по вершинам фрагментов: при трёх плоскостях
+  // общий узел или близкие численные координаты могли ошибочно связать ребро
+  // одной пары с третьей плоскостью и породить посторонний пунктир.
+  for (let i = 0; i < visiblePlanes.length; i += 1) {
+    const first = visiblePlanes[i]!;
+    const firstEq = resolved.planes.get(first.id);
+    if (!firstEq) continue;
+    for (let j = i + 1; j < visiblePlanes.length; j += 1) {
+      const second = visiblePlanes[j]!;
+      const secondEq = resolved.planes.get(second.id);
+      if (!secondEq) continue;
+      const carrier = intersectPlanes(firstEq, secondEq);
+      if (!carrier) continue;
+      const range = planeIntersectionSegmentRange(
+        carrier,
+        first.id,
+        second.id,
+        figure,
+        resolved.points,
+        resolved.planes,
+        resolved.basis,
+      );
+      if (!range || range.t1 - range.t0 <= eps) continue;
+      const a = add(carrier.origin, scale(carrier.dir, range.t0));
+      const b = add(carrier.origin, scale(carrier.dir, range.t1));
       const pa = projectWorld(a, resolved, data.view, fit, figure);
       const pb = projectWorld(b, resolved, data.view, fit, figure);
-      // Рисуется у каждого соседнего фрагмента: последний (ближний) ложится сверху.
       parts.push(
         `<line x1="${round(pa.x)}" y1="${round(pa.y)}" x2="${round(pb.x)}" y2="${round(pb.y)}" stroke="${first.style.color}" stroke-width="${width}" stroke-dasharray="${data.appearance.hiddenDash}" stroke-linecap="round"/>`,
       );
