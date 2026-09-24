@@ -22,7 +22,8 @@ export function mergeAiScene(raw: unknown): PlotScene {
   const input = (cleaned ?? {}) as Partial<PlotScene> & {
     grid?: Partial<GridSpec> & { followAxisStep?: boolean; stepX?: string; stepY?: string };
   };
-  const legacyGrid = input.grid ?? {};
+  const legacyGrid: Partial<GridSpec> & { followAxisStep?: boolean; stepX?: string; stepY?: string } =
+    input.grid ?? {};
   const isLine = input.space === "line";
 
   if (isLine) {
