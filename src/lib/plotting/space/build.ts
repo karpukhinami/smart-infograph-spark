@@ -710,6 +710,14 @@ function clipCarrierToFigure(
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
 ): { t0: number; t1: number } | null {
   if (isParallelepiped(figure)) return clipCarrierToUnitCube(carrier, basis);
+  const bodyVertices = figure.vertices
+    .map((vertex) => points.get(vertex.id)?.world)
+    .filter(Boolean) as Vec3[];
+  if (!bodyVertices.length) return null;
+  const bodyCenter = scale(
+    bodyVertices.reduce((sum, vertex) => add(sum, vertex), { x: 0, y: 0, z: 0 }),
+    1 / bodyVertices.length,
+  );
   let t0 = -Infinity;
   let t1 = Infinity;
   for (const face of figure.faces) {
@@ -717,15 +725,12 @@ function clipCarrierToFigure(
     if (!plane) continue;
     const ws = face.vertexIds.map((id) => points.get(id)?.world).filter(Boolean) as Vec3[];
     if (ws.length < 3) continue;
-    const c = scale(
-      ws.reduce((acc, v) => add(acc, v), { x: 0, y: 0, z: 0 }),
-      1 / ws.length,
-    );
-    const insideSign = Math.sign(planePointDistance(c, plane)) || 1;
+    const insideSign = Math.sign(planePointDistance(bodyCenter, plane));
+    if (insideSign === 0) continue;
     const d0 = insideSign * (dot(plane.normal, carrier.origin) + plane.d);
     const dd = insideSign * dot(plane.normal, carrier.dir);
     if (Math.abs(dd) < 1e-12) {
-      if (d0 > 1e-6) return null;
+      if (d0 < -1e-6) return null;
       continue;
     }
     const tHit = -d0 / dd;

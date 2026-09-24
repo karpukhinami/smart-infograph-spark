@@ -9,14 +9,14 @@ import {
   resolveLineCarrier,
   type ResolvedSpaceScene,
 } from "./build";
-import { fitSpaceProjection, sampleRotationEllipse } from "./camera";
+import { fitSpaceProjection, projectFromLocalCoeffs, sampleRotationEllipse } from "./camera";
 import {
   projectWorldDisplay,
   projectWorldOffFigureBody,
   type DisplayProjectionContext,
 } from "./display-projection";
 import { collectVisibleOverlaySegments, isEdgeCoveredOnScreen } from "./edge-overlay";
-import { collectPlaneFillFragments, isSegmentOnPolygonBoundary } from "./plane-subdivision";
+import { collectPlaneFillFragments } from "./plane-subdivision";
 import {
   buildOcclusionContext,
   isBodyEdgeVisibleForRender,
@@ -186,6 +186,21 @@ function projectWorld(
 ): { x: number; y: number } {
   const pr = projectWorldDisplay(world, displayCtxFromResolved(resolved), view, figure);
   return { x: pr.x * fit.scale + fit.cx, y: pr.y * fit.scale + fit.cy };
+}
+
+function projectWorldWithDepth(
+  world: Vec3,
+  resolved: ResolvedSpaceScene,
+  view: SpaceSceneData["view"],
+  fit: { scale: number; cx: number; cy: number },
+  figure: SpaceFigure,
+): { x: number; y: number; depth: number } {
+  const projected = projectWorldDisplay(world, displayCtxFromResolved(resolved), view, figure);
+  return {
+    x: projected.x * fit.scale + fit.cx,
+    y: projected.y * fit.scale + fit.cy,
+    depth: projected.depth,
+  };
 }
 
 function renderLabels(
@@ -381,21 +396,12 @@ function renderPlaneSectionEdges(
   occlusion: OcclusionContext,
   parts: string[],
   obstacles: Obstacle[],
-  /**
-   * Если передано — рисуются только те рёбра `section`, которые лежат на
-   * границе этого исходного (неразбитого) сечения. Нужно для фрагментов,
-   * полученных делением сечения линией пересечения с другой плоскостью:
-   * такое деление добавляет технический «разрез», который не является
-   * настоящей границей плоскости и не должен отображаться как линия.
-   */
-  boundaryRef?: Vec3[],
   fillByDepth = false,
 ): void {
   const edgeWidth = data.appearance.lineWidth;
   for (let i = 0; i < section.length; i += 1) {
     const a = section[i]!;
     const b = section[(i + 1) % section.length]!;
-    if (boundaryRef && !isSegmentOnPolygonBoundary(a, b, boundaryRef)) continue;
     drawSegmentWithVisibility(
       a,
       b,
@@ -519,8 +525,7 @@ function renderPlane(
 
 /**
  * Явная линия пересечения каждой пары построенных видимых плоскостей —
- * рисуется ОДИН раз на пару (в отличие от служебных «разрезов» фрагментов
- * заливки, которые не рисуются вовсе, см. `isSegmentOnPolygonBoundary`).
+ * рисуется ОДИН раз на пару. Служебные границы фрагментов заливки не рисуются.
  * Это подлинная прямая пересечения плоскостей внутри тела: `intersectPlanes`
  * даёт несущую прямую, `planeIntersectionSegmentRange` обрезает её по телу —
  * а поскольку обе плоскости являются сечениями ЭТОГО ЖЕ тела, отрезок внутри
@@ -528,25 +533,6 @@ function renderPlane(
  * область их взаимного перекрытия). Рисуется пунктиром, независимо от
  * окклюзии — как обозначение самого факта пересечения.
  */
-/** Смешивает два HEX-цвета (среднее по каналам) — для линии пересечения двух плоскостей. */
-function blendHexColors(colorA: string, colorB: string): string {
-  const parse = (c: string): [number, number, number] | null => {
-    const m = /^#([0-9a-fA-F]{6})$/.exec(c.trim());
-    if (!m) return null;
-    const hex = m[1]!;
-    return [
-      parseInt(hex.slice(0, 2), 16),
-      parseInt(hex.slice(2, 4), 16),
-      parseInt(hex.slice(4, 6), 16),
-    ];
-  };
-  const a = parse(colorA);
-  const b = parse(colorB);
-  if (!a || !b) return colorA;
-  const mix = a.map((v, i) => Math.round((v + b[i]!) / 2));
-  return `#${mix.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
-}
-
 function renderPlaneIntersectionMarkers(
   data: SpaceSceneData,
   figure: SpaceFigure,
@@ -555,15 +541,8 @@ function renderPlaneIntersectionMarkers(
   parts: string[],
 ): void {
   const builtPlanes = data.planes.filter((p) => p.built && p.style.visible);
-  /**
-   * Свой (более редкий) пунктир, а НЕ `data.appearance.hiddenDash` («20 14» —
-   * рассчитан на длинные скрытые рёбра тела, штрих длиннее самого отрезка
-   * пересечения). Цвет — смесь цветов обеих плоскостей (не чёрный/серый),
-   * чтобы линия была видна как «след» именно этих двух плоскостей, а не
-   * служебная разметка.
-   */
-  const width = Math.max(2.2, data.appearance.lineWidth);
-  const markerDash = "14 10";
+  const width = data.appearance.lineWidth;
+  const markerDash = data.appearance.hiddenDash;
   const pyramid = isPyramid(figure);
   for (let i = 0; i < builtPlanes.length; i += 1) {
     for (let j = i + 1; j < builtPlanes.length; j += 1) {
@@ -572,10 +551,10 @@ function renderPlaneIntersectionMarkers(
       const eqA = resolved.planes.get(planeA.id);
       const eqB = resolved.planes.get(planeB.id);
       if (!eqA || !eqB) continue;
-      const markerColor = blendHexColors(planeA.style.color, planeB.style.color);
+      const markerColor = planeA.style.color;
       const carrier = intersectPlanes(eqA, eqB);
       if (!carrier) continue;
-      let clip = planeIntersectionSegmentRange(
+      const clip = planeIntersectionSegmentRange(
         carrier,
         planeA.id,
         planeB.id,
@@ -831,7 +810,7 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
 
   if (data.view.planeFillByDepth) {
     const fragments = collectPlaneFillFragments(data, figure, resolved, (world) =>
-      projectWorld(world, resolved, data.view, fit, figure),
+      projectWorldWithDepth(world, resolved, data.view, fit, figure),
     );
     const planeById = new Map(data.planes.map((p) => [p.id, p]));
     /** При разбиении по глубине фрагменты часто перекрываются на экране — нужна плотная заливка. */
@@ -849,8 +828,21 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
         fit,
         parts,
       );
+    }
+    // Контур каждого сечения рисуется один раз. Технические границы фрагментов
+    // вообще не попадают в SVG, поэтому при трёх плоскостях не возникает швов.
+    for (const plane of data.planes) {
+      if (!plane.built || !plane.style.visible) continue;
+      const section = computeFaceOrPlaneSection(
+        plane.id,
+        figure,
+        resolved.points,
+        resolved.planes,
+        resolved.basis,
+      );
+      if (!section || section.length < 3) continue;
       renderPlaneSectionEdges(
-        fragment.vertices,
+        section,
         plane,
         data,
         figure,
@@ -859,14 +851,18 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
         occlusion,
         parts,
         obstacles,
-        fragment.originalSection,
         true,
       );
+      renderPlaneHelperLines(plane, section, data, figure, resolved, fit, occlusion, parts, obstacles);
     }
   } else {
     for (const plane of data.planes) {
       renderPlane(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
     }
+  }
+
+  if (data.view.planeFillByDepth) {
+    renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
   }
 
   for (const line of data.lines) {
@@ -889,10 +885,6 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
   }
 
   parts.push(`<g>${renderLabels(data, figure, resolved, obstacles, fit, a)}</g>`);
-
-  if (data.view.planeFillByDepth) {
-    renderPlaneIntersectionMarkers(data, figure, resolved, fit, parts);
-  }
 
   const w = round(a.width);
   const h = round(a.height);
