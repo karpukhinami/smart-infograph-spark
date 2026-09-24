@@ -114,7 +114,7 @@ function depthOnFace(px: number, py: number, verts: ScreenVert[]): number {
       const v1 = verts[i]!;
       const v2 = verts[i + 1]!;
       const den =
-        (v1.y - v2.y) * (v0.y * 0 + v0.x - v2.x) +
+        (v1.y - v2.y) * (v0.x - v2.x) +
         (v2.x - v1.x) * (v0.y - v2.y);
       if (Math.abs(den) < 1e-12) continue;
       const w0 = ((v1.y - v2.y) * (px - v2.x) + (v2.x - v1.x) * (py - v2.y)) / den;
