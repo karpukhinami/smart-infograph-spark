@@ -26,7 +26,6 @@ export interface PlaneFillFragment {
   vertices: Vec3[];
   /** Средняя глубина в той же проекции, которой рисуется фрагмент. Меньше = ближе. */
   depth: number;
-  originalSection: Vec3[];
 }
 
 const WORLD_EPS = 1e-7;
@@ -296,7 +295,6 @@ export function collectPlaneFillFragments(
         color: plane.style.color,
         vertices,
         depth: averageDepth(vertices, project),
-        originalSection: section,
         screen,
       });
     }

@@ -9,7 +9,7 @@ import {
   resolveLineCarrier,
   type ResolvedSpaceScene,
 } from "./build";
-import { fitSpaceProjection, sampleRotationEllipse } from "./camera";
+import { fitSpaceProjection, projectFromLocalCoeffs, sampleRotationEllipse } from "./camera";
 import {
   projectWorldDisplay,
   projectWorldOffFigureBody,
@@ -555,7 +555,7 @@ function renderPlaneIntersectionMarkers(
       const markerColor = planeA.style.color;
       const carrier = intersectPlanes(eqA, eqB);
       if (!carrier) continue;
-      let clip = planeIntersectionSegmentRange(
+      const clip = planeIntersectionSegmentRange(
         carrier,
         planeA.id,
         planeB.id,
