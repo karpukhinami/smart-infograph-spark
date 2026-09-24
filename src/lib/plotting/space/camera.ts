@@ -191,6 +191,23 @@ function kwySafe(kwy: number): number {
   return Math.abs(kwy) > 1e-9 ? kwy : 1;
 }
 
+/** Нулевая ось экранной проекции: перемещение вдоль неё не меняет экранные X/Y. */
+function affineProjectionDepthAxis(coeffs: ProjectionCoeffs): LocalCoords {
+  const { kwx, kwy, yawRad, orbit } = coeffs;
+  const { a, b, d } = baseCorners(orbit, yawRad);
+  const xu = b.x - a.x;
+  const xv = d.x - a.x;
+  const yu = b.y - a.y;
+  const yv = d.y - a.y;
+  const axis = {
+    u: xv * kwy - kwx * yv,
+    v: kwx * yu - xu * kwy,
+    w: xu * yv - xv * yu,
+  };
+  const axisLength = Math.hypot(axis.u, axis.v, axis.w) || 1;
+  return { u: axis.u / axisLength, v: axis.v / axisLength, w: axis.w / axisLength };
+}
+
 /** A, B, D нижнего основания на эллипсе при параметре t (= yawRad). */
 function baseCorners(
   orbit: ConicEllipse,
@@ -296,17 +313,24 @@ export function genericAffineLocalToView(
   coeffs: ProjectionCoeffs,
 ): { x: number; y: number; z: number } {
   const { u, v, w } = local;
-  const { kx, ky, kwx, kwy, yawRad, orbit } = coeffs;
-  const kw = kwySafe(kwy);
+  const { kwx, kwy, yawRad, orbit } = coeffs;
   const { a, b, d } = baseCorners(orbit, yawRad);
-  const ct = Math.cos(yawRad);
-  const st = Math.sin(yawRad);
-  const ur = u * ct - v * st;
-  const vr = u * st + v * ct;
+  const xu = b.x - a.x;
+  const xv = d.x - a.x;
+  const yu = b.y - a.y;
+  const yv = d.y - a.y;
+  // Глубина обязана быть направлена точно вдоль луча этой же экранной
+  // проекции. Прежняя формула через kx/ky описывала исходный косоугольный
+  // вид, но не текущую эллиптическую орбиту и после половины оборота могла
+  // менять визуальный порядок ближнего и дальнего.
+  const depthAxis = affineProjectionDepthAxis(coeffs);
+  // Порядок векторного произведения фиксирован и непрерывен на всей орбите:
+  // знак нельзя повторно выбирать по старой оси — именно это давало инверсию
+  // после прохождения противоположной половины оборота.
   return {
-    x: a.x + u * (b.x - a.x) + v * (d.x - a.x) + kwx * w,
-    y: a.y + u * (b.y - a.y) + v * (d.y - a.y) + kwy * w,
-    z: ur - kx * vr - (ky / kw) * w,
+    x: a.x + u * xu + v * xv + kwx * w,
+    y: a.y + u * yu + v * yv + kwy * w,
+    z: u * depthAxis.u + v * depthAxis.v + w * depthAxis.w,
   };
 }
 
@@ -392,16 +416,8 @@ export function worldViewSortDepth(
 }
 
 /** Направление луча наблюдения в локальных (u,v,w). */
-export function viewDirectionLocal({ kx, ky, kwx, kwy, yawRad }: ProjectionCoeffs): LocalCoords {
-  const kw = kwySafe(kwy);
-  const vBase = -kx + (kwx * ky) / kw;
-  const ct = Math.cos(yawRad);
-  const st = Math.sin(yawRad);
-  return {
-    u: ct - st * vBase,
-    v: st + ct * vBase,
-    w: -ky / kw,
-  };
+export function viewDirectionLocal(projection: ProjectionCoeffs): LocalCoords {
+  return affineProjectionDepthAxis(projection);
 }
 
 export function projectLocal(

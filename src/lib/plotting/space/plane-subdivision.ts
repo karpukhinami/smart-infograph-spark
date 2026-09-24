@@ -37,6 +37,17 @@ function samePoint(a: Vec3, b: Vec3, eps = WORLD_EPS): boolean {
   return len(sub(a, b)) <= eps;
 }
 
+function polygonScale(vertices: Vec3[]): number {
+  if (vertices.length < 2) return 1;
+  let diameter = 0;
+  for (let i = 0; i < vertices.length; i += 1) {
+    for (let j = i + 1; j < vertices.length; j += 1) {
+      diameter = Math.max(diameter, len(sub(vertices[i]!, vertices[j]!)));
+    }
+  }
+  return Math.max(diameter, 1);
+}
+
 /** Удаляет дубли и точки на прямой, которые накапливаются после нескольких разрезов. */
 function normalizePolygon(vertices: Vec3[]): Vec3[] {
   const clean: Vec3[] = [];
@@ -114,6 +125,8 @@ export function subdividePlaneSection(
   planeEq: PlaneEq,
   otherPlaneEqs: PlaneEq[],
 ): Vec3[][] {
+  const scaleRef = polygonScale(section);
+  const areaEps = Math.max(AREA_EPS, scaleRef * scaleRef * 1e-8);
   let fragments: Vec3[][] = [normalizePolygon(section)];
   for (const otherEq of otherPlaneEqs) {
     const next = fragments.flatMap((fragment) =>
@@ -122,7 +135,7 @@ export function subdividePlaneSection(
     if (next.length) fragments = next;
   }
   return fragments.filter(
-    (fragment) => fragment.length >= 3 && polygonArea3D(fragment, planeEq.normal) > AREA_EPS,
+    (fragment) => fragment.length >= 3 && polygonArea3D(fragment, planeEq.normal) > areaEps,
   );
 }
 
