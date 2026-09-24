@@ -402,7 +402,7 @@ function renderPlaneFillPolygon(
     }
     // Непрозрачные треугольники внутри группы с общей прозрачностью: швы не накладываются.
     parts.push(
-      `<g opacity="${fillOpacity}" fill="${color}" stroke="${color}" stroke-width="0.4" stroke-linejoin="round">${tris.join("")}</g>`,
+      `<g opacity="${fillOpacity}" fill="${color}" stroke="${color}" stroke-width="0.8" stroke-linejoin="round">${tris.join("")}</g>`,
     );
     return;
   }
