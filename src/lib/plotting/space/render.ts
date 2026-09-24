@@ -754,6 +754,7 @@ function renderPlanesByDepth(
   // в которых её прямая пересекает грани тела. Автоматическая линия всегда
   // пунктирная: видимость, совпадение с рёбрами и экранные эвристики здесь
   // намеренно не участвуют.
+  if (!data.view.showPlaneIntersections) return;
   for (let i = 0; i < visiblePlanes.length; i += 1) {
     const first = visiblePlanes[i]!;
     const firstEq = resolved.planes.get(first.id);
