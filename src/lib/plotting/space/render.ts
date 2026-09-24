@@ -65,6 +65,65 @@ function lineObstacle(x1: number, y1: number, x2: number, y2: number, kind: Obst
   return { kind, points: [[x1, y1], [x2, y2]] };
 }
 
+/** Если отрезок целиком лежит на ребре тела, возвращает видимость этого ребра. */
+function inheritedBodyEdgeVisibility(
+  aWorld: Vec3,
+  bWorld: Vec3,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceSceneData["view"],
+): boolean | null {
+  let sizeRef = 1;
+  for (const vertex of figure.vertices) {
+    const world = resolved.points.get(vertex.id)?.world;
+    if (world) sizeRef = Math.max(sizeRef, len(world));
+  }
+  const eps = sizeRef * 1e-5;
+  for (const edge of figure.edges) {
+    const edgeA = resolved.points.get(edge.aId)?.world;
+    const edgeB = resolved.points.get(edge.bId)?.world;
+    if (!edgeA || !edgeB) continue;
+    if (pointSegDist(aWorld, edgeA, edgeB) > eps || pointSegDist(bWorld, edgeA, edgeB) > eps) continue;
+    return isBodyEdgeVisibleForRender(edge.id, figure, resolved, view);
+  }
+  return null;
+}
+
+/** Экранное совпадение тоже наследует штрих: иначе наложенная цветная линия визуально инвертирует ребро. */
+function inheritedProjectedBodyEdgeVisibility(
+  aWorld: Vec3,
+  bWorld: Vec3,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceSceneData["view"],
+  fit: { scale: number; cx: number; cy: number },
+): boolean | null {
+  const a = projectWorld(aWorld, resolved, view, fit, figure);
+  const b = projectWorld(bWorld, resolved, view, fit, figure);
+  const distance = (
+    p: { x: number; y: number },
+    s0: { x: number; y: number },
+    s1: { x: number; y: number },
+  ) => {
+    const dx = s1.x - s0.x;
+    const dy = s1.y - s0.y;
+    const l2 = dx * dx + dy * dy;
+    if (l2 < 1e-12) return Math.hypot(p.x - s0.x, p.y - s0.y);
+    const t = Math.max(0, Math.min(1, ((p.x - s0.x) * dx + (p.y - s0.y) * dy) / l2));
+    return Math.hypot(p.x - (s0.x + t * dx), p.y - (s0.y + t * dy));
+  };
+  for (const edge of figure.edges) {
+    const edgeA = resolved.points.get(edge.aId)?.world;
+    const edgeB = resolved.points.get(edge.bId)?.world;
+    if (!edgeA || !edgeB) continue;
+    const p0 = projectWorld(edgeA, resolved, view, fit, figure);
+    const p1 = projectWorld(edgeB, resolved, view, fit, figure);
+    if (distance(a, p0, p1) > 0.5 || distance(b, p0, p1) > 0.5) continue;
+    return isBodyEdgeVisibleForRender(edge.id, figure, resolved, view);
+  }
+  return null;
+}
+
 /** Рисует отрезок с учётом грани (видимая/скрытая) или окклюзии тела. */
 function drawSegmentWithVisibility(
   aWorld: Vec3,
@@ -84,14 +143,23 @@ function drawSegmentWithVisibility(
   skipHiddenSegments = false,
   /** Для границ сечения пирамиды нужна проверка по глубине поверхности, а не по оболочке вершин. */
   useSurfaceDepth = false,
+  /** Совпадающая с ребром тела граница обязана повторять его штрих. */
+  inheritBodyEdgeStroke = false,
 ): void {
   const dir = sub(bWorld, aWorld);
   const abLen = len(dir);
   if (!(abLen > 1e-9)) return;
   const unit = scale(dir, 1 / abLen);
-  const segments = useSurfaceDepth
-    ? splitLineByVisibility(aWorld, unit, 0, abLen, figure, resolved, view, occlusion)
-    : splitLineForRender(aWorld, unit, 0, abLen, figure, resolved, view, occlusion);
+  const bodyEdgeVisibility = inheritBodyEdgeStroke
+    ? inheritedBodyEdgeVisibility(aWorld, bWorld, figure, resolved, view) ??
+      inheritedProjectedBodyEdgeVisibility(aWorld, bWorld, figure, resolved, view, fit)
+    : null;
+  const segments =
+    bodyEdgeVisibility !== null
+      ? [{ a: aWorld, b: bWorld, visible: bodyEdgeVisibility }]
+      : useSurfaceDepth
+        ? splitLineByVisibility(aWorld, unit, 0, abLen, figure, resolved, view, occlusion)
+        : splitLineForRender(aWorld, unit, 0, abLen, figure, resolved, view, occlusion);
   const opacityAttr =
     strokeOpacity !== undefined && strokeOpacity < 1
       ? ` stroke-opacity="${strokeOpacity}"`
@@ -428,6 +496,7 @@ function renderPlaneSectionEdges(
       undefined,
       fillByDepth,
       isPyramid(figure),
+      true,
     );
   }
 }
@@ -640,6 +709,7 @@ function renderPlanesByDepth(
           undefined,
           false,
           isPyramid(figure),
+          true,
         );
         continue;
       }
@@ -674,10 +744,14 @@ function renderPlanesByDepth(
       const b = add(carrier.origin, scale(carrier.dir, range.t1));
       const pa = projectWorld(a, resolved, data.view, fit, figure);
       const pb = projectWorld(b, resolved, data.view, fit, figure);
+      const bodyEdgeVisibility =
+        inheritedBodyEdgeVisibility(a, b, figure, resolved, data.view) ??
+        inheritedProjectedBodyEdgeVisibility(a, b, figure, resolved, data.view, fit);
+      const dash = bodyEdgeVisibility === true ? "" : ` stroke-dasharray="${data.appearance.hiddenDash}"`;
       parts.push(
-        `<line x1="${round(pa.x)}" y1="${round(pa.y)}" x2="${round(pb.x)}" y2="${round(pb.y)}" stroke="${first.style.color}" stroke-width="${width}" stroke-dasharray="${data.appearance.hiddenDash}" stroke-linecap="round"/>`,
+        `<line x1="${round(pa.x)}" y1="${round(pa.y)}" x2="${round(pb.x)}" y2="${round(pb.y)}" stroke="${first.style.color}" stroke-width="${width}"${dash} stroke-linecap="round"/>`,
       );
-      obstacles.push(lineObstacle(pa.x, pa.y, pb.x, pb.y, "helper"));
+      obstacles.push(lineObstacle(pa.x, pa.y, pb.x, pb.y, bodyEdgeVisibility === true ? "curve" : "helper"));
     }
   }
 }
