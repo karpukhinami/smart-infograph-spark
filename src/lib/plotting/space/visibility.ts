@@ -3,9 +3,12 @@ import { facePlane, type ResolvedSpaceScene } from "./build";
 import {
   buildProjectionConvexHull,
   isBodyEdgeVisibleProjectionHull,
+  isFaceVisibleProjectionHull,
+  matchFigureVertexAtWorld,
   splitLineProjectionHull,
   type ProjectionHull,
 } from "./convex-hull-visibility";
+import { isSegmentInsidePyramidVolume } from "./pyramid-view";
 import { edgeById, faceById, isPyramid } from "./figure";
 import type { LineSplitSegment, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
@@ -452,6 +455,80 @@ export function isBodyEdgeVisibleForRender(
   return isBodyEdgeVisibleSchool(edgeId, figure, resolved.projection);
 }
 
+/**
+ * Прямая на пирамиде: режем по входу/выходу из тела (плоскости граней) и по
+ * экранным пересечениям с рёбрами, затем классифицируем каждый кусок:
+ * внутри тела — пунктир; на грани — как сама грань; снаружи — по глубине
+ * ближайшей поверхности тела в этой точке экрана.
+ */
+function splitLinePyramid(
+  origin: Vec3,
+  dir: Vec3,
+  t0: number,
+  t1: number,
+  body: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceViewParams,
+  hull: ProjectionHull,
+  ctx?: OcclusionContext,
+): LineSplitSegment[] {
+  const a = add(origin, scale(dir, t0));
+  const b = add(origin, scale(dir, t1));
+  // Отрезок, совпадающий с ребром тела, — прежняя логика рёбер.
+  const whole = splitLineProjectionHull(origin, dir, t0, t1, body, resolved, view, hull);
+  const aId = matchFigureVertexAtWorld(a, body, resolved);
+  const bId = matchFigureVertexAtWorld(b, body, resolved);
+  if (aId && bId && body.edges.some((e) => (e.aId === aId && e.bId === bId) || (e.aId === bId && e.bId === aId))) {
+    return whole;
+  }
+
+  const occluder = ctx ?? buildOcclusionContext(body, resolved, view);
+  const breakpoints: number[] = [];
+  const planes: Array<{ faceId: string; vertexIds: string[]; plane: PlaneEq }> = [];
+  for (const face of body.faces) {
+    const plane = facePlane(body, face.id, resolved.points);
+    if (!plane) continue;
+    planes.push({ faceId: face.id, vertexIds: face.vertexIds, plane });
+    const tHit = intersectLinePlaneT(origin, dir, plane);
+    if (tHit === null || tHit < t0 - T_EPS || tHit > t1 + T_EPS) continue;
+    breakpoints.push(tHit);
+  }
+  const pStart = screenTFromWorldT(origin, dir, t0, occluder);
+  const pEnd = screenTFromWorldT(origin, dir, t1, occluder);
+  for (const edge of occluder.edgeScreens) {
+    const t = segSegIntersectionT(pStart.x, pStart.y, pEnd.x, pEnd.y, edge.a.x, edge.a.y, edge.b.x, edge.b.y);
+    if (t === null) continue;
+    breakpoints.push(t0 + t * (t1 - t0));
+  }
+
+  const sorted = mergeBreakpoints(breakpoints, t0, t1);
+  const segments: LineSplitSegment[] = [];
+  for (let i = 0; i < sorted.length - 1; i += 1) {
+    const ta = sorted[i]!;
+    const tb = sorted[i + 1]!;
+    if (tb - ta < T_EPS) continue;
+    const pa = add(origin, scale(dir, ta));
+    const pb = add(origin, scale(dir, tb));
+    const mid = add(origin, scale(dir, (ta + tb) * 0.5));
+    let visible: boolean;
+    const onFace = planes.find(
+      (f) =>
+        pointInFace3D(pa, f.vertexIds, resolved.points) &&
+        pointInFace3D(pb, f.vertexIds, resolved.points) &&
+        pointInFace3D(mid, f.vertexIds, resolved.points),
+    );
+    if (onFace) {
+      visible = isFaceVisibleProjectionHull(onFace.faceId, body, hull);
+    } else if (isSegmentInsidePyramidVolume(mid, mid, body, resolved)) {
+      visible = false;
+    } else {
+      visible = isPointVisible(mid, worldToLocal(mid, occluder.basis), occluder);
+    }
+    segments.push({ a: pa, b: pb, visible });
+  }
+  return segments.length ? mergeAdjacentSegments(segments) : whole;
+}
+
 /** Разбиение линии на видимые/скрытые участки (переключаемый режим). */
 export function splitLineForRender(
   origin: Vec3,
@@ -469,7 +546,7 @@ export function splitLineForRender(
   }
   if (isPyramid(body)) {
     const hull = projectionHullForFigure(body, resolved, view);
-    return splitLineProjectionHull(origin, dir, t0, t1, body, resolved, view, hull);
+    return splitLinePyramid(origin, dir, t0, t1, body, resolved, view, hull, ctx);
   }
   return splitLineSchoolView(origin, dir, t0, t1, body, resolved, view);
 }
