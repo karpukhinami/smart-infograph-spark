@@ -7,15 +7,10 @@ import {
 import { isParallelepiped, isPyramid } from "./figure";
 import {
   localToCartesian,
-  pyramidApexScreenAnchor,
   pyramidBaseCartesianFromFigure,
-  pyramidBaseScreenAtXY,
   pyramidEllipseBaseScreen,
-  pyramidFootOnBaseFromWorld,
   pyramidHeight,
   pyramidObserverEyePosition,
-  pyramidProjectOnApexGenerator,
-  pyramidWorldUsesLateralProjection,
 } from "./pyramid";
 import type {
   LocalCoords,
@@ -258,35 +253,43 @@ function pyramidWorldToView(
   coeffs: ProjectionCoeffs,
   figure: PyramidFigure,
 ): { x: number; y: number; z: number } {
-  const { kwx, kwy, orbit } = coeffs;
+  const { kwx, kwy } = coeffs;
   const H = pyramidHeight(figure.constraints);
   const baseCart = pyramidBaseCartesianFromFigure(figure);
   const baseScr = pyramidScreenBase(figure, coeffs);
-  const apexAnchor = pyramidApexScreenAnchor(figure, orbit, baseScr);
-  /** Высота по z: основание z=0, вершина z=H — параметр t на любом генераторе S→Q. */
-  const t = H > 1e-9 ? Math.max(0, Math.min(1, world.z / H)) : 0;
-  const footForDepth = pyramidFootOnBaseFromWorld(world, figure);
   const depth = pyramidCartesianDepth(world, coeffs);
-  const lateral = pyramidWorldUsesLateralProjection(world, figure)
-    ? pyramidProjectOnApexGenerator(
-        world,
-        figure,
-        baseCart,
-        baseScr,
-        apexAnchor,
-        H,
-        kwx,
-        kwy,
-      )
-    : null;
-  if (lateral) {
-    return { x: lateral.x, y: lateral.y, z: depth };
-  }
-  const foot2 = footForDepth ?? { x: world.x, y: world.y };
-  const atBase = pyramidBaseScreenAtXY(foot2.x, foot2.y, baseCart, baseScr);
+  const a = baseCart[0];
+  const b = baseCart[1];
+  const c = baseCart[2];
+  const sa = baseScr[0];
+  const sb = baseScr[1];
+  const sc = baseScr[2];
+  if (!a || !b || !c || !sa || !sb || !sc) return { x: 0, y: 0, z: depth };
+
+  // Экранные вершины правильного основания лежат на одном эллипсе и потому
+  // задаются единственным аффинным отображением его декартовой окружности.
+  // Используем это отображение для КАЖДОЙ точки пирамиды. Прежняя функция
+  // искала треугольник основания отдельно для каждой точки; на диагоналях этих
+  // треугольников формула менялась, поэтому прямая пересечения визуально
+  // ломалась, а точка тройного разбиения выглядела посторонней вершиной.
+  const ux = b.x - a.x;
+  const uy = b.y - a.y;
+  const vx = c.x - a.x;
+  const vy = c.y - a.y;
+  const determinant = ux * vy - uy * vx;
+  if (Math.abs(determinant) <= 1e-12) return { x: sa.x, y: sa.y, z: depth };
+  const px = world.x - a.x;
+  const py = world.y - a.y;
+  const u = (px * vy - py * vx) / determinant;
+  const v = (ux * py - uy * px) / determinant;
+  const atBase = {
+    x: sa.x + u * (sb.x - sa.x) + v * (sc.x - sa.x),
+    y: sa.y + u * (sb.y - sa.y) + v * (sc.y - sa.y),
+  };
+  const t = H > 1e-9 ? world.z / H : 0;
   return {
-    x: atBase.x + t * (apexAnchor.x - atBase.x) + kwx * t,
-    y: atBase.y + t * (apexAnchor.y - atBase.y) + kwy * t,
+    x: atBase.x + kwx * t,
+    y: atBase.y + kwy * t,
     z: depth,
   };
 }
