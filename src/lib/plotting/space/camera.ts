@@ -238,14 +238,62 @@ function pyramidScreenBase(figure: PyramidFigure, coeffs: ProjectionCoeffs): Arr
  * рёбер на чертеже — так порядок «дальше/ближе» совпадает с тем, что нарисовано
  * (сходящиеся к вершине S рёбра рассчитаны на взгляд именно из этой точки).
  */
-function pyramidCartesianDepth(world: Vec3, coeffs: ProjectionCoeffs): number {
+function pyramidProjectionDepthAxis(
+  coeffs: ProjectionCoeffs,
+  figure: PyramidFigure,
+): Vec3 {
+  const { kwx, kwy } = coeffs;
+  const H = pyramidHeight(figure.constraints);
+  const baseCart = pyramidBaseCartesianFromFigure(figure);
+  const baseScr = pyramidScreenBase(figure, coeffs);
+  const a = baseCart[0];
+  const b = baseCart[1];
+  const c = baseCart[2];
+  const sa = baseScr[0];
+  const sb = baseScr[1];
+  const sc = baseScr[2];
+  if (!a || !b || !c || !sa || !sb || !sc) return { x: 0, y: 0, z: 1 };
+
+  const ux = b.x - a.x;
+  const uy = b.y - a.y;
+  const vx = c.x - a.x;
+  const vy = c.y - a.y;
+  const determinant = ux * vy - uy * vx;
+  if (Math.abs(determinant) <= 1e-12) return { x: 0, y: 0, z: 1 };
+
+  // Коэффициенты единого аффинного отображения world → screen.
+  const sxu = sb.x - sa.x;
+  const sxv = sc.x - sa.x;
+  const syu = sb.y - sa.y;
+  const syv = sc.y - sa.y;
+  const rowX = {
+    x: (sxu * vy - sxv * uy) / determinant,
+    y: (-sxu * vx + sxv * ux) / determinant,
+    z: H > 1e-9 ? kwx / H : 0,
+  };
+  const rowY = {
+    x: (syu * vy - syv * uy) / determinant,
+    y: (-syu * vx + syv * ux) / determinant,
+    z: H > 1e-9 ? kwy / H : 0,
+  };
+  let axis = normalize({
+    x: rowX.y * rowY.z - rowX.z * rowY.y,
+    y: rowX.z * rowY.x - rowX.x * rowY.z,
+    z: rowX.x * rowY.y - rowX.y * rowY.x,
+  });
   const eye = pyramidObserverEyePosition(coeffs.yawRad);
-  const eyeLen = Math.hypot(eye.x, eye.y, eye.z) || 1;
-  const ux = eye.x / eyeLen;
-  const uy = eye.y / eyeLen;
-  const uz = eye.z / eyeLen;
-  // Меньше = ближе к наблюдателю: точки в направлении глаза имеют больший dot(P,u).
-  return -(world.x * ux + world.y * uy + world.z * uz);
+  if (dot(axis, eye) < 0) axis = scale(axis, -1);
+  return axis;
+}
+
+function pyramidCartesianDepth(
+  world: Vec3,
+  coeffs: ProjectionCoeffs,
+  figure: PyramidFigure,
+): number {
+  const axis = pyramidProjectionDepthAxis(coeffs, figure);
+  // Меньше = ближе к наблюдателю.
+  return -dot(world, axis);
 }
 
 function pyramidWorldToView(
@@ -257,7 +305,7 @@ function pyramidWorldToView(
   const H = pyramidHeight(figure.constraints);
   const baseCart = pyramidBaseCartesianFromFigure(figure);
   const baseScr = pyramidScreenBase(figure, coeffs);
-  const depth = pyramidCartesianDepth(world, coeffs);
+  const depth = pyramidCartesianDepth(world, coeffs, figure);
   const a = baseCart[0];
   const b = baseCart[1];
   const c = baseCart[2];
@@ -413,7 +461,7 @@ export function worldViewSortDepth(
     return monitorPlaneSortDepth(world, basis, projection, figure);
   }
   if (isPyramid(figure)) {
-    return pyramidCartesianDepth(world, projection);
+    return pyramidCartesianDepth(world, projection, figure);
   }
   return parallelepipedSchoolSortDepth(world, basis, projection);
 }
