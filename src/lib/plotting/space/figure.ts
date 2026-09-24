@@ -34,6 +34,17 @@ export function isPyramid(figure: SpaceFigure): figure is import("./types").Pyra
   return figure.kind === "pyramid";
 }
 
+export function isPrism(figure: SpaceFigure): figure is import("./types").PrismFigure {
+  return figure.kind === "prism";
+}
+
+/** Пирамида и призма: декартовы local, школьная проекция основания на эллипсе. */
+export function isSchoolExtrusionFigure(
+  figure: SpaceFigure,
+): figure is import("./types").PyramidFigure | import("./types").PrismFigure {
+  return figure.kind === "pyramid" || figure.kind === "prism";
+}
+
 export function figureConstraints(figure: SpaceFigure) {
   return figure.constraints;
 }

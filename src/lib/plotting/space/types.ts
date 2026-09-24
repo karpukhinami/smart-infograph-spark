@@ -13,7 +13,7 @@ export type SpaceShapeKind =
 export const SPACE_SHAPE_OPTIONS: Array<{ value: SpaceShapeKind; label: string; enabled: boolean }> = [
   { value: "parallelepiped", label: "Параллелепипед", enabled: true },
   { value: "pyramid", label: "Пирамида", enabled: true },
-  { value: "prism", label: "Призма", enabled: false },
+  { value: "prism", label: "Призма", enabled: true },
   { value: "cone", label: "Конус", enabled: false },
   { value: "sphere", label: "Шар", enabled: false },
   { value: "cylinder", label: "Цилиндр", enabled: false },
@@ -100,9 +100,29 @@ export interface PyramidFigure {
   faces: SpaceFace[];
 }
 
-export type SpaceFigure = ParallelepipedFigure | PyramidFigure;
+/** false — «прямая» выкл (как вершина пирамиды над центром); true — «прямая» вкл (как над первой вершиной основания). */
+export interface PrismConstraints {
+  straight: boolean;
+  equilateral: boolean;
+  badAngleDeg: number;
+}
 
-export type SpaceFigureConstraints = ParallelepipedConstraints | PyramidConstraints;
+export interface PrismFigure {
+  id: string;
+  kind: "prism";
+  baseLabels: string[];
+  constraints: PrismConstraints;
+  vertices: SpaceVertex[];
+  edges: SpaceEdge[];
+  faces: SpaceFace[];
+}
+
+export type SpaceFigure = ParallelepipedFigure | PyramidFigure | PrismFigure;
+
+export type SpaceFigureConstraints =
+  | ParallelepipedConstraints
+  | PyramidConstraints
+  | PrismConstraints;
 
 export type LineRegion = "before" | "between" | "after";
 

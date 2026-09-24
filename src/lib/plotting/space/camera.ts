@@ -4,17 +4,26 @@ import {
   sampleConicEllipse,
   type ConicEllipse,
 } from "./conic-ellipse";
-import { isParallelepiped, isPyramid } from "./figure";
+import { isParallelepiped, isPrism, isPyramid, isSchoolExtrusionFigure } from "./figure";
 import {
   localToCartesian,
+  pyramidApexScreenAnchor,
   pyramidBaseCartesianFromFigure,
   pyramidEllipseBaseScreen,
   pyramidHeight,
   pyramidObserverEyePosition,
+  pyramidProjectOnApexGenerator,
 } from "./pyramid";
+import {
+  prismHeight,
+  prismProjectionPyramid,
+  prismScreenBaseVertices,
+  prismTopScreenOffset,
+} from "./prism";
 import type {
   LocalCoords,
   ParallelepipedConstraints,
+  PrismFigure,
   PyramidFigure,
   SpaceAppearance,
   SpaceFigure,
@@ -350,6 +359,57 @@ function pyramidLocalToView(
   return pyramidWorldToView(localToCartesian(local), coeffs, figure);
 }
 
+function prismWorldToView(
+  world: Vec3,
+  coeffs: ProjectionCoeffs,
+  figure: PrismFigure,
+): { x: number; y: number; z: number } {
+  const H = prismHeight(figure.constraints);
+  const baseScr = prismScreenBaseVertices(figure, coeffs);
+  const proj = prismProjectionPyramid(figure);
+  const depth = pyramidCartesianDepth(world, coeffs, proj);
+  const { dx, dy } = prismTopScreenOffset(figure, coeffs, baseScr);
+  const eps = 1e-4;
+
+  if (Math.abs(world.z - H) <= eps) {
+    const baseCart = pyramidBaseCartesianFromFigure(proj);
+    for (let i = 0; i < baseCart.length; i += 1) {
+      const c = baseCart[i]!;
+      if ((world.x - c.x) ** 2 + (world.y - c.y) ** 2 < eps * eps) {
+        const s = baseScr[i] ?? { x: 0, y: 0 };
+        return { x: s.x + dx, y: s.y + dy, z: depth };
+      }
+    }
+  }
+
+  const baseCart = pyramidBaseCartesianFromFigure(proj);
+  const { kwx, kwy } = coeffs;
+  const anchor = pyramidApexScreenAnchor(proj, coeffs.orbit, baseScr);
+  const lateral = pyramidProjectOnApexGenerator(
+    world,
+    proj,
+    baseCart,
+    baseScr,
+    anchor,
+    H,
+    kwx,
+    kwy,
+  );
+  if (lateral) {
+    return { x: lateral.x, y: lateral.y, z: depth };
+  }
+
+  return pyramidWorldToView(world, coeffs, proj);
+}
+
+function prismLocalToView(
+  local: LocalCoords,
+  coeffs: ProjectionCoeffs,
+  figure: PrismFigure,
+): { x: number; y: number; z: number } {
+  return prismWorldToView(localToCartesian(local), coeffs, figure);
+}
+
 /**
  * Общая аффинная («косоугольная») проекция (u,v,w) → (X,Y,Z): та же формула, что
  * у параллелепипеда. В отличие от `pyramidWorldToView` (сходящиеся к вершине S
@@ -394,6 +454,7 @@ export function localToView(
   figure?: SpaceFigure,
 ): { x: number; y: number; z: number } {
   if (figure && isPyramid(figure)) return pyramidLocalToView(local, coeffs, figure);
+  if (figure && isPrism(figure)) return prismLocalToView(local, coeffs, figure);
   return genericAffineLocalToView(local, coeffs);
 }
 
@@ -402,12 +463,12 @@ function localViewDirToWorld(
   basis: { e1: Vec3; e2: Vec3; e3: Vec3 },
   figure: SpaceFigure,
 ): Vec3 {
-  if (isPyramid(figure)) return { x: vd.u, y: vd.v, z: vd.w };
+  if (isSchoolExtrusionFigure(figure)) return { x: vd.u, y: vd.v, z: vd.w };
   return add(add(scale(basis.e1, vd.u), scale(basis.e2, vd.v)), scale(basis.e3, vd.w));
 }
 
 function figureUpWorld(basis: { e1: Vec3; e2: Vec3; e3: Vec3 }, figure: SpaceFigure): Vec3 {
-  return isPyramid(figure) ? { x: 0, y: 0, z: 1 } : basis.e3;
+  return isSchoolExtrusionFigure(figure) ? { x: 0, y: 0, z: 1 } : basis.e3;
 }
 
 /**
@@ -462,6 +523,9 @@ export function worldViewSortDepth(
   }
   if (isPyramid(figure)) {
     return pyramidCartesianDepth(world, projection, figure);
+  }
+  if (isPrism(figure)) {
+    return pyramidCartesianDepth(world, projection, prismProjectionPyramid(figure));
   }
   return parallelepipedSchoolSortDepth(world, basis, projection);
 }

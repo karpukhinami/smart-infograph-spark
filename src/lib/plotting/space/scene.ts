@@ -1,10 +1,11 @@
 import { nextId, DEFAULT_APPEARANCE, PLOT_PALETTE } from "../shared";
 import { computeSpaceViewFit, DEFAULT_SPACE_VIEW, fitProjection, projectPoint } from "./camera";
-import { parseBaseVertexLabels, parsePyramidVertexLabels, formatVertexLabel } from "./parse-vertices";
+import { parseBaseVertexLabels, parsePrismBaseLabels, parsePyramidVertexLabels } from "./parse-vertices";
 import { nextAvailableVertexLabel, normalizeUserPointLabel } from "./vertex-label-normalize";
 import { faceDisplayLabel } from "./figure";
 import { createParallelepiped } from "./parallelepiped";
 import { createPyramid } from "./pyramid";
+import { createPrism } from "./prism";
 import {
   buildSpaceScene,
   clampRegionParam,
@@ -17,6 +18,7 @@ import { cross, intersectPlanes, len, segmentPlaneIntersection, sub } from "./ve
 import type {
   LineRegion,
   ParallelepipedConstraints,
+  PrismConstraints,
   PyramidConstraints,
   SpaceFigure,
   SpaceFigureConstraints,
@@ -170,6 +172,27 @@ export function defaultPyramidConstraints(): PyramidConstraints {
   return { apexOnCenter: true, equilateral: false, badAngleDeg: 35 };
 }
 
+export function defaultPrismConstraints(): PrismConstraints {
+  return { straight: false, equilateral: false, badAngleDeg: 35 };
+}
+
+export function createPrismFromInput(
+  input: string,
+  constraints?: PrismConstraints,
+): { figure: import("./types").PrismFigure | null; error: string | null } {
+  const labels = parsePrismBaseLabels(input);
+  if (!labels) {
+    return {
+      figure: null,
+      error: "Введите минимум 3 различные буквы вершин нижнего основания.",
+    };
+  }
+  return {
+    figure: createPrism(labels, constraints ?? defaultPrismConstraints()),
+    error: null,
+  };
+}
+
 export function defaultParallelepipedConstraints(): ParallelepipedConstraints {
   return { rectangular: true, equilateral: false, badAngleDeg: 35 };
 }
@@ -178,6 +201,9 @@ export function defaultParallelepipedConstraints(): ParallelepipedConstraints {
 export function figureVertexInputString(figure: SpaceFigure): string {
   if (figure.kind === "pyramid") {
     return [figure.apexLabel, ...figure.baseLabels].join(", ");
+  }
+  if (figure.kind === "prism") {
+    return figure.baseLabels.join(", ");
   }
   return figure.baseLabels.join(", ");
 }
@@ -189,6 +215,9 @@ export function createFigureFromInput(
 ): { figure: SpaceFigure | null; error: string | null } {
   if (shapeKind === "pyramid") {
     return createPyramidFromInput(input, constraints as PyramidConstraints);
+  }
+  if (shapeKind === "prism") {
+    return createPrismFromInput(input, constraints as PrismConstraints);
   }
   return createParallelepipedFromInput(input, constraints as ParallelepipedConstraints);
 }

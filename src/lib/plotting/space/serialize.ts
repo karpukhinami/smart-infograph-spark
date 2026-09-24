@@ -11,10 +11,12 @@ import {
   createSpaceSceneData,
   defaultParallelepipedConstraints,
   defaultPyramidConstraints,
+  defaultPrismConstraints,
   figureVertexInputString,
 } from "./scene";
 import type {
   ParallelepipedConstraints,
+  PrismConstraints,
   PyramidConstraints,
   SpaceAppearance,
   SpaceFigureConstraints,
@@ -127,6 +129,15 @@ function normalizeConstraints(
       badAngleDeg: p.badAngleDeg ?? d.badAngleDeg,
     };
   }
+  if (shapeKind === "prism") {
+    const d = defaultPrismConstraints();
+    const p = o as Partial<PrismConstraints>;
+    return {
+      straight: p.straight ?? d.straight,
+      equilateral: p.equilateral ?? d.equilateral,
+      badAngleDeg: p.badAngleDeg ?? d.badAngleDeg,
+    };
+  }
   const d = defaultParallelepipedConstraints();
   const pp = o as Partial<ParallelepipedConstraints>;
   return {
@@ -138,9 +149,9 @@ function normalizeConstraints(
 
 function resolveShapeKind(raw: Record<string, unknown>): SpaceShapeKind | null {
   const k = raw.shapeKind;
-  if (k === "parallelepiped" || k === "pyramid") return k;
+  if (k === "parallelepiped" || k === "pyramid" || k === "prism") return k;
   const fig = raw.figure as { kind?: string } | null | undefined;
-  if (fig?.kind === "parallelepiped" || fig?.kind === "pyramid") return fig.kind;
+  if (fig?.kind === "parallelepiped" || fig?.kind === "pyramid" || fig?.kind === "prism") return fig.kind;
   return null;
 }
 

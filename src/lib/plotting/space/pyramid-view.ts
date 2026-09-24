@@ -5,7 +5,7 @@
 import type { ResolvedSpaceScene } from "./build";
 import { viewDirectionLocal, type ProjectionCoeffs } from "./camera";
 import type { ProjectionHull } from "./convex-hull-visibility";
-import { faceById, isPyramid } from "./figure";
+import { faceById, isSchoolExtrusionFigure } from "./figure";
 import {
   PYRAMID_OBSERVER_EYE_AT_YAW_ZERO,
   pyramidObserverEyePosition,
@@ -135,7 +135,7 @@ export function buildSchoolViewObserver(
 ): PyramidObserver {
   const center = figureBodyCenterCartesian(figure, resolved);
   const extent = observerExtent(figure, resolved, center);
-  if (isPyramid(figure)) {
+  if (isSchoolExtrusionFigure(figure)) {
     return pyramidObserverFromFixedEye(figure, resolved, projection);
   }
   const vd = viewDirectionLocal({ ...projection, yawRad: 0 });

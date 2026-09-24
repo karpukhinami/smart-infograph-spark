@@ -57,6 +57,7 @@ import {
   resolvePointLabelInput,
   defaultParallelepipedConstraints,
   defaultPyramidConstraints,
+  defaultPrismConstraints,
   createPlaneIntersectionEndpoints,
   createSpaceLine,
   createSpacePlane,
@@ -81,6 +82,7 @@ import type {
 } from "./space/types";
 import { clampRegionParam, defaultLineParam } from "./space/build";
 import { refreshPyramidVertices } from "./space/pyramid";
+import { refreshPrismVertices } from "./space/prism";
 import { deserializeSpaceSceneData } from "./space/serialize";
 
 export interface SpacePointDraft {
@@ -1115,9 +1117,11 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
         figureConstraints:
           kind === "pyramid"
             ? defaultPyramidConstraints()
-            : kind === "parallelepiped"
-              ? defaultParallelepipedConstraints()
-              : data.figureConstraints,
+            : kind === "prism"
+              ? defaultPrismConstraints()
+              : kind === "parallelepiped"
+                ? defaultParallelepipedConstraints()
+                : data.figureConstraints,
       })),
     ),
 
@@ -1171,6 +1175,8 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     let figure = { ...data.figure, constraints: { ...figureConstraints } } as typeof data.figure;
     if (figure.kind === "pyramid") {
       figure = refreshPyramidVertices(figure);
+    } else if (figure.kind === "prism") {
+      figure = refreshPrismVertices(figure);
     }
     const result = applySpaceBuild({
       ...state.scene,

@@ -30,8 +30,9 @@ import {
   type ProjectedPoint,
 } from "./camera";
 import { projectWorldDisplay, snapWorldToFigureEdge } from "./display-projection";
-import { edgeById, faceById, isParallelepiped, isPyramid, vertexById } from "./figure";
+import { edgeById, faceById, isParallelepiped, isPyramid, isPrism, isSchoolExtrusionFigure, vertexById } from "./figure";
 import { localToCartesian, refreshPyramidVertices } from "./pyramid";
+import { refreshPrismVertices } from "./prism";
 import type {
   BuiltSpacePoint,
   LineRegion,
@@ -357,8 +358,9 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
     };
   }
 
-  const figure =
-    isPyramid(data.figure) ? refreshPyramidVertices(data.figure) : data.figure;
+  let figure = data.figure;
+  if (figure && isPyramid(figure)) figure = refreshPyramidVertices(figure);
+  else if (figure && isPrism(figure)) figure = refreshPrismVertices(figure);
 
   const basis = computeFigureBasis(figure);
   const projection = getProjectionCoeffs(data.view, figure);
@@ -517,7 +519,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
       continue;
     }
     let world = add(carrier.origin, scale(carrier.dir, def.lineParam));
-    if (isPyramid(figure)) {
+    if (isSchoolExtrusionFigure(figure)) {
       world = snapWorldToFigureEdge(world, figure, points);
     }
     const local = worldToLocal(world, basis);
@@ -528,7 +530,7 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
     points.set(point.id, { local, world });
   }
 
-  if (isPyramid(figure)) {
+  if (isSchoolExtrusionFigure(figure)) {
     const vertexIds = new Set(figure.vertices.map((v) => v.id));
     for (const [id, pt] of points) {
       if (vertexIds.has(id)) continue;
@@ -577,7 +579,7 @@ export function computeLineDisplayRange(
   extension: number,
   figure?: SpaceFigure,
 ): { t0: number; t1: number } {
-  if (figure && isPyramid(figure)) {
+  if (figure && isSchoolExtrusionFigure(figure)) {
     return { t0: tMin - extension, t1: tMax + extension };
   }
   let lo = tMin;
@@ -719,7 +721,7 @@ export function orderSectionPolygon(
   figure?: SpaceFigure,
 ): Vec3[] {
   if (hits.length <= 2) return hits;
-  if (figure && isPyramid(figure)) return orderSectionByPlaneAngle(hits, basis);
+  if (figure && isSchoolExtrusionFigure(figure)) return orderSectionByPlaneAngle(hits, basis);
   const tagged = hits.map((w) => ({ w, l: worldToLocal(w, basis)! }));
 
   const walked = orderSectionByFaceWalk(tagged);
@@ -880,7 +882,7 @@ export function computeFaceOrPlaneSection(
     }
     if (da * db < -1e-10) {
       let p = lerp(a, b, da / (da - db));
-      if (figure && isPyramid(figure)) {
+      if (figure && isSchoolExtrusionFigure(figure)) {
         p = snapWorldToFigureEdge(p, figure, points);
       }
       const k = key(p);
@@ -986,7 +988,7 @@ export function getPlaneOutsideSupportPoints(
   for (const id of planeDefiningPointIds(plane)) {
     const pt = points.get(id);
     if (!pt) continue;
-    if (figure && isPyramid(figure)) {
+    if (figure && isSchoolExtrusionFigure(figure)) {
       if (isPointInsideParallelepiped(pt.world, figure, points)) continue;
     } else {
       const local = pt.local ?? worldToLocal(pt.world, basis);
@@ -1155,7 +1157,7 @@ function clipHelperOutsideFigure(
 
   const dir = sub(target, support);
   let tHit: number | null = null;
-  if (figure && isPyramid(figure) && points) {
+  if (figure && isSchoolExtrusionFigure(figure) && points) {
     tHit = firstPolyhedronBoundaryParam(support, target, figure, points);
   } else {
     tHit = firstBoxBoundaryHit(a, b);
@@ -1191,7 +1193,7 @@ export function computePlaneHelperSegments(
     if (
       !clipped &&
       figure &&
-      isPyramid(figure) &&
+      isSchoolExtrusionFigure(figure) &&
       points &&
       !isPointInsideParallelepiped(support, figure, points)
     ) {

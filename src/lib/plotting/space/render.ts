@@ -24,7 +24,7 @@ import {
   splitLineForRender,
   type OcclusionContext,
 } from "./visibility";
-import { isPyramid } from "./figure";
+import { isSchoolExtrusionFigure } from "./figure";
 import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
 import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
 import { add, dot, intersectPlanes, len, scale, sub, worldToLocal } from "./vec3";
@@ -199,7 +199,7 @@ function drawCarrierWithVisibility(
   const span = t1 - t0;
   if (!(span > 1e-12)) return;
 
-  if (isPyramid(figure)) {
+  if (isSchoolExtrusionFigure(figure)) {
     const steps = Math.min(
       PYRAMID_CARRIER_MAX_STEPS,
       Math.max(PYRAMID_CARRIER_MIN_STEPS, Math.ceil(span * 10)),
@@ -495,7 +495,7 @@ function renderPlaneSectionEdges(
       obstacles,
       undefined,
       fillByDepth,
-      isPyramid(figure),
+      isSchoolExtrusionFigure(figure),
       true,
     );
   }
@@ -708,7 +708,7 @@ function renderPlanesByDepth(
           obstacles,
           undefined,
           false,
-          isPyramid(figure),
+          isSchoolExtrusionFigure(figure),
           true,
         );
         continue;
@@ -916,7 +916,7 @@ function renderViewConvergenceRays(
   const observer = buildSchoolViewObserver(figure, resolved, resolved.projection);
   const centerWorld = figureBodyCenterWorld(figure, resolved);
   const anchors: Vec3[] = [centerWorld];
-  if (isPyramid(figure)) {
+  if (isSchoolExtrusionFigure(figure)) {
     const apex = figure.vertices.find((v) => v.id.startsWith("pyr-v-apex"));
     const aw = apex ? resolved.points.get(apex.id)?.world : null;
     if (aw) anchors.push(aw);
@@ -944,7 +944,7 @@ function renderViewConvergenceRays(
    * формы основания или положения вершины.
    */
   let pEye: { x: number; y: number };
-  if (isPyramid(figure)) {
+  if (isSchoolExtrusionFigure(figure)) {
     pEye = { x: width / 2, y: height * 0.94 };
   } else {
     const prEye = projectWorldOffFigureBody(
@@ -972,7 +972,7 @@ function renderViewConvergenceRays(
   }
 
   const eye = observer.eye;
-  const eyeLabel = isPyramid(figure)
+  const eyeLabel = isSchoolExtrusionFigure(figure)
     ? `к зрителю (глаз ≈ (${round(eye.x)}, ${round(eye.y)}, ${round(eye.z)}))`
     : `глаз (${round(eye.x)}, ${round(eye.y)}, ${round(eye.z)})`;
   parts.push(
@@ -1029,7 +1029,7 @@ function collectFitPoints(
       if (!clip) continue;
       t0 = clip.t0;
       t1 = clip.t1;
-      if (line.style.visualKind === "line" && !isPyramid(figure)) {
+      if (line.style.visualKind === "line" && !isSchoolExtrusionFigure(figure)) {
         const span = Math.max(t1 - t0, 1e-6);
         const ext = data.appearance.lineExtension * span;
         t0 -= ext;

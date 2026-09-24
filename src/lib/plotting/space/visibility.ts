@@ -9,7 +9,7 @@ import {
   type ProjectionHull,
 } from "./convex-hull-visibility";
 import { isSegmentInsidePyramidVolume } from "./pyramid-view";
-import { edgeById, faceById, isPyramid } from "./figure";
+import { edgeById, faceById, isSchoolExtrusionFigure } from "./figure";
 import type { LineSplitSegment, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
 import { viewDirectionLocal } from "./camera";
@@ -450,7 +450,7 @@ export function isBodyEdgeVisibleForRender(
   view: SpaceViewParams,
 ): boolean {
   const body = resolved.figure ?? figure;
-  if (isPyramid(body)) return isBodyEdgeVisiblePyramid(edgeId, body, resolved, view);
+  if (isSchoolExtrusionFigure(body)) return isBodyEdgeVisiblePyramid(edgeId, body, resolved, view);
   if (getVisibilityMode(view) === "legacy") return isBodyEdgeVisible(edgeId, figure);
   return isBodyEdgeVisibleSchool(edgeId, figure, resolved.projection);
 }
@@ -544,7 +544,7 @@ export function splitLineForRender(
   if (getVisibilityMode(view) === "legacy") {
     return splitLineByVisibility(origin, dir, t0, t1, body, resolved, view, ctx);
   }
-  if (isPyramid(body)) {
+  if (isSchoolExtrusionFigure(body)) {
     const hull = projectionHullForFigure(body, resolved, view);
     return splitLinePyramid(origin, dir, t0, t1, body, resolved, view, hull, ctx);
   }

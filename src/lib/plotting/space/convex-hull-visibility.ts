@@ -4,8 +4,8 @@
 import { projectFromLocalCoeffs } from "./camera";
 import type { ResolvedSpaceScene } from "./build";
 import { locatePointOnFigureEdge } from "./display-projection";
-import { faceById, isPyramid } from "./figure";
-import type { BuiltSpacePoint, PyramidFigure } from "./types";
+import { faceById, isSchoolExtrusionFigure } from "./figure";
+import type { BuiltSpacePoint } from "./types";
 import {
   buildPyramidObserver,
   isSegmentInsidePyramidVolume,
@@ -111,11 +111,16 @@ export type ProjectionHull = {
 };
 
 function isBaseVertexId(id: string): boolean {
-  return id.startsWith("pyr-v-b");
+  return id.startsWith("pyr-v-b") || id.startsWith("prism-v-b");
 }
 
 function baseVertexIndex(id: string): number {
+  if (id.startsWith("prism-v-b")) return Number(id.replace("prism-v-b", ""));
   return Number(id.replace("pyr-v-b", ""));
+}
+
+function isBaseEdgeId(id: string): boolean {
+  return id.startsWith("pyr-e-b") || id.startsWith("prism-e-b");
 }
 
 /** Ребро основания между min x и max x (среди вершин основания); иначе единственное ребро основания вне 2D-контура. */
@@ -137,17 +142,17 @@ function computeSoleDashedBaseEdgeKey(
 
   const directKey = edgeEndpointKey(left.id, right.id);
   for (const e of figure.edges) {
-    if (!e.id.startsWith("pyr-e-b")) continue;
+    if (!isBaseEdgeId(e.id)) continue;
     if (edgeEndpointKey(e.aId, e.bId) === directKey) return directKey;
   }
 
   const hiddenBaseKeys = figure.edges
-    .filter((e) => e.id.startsWith("pyr-e-b"))
+    .filter((e) => isBaseEdgeId(e.id))
     .map((e) => edgeEndpointKey(e.aId, e.bId))
     .filter((k) => !hullEdgeKeys.has(k));
   if (hiddenBaseKeys.length === 1) return hiddenBaseKeys[0]!;
 
-  const n = (figure as PyramidFigure).baseLabels.length;
+  const n = figure.baseLabels.length;
   const li = baseVertexIndex(left.id);
   const ri = baseVertexIndex(right.id);
   if (!Number.isFinite(li) || !Number.isFinite(ri) || n < 3) {
@@ -159,7 +164,8 @@ function computeSoleDashedBaseEdgeKey(
     let i = from;
     for (let guard = 0; guard <= n && i !== to; guard += 1) {
       const j = (i + step + n) % n;
-      keys.push(edgeEndpointKey(`pyr-v-b${i}`, `pyr-v-b${j}`));
+      const prefix = figure.kind === "prism" ? "prism-v-b" : "pyr-v-b";
+      keys.push(edgeEndpointKey(`${prefix}${i}`, `${prefix}${j}`));
       i = j;
     }
     return keys;
@@ -219,12 +225,12 @@ export function buildProjectionConvexHull(
   }
 
   let soleDashedBodyEdgeKey: string | null = null;
-  if (isPyramid(body) && interiorVertexIds.size === 0) {
+  if (isSchoolExtrusionFigure(body) && interiorVertexIds.size === 0) {
     soleDashedBodyEdgeKey = computeSoleDashedBaseEdgeKey(body, projected, hullEdgeKeys);
   }
 
   const pyramidObserver =
-    isPyramid(body)
+    isSchoolExtrusionFigure(body)
       ? buildPyramidObserver(body, resolved, resolved.projection, {
           hull,
           hullEdgeKeys,

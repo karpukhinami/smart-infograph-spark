@@ -24,6 +24,15 @@ export function parseBaseVertexLabels(input: string): string[] | null {
   return normalized;
 }
 
+/** Призма: буквы нижнего основания по порядку (минимум 3). */
+export function parsePrismBaseLabels(input: string): string[] | null {
+  const letters = extractLetters(input);
+  if (letters.length < 3) return null;
+  const normalized = assignUniqueVertexLabels(letters);
+  if (new Set(normalized).size < normalized.length) return null;
+  return normalized;
+}
+
 /** Пирамида: первая буква — вершина, остальные — основание (минимум 3). */
 export function parsePyramidVertexLabels(input: string): { apex: string; base: string[] } | null {
   const letters = extractLetters(input);

@@ -8,7 +8,7 @@ import {
   type ProjectedPoint,
   type ProjectionCoeffs,
 } from "./camera";
-import { isPyramid } from "./figure";
+import { isSchoolExtrusionFigure } from "./figure";
 import type { BuiltSpacePoint, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, len, paramOnLine, scale, sub, worldToLocal } from "./vec3";
 
@@ -97,7 +97,9 @@ export function projectWorldOffFigureBody(
   figure: SpaceFigure,
 ): ProjectedPoint {
   const body = ctx.figure ?? figure;
-  const local = isPyramid(body) ? { u: world.x, v: world.y, w: world.z } : worldToLocal(world, ctx.basis) ?? { u: 0, v: 0, w: 0 };
+  const local = isSchoolExtrusionFigure(body)
+    ? { u: world.x, v: world.y, w: world.z }
+    : worldToLocal(world, ctx.basis) ?? { u: 0, v: 0, w: 0 };
   const { x, y, z } = genericAffineLocalToView(local, ctx.projection);
   return { x: x * view.scale, y: -y * view.scale, depth: z, world };
 }
@@ -110,7 +112,7 @@ export function projectWorldDisplay(
   figure: SpaceFigure,
 ): ProjectedPoint {
   const body = ctx.figure ?? figure;
-  if (isPyramid(body)) {
+  if (isSchoolExtrusionFigure(body)) {
     if (isFigureVertexWorld(world, body, ctx.points)) {
       for (const v of body.vertices) {
         const pt = ctx.points.get(v.id);
