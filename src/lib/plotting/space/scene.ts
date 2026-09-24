@@ -13,7 +13,7 @@ import {
   planeIntersectionSegmentRange,
   resolveLineCarrier,
 } from "./build";
-import { add, cross, intersectPlanes, len, scale, segmentPlaneIntersection, sub } from "./vec3";
+import { cross, intersectPlanes, len, segmentPlaneIntersection, sub } from "./vec3";
 import type {
   LineRegion,
   ParallelepipedConstraints,
@@ -291,18 +291,41 @@ export function derivedPointChoices(data: SpaceSceneData): DerivedPointChoice[] 
 }
 
 export function derivedLineChoices(data: SpaceSceneData): DerivedLineChoice[] {
-  return derivedPointChoices(data)
-    .filter((choice): choice is Extract<DerivedPointChoice, { kind: "planePair" }> => choice.kind === "planePair")
-    .filter((choice) => !data.lines.some((line) =>
-      line.definition.kind === "planeIntersection"
-      && planePairKey(line.definition.planeAId, line.definition.planeBId) === choice.id,
-    ))
-    .map((choice) => ({
-      id: choice.id,
-      label: choice.label.replace(" → две граничные точки", ""),
-      planeAId: choice.planeAId,
-      planeBId: choice.planeBId,
-    }));
+  if (!data.figure) return [];
+  const resolved = buildSpaceScene(data);
+  const planes = data.planes.filter((plane) => plane.built && resolved.planes.has(plane.id));
+  const choices: DerivedLineChoice[] = [];
+  for (let i = 0; i < planes.length; i += 1) {
+    for (let j = i + 1; j < planes.length; j += 1) {
+      const [planeAId, planeBId] = canonicalPlanePair(planes[i]!.id, planes[j]!.id);
+      const id = planePairKey(planeAId, planeBId);
+      if (data.lines.some((line) =>
+        line.definition.kind === "planeIntersection"
+        && planePairKey(line.definition.planeAId, line.definition.planeBId) === id,
+      )) continue;
+      const aEq = resolved.planes.get(planeAId);
+      const bEq = resolved.planes.get(planeBId);
+      const carrier = aEq && bEq ? intersectPlanes(aEq, bEq) : null;
+      if (!carrier) continue;
+      const range = planeIntersectionSegmentRange(
+        carrier,
+        planeAId,
+        planeBId,
+        data.figure,
+        resolved.points,
+        resolved.planes,
+        resolved.basis,
+      );
+      if (!range) continue;
+      choices.push({
+        id,
+        label: `${planeDisplayLabel(data, planeAId)} ∩ ${planeDisplayLabel(data, planeBId)}`,
+        planeAId,
+        planeBId,
+      });
+    }
+  }
+  return choices;
 }
 
 export function createDerivedPoints(data: SpaceSceneData, choice: DerivedPointChoice): SpacePoint[] {
