@@ -20,6 +20,7 @@ import { collectPlaneFillFragments } from "./plane-subdivision";
 import {
   buildOcclusionContext,
   isBodyEdgeVisibleForRender,
+  splitLineByVisibility,
   splitLineForRender,
   type OcclusionContext,
 } from "./visibility";
@@ -81,12 +82,16 @@ function drawSegmentWithVisibility(
   strokeOpacity?: number,
   /** В режиме заливки по глубине скрытые куски не рисуем — пунктир только на линии пересечения. */
   skipHiddenSegments = false,
+  /** Для границ сечения пирамиды нужна проверка по глубине поверхности, а не по оболочке вершин. */
+  useSurfaceDepth = false,
 ): void {
   const dir = sub(bWorld, aWorld);
   const abLen = len(dir);
   if (!(abLen > 1e-9)) return;
   const unit = scale(dir, 1 / abLen);
-  const segments = splitLineForRender(aWorld, unit, 0, abLen, figure, resolved, view, occlusion);
+  const segments = useSurfaceDepth
+    ? splitLineByVisibility(aWorld, unit, 0, abLen, figure, resolved, view, occlusion)
+    : splitLineForRender(aWorld, unit, 0, abLen, figure, resolved, view, occlusion);
   const opacityAttr =
     strokeOpacity !== undefined && strokeOpacity < 1
       ? ` stroke-opacity="${strokeOpacity}"`
@@ -422,6 +427,7 @@ function renderPlaneSectionEdges(
       obstacles,
       undefined,
       fillByDepth,
+      isPyramid(figure),
     );
   }
 }
@@ -631,6 +637,9 @@ function renderPlanesByDepth(
           data.appearance.hiddenDash,
           parts,
           obstacles,
+          undefined,
+          false,
+          isPyramid(figure),
         );
         continue;
       }

@@ -207,25 +207,27 @@ export function pointInFace3D(
   points: ResolvedSpaceScene["points"],
 ): boolean {
   const verts = faceVertexIds.map((id) => points.get(id)?.world).filter(Boolean) as Vec3[];
-  if (verts.length < 4) return false;
-  const [v0, v1, v2, v3] = verts;
-  const n = cross(sub(v1!, v0!), sub(v2!, v0!));
+  if (verts.length < 3) return false;
+  const v0 = verts[0];
+  const v1 = verts[1];
+  const v2 = verts[2];
+  if (!v0 || !v1 || !v2) return false;
+  const n = cross(sub(v1, v0), sub(v2, v0));
   if (len(n) < 1e-9) return false;
   const nn = scale(n, 1 / len(n));
-  const toP = sub(p, v0!);
+  const toP = sub(p, v0);
   if (Math.abs(dot(toP, nn)) > 1e-4) return false;
-  const e1 = sub(v1!, v0!);
-  const e2 = sub(v3!, v0!);
-  const a = dot(e1, e1);
-  const b = dot(e1, e2);
-  const c = dot(e2, e2);
-  const d = dot(e1, toP);
-  const e = dot(e2, toP);
-  const denom = a * c - b * b;
-  if (Math.abs(denom) < 1e-9) return false;
-  const u = (d * c - b * e) / denom;
-  const v = (a * e - b * d) / denom;
-  return u >= -0.02 && v >= -0.02 && u + v <= 1.02;
+  let sign = 0;
+  for (let i = 0; i < verts.length; i += 1) {
+    const a = verts[i];
+    const b = verts[(i + 1) % verts.length];
+    if (!a || !b) return false;
+    const side = dot(cross(sub(b, a), sub(p, a)), nn);
+    if (Math.abs(side) <= 1e-6) continue;
+    if (sign === 0) sign = Math.sign(side);
+    else if (Math.sign(side) !== sign) return false;
+  }
+  return true;
 }
 
 export function classifySegmentFaceVisibility(
