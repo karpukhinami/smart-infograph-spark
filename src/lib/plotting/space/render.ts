@@ -26,7 +26,7 @@ import {
 import { isPyramid } from "./figure";
 import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
 import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
-import { add, intersectPlanes, len, scale, sub, worldToLocal } from "./vec3";
+import { add, dot, intersectPlanes, len, scale, sub, worldToLocal } from "./vec3";
 
 function round(n: number): string {
   return String(Number(n.toFixed(2)));
