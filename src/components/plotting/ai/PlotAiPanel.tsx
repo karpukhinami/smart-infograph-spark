@@ -203,7 +203,11 @@ export function PlotAiPanel() {
             {analysis.canDraw && analysis.sceneType && (
               <p className="text-xs text-muted-foreground">
                 Тип сцены:{" "}
-                {analysis.sceneType === "plane" ? "координатная плоскость" : "числовая прямая"}
+                {analysis.sceneType === "plane"
+                  ? "координатная плоскость"
+                  : analysis.sceneType === "space"
+                    ? "пространство (многогранник)"
+                    : "числовая прямая"}
               </p>
             )}
             <div className="space-y-2">

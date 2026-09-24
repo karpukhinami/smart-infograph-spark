@@ -13,8 +13,8 @@ function asObject(value: unknown, field: string): Record<string, unknown> {
 }
 
 function parseSceneType(value: unknown): PlotSceneType {
-  if (value === "plane" || value === "line") return value;
-  throw new Error('Поле sceneType должно быть "plane" или "line"');
+  if (value === "plane" || value === "line" || value === "space") return value;
+  throw new Error('Поле sceneType должно быть "plane", "line" или "space"');
 }
 
 export function validatePlotAnalysisJson(value: unknown): PlotAnalysisResult {

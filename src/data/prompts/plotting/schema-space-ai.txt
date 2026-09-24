@@ -1,0 +1,114 @@
+СХЕМА JSON-СЦЕНЫ: ПРОСТРАНСТВО (space = "space")
+
+Модель возвращает УПРОЩЁННЫЙ объект. Приложение дополнит все служебные поля (appearance, fit, id, built-геометрию, полный view).
+
+Корень ответа:
+{ "scene": { "version": 1, "space": "space", "space3d": { ... } } }
+
+Не включай: graphs, points (плоскость), line, tangents, appearance, customColors, xAxis/yAxis/grid для space.
+
+Объект space3d (только значимые для задачи поля):
+
+{
+  "shapeKind": "parallelepiped" | "pyramid" | "prism",
+  "baseVerticesInput": string,
+  "figureConstraints": { ... см. ниже },
+  "view": { "yaw": number },
+  "points": [ ... ],
+  "lines": [ ... ],
+  "planes": [ ... ]
+}
+
+figureConstraints — только перечисленные ключи для выбранного shapeKind:
+- parallelepiped: { "rectangular": boolean }
+- pyramid: { "apexOnCenter": boolean }
+- prism: { "straight": boolean }
+
+view — необязательно; если нужен поворот, укажи только yaw (градусы). Остальное не передавай.
+
+{{SPACE_FIGURES_GUIDE}}
+
+{{SPACE_CONSTRUCTIONS_GUIDE}}
+
+ПРИМЕР (пирамида SABC, точка M — середина SA, плоскость через M, B, C):
+
+{
+  "scene": {
+    "version": 1,
+    "space": "space",
+    "space3d": {
+      "shapeKind": "pyramid",
+      "baseVerticesInput": "S, A, B, C",
+      "figureConstraints": { "apexOnCenter": true },
+      "view": { "yaw": 0 },
+      "points": [
+        {
+          "index": 1,
+          "label": "M",
+          "built": true,
+          "definition": {
+            "kind": "onLine",
+            "pointA": "S",
+            "pointB": "A",
+            "region": "between",
+            "ratioMode": "explicit",
+            "ratioA": 1,
+            "ratioB": 1
+          },
+          "style": { "colorGroup": 2 }
+        }
+      ],
+      "lines": [],
+      "planes": [
+        {
+          "index": 1,
+          "label": "α",
+          "built": true,
+          "definition": {
+            "kind": "threePoints",
+            "a": "M",
+            "b": "B",
+            "c": "C"
+          },
+          "style": { "colorGroup": 3 }
+        }
+      ]
+    }
+  }
+}
+
+ПРИМЕР (параллелепипед ABCD, прямоугольный, диагональное сечение A, C, D₁, B₁):
+
+{
+  "scene": {
+    "version": 1,
+    "space": "space",
+    "space3d": {
+      "shapeKind": "parallelepiped",
+      "baseVerticesInput": "A, B, C, D",
+      "figureConstraints": { "rectangular": true },
+      "planes": [
+        {
+          "index": 1,
+          "label": "α",
+          "built": true,
+          "definition": {
+            "kind": "threePoints",
+            "a": "A",
+            "b": "C",
+            "c": "D1"
+          }
+        }
+      ],
+      "points": [],
+      "lines": []
+    }
+  }
+}
+
+Подпись верхней вершины в JSON можно писать как "D1" или "D₁" — приложение нормализует.
+
+ЗАДАЧА ВТОРОГО ЭТАПА
+По analysisText и stageData.spaceFigure / stageData.spaceConstructions собери space3d.
+Все элементы условия (сечения, пересечения, отмеченные точки) должны быть built: true.
+Не добавляй построений, которых нет в задании, если пользователь не просил иначе.

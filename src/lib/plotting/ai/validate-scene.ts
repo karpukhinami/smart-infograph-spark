@@ -1,6 +1,7 @@
 import { buildLineScene } from "../line/scene";
 import type { LineSceneData } from "../line/types";
 import { buildScene } from "../scene";
+import { buildSpaceSceneData } from "../space/scene";
 import type { PlotSceneType } from "./types";
 import { mergeAiScene } from "./merge-scene";
 
@@ -72,7 +73,8 @@ export function validatePlotSceneJson(raw: unknown, expectedSceneType: PlotScene
   }
 
   const space = (sceneRaw as { space?: string }).space;
-  const expectedSpace = expectedSceneType === "line" ? "line" : "plane";
+  const expectedSpace =
+    expectedSceneType === "line" ? "line" : expectedSceneType === "space" ? "space" : "plane";
   if (space !== expectedSpace) {
     errors.push(`scene.space должно быть "${expectedSpace}", получено "${String(space)}"`);
   }
@@ -85,7 +87,22 @@ export function validatePlotSceneJson(raw: unknown, expectedSceneType: PlotScene
     return { valid: false, errors };
   }
 
-  if (expectedSceneType === "line") {
+  if (expectedSceneType === "space") {
+    if (!scene.space3d) {
+      errors.push("Для пространства отсутствует scene.space3d");
+      return { valid: false, errors };
+    }
+    if (!scene.space3d.figure) {
+      errors.push("Не удалось построить многогранник (figure)");
+    }
+    const report = buildSpaceSceneData(scene.space3d);
+    if (report.errors.length) {
+      errors.push(...report.errors);
+    }
+    if (!scene.space3d.figure) {
+      return { valid: errors.length === 0, errors };
+    }
+  } else if (expectedSceneType === "line") {
     if (!scene.line) {
       errors.push("Для числовой прямой отсутствует scene.line");
       return { valid: false, errors };

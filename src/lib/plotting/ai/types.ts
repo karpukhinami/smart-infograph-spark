@@ -3,7 +3,7 @@
 /** Что анализировать в сценарии «Нарисовать по заданию» — зарезервировано. */
 export type PlotAiScenario = "draw" | "reproduce" | "analog";
 
-export type PlotSceneType = "plane" | "line";
+export type PlotSceneType = "plane" | "line" | "space";
 
 export interface PlotAnalysisResult {
   canDraw: boolean;

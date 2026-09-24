@@ -35,6 +35,11 @@
 2. Числовая прямая (sceneType = "line"):
    — отдельные точки на прямой;
    — интервалы, лучи и объединения (множества решений неравенств и т. п.).
+3. Пространство (sceneType = "space"):
+   — параллелепипед, пирамида или призма с подписанными вершинами;
+   — дополнительные точки на рёбрах/гранях, прямых и плоскостях (середины, пересечения, сечения);
+   — только если в задании явно нужен чертёж многогранника или стереометрическое построение на нём.
+   — НЕ выбирай space для задач «только график функции» или «только числовая прямая».
 
 Если построение нашим инструментом невозможно — canDraw = false.
 
@@ -43,7 +48,7 @@
 СТРУКТУРА JSON-ОТВЕТА
 {
   "canDraw": boolean,
-  "sceneType": "plane" | "line",
+  "sceneType": "plane" | "line" | "space",
   "analysisText": string,
   "stageData": {
     "targetDescription": string,
@@ -57,9 +62,34 @@
     "lineSets": [ { "kind": "interval"|"ray"|"freeform", "left": string, "right": string, "leftOp": string, "rightOp": string, "rayOp": string, "rayBoundary": string, "display": string, "position": string, "description": string } ],
     "planePoints": [ { "x": string, "y": string, "label": string, "mode": string } ],
     "axisHints": { "xMin": string, "xMax": string, "yMin": string, "yMax": string, "lineMin": string, "lineMax": string },
-    "extraElements": string
+    "extraElements": string,
+
+    "spaceFigure": {
+      "shapeKind": "parallelepiped" | "pyramid" | "prism",
+      "baseVerticesInput": string,
+      "figureConstraints": { "rectangular"?: boolean, "apexOnCenter"?: boolean, "straight"?: boolean },
+      "viewYaw": string,
+      "notes": string
+    },
+    "spaceConstructions": [
+      {
+        "kind": "point" | "line" | "plane",
+        "label": string,
+        "description": string,
+        "definitionSummary": string
+      }
+    ]
   }
 }
+
+Для sceneType = "space":
+— В stageData.spaceFigure укажи тип тела, строку вершин основания (как в условии: «A, B, C, D» или «S, A, B, C» для пирамиды), нужные переключатели геометрии:
+  · parallelepiped: rectangular (true — прямоугольный параллелепипед, боковые грани перпендикулярны основанию);
+  · pyramid: apexOnCenter (true — вершина над центром основания, false — «прямая» пирамида, вершина над первой вершиной основания);
+  · prism: straight (true — «прямая» призма, false — вершина верхнего основания над центром нижнего).
+— viewYaw — только если по условию или картинке нужен поворот (число в градусах, иначе "0").
+— В spaceConstructions перечисли КАЖДое построение из условия: отмеченные точки (середина, точка на ребре), прямые (через две точки, линия пересечения двух плоскостей), плоскости (через три точки, через точку и прямую и т. д.) с кратким definitionSummary (какие вершины/точки участвуют, отношение для середины).
+— Не дублируй в spaceConstructions сами вершины многогранника — они задаются baseVerticesInput.
 
 ТРЕБОВАНИЯ К analysisText
 — Что нужно построить; ответ (если есть); блок «Данные для построения» с уравнениями, интервалами, координатами.

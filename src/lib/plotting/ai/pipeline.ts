@@ -84,7 +84,7 @@ export async function generatePlotScene(opts: {
     sceneType,
   });
   const images = opts.attachedImages.length ? opts.attachedImages : undefined;
-  const schemaHint = generateSchemaHint(opts.scenario);
+  const schemaHint = generateSchemaHint(opts.scenario, sceneType);
 
   async function runOnce(extraSuffix = ""): Promise<unknown> {
     try {

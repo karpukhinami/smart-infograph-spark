@@ -1,0 +1,63 @@
+ДОПОЛНИТЕЛЬНЫЕ ПОСТРОЕНИЯ (points, lines, planes)
+
+Все объекты с "built": true. index — порядковый номер с 1. id не указывай.
+Подписи точек — label; прямые и плоскости могут иметь label ("" — автоподпись).
+
+ТОЧКИ (points[])
+
+definition.kind и поля (ссылки — label вершины тела или уже описанной точки):
+
+- onLine — точка на прямой через две точки
+  pointA, pointB: string (labels)
+  region: "between" | "before" | "after"
+  ratioMode: "auto" | "explicit"
+  ratioA, ratioB: number (если explicit; для between часто 1 и 1 — середина)
+  lineParam: number (опционально; для before/after — положение вне отрезка)
+
+- onFace — точка на грани
+  face: "bottom" | "top" | "base" | "front" | "back" | "left" | "right" | "side:N" (N — номер боковой грани с 0)
+  Для пирамиды/призмы: bottom/base — нижнее основание, top — верхнее (у пирамиды только base и side:N).
+  placement: "arbitrary" | "center"
+  faceU, faceV: number 0…1 (если arbitrary; по умолчанию 0.35)
+
+- onSpaceLine — точка на построенной прямой
+  lineIndex: number (index из lines[])
+  lineParam: number
+
+- linePlaneIntersection — пересечение прямой и плоскости
+  lineIndex: number
+  planeIndex: number
+
+- planeEdgeIntersection — пересечение плоскости и ребра тела
+  planeIndex: number
+  edge: string — две буквы ребра без пробела, например "AB" (вершины тела)
+
+- planeIntersectionBoundary — конец отрезка пересечения двух плоскостей внутри тела
+  planeAIndex, planeBIndex: number
+  endpoint: 0 | 1
+
+ПРЯМЫЕ (lines[])
+
+definition:
+- twoPoints: a, b — labels точек (вершины или points[])
+  style.visualKind: "segment" | "line" | "vector" (по умолчанию segment)
+
+- planeIntersection: planeAIndex, planeBIndex — index плоскостей; пересечение двух плоскостей
+
+ПЛОСКОСТИ (planes[])
+
+definition:
+- threePoints: a, b, c — labels
+- pointAndLine: point (label), lineIndex
+- twoLines: lineAIndex, lineBIndex
+- lineParallelToLine: throughLineIndex, parallelToLineIndex
+
+style: только colorGroup (1–6) при необходимости; visible по умолчанию true.
+
+ПОРЯДОК
+1) Сначала опиши фигуру (shapeKind, baseVerticesInput, constraints).
+2) points, которые не зависят от lines/planes.
+3) lines.
+4) planes и точки пересечений (linePlaneIntersection, planeEdgeIntersection, …).
+
+При сомнении в параметрах onLine для середины: region "between", ratioMode "explicit", ratioA 1, ratioB 1.
