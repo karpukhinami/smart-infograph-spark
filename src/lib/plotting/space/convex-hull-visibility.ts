@@ -4,7 +4,8 @@
 import { projectFromLocalCoeffs } from "./camera";
 import type { ResolvedSpaceScene } from "./build";
 import { locatePointOnFigureEdge } from "./display-projection";
-import { faceById, isSchoolExtrusionFigure } from "./figure";
+import { faceById, isPrism, isPyramid, isSchoolExtrusionFigure } from "./figure";
+import { isBodyEdgeVisiblePrism, isFaceVisiblePrism } from "./prism-visibility";
 import type { BuiltSpacePoint } from "./types";
 import {
   buildPyramidObserver,
@@ -225,7 +226,7 @@ export function buildProjectionConvexHull(
   }
 
   let soleDashedBodyEdgeKey: string | null = null;
-  if (isSchoolExtrusionFigure(body) && interiorVertexIds.size === 0) {
+  if (isPyramid(body) && interiorVertexIds.size === 0) {
     soleDashedBodyEdgeKey = computeSoleDashedBaseEdgeKey(body, projected, hullEdgeKeys);
   }
 
@@ -328,9 +329,18 @@ function isPointOnHiddenBodyEdge(
   figure: SpaceFigure,
   points: Map<string, BuiltSpacePoint>,
   hull: ProjectionHull,
+  view: SpaceViewParams,
+  resolved: ResolvedSpaceScene,
 ): boolean {
   const on = locatePointOnFigureEdge(world, figure, points);
   if (!on) return false;
+  if (isPrism(figure)) {
+    const edge = figure.edges.find(
+      (e) =>
+        (e.aId === on.aId && e.bId === on.bId) || (e.aId === on.bId && e.bId === on.aId),
+    );
+    if (edge) return !isBodyEdgeVisiblePrism(edge.id, figure, resolved, view);
+  }
   return !isBodyEdgeVisibleProjectionHull(on.aId, on.bId, hull);
 }
 
@@ -339,9 +349,12 @@ function pointOnHiddenFace(
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   hull: ProjectionHull,
+  view: SpaceViewParams,
 ): boolean {
   for (const face of figure.faces) {
-    if (isFaceVisibleProjectionHull(face.id, figure, hull)) continue;
+    if (isPrism(figure)) {
+      if (isFaceVisiblePrism(face.id, figure, resolved, view)) continue;
+    } else if (isFaceVisibleProjectionHull(face.id, figure, hull)) continue;
     const verts = faceWorldPoints(face.id, figure, resolved);
     if (pointInFaceTriangle(p, verts)) return true;
   }
@@ -355,16 +368,28 @@ export function isWorldSegmentVisibleProjectionHull(
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
   hull: ProjectionHull,
+  view: SpaceViewParams,
 ): boolean {
   const aId = matchFigureVertexAtWorld(aWorld, figure, resolved);
   const bId = matchFigureVertexAtWorld(bWorld, figure, resolved);
-  if (aId && hull.interiorVertexIds.has(aId)) return false;
-  if (bId && hull.interiorVertexIds.has(bId)) return false;
-  if (aId && bId) return isBodyEdgeVisibleProjectionHull(aId, bId, hull);
+  if (isPyramid(figure)) {
+    if (aId && hull.interiorVertexIds.has(aId)) return false;
+    if (bId && hull.interiorVertexIds.has(bId)) return false;
+  }
+  if (aId && bId) {
+    if (isPrism(figure)) {
+      const edge = figure.edges.find(
+        (e) =>
+          (e.aId === aId && e.bId === bId) || (e.aId === bId && e.bId === aId),
+      );
+      if (edge) return isBodyEdgeVisiblePrism(edge.id, figure, resolved, view);
+    }
+    return isBodyEdgeVisibleProjectionHull(aId, bId, hull);
+  }
 
   if (
-    isPointOnHiddenBodyEdge(aWorld, figure, resolved.points, hull) &&
-    isPointOnHiddenBodyEdge(bWorld, figure, resolved.points, hull)
+    isPointOnHiddenBodyEdge(aWorld, figure, resolved.points, hull, view, resolved) &&
+    isPointOnHiddenBodyEdge(bWorld, figure, resolved.points, hull, view, resolved)
   ) {
     return false;
   }
@@ -372,7 +397,7 @@ export function isWorldSegmentVisibleProjectionHull(
   if (isSegmentInsidePyramidVolume(aWorld, bWorld, figure, resolved)) return false;
 
   const mid = scale(add(aWorld, bWorld), 0.5);
-  if (pointOnHiddenFace(mid, figure, resolved, hull)) return false;
+  if (pointOnHiddenFace(mid, figure, resolved, hull, view)) return false;
   return true;
 }
 
@@ -388,7 +413,7 @@ export function splitLineProjectionHull(
 ): LineSplitSegment[] {
   const a = add(originWorld, scale(dirWorld, t0));
   const b = add(originWorld, scale(dirWorld, t1));
-  const visible = isWorldSegmentVisibleProjectionHull(a, b, figure, resolved, hull);
+  const visible = isWorldSegmentVisibleProjectionHull(a, b, figure, resolved, hull, view);
   return [{ a, b, visible }];
 }
 

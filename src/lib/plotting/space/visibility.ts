@@ -9,7 +9,8 @@ import {
   type ProjectionHull,
 } from "./convex-hull-visibility";
 import { isSegmentInsidePyramidVolume } from "./pyramid-view";
-import { edgeById, faceById, isSchoolExtrusionFigure } from "./figure";
+import { edgeById, faceById, isPrism, isPyramid, isSchoolExtrusionFigure } from "./figure";
+import { isBodyEdgeVisiblePrism, isFaceVisiblePrism } from "./prism-visibility";
 import type { LineSplitSegment, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, cross, dot, len, normalize, scale, sub, worldToLocal, type PlaneEq } from "./vec3";
 import { viewDirectionLocal } from "./camera";
@@ -429,7 +430,7 @@ function projectionHullForFigure(
   return projectionHullCache;
 }
 
-/** Пунктир по выпуклой оболочке 2D-проекции вершин. */
+/** Пунктир по выпуклой оболочке 2D-проекции вершин (пирамида). */
 function isBodyEdgeVisiblePyramid(
   edgeId: string,
   figure: SpaceFigure,
@@ -450,7 +451,8 @@ export function isBodyEdgeVisibleForRender(
   view: SpaceViewParams,
 ): boolean {
   const body = resolved.figure ?? figure;
-  if (isSchoolExtrusionFigure(body)) return isBodyEdgeVisiblePyramid(edgeId, body, resolved, view);
+  if (isPyramid(body)) return isBodyEdgeVisiblePyramid(edgeId, body, resolved, view);
+  if (isPrism(body)) return isBodyEdgeVisiblePrism(edgeId, body, resolved, view);
   if (getVisibilityMode(view) === "legacy") return isBodyEdgeVisible(edgeId, figure);
   return isBodyEdgeVisibleSchool(edgeId, figure, resolved.projection);
 }
@@ -518,7 +520,9 @@ function splitLinePyramid(
         pointInFace3D(mid, f.vertexIds, resolved.points),
     );
     if (onFace) {
-      visible = isFaceVisibleProjectionHull(onFace.faceId, body, hull);
+      visible = isPrism(body)
+        ? isFaceVisiblePrism(onFace.faceId, body, resolved, view)
+        : isFaceVisibleProjectionHull(onFace.faceId, body, hull);
     } else if (isSegmentInsidePyramidVolume(mid, mid, body, resolved)) {
       visible = false;
     } else {
