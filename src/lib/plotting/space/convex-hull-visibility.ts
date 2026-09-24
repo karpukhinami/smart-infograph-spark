@@ -5,8 +5,7 @@ import { projectFromLocalCoeffs } from "./camera";
 import type { ResolvedSpaceScene } from "./build";
 import { locatePointOnFigureEdge } from "./display-projection";
 import { faceById, isPyramid } from "./figure";
-import type { PyramidFigure } from "./types";
-import type { BuiltSpacePoint } from "./build";
+import type { BuiltSpacePoint, PyramidFigure } from "./types";
 import {
   buildPyramidObserver,
   isSegmentInsidePyramidVolume,

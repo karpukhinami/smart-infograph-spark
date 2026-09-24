@@ -853,7 +853,9 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
         obstacles,
         true,
       );
-      renderPlaneHelperLines(plane, section, data, figure, resolved, fit, occlusion, parts, obstacles);
+      // В режиме глубины показываем только истинные попарные пересечения ниже.
+      // Вспомогательные линии от опорных точек визуально выдавали себя за
+      // дополнительные пересечения, особенно у трёх плоскостей.
     }
   } else {
     for (const plane of data.planes) {

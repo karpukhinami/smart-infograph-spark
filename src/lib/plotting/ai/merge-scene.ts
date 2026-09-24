@@ -22,7 +22,8 @@ export function mergeAiScene(raw: unknown): PlotScene {
   const input = (cleaned ?? {}) as Partial<PlotScene> & {
     grid?: Partial<GridSpec> & { followAxisStep?: boolean; stepX?: string; stepY?: string };
   };
-  const legacyGrid = input.grid ?? {};
+  const legacyGrid: Partial<GridSpec> & { followAxisStep?: boolean; stepX?: string; stepY?: string } =
+    input.grid ?? {};
   const isLine = input.space === "line";
 
   if (isLine) {
@@ -50,7 +51,7 @@ export function mergeAiScene(raw: unknown): PlotScene {
             ...set,
             index,
             math: { ...defaults.math, ...set.math },
-            style: normalizeAiSetStyle(set.style as Record<string, unknown>, defaults.style, index),
+            style: normalizeAiSetStyle(set.style as unknown as Record<string, unknown>, defaults.style, index),
             built: null,
             dirty: true,
             error: null,
@@ -65,7 +66,7 @@ export function mergeAiScene(raw: unknown): PlotScene {
             index,
             math: { ...defaults.math, ...point.math },
             style: normalizeAiLinePointStyle(
-              point.style as Record<string, unknown>,
+              point.style as unknown as Record<string, unknown>,
               defaults.style,
               index,
             ),
@@ -98,7 +99,7 @@ export function mergeAiScene(raw: unknown): PlotScene {
         ...graph,
         index,
         math: { ...defaults.math, ...graph.math },
-        style: normalizeAiGraphStyle(graph.style as Record<string, unknown>, defaults.style, index),
+        style: normalizeAiGraphStyle(graph.style as unknown as Record<string, unknown>, defaults.style, index),
         built: null,
         dirty: true,
         error: null,
@@ -114,7 +115,7 @@ export function mergeAiScene(raw: unknown): PlotScene {
         math: { ...defaults.math, ...point.math },
         style: {
           ...defaults.style,
-          ...normalizeAiPointStyle(point.style as Record<string, unknown>, defaults.style, index),
+          ...normalizeAiPointStyle(point.style as unknown as Record<string, unknown>, defaults.style, index),
         },
         built: null,
         dirty: true,

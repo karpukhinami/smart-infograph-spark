@@ -963,7 +963,8 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       grid?: Partial<GridSpec> & { followAxisStep?: boolean; stepX?: string; stepY?: string };
       space3d?: unknown;
     };
-    const legacyGrid = input.grid ?? {};
+    const legacyGrid: Partial<GridSpec> & { followAxisStep?: boolean; stepX?: string; stepY?: string } =
+      input.grid ?? {};
     const isLine = input.space === "line";
     const isSpace =
       input.space === "space" || (input.space3d != null && typeof input.space3d === "object" && !isLine);
