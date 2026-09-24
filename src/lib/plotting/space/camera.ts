@@ -508,6 +508,7 @@ export const DEFAULT_SPACE_VIEW: SpaceViewParams = {
   heightLength: DEFAULT_HEIGHT_LENGTH,
   visibilityMode: "school",
   planeFillByDepth: false,
+  showPlaneIntersections: false,
   planeFillDepthMode: "plane",
 };
 

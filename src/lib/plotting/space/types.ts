@@ -142,12 +142,27 @@ export type PointAtLinePlaneIntersectionDefinition = {
   planeId: string;
 };
 
+export type PointAtPlaneEdgeIntersectionDefinition = {
+  kind: "planeEdgeIntersection";
+  planeId: string;
+  edgeId: string;
+};
+
+export type PointAtPlaneIntersectionBoundaryDefinition = {
+  kind: "planeIntersectionBoundary";
+  planeAId: string;
+  planeBId: string;
+  endpoint: 0 | 1;
+};
+
 export type SpacePointDefinition =
   | { kind: "builtin"; vertexId: string }
   | PointOnLineDefinition
   | PointOnFaceDefinition
   | PointOnSpaceLineDefinition
-  | PointAtLinePlaneIntersectionDefinition;
+  | PointAtLinePlaneIntersectionDefinition
+  | PointAtPlaneEdgeIntersectionDefinition
+  | PointAtPlaneIntersectionBoundaryDefinition;
 
 export interface SpacePointStyle {
   color: string;
@@ -178,7 +193,13 @@ export type LinearVisualKind = "segment" | "line" | "vector";
 
 export type SpaceLineDefinition =
   | { kind: "twoPoints"; aId: string; bId: string }
-  | { kind: "planeIntersection"; planeAId: string; planeBId: string };
+  | {
+      kind: "planeIntersection";
+      planeAId: string;
+      planeBId: string;
+      endpointAId?: string;
+      endpointBId?: string;
+    };
 
 export interface SpaceLineStyle {
   color: string;
@@ -255,6 +276,8 @@ export interface SpaceViewParams {
   visibilityMode?: "school" | "legacy";
   /** Заливка плоскостей с учётом глубины (разбиение по линиям пересечения). */
   planeFillByDepth?: boolean;
+  /** Показывать автоматические пунктирные линии пересечения плоскостей. */
+  showPlaneIntersections?: boolean;
   /**
    * Как считать глубину для сортировки заливок:
    * - `eye` — пирамида: вдоль луча к «глазу» (4,4,1); параллелепипед: школьная ось (без глаза).

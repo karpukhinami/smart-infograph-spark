@@ -750,10 +750,22 @@ function renderPlanesByDepth(
     }
   }
 
-  // Для каждой конкретной пары используем только две зафиксированные точки,
-  // в которых её прямая пересекает грани тела. Автоматическая линия всегда
-  // пунктирная: видимость, совпадение с рёбрами и экранные эвристики здесь
-  // намеренно не участвуют.
+}
+
+function renderAutomaticPlaneIntersections(
+  data: SpaceSceneData,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  fit: { scale: number; cx: number; cy: number },
+  parts: string[],
+  obstacles: Obstacle[],
+): void {
+  if (!data.view.showPlaneIntersections) return;
+  const visiblePlanes = data.planes.filter((plane) => plane.built && plane.style.visible);
+  const eps = 1e-9;
+  const width = data.appearance.lineWidth;
+  // Для каждой пары используем только две точки пересечения её носителя с
+  // гранями тела. Видимость и совпадения с другими линиями не анализируются.
   for (let i = 0; i < visiblePlanes.length; i += 1) {
     const first = visiblePlanes[i]!;
     const firstEq = resolved.planes.get(first.id);
@@ -1022,6 +1034,7 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
       renderPlane(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
     }
   }
+  renderAutomaticPlaneIntersections(data, figure, resolved, fit, parts, obstacles);
 
   for (const line of data.lines) {
     renderLineObject(line, data, figure, resolved, fit, occlusion, parts, obstacles);

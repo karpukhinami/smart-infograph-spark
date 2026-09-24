@@ -51,6 +51,7 @@ import type {
 import {
   buildSpaceSceneData,
   createAuxiliaryLineForPoint,
+  createDerivedPoints,
   createFigureFromInput,
   figureVertexInputString,
   resolvePointLabelInput,
@@ -60,6 +61,8 @@ import {
   createSpaceLine,
   createSpacePlane,
   createSpacePoint,
+  derivedLineChoices,
+  derivedPointChoices,
   nextFreePointLabel,
   reindexSpace,
 } from "./space/scene";
@@ -81,7 +84,7 @@ import { refreshPyramidVertices } from "./space/pyramid";
 import { deserializeSpaceSceneData } from "./space/serialize";
 
 export interface SpacePointDraft {
-  mode: "onLine" | "onFace" | "linePlaneIntersection";
+  mode: "onLine" | "onFace" | "linePlaneIntersection" | "fromConstruction";
   label: string;
   pointAId: string;
   pointBId: string;
@@ -94,15 +97,17 @@ export interface SpacePointDraft {
   placement: "arbitrary" | "center";
   lineId: string;
   planeId: string;
+  derivedId: string;
 }
 
 export interface SpaceLineDraft {
-  kind: "twoPoints" | "planeIntersection";
+  kind: "twoPoints" | "planeIntersection" | "fromConstruction";
   visualKind: LinearVisualKind;
   aId: string;
   bId: string;
   planeAId: string;
   planeBId: string;
+  derivedId: string;
 }
 
 export interface SpacePlaneDraft {
@@ -1194,6 +1199,7 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const verts = data.figure.vertices;
     const firstLineId = data.figure.edges[0]?.id ?? data.lines.find((line) => line.built)?.id ?? "";
     const firstPlaneId = data.figure.faces[0]?.id ?? data.planes.find((plane) => plane.built)?.id ?? "";
+    const firstDerivedId = derivedPointChoices(data)[0]?.id ?? "";
     set({
       spacePointDraft: {
         mode: "onLine",
@@ -1209,6 +1215,7 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
         placement: "arbitrary",
         lineId: firstLineId,
         planeId: firstPlaneId,
+        derivedId: firstDerivedId,
       },
       spacePointDraftError: null,
     });
@@ -1227,6 +1234,30 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const draft = state.spacePointDraft;
     const data = state.scene.space3d;
     if (!draft || !data?.figure) return;
+
+    if (draft.mode === "fromConstruction") {
+      const choice = derivedPointChoices(data).find((item) => item.id === draft.derivedId);
+      if (!choice) {
+        set({ spacePointDraftError: "Выберите доступное построение." });
+        return;
+      }
+      const additions = createDerivedPoints(data, choice);
+      if (!additions.length) {
+        set({ spacePointDraftError: "Это построение больше недоступно." });
+        return;
+      }
+      const result = applySpaceBuild({
+        ...state.scene,
+        space3d: { ...data, points: [...data.points, ...additions] },
+      });
+      set({
+        scene: result.scene,
+        status: result.status,
+        spacePointDraft: null,
+        spacePointDraftError: null,
+      });
+      return;
+    }
 
     const definition =
       draft.mode === "onLine"
@@ -1355,6 +1386,7 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     if (!data?.figure) return;
     const verts = data.figure.vertices;
     const faces = data.figure.faces;
+    const firstDerivedId = derivedLineChoices(data)[0]?.id ?? "";
     set({
       spaceLineDraft: {
         kind: "twoPoints",
@@ -1363,6 +1395,7 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
         bId: verts[3]!.id,
         planeAId: faces.find((f) => f.id === "f-left")?.id ?? faces[0]!.id,
         planeBId: faces.find((f) => f.id === "f-back")?.id ?? faces[1]!.id,
+        derivedId: firstDerivedId,
       },
       spaceLineDraftError: null,
     });
@@ -1381,6 +1414,10 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
     const draft = state.spaceLineDraft;
     const data = state.scene.space3d;
     if (!draft || !data?.figure) return;
+    if (draft.kind === "fromConstruction" && !draft.derivedId) {
+      set({ spaceLineDraftError: "Выберите доступное построение." });
+      return;
+    }
     if (draft.kind === "twoPoints" && draft.aId === draft.bId) {
       set({ spaceLineDraftError: "Выберите две различные точки." });
       return;
@@ -1389,18 +1426,47 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
       set({ spaceLineDraftError: "Выберите две различные плоскости." });
       return;
     }
+    const derivedChoice = draft.kind === "fromConstruction"
+      ? derivedLineChoices(data).find((item) => item.id === draft.derivedId)
+      : null;
+    if (draft.kind === "fromConstruction" && !derivedChoice) {
+      set({ spaceLineDraftError: "Это построение больше недоступно." });
+      return;
+    }
     const definition: SpaceLineDefinition =
       draft.kind === "twoPoints"
         ? { kind: "twoPoints", aId: draft.aId, bId: draft.bId }
-        : { kind: "planeIntersection", planeAId: draft.planeAId, planeBId: draft.planeBId };
+        : {
+            kind: "planeIntersection",
+            planeAId: derivedChoice?.planeAId ?? draft.planeAId,
+            planeBId: derivedChoice?.planeBId ?? draft.planeBId,
+          };
     const line = createSpaceLine(data.lines.length + 1, definition, "");
     line.style.visualKind = draft.visualKind;
     line.built = true;
-    const lines = [...data.lines, line];
+    let lines = [...data.lines, line];
     let points = data.points;
-    if (draft.kind === "planeIntersection") {
+    if (draft.kind === "planeIntersection" || draft.kind === "fromConstruction") {
       const endpoints = createPlaneIntersectionEndpoints({ ...data, lines }, line);
-      if (endpoints.length) points = [...points, ...endpoints];
+      if (endpoints.length) {
+        points = [...points, ...endpoints];
+      }
+      if (line.definition.kind === "planeIntersection") {
+        const pairKey = [line.definition.planeAId, line.definition.planeBId].sort().join(":");
+        const pairPoints = points
+          .filter((point) => point.definition.kind === "planeIntersectionBoundary"
+            && [point.definition.planeAId, point.definition.planeBId].sort().join(":") === pairKey)
+          .sort((a, b) => {
+            if (a.definition.kind !== "planeIntersectionBoundary" || b.definition.kind !== "planeIntersectionBoundary") return 0;
+            return a.definition.endpoint - b.definition.endpoint;
+          });
+        line.definition = {
+          ...line.definition,
+          endpointAId: pairPoints[0]?.id,
+          endpointBId: pairPoints[1]?.id,
+        };
+      }
+      lines = [...data.lines, line];
     }
     const result = applySpaceBuild({
       ...state.scene,

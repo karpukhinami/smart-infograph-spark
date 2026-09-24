@@ -60,6 +60,10 @@ export function SpacePointCard({ point }: { point: SpacePoint }) {
                   ? "на грани"
                   : def.kind === "linePlaneIntersection"
                     ? "пересечение прямой и плоскости"
+                    : def.kind === "planeEdgeIntersection"
+                      ? "пересечение плоскости и ребра"
+                      : def.kind === "planeIntersectionBoundary"
+                        ? "граница пересечения плоскостей"
                     : ""}
               {!point.built ? " · не построена" : point.dirty ? " · изменена" : ""}
               {point.error ? ` · ${point.error}` : ""}

@@ -163,6 +163,11 @@ function resolvePoint(
     return { built: null, error: null };
   }
 
+  if (def.kind === "planeEdgeIntersection" || def.kind === "planeIntersectionBoundary") {
+    // Эти формулы зависят от уже разрешённых плоскостей и вычисляются ниже.
+    return { built: null, error: null };
+  }
+
   if (def.kind === "onFace") {
     if (def.placement === "center") {
       const face = faceById(figure, def.faceId);
@@ -405,6 +410,69 @@ export function buildSpaceScene(data: SpaceSceneData): ResolvedSpaceScene {
   }
 
   for (const point of data.points) {
+    if (point.definition.kind === "planeEdgeIntersection") {
+      const def = point.definition;
+      const edge = edgeById(figure, def.edgeId);
+      const plane = planes.get(def.planeId);
+      const a = edge ? points.get(edge.aId)?.world : null;
+      const b = edge ? points.get(edge.bId)?.world : null;
+      if (!edge || !a || !b) {
+        pointErrors.set(point.id, "Ребро не найдено.");
+        continue;
+      }
+      if (!plane) {
+        pointErrors.set(point.id, "Плоскость не построена.");
+        continue;
+      }
+      const world = segmentPlaneIntersection(a, b, plane);
+      if (!world) {
+        pointErrors.set(point.id, "Плоскость не пересекает выбранное ребро в одной точке.");
+        continue;
+      }
+      const local = worldToLocal(world, basis);
+      if (!local) {
+        pointErrors.set(point.id, "Не удалось вычислить координаты точки.");
+        continue;
+      }
+      points.set(point.id, { local, world });
+      pointErrors.delete(point.id);
+      continue;
+    }
+
+    if (point.definition.kind === "planeIntersectionBoundary") {
+      const def = point.definition;
+      const planeA = planes.get(def.planeAId);
+      const planeB = planes.get(def.planeBId);
+      const carrier = planeA && planeB ? intersectPlanes(planeA, planeB) : null;
+      if (!carrier) {
+        pointErrors.set(point.id, "Плоскости не построены или параллельны.");
+        continue;
+      }
+      const range = planeIntersectionSegmentRange(
+        carrier,
+        def.planeAId,
+        def.planeBId,
+        figure,
+        points,
+        planes,
+        basis,
+      );
+      if (!range) {
+        pointErrors.set(point.id, "Линия пересечения не проходит через фигуру.");
+        continue;
+      }
+      const t = def.endpoint === 0 ? range.t0 : range.t1;
+      const world = add(carrier.origin, scale(carrier.dir, t));
+      const local = worldToLocal(world, basis);
+      if (!local) {
+        pointErrors.set(point.id, "Не удалось вычислить координаты точки.");
+        continue;
+      }
+      points.set(point.id, { local, world });
+      pointErrors.delete(point.id);
+      continue;
+    }
+
     if (point.definition.kind === "linePlaneIntersection") {
       const def = point.definition;
       const carrier = resolveCarrierRef(def.lineId, figure, points, planes, data.lines);
