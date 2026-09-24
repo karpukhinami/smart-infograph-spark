@@ -267,7 +267,7 @@ function outwardFaceNormal(
   return n;
 }
 
-function isFaceFrontFacingFigure(
+export function isFaceFrontFacingFigure(
   faceId: string,
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,

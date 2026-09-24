@@ -11,8 +11,8 @@ import {
   defaultParallelepipedConstraints,
   defaultPrismConstraints,
   defaultPyramidConstraints,
-  getPointLabel,
 } from "./scene";
+import { getPointLabel } from "./build";
 import { faceDisplayLabel } from "./figure";
 import type {
   ParallelepipedConstraints,
@@ -302,6 +302,7 @@ export function expandAiSpaceScene(rawSpace3d: unknown): SpaceSceneData {
   if (!figure || error) {
     throw new Error(error ?? "Не удалось создать фигуру");
   }
+  const body = figure;
 
   const viewRaw = (input.view ?? {}) as Record<string, unknown>;
   const yaw = typeof viewRaw.yaw === "number" && Number.isFinite(viewRaw.yaw) ? viewRaw.yaw : base.view.yaw;
@@ -311,7 +312,7 @@ export function expandAiSpaceScene(rawSpace3d: unknown): SpaceSceneData {
     shapeKind,
     baseVerticesInput,
     figureConstraints,
-    figure,
+    figure: body,
     figureDirty: false,
     view: { ...base.view, yaw },
     points: [],
@@ -339,7 +340,7 @@ export function expandAiSpaceScene(rawSpace3d: unknown): SpaceSceneData {
     const label = String(row.label ?? `T${index}`);
     const def = mapPointDefinition(
       (row.definition ?? {}) as LooseDef,
-      figure,
+      body,
       data,
       lines,
       planes,
@@ -361,7 +362,7 @@ export function expandAiSpaceScene(rawSpace3d: unknown): SpaceSceneData {
     const index = Number(row.index ?? i + 1);
     const def = mapLineDefinition(
       (row.definition ?? {}) as LooseDef,
-      figure,
+      body,
       data,
       lines,
       data.planes,
@@ -387,7 +388,7 @@ export function expandAiSpaceScene(rawSpace3d: unknown): SpaceSceneData {
     const index = Number(row.index ?? i + 1);
     const def = mapPlaneDefinition(
       (row.definition ?? {}) as LooseDef,
-      figure,
+      body,
       data,
       lines,
       pendingPoints,
