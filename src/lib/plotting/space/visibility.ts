@@ -104,6 +104,27 @@ function depthOnFace(px: number, py: number, verts: ScreenVert[]): number {
     const w2 = 1 - w0 - w1;
     return w0 * v0!.depth + w1 * v1!.depth + w2 * v2!.depth;
   }
+  if (verts.length > 4) {
+    // Основание пирамиды может быть пятиугольным и больше. Прежний общий
+    // путь фактически читал только первые четыре вершины как параллелограмм,
+    // поэтому на остальных секторах основания получалась чужая глубина и
+    // лежащая прямо на видимой грани линия ошибочно становилась пунктирной.
+    const v0 = verts[0]!;
+    for (let i = 1; i + 1 < verts.length; i += 1) {
+      const v1 = verts[i]!;
+      const v2 = verts[i + 1]!;
+      const den =
+        (v1.y - v2.y) * (v0.y * 0 + v0.x - v2.x) +
+        (v2.x - v1.x) * (v0.y - v2.y);
+      if (Math.abs(den) < 1e-12) continue;
+      const w0 = ((v1.y - v2.y) * (px - v2.x) + (v2.x - v1.x) * (py - v2.y)) / den;
+      const w1 = ((v2.y - v0.y) * (px - v2.x) + (v0.x - v2.x) * (py - v2.y)) / den;
+      const w2 = 1 - w0 - w1;
+      if (w0 < -1e-7 || w1 < -1e-7 || w2 < -1e-7) continue;
+      return w0 * v0.depth + w1 * v1.depth + w2 * v2.depth;
+    }
+    return verts.reduce((sum, vertex) => sum + vertex.depth, 0) / verts.length;
+  }
   const [v0, v1, v2, v3] = verts;
   const denom = (v2!.x - v0!.x) * (v3!.y - v0!.y) - (v2!.y - v0!.y) * (v3!.x - v0!.x);
   if (Math.abs(denom) < 1e-12) {
