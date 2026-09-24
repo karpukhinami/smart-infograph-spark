@@ -708,10 +708,12 @@ function renderPlanesByDepth(
       const b = add(carrier.origin, scale(carrier.dir, range.t1));
       const pa = projectWorld(a, resolved, data.view, fit, figure);
       const pb = projectWorld(b, resolved, data.view, fit, figure);
+      const bodyEdgeVisibility = inheritedBodyEdgeVisibility(a, b, figure, resolved, data.view);
+      const dash = bodyEdgeVisibility === true ? "" : ` stroke-dasharray="${data.appearance.hiddenDash}"`;
       parts.push(
-        `<line x1="${round(pa.x)}" y1="${round(pa.y)}" x2="${round(pb.x)}" y2="${round(pb.y)}" stroke="${first.style.color}" stroke-width="${width}" stroke-dasharray="${data.appearance.hiddenDash}" stroke-linecap="round"/>`,
+        `<line x1="${round(pa.x)}" y1="${round(pa.y)}" x2="${round(pb.x)}" y2="${round(pb.y)}" stroke="${first.style.color}" stroke-width="${width}"${dash} stroke-linecap="round"/>`,
       );
-      obstacles.push(lineObstacle(pa.x, pa.y, pb.x, pb.y, "helper"));
+      obstacles.push(lineObstacle(pa.x, pa.y, pb.x, pb.y, bodyEdgeVisibility === true ? "curve" : "helper"));
     }
   }
 }
