@@ -379,6 +379,28 @@ function renderPlaneFillPolygon(
   parts: string[],
 ): void {
   if (vertices.length < 3) return;
+  if (isPyramid(figure)) {
+    const midpoint = (a: Vec3, b: Vec3): Vec3 => scale(add(a, b), 0.5);
+    const renderTriangle = (a: Vec3, b: Vec3, c: Vec3, level: number): void => {
+      if (level > 0) {
+        const ab = midpoint(a, b);
+        const bc = midpoint(b, c);
+        const ca = midpoint(c, a);
+        renderTriangle(a, ab, ca, level - 1);
+        renderTriangle(ab, b, bc, level - 1);
+        renderTriangle(ca, bc, c, level - 1);
+        renderTriangle(ab, bc, ca, level - 1);
+        return;
+      }
+      const screenPts = [a, b, c].map((w) => projectWorld(w, resolved, data.view, fit, figure));
+      const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
+      parts.push(`<polygon points="${poly}" fill="${color}" fill-opacity="${fillOpacity}" stroke="none"/>`);
+    };
+    for (let i = 1; i + 1 < vertices.length; i += 1) {
+      renderTriangle(vertices[0]!, vertices[i]!, vertices[i + 1]!, 2);
+    }
+    return;
+  }
   const screenPts = vertices.map((w) => projectWorld(w, resolved, data.view, fit, figure));
   const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
   parts.push(
@@ -532,7 +554,7 @@ function pointSegDist(p: Vec3, a: Vec3, b: Vec3): number {
 }
 
 /** Непрозрачность заливки плоскостей в режиме глубины. */
-const DEPTH_PLANE_FILL_OPACITY = 0.32;
+const DEPTH_PLANE_FILL_OPACITY = 0.45;
 
 /**
  * Рисование плоскостей «художником» от дальних фрагментов к ближним.

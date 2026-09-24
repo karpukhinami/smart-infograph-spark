@@ -303,10 +303,33 @@ export function genericAffineLocalToView(
   const st = Math.sin(yawRad);
   const ur = u * ct - v * st;
   const vr = u * st + v * ct;
+  const xu = b.x - a.x;
+  const xv = d.x - a.x;
+  const yu = b.y - a.y;
+  const yv = d.y - a.y;
+  // Глубина обязана быть направлена точно вдоль луча этой же экранной
+  // проекции. Прежняя формула через kx/ky описывала исходный косоугольный
+  // вид, но не текущую эллиптическую орбиту и после половины оборота могла
+  // менять визуальный порядок ближнего и дальнего.
+  let depthAxis = {
+    u: xv * kwy - kwx * yv,
+    v: kwx * yu - xu * kwy,
+    w: xu * yv - xv * yu,
+  };
+  const legacyAxis = { u: ct - kx * st, v: -st - kx * ct, w: -ky / kw };
+  if (
+    depthAxis.u * legacyAxis.u +
+      depthAxis.v * legacyAxis.v +
+      depthAxis.w * legacyAxis.w <
+    0
+  ) {
+    depthAxis = { u: -depthAxis.u, v: -depthAxis.v, w: -depthAxis.w };
+  }
+  const depthLength = Math.hypot(depthAxis.u, depthAxis.v, depthAxis.w) || 1;
   return {
-    x: a.x + u * (b.x - a.x) + v * (d.x - a.x) + kwx * w,
-    y: a.y + u * (b.y - a.y) + v * (d.y - a.y) + kwy * w,
-    z: ur - kx * vr - (ky / kw) * w,
+    x: a.x + u * xu + v * xv + kwx * w,
+    y: a.y + u * yu + v * yv + kwy * w,
+    z: (u * depthAxis.u + v * depthAxis.v + w * depthAxis.w) / depthLength,
   };
 }
 
