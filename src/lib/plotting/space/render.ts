@@ -65,6 +65,30 @@ function lineObstacle(x1: number, y1: number, x2: number, y2: number, kind: Obst
   return { kind, points: [[x1, y1], [x2, y2]] };
 }
 
+/** Если отрезок целиком лежит на ребре тела, возвращает видимость этого ребра. */
+function inheritedBodyEdgeVisibility(
+  aWorld: Vec3,
+  bWorld: Vec3,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  view: SpaceSceneData["view"],
+): boolean | null {
+  let sizeRef = 1;
+  for (const vertex of figure.vertices) {
+    const world = resolved.points.get(vertex.id)?.world;
+    if (world) sizeRef = Math.max(sizeRef, len(world));
+  }
+  const eps = sizeRef * 1e-5;
+  for (const edge of figure.edges) {
+    const edgeA = resolved.points.get(edge.aId)?.world;
+    const edgeB = resolved.points.get(edge.bId)?.world;
+    if (!edgeA || !edgeB) continue;
+    if (pointSegDist(aWorld, edgeA, edgeB) > eps || pointSegDist(bWorld, edgeA, edgeB) > eps) continue;
+    return isBodyEdgeVisibleForRender(edge.id, figure, resolved, view);
+  }
+  return null;
+}
+
 /** Рисует отрезок с учётом грани (видимая/скрытая) или окклюзии тела. */
 function drawSegmentWithVisibility(
   aWorld: Vec3,
@@ -84,14 +108,22 @@ function drawSegmentWithVisibility(
   skipHiddenSegments = false,
   /** Для границ сечения пирамиды нужна проверка по глубине поверхности, а не по оболочке вершин. */
   useSurfaceDepth = false,
+  /** Совпадающая с ребром тела граница обязана повторять его штрих. */
+  inheritBodyEdgeStroke = false,
 ): void {
   const dir = sub(bWorld, aWorld);
   const abLen = len(dir);
   if (!(abLen > 1e-9)) return;
   const unit = scale(dir, 1 / abLen);
-  const segments = useSurfaceDepth
-    ? splitLineByVisibility(aWorld, unit, 0, abLen, figure, resolved, view, occlusion)
-    : splitLineForRender(aWorld, unit, 0, abLen, figure, resolved, view, occlusion);
+  const bodyEdgeVisibility = inheritBodyEdgeStroke
+    ? inheritedBodyEdgeVisibility(aWorld, bWorld, figure, resolved, view)
+    : null;
+  const segments =
+    bodyEdgeVisibility !== null
+      ? [{ a: aWorld, b: bWorld, visible: bodyEdgeVisibility }]
+      : useSurfaceDepth
+        ? splitLineByVisibility(aWorld, unit, 0, abLen, figure, resolved, view, occlusion)
+        : splitLineForRender(aWorld, unit, 0, abLen, figure, resolved, view, occlusion);
   const opacityAttr =
     strokeOpacity !== undefined && strokeOpacity < 1
       ? ` stroke-opacity="${strokeOpacity}"`
@@ -428,6 +460,7 @@ function renderPlaneSectionEdges(
       undefined,
       fillByDepth,
       isPyramid(figure),
+      true,
     );
   }
 }
@@ -640,6 +673,7 @@ function renderPlanesByDepth(
           undefined,
           false,
           isPyramid(figure),
+          true,
         );
         continue;
       }
