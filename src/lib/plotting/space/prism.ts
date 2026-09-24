@@ -44,8 +44,8 @@ export function prismProjectionPyramid(figure: PrismFigure): PyramidFigure {
     apex: pyramidApexCartesian(pc, pyramidBaseRadius(pc), pyramidHeight(pc)),
     base: pyramidBaseVerticesCartesian(n, pyramidBaseRadius(pc)),
   };
-  const apexId = "prism-proj-apex";
-  const baseIds = figure.baseLabels.map((_, i) => `prism-proj-b${i}`);
+  const apexId = "pyr-v-apex";
+  const baseIds = figure.baseLabels.map((_, i) => `pyr-v-b${i}`);
   return {
     id: figure.id,
     kind: "pyramid",
