@@ -764,6 +764,145 @@ function renderAutomaticPlaneIntersections(
   }
 }
 
+type ProjectedDepthPoint = { x: number; y: number; depth: number };
+
+function pointInScreenPolygon(point: { x: number; y: number }, polygon: ProjectedDepthPoint[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const a = polygon[i]!;
+    const b = polygon[j]!;
+    if (a.y > point.y !== b.y > point.y) {
+      const boundaryX = ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
+      if (point.x < boundaryX) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function depthInScreenPolygon(
+  point: { x: number; y: number },
+  polygon: ProjectedDepthPoint[],
+): number | null {
+  const origin = polygon[0];
+  if (!origin) return null;
+  for (let i = 1; i + 1 < polygon.length; i += 1) {
+    const b = polygon[i]!;
+    const c = polygon[i + 1]!;
+    const denominator = (b.y - c.y) * (origin.x - c.x) + (c.x - b.x) * (origin.y - c.y);
+    if (Math.abs(denominator) < 1e-9) continue;
+    const wa = ((b.y - c.y) * (point.x - c.x) + (c.x - b.x) * (point.y - c.y)) / denominator;
+    const wb = ((c.y - origin.y) * (point.x - c.x) + (origin.x - c.x) * (point.y - c.y)) / denominator;
+    const wc = 1 - wa - wb;
+    if (wa < -1e-7 || wb < -1e-7 || wc < -1e-7) continue;
+    return wa * origin.depth + wb * b.depth + wc * c.depth;
+  }
+  return null;
+}
+
+function screenSegmentIntersectionParameter(
+  a: ProjectedDepthPoint,
+  b: ProjectedDepthPoint,
+  c: ProjectedDepthPoint,
+  d: ProjectedDepthPoint,
+): number | null {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const cdx = d.x - c.x;
+  const cdy = d.y - c.y;
+  const denominator = abx * cdy - aby * cdx;
+  if (Math.abs(denominator) < 1e-9) return null;
+  const acx = c.x - a.x;
+  const acy = c.y - a.y;
+  const t = (acx * cdy - acy * cdx) / denominator;
+  const u = (acx * aby - acy * abx) / denominator;
+  return t > 1e-7 && t < 1 - 1e-7 && u >= -1e-7 && u <= 1 + 1e-7 ? t : null;
+}
+
+/**
+ * Возвращает поверх заливок только те части рёбер тела, которые действительно
+ * находятся ближе секущих плоскостей в той же экранной точке. Остальные части
+ * остаются под заливкой и поэтому корректно приглушаются ею.
+ */
+function renderBodyEdgesInFrontOfPlanes(
+  data: SpaceSceneData,
+  figure: SpaceFigure,
+  resolved: ResolvedSpaceScene,
+  fit: { scale: number; cx: number; cy: number },
+  parts: string[],
+): void {
+  const planeSections = data.planes
+    .filter((plane) => plane.built && plane.style.visible)
+    .map((plane) => {
+      const world = computeFaceOrPlaneSection(
+        plane.id,
+        figure,
+        resolved.points,
+        resolved.planes,
+        resolved.basis,
+      );
+      const equation = resolved.planes.get(plane.id);
+      return world && world.length >= 3 && equation
+        ? { world, equation, screen: world.map((point) => projectWorldWithDepth(point, resolved, data.view, fit, figure)) }
+        : null;
+    })
+    .filter(Boolean) as Array<{ world: Vec3[]; equation: { normal: Vec3; d: number }; screen: ProjectedDepthPoint[] }>;
+  if (!planeSections.length) return;
+
+  for (const edge of figure.edges) {
+    const aWorld = resolved.points.get(edge.aId)?.world;
+    const bWorld = resolved.points.get(edge.bId)?.world;
+    if (!aWorld || !bWorld) continue;
+    const a = projectWorldWithDepth(aWorld, resolved, data.view, fit, figure);
+    const b = projectWorldWithDepth(bWorld, resolved, data.view, fit, figure);
+    const breakpoints = [0, 1];
+
+    for (const section of planeSections) {
+      for (let i = 0; i < section.screen.length; i += 1) {
+        const t = screenSegmentIntersectionParameter(
+          a,
+          b,
+          section.screen[i]!,
+          section.screen[(i + 1) % section.screen.length]!,
+        );
+        if (t !== null) breakpoints.push(t);
+      }
+      const da = dot(section.equation.normal, aWorld) + section.equation.d;
+      const db = dot(section.equation.normal, bWorld) + section.equation.d;
+      if (Math.abs(da - db) > 1e-9) {
+        const t = da / (da - db);
+        if (t > 1e-7 && t < 1 - 1e-7) breakpoints.push(t);
+      }
+    }
+
+    breakpoints.sort((x, y) => x - y);
+    const unique = breakpoints.filter((value, index) => index === 0 || value - breakpoints[index - 1]! > 1e-7);
+    const visible = isBodyEdgeVisibleForRender(edge.id, figure, resolved, data.view);
+    const dash = visible ? "" : ` stroke-dasharray="${data.appearance.hiddenDash}"`;
+    for (let i = 0; i + 1 < unique.length; i += 1) {
+      const t0 = unique[i]!;
+      const t1 = unique[i + 1]!;
+      const tm = (t0 + t1) * 0.5;
+      const sample = {
+        x: a.x + (b.x - a.x) * tm,
+        y: a.y + (b.y - a.y) * tm,
+      };
+      let nearestPlaneDepth: number | null = null;
+      for (const section of planeSections) {
+        if (!pointInScreenPolygon(sample, section.screen)) continue;
+        const depth = depthInScreenPolygon(sample, section.screen);
+        if (depth !== null && (nearestPlaneDepth === null || depth < nearestPlaneDepth)) nearestPlaneDepth = depth;
+      }
+      const edgeDepth = a.depth + (b.depth - a.depth) * tm;
+      if (nearestPlaneDepth === null || edgeDepth >= nearestPlaneDepth - 1e-6) continue;
+      const p0 = { x: a.x + (b.x - a.x) * t0, y: a.y + (b.y - a.y) * t0 };
+      const p1 = { x: a.x + (b.x - a.x) * t1, y: a.y + (b.y - a.y) * t1 };
+      parts.push(
+        `<line x1="${round(p0.x)}" y1="${round(p0.y)}" x2="${round(p1.x)}" y2="${round(p1.y)}" stroke="${data.appearance.edgeColor}" stroke-width="${data.appearance.edgeWidth}" stroke-linecap="round"${dash}/>` ,
+      );
+    }
+  }
+}
+
 /** Отладочные лучи: от центра (и вершины пирамиды) через экран к проекции «глаза». */
 function renderViewConvergenceRays(
   data: SpaceSceneData,
@@ -1001,6 +1140,9 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     }
   }
   renderAutomaticPlaneIntersections(data, figure, resolved, fit, parts, obstacles);
+  if (data.view.planeFillByDepth) {
+    renderBodyEdgesInFrontOfPlanes(data, figure, resolved, fit, parts);
+  }
 
   for (const line of data.lines) {
     renderLineObject(line, data, figure, resolved, fit, occlusion, parts, obstacles);
