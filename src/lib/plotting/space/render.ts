@@ -394,11 +394,16 @@ function renderPlaneFillPolygon(
       }
       const screenPts = [a, b, c].map((w) => projectWorld(w, resolved, data.view, fit, figure));
       const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
-      parts.push(`<polygon points="${poly}" fill="${color}" fill-opacity="${fillOpacity}" stroke="none"/>`);
+      tris.push(`<polygon points="${poly}"/>`);
     };
+    const tris: string[] = [];
     for (let i = 1; i + 1 < vertices.length; i += 1) {
       renderTriangle(vertices[0]!, vertices[i]!, vertices[i + 1]!, 2);
     }
+    // Непрозрачные треугольники внутри группы с общей прозрачностью: швы не накладываются.
+    parts.push(
+      `<g opacity="${fillOpacity}" fill="${color}" stroke="${color}" stroke-width="0.4" stroke-linejoin="round">${tris.join("")}</g>`,
+    );
     return;
   }
   const screenPts = vertices.map((w) => projectWorld(w, resolved, data.view, fit, figure));
