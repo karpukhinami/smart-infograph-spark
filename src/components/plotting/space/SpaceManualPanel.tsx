@@ -301,31 +301,6 @@ export function SpaceManualPanel() {
                   onCheckedChange={(checked) => updateSpaceView({ planeFillByDepth: checked })}
                 />
               </div>
-              {space3d.view.planeFillByDepth ? (
-                <div className="space-y-1.5 rounded-md border border-border p-2">
-                  <Label className="text-xs">Глубина для заливки</Label>
-                  <Select
-                    value={space3d.view.planeFillDepthMode ?? "plane"}
-                    onValueChange={(value) =>
-                      updateSpaceView({
-                        planeFillDepthMode: value === "eye" ? "eye" : "plane",
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="plane">Плоскость изображения (вертикальная)</SelectItem>
-                      <SelectItem value="eye">Глаз (пирамида) / школьная ось (параллелепипед)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-muted-foreground">
-                    Плоскость: расстояние до «экрана», нормаль крутится с поворотом. Глаз: как раньше
-                    для параллелепипеда без точки обзора; для пирамиды — луч к (4,4,1).
-                  </p>
-                </div>
-              ) : null}
               {space3d.planes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Плоскости пока не добавлены.</p>
               ) : (

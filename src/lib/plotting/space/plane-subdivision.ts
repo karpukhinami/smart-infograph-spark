@@ -3,35 +3,86 @@ import {
   planeIntersectionSegmentRange,
   type ResolvedSpaceScene,
 } from "./build";
-import { worldViewSortDepth } from "./camera";
-import type { PlaneFillDepthMode, SpaceFigure, SpaceSceneData, Vec3 } from "./types";
-import { add, dot, intersectPlanes, len, planePointDistance, scale, sub, type PlaneEq } from "./vec3";
+import type { SpaceFigure, SpaceSceneData, Vec3 } from "./types";
+import {
+  add,
+  cross,
+  dot,
+  intersectPlanes,
+  len,
+  normalize,
+  planePointDistance,
+  scale,
+  sub,
+  type PlaneEq,
+} from "./vec3";
 
-export type ScreenProjectFn = (world: Vec3) => { x: number; y: number };
+export type ScreenProjectedPoint = { x: number; y: number; depth: number };
+export type ScreenProjectFn = (world: Vec3) => ScreenProjectedPoint;
 
 export interface PlaneFillFragment {
   planeId: string;
   color: string;
   vertices: Vec3[];
-  /** Глубина в барицентре фрагмента: меньше — ближе к наблюдателю. */
+  /** Средняя глубина в той же проекции, которой рисуется фрагмент. Меньше = ближе. */
   depth: number;
-  /**
-   * Исходное (неразбитое) сечение плоскости — по нему определяется, какие
-   * рёбра фрагмента являются настоящей границей плоскости, а какие —
-   * технические «разрезы», появившиеся при делении на фрагменты для
-   * подсчёта глубины (их не нужно рисовать как линии).
-   */
   originalSection: Vec3[];
 }
 
-/**
- * Делит выпуклое сечение плоскости A на части по полупространствам плоскости B.
- * Граница — линия пересечения A∩B (без 2D-проекции и без clipLineToConvexPolygon).
- */
+const WORLD_EPS = 1e-7;
+const AREA_EPS = 1e-10;
+const SCREEN_EPS = 1e-6;
+const DEPTH_EPS = 1e-7;
+
+function samePoint(a: Vec3, b: Vec3, eps = WORLD_EPS): boolean {
+  return len(sub(a, b)) <= eps;
+}
+
+/** Удаляет дубли и точки на прямой, которые накапливаются после нескольких разрезов. */
+function normalizePolygon(vertices: Vec3[]): Vec3[] {
+  const clean: Vec3[] = [];
+  for (const vertex of vertices) {
+    if (!clean.length || !samePoint(vertex, clean[clean.length - 1]!)) clean.push(vertex);
+  }
+  if (clean.length > 1 && samePoint(clean[0]!, clean[clean.length - 1]!)) clean.pop();
+
+  let changed = true;
+  while (changed && clean.length >= 3) {
+    changed = false;
+    for (let i = 0; i < clean.length; i += 1) {
+      const prev = clean[(i + clean.length - 1) % clean.length]!;
+      const cur = clean[i]!;
+      const next = clean[(i + 1) % clean.length]!;
+      const a = sub(cur, prev);
+      const b = sub(next, cur);
+      const scaleRef = Math.max(len(a) * len(b), 1);
+      if (len(a) <= WORLD_EPS || len(b) <= WORLD_EPS || len(cross(a, b)) <= WORLD_EPS * scaleRef) {
+        clean.splice(i, 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+  return clean;
+}
+
+function polygonArea3D(vertices: Vec3[], planeNormal: Vec3): number {
+  if (vertices.length < 3) return 0;
+  const n = normalize(planeNormal);
+  let twiceArea = 0;
+  const origin = vertices[0]!;
+  for (let i = 1; i + 1 < vertices.length; i += 1) {
+    twiceArea += Math.abs(dot(cross(sub(vertices[i]!, origin), sub(vertices[i + 1]!, origin)), n));
+  }
+  return twiceArea * 0.5;
+}
+
+/** Делит выпуклое сечение по линии пересечения с другой плоскостью. */
 function splitConvexPolygonByHalfSpace(
   polygon: Vec3[],
   cuttingPlane: PlaneEq,
-  eps = 1e-7,
+  polygonPlane: PlaneEq,
+  eps = WORLD_EPS,
 ): Vec3[][] {
   const dists = polygon.map((p) => planePointDistance(p, cuttingPlane));
   const hasPos = dists.some((d) => d > eps);
@@ -40,224 +91,175 @@ function splitConvexPolygonByHalfSpace(
 
   const pos: Vec3[] = [];
   const neg: Vec3[] = [];
-  const n = polygon.length;
-
-  for (let i = 0; i < n; i += 1) {
+  for (let i = 0; i < polygon.length; i += 1) {
     const cur = polygon[i]!;
-    const next = polygon[(i + 1) % n]!;
+    const next = polygon[(i + 1) % polygon.length]!;
     const dc = dists[i]!;
-    const dn = dists[(i + 1) % n]!;
-
+    const dn = dists[(i + 1) % polygon.length]!;
     if (dc >= -eps) pos.push(cur);
     if (dc <= eps) neg.push(cur);
-
-    if (dc * dn < -eps * eps) {
-      const t = dc / (dc - dn);
-      const hit = add(cur, scale(sub(next, cur), t));
+    if ((dc > eps && dn < -eps) || (dc < -eps && dn > eps)) {
+      const hit = add(cur, scale(sub(next, cur), dc / (dc - dn)));
       pos.push(hit);
       neg.push(hit);
     }
   }
 
-  const out: Vec3[][] = [];
-  if (pos.length >= 3) out.push(pos);
-  if (neg.length >= 3) out.push(neg);
-  return out.length ? out : [polygon];
+  return [pos, neg]
+    .map(normalizePolygon)
+    .filter((part) => part.length >= 3 && polygonArea3D(part, polygonPlane.normal) > AREA_EPS);
 }
 
-/**
- * Проверяет, лежит ли отрезок [a,b] на одном из рёбер исходного многоугольника
- * `section` (в пределах его длины). Используется, чтобы отличить настоящие
- * границы сечения плоскости от «разрезов», добавленных при делении фрагмента
- * линией пересечения с другой плоскостью — такие разрезы не являются частью
- * контура плоскости и не должны отображаться как линия.
- */
-export function isSegmentOnPolygonBoundary(
-  a: Vec3,
-  b: Vec3,
-  section: Vec3[],
-  eps = 1e-4,
-): boolean {
-  const n = section.length;
-  for (let i = 0; i < n; i += 1) {
-    const p0 = section[i]!;
-    const p1 = section[(i + 1) % n]!;
-    const full = sub(p1, p0);
-    const edgeLen = len(full);
-    if (edgeLen < 1e-9) continue;
-    const dir = scale(full, 1 / edgeLen);
-
-    const da = sub(a, p0);
-    const db = sub(b, p0);
-    const ta = dot(da, dir);
-    const tb = dot(db, dir);
-    const perpA = sub(da, scale(dir, ta));
-    const perpB = sub(db, scale(dir, tb));
-    if (len(perpA) > eps || len(perpB) > eps) continue;
-
-    const lo = Math.min(ta, tb);
-    const hi = Math.max(ta, tb);
-    if (lo >= -eps && hi <= edgeLen + eps) return true;
-  }
-  return false;
-}
-
-/** Делит сечение плоскости на части линиями пересечения с другими плоскостями. */
 export function subdividePlaneSection(
   section: Vec3[],
   planeEq: PlaneEq,
   otherPlaneEqs: PlaneEq[],
 ): Vec3[][] {
-  let fragments: Vec3[][] = [section];
+  let fragments: Vec3[][] = [normalizePolygon(section)];
   for (const otherEq of otherPlaneEqs) {
-    const next: Vec3[][] = [];
-    for (const frag of fragments) {
-      if (frag.length < 3) continue;
-      next.push(...splitConvexPolygonByHalfSpace(frag, otherEq));
-    }
-    fragments = next.length ? next : fragments;
+    const next = fragments.flatMap((fragment) =>
+      splitConvexPolygonByHalfSpace(fragment, otherEq, planeEq),
+    );
+    if (next.length) fragments = next;
   }
-  return fragments;
-}
-
-function polygonBarycenter(vertices: Vec3[]): Vec3 {
-  let sx = 0;
-  let sy = 0;
-  let sz = 0;
-  for (const v of vertices) {
-    sx += v.x;
-    sy += v.y;
-    sz += v.z;
-  }
-  const n = Math.max(vertices.length, 1);
-  return { x: sx / n, y: sy / n, z: sz / n };
-}
-
-/** Глубина фрагмента — в барицентре многоугольника (режим задаётся в `planeFillDepthMode`). */
-function fragmentSortDepth(
-  vertices: Vec3[],
-  resolved: ResolvedSpaceScene,
-  figure: SpaceFigure,
-  mode: PlaneFillDepthMode,
-): number {
-  const c = polygonBarycenter(vertices);
-  return worldViewSortDepth(c, resolved.basis, resolved.projection, figure, mode);
-}
-
-function sideOfScreenLine(
-  p: { x: number; y: number },
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-): number {
-  return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
-}
-
-/**
- * Сверка по **проекции**: слева/справа от линии пересечения на экране.
- * Меньший depth = ближе = рисуется сверху. С одной стороны линии «победитель»
- * не должен совпадать с другой стороной; если одна плоскость выигрывает обе —
- * сдвигаем depth на одной стороне так, чтобы порядок перевернулся.
- */
-function reconcileTwoPlaneFragmentsByScreenSide(
-  fragments: PlaneFillFragment[],
-  planeAId: string,
-  planeBId: string,
-  eqA: PlaneEq,
-  eqB: PlaneEq,
-  figure: SpaceFigure,
-  resolved: ResolvedSpaceScene,
-  project: ScreenProjectFn,
-): void {
-  const carrier = intersectPlanes(eqA, eqB);
-  if (!carrier) return;
-  const clip = planeIntersectionSegmentRange(
-    carrier,
-    planeAId,
-    planeBId,
-    figure,
-    resolved.points,
-    resolved.planes,
-    resolved.basis,
+  return fragments.filter(
+    (fragment) => fragment.length >= 3 && polygonArea3D(fragment, planeEq.normal) > AREA_EPS,
   );
-  if (!clip || clip.t1 - clip.t0 < 1e-9) return;
-
-  const w0 = add(carrier.origin, scale(carrier.dir, clip.t0));
-  const w1 = add(carrier.origin, scale(carrier.dir, clip.t1));
-  const s0 = project(w0);
-  const s1 = project(w1);
-  const lineLen = Math.hypot(s1.x - s0.x, s1.y - s0.y);
-  if (!(lineLen > 1e-6)) return;
-
-  const pairFrags = fragments.filter(
-    (f) => f.planeId === planeAId || f.planeId === planeBId,
-  );
-
-  const classifySide = (frag: PlaneFillFragment): "left" | "right" | "on" => {
-    const c = polygonBarycenter(frag.vertices);
-    const cross = sideOfScreenLine(project(c), s0, s1);
-    const tol = 1e-4 * lineLen;
-    if (Math.abs(cross) <= tol) return "on";
-    return cross > 0 ? "left" : "right";
-  };
-
-  const bySide = (side: "left" | "right") =>
-    pairFrags.filter((f) => classifySide(f) === side);
-
-  const winnerOnSide = (sideFrags: PlaneFillFragment[]): string | null => {
-    const aOn = sideFrags.filter((f) => f.planeId === planeAId);
-    const bOn = sideFrags.filter((f) => f.planeId === planeBId);
-    if (!aOn.length || !bOn.length) return null;
-    const minA = Math.min(...aOn.map((f) => f.depth));
-    const minB = Math.min(...bOn.map((f) => f.depth));
-    return minA < minB ? planeAId : planeBId;
-  };
-
-  const leftFrags = bySide("left");
-  const rightFrags = bySide("right");
-  const winLeft = winnerOnSide(leftFrags);
-  const winRight = winnerOnSide(rightFrags);
-  if (!winLeft || !winRight || winLeft !== winRight) return;
-
-  const depths = pairFrags.map((f) => f.depth);
-  const span = Math.max(...depths) - Math.min(...depths);
-  const bump = Math.max(0.08, span * 0.6 + 0.02);
-  const loser = winLeft === planeAId ? planeBId : planeAId;
-
-  const fixSide = (sideFrags: PlaneFillFragment[]) => {
-    for (const f of sideFrags) {
-      if (f.planeId === winLeft) f.depth += bump;
-      if (f.planeId === loser) f.depth -= bump;
-    }
-  };
-
-  /** Переворачиваем порядок на стороне, где больше площадь перекрытия (обычно «право»). */
-  if (rightFrags.some((f) => f.planeId === planeAId) && rightFrags.some((f) => f.planeId === planeBId)) {
-    fixSide(rightFrags);
-  } else if (
-    leftFrags.some((f) => f.planeId === planeAId) &&
-    leftFrags.some((f) => f.planeId === planeBId)
-  ) {
-    fixSide(leftFrags);
-  }
 }
 
-/**
- * Фрагменты заливки всех плоскостей, отсортированные от дальних к ближним
- * (ближние рисуются последними).
- */
+function averageDepth(vertices: Vec3[], project: ScreenProjectFn): number {
+  return vertices.reduce((sum, vertex) => sum + project(vertex).depth, 0) / Math.max(vertices.length, 1);
+}
+
+type ProjectedFragment = PlaneFillFragment & { screen: ScreenProjectedPoint[] };
+
+function pointInPolygon(point: { x: number; y: number }, polygon: ScreenProjectedPoint[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const a = polygon[i]!;
+    const b = polygon[j]!;
+    const crosses = a.y > point.y !== b.y > point.y;
+    if (crosses && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+function segmentIntersection(
+  a: ScreenProjectedPoint,
+  b: ScreenProjectedPoint,
+  c: ScreenProjectedPoint,
+  d: ScreenProjectedPoint,
+): { x: number; y: number } | null {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const cdx = d.x - c.x;
+  const cdy = d.y - c.y;
+  const denominator = abx * cdy - aby * cdx;
+  if (Math.abs(denominator) <= SCREEN_EPS) return null;
+  const acx = c.x - a.x;
+  const acy = c.y - a.y;
+  const t = (acx * cdy - acy * cdx) / denominator;
+  const u = (acx * aby - acy * abx) / denominator;
+  if (t < -SCREEN_EPS || t > 1 + SCREEN_EPS || u < -SCREEN_EPS || u > 1 + SCREEN_EPS) return null;
+  return { x: a.x + t * abx, y: a.y + t * aby };
+}
+
+/** Точка внутри общей экранной области двух полигонов. */
+function overlapSample(a: ScreenProjectedPoint[], b: ScreenProjectedPoint[]): { x: number; y: number } | null {
+  const points: Array<{ x: number; y: number }> = [];
+  for (const p of a) if (pointInPolygon(p, b)) points.push(p);
+  for (const p of b) if (pointInPolygon(p, a)) points.push(p);
+  for (let i = 0; i < a.length; i += 1) {
+    for (let j = 0; j < b.length; j += 1) {
+      const hit = segmentIntersection(a[i]!, a[(i + 1) % a.length]!, b[j]!, b[(j + 1) % b.length]!);
+      if (hit) points.push(hit);
+    }
+  }
+  if (!points.length) return null;
+  return {
+    x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
+    y: points.reduce((sum, p) => sum + p.y, 0) / points.length,
+  };
+}
+
+function depthInTriangle(
+  point: { x: number; y: number },
+  a: ScreenProjectedPoint,
+  b: ScreenProjectedPoint,
+  c: ScreenProjectedPoint,
+): number | null {
+  const denominator = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+  if (Math.abs(denominator) <= SCREEN_EPS) return null;
+  const wa = ((b.y - c.y) * (point.x - c.x) + (c.x - b.x) * (point.y - c.y)) / denominator;
+  const wb = ((c.y - a.y) * (point.x - c.x) + (a.x - c.x) * (point.y - c.y)) / denominator;
+  const wc = 1 - wa - wb;
+  if (wa < -SCREEN_EPS || wb < -SCREEN_EPS || wc < -SCREEN_EPS) return null;
+  return wa * a.depth + wb * b.depth + wc * c.depth;
+}
+
+function depthAtScreen(point: { x: number; y: number }, polygon: ScreenProjectedPoint[]): number | null {
+  for (let i = 1; i + 1 < polygon.length; i += 1) {
+    const depth = depthInTriangle(point, polygon[0]!, polygon[i]!, polygon[i + 1]!);
+    if (depth !== null) return depth;
+  }
+  return null;
+}
+
+/** Painter's algorithm with pairwise constraints in actual overlapping screen areas. */
+function sortFragmentsByProjectedDepth(fragments: ProjectedFragment[]): PlaneFillFragment[] {
+  const outgoing = fragments.map(() => new Set<number>());
+  const incoming = fragments.map(() => 0);
+
+  for (let i = 0; i < fragments.length; i += 1) {
+    for (let j = i + 1; j < fragments.length; j += 1) {
+      const a = fragments[i]!;
+      const b = fragments[j]!;
+      if (a.planeId === b.planeId) continue;
+      const sample = overlapSample(a.screen, b.screen);
+      if (!sample) continue;
+      const da = depthAtScreen(sample, a.screen);
+      const db = depthAtScreen(sample, b.screen);
+      if (da === null || db === null || Math.abs(da - db) <= DEPTH_EPS) continue;
+      const far = da > db ? i : j;
+      const near = da > db ? j : i;
+      if (!outgoing[far]!.has(near)) {
+        outgoing[far]!.add(near);
+        incoming[near]! += 1;
+      }
+    }
+  }
+
+  const remaining = new Set(fragments.map((_, index) => index));
+  const result: PlaneFillFragment[] = [];
+  while (remaining.size) {
+    const available = [...remaining]
+      .filter((index) => incoming[index] === 0)
+      .sort((ia, ib) => {
+        const depthDiff = fragments[ib]!.depth - fragments[ia]!.depth;
+        return Math.abs(depthDiff) > DEPTH_EPS ? depthDiff : ia - ib;
+      });
+    // A numerical cycle can only occur at a degenerate/tangent view. Break it deterministically.
+    const current = available[0] ?? [...remaining].sort((ia, ib) => fragments[ib]!.depth - fragments[ia]!.depth || ia - ib)[0]!;
+    remaining.delete(current);
+    result.push(fragments[current]!);
+    for (const near of outgoing[current]!) incoming[near]! -= 1;
+  }
+  return result;
+}
+
+/** Фрагменты заливки, отсортированные от дальних к ближним. */
 export function collectPlaneFillFragments(
   data: SpaceSceneData,
   figure: SpaceFigure,
   resolved: ResolvedSpaceScene,
-  screenProject?: ScreenProjectFn,
+  project: ScreenProjectFn,
 ): PlaneFillFragment[] {
-  const builtPlanes = data.planes.filter((p) => p.built && p.style.visible);
-  const depthMode: PlaneFillDepthMode = data.view.planeFillDepthMode ?? "plane";
-  const fragments: PlaneFillFragment[] = [];
+  const builtPlanes = data.planes.filter((plane) => plane.built && plane.style.visible);
+  const fragments: ProjectedFragment[] = [];
 
   for (const plane of builtPlanes) {
-    const eq = resolved.planes.get(plane.id);
-    if (!eq) continue;
+    const equation = resolved.planes.get(plane.id);
+    if (!equation) continue;
     const section = computeFaceOrPlaneSection(
       plane.id,
       figure,
@@ -267,48 +269,38 @@ export function collectPlaneFillFragments(
     );
     if (!section || section.length < 3) continue;
 
-    const otherEqs = builtPlanes
-      .filter((p) => p.id !== plane.id)
-      .map((p) => resolved.planes.get(p.id))
-      .filter(Boolean) as PlaneEq[];
+    const cutters: PlaneEq[] = [];
+    for (const other of builtPlanes) {
+      if (other.id === plane.id) continue;
+      const otherEquation = resolved.planes.get(other.id);
+      if (!otherEquation) continue;
+      const carrier = intersectPlanes(equation, otherEquation);
+      if (!carrier) continue;
+      const range = planeIntersectionSegmentRange(
+        carrier,
+        plane.id,
+        other.id,
+        figure,
+        resolved.points,
+        resolved.planes,
+        resolved.basis,
+      );
+      if (range && range.t1 - range.t0 > WORLD_EPS) cutters.push(otherEquation);
+    }
 
-    const parts =
-      otherEqs.length > 0 ? subdividePlaneSection(section, eq, otherEqs) : [section];
-
-    for (const part of parts) {
-      if (part.length < 3) continue;
+    const parts = cutters.length ? subdividePlaneSection(section, equation, cutters) : [section];
+    for (const vertices of parts) {
+      const screen = vertices.map(project);
       fragments.push({
         planeId: plane.id,
         color: plane.style.color,
-        vertices: part,
-        depth: fragmentSortDepth(part, resolved, figure, depthMode),
+        vertices,
+        depth: averageDepth(vertices, project),
         originalSection: section,
+        screen,
       });
     }
   }
 
-  if (screenProject) {
-    for (let i = 0; i < builtPlanes.length; i += 1) {
-      for (let j = i + 1; j < builtPlanes.length; j += 1) {
-        const pa = builtPlanes[i]!;
-        const pb = builtPlanes[j]!;
-        const eqA = resolved.planes.get(pa.id);
-        const eqB = resolved.planes.get(pb.id);
-        if (!eqA || !eqB) continue;
-        reconcileTwoPlaneFragmentsByScreenSide(
-          fragments,
-          pa.id,
-          pb.id,
-          eqA,
-          eqB,
-          figure,
-          resolved,
-          screenProject,
-        );
-      }
-    }
-  }
-
-  fragments.sort((a, b) => b.depth - a.depth);
-  return fragments;
+  return sortFragmentsByProjectedDepth(fragments);
 }
