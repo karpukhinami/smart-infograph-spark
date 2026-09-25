@@ -3,7 +3,8 @@
  * Альтернатива legacy-режиму в visibility.ts.
  */
 import { localToView, projectFromLocalCoeffs, viewDirectionLocal, type ProjectionCoeffs } from "./camera";
-import { adjacentFaceIds, faceById, isParallelepiped } from "./figure";
+import { adjacentFaceIds, faceById, isParallelepiped, isSchoolExtrusionFigure } from "./figure";
+import { pyramidObserverToViewer } from "./pyramid-view";
 import type { LineSplitSegment, LocalCoords, SpaceFigure, SpaceViewParams, Vec3 } from "./types";
 import { add, cross, dot, dotLocal, len, normalize, scale, sub, worldToLocal } from "./vec3";
 import type { ResolvedSpaceScene } from "./build";
@@ -275,6 +276,13 @@ export function isFaceFrontFacingFigure(
   if (isParallelepiped(figure)) return isFaceFrontFacing(faceId, resolved.projection);
   const n = outwardFaceNormal(faceId, figure, resolved);
   if (!n) return false;
+  // Пирамида/призма: экран и depth — школьный «глаз» с yaw (pyramidCartesianDepth).
+  // Абстрактная ось viewDirectionLocal (kx/ky) после орбиты может перепутать соседние боковые грани.
+  if (isSchoolExtrusionFigure(figure)) {
+    const center = figureBodyCenter(figure, resolved);
+    const toViewer = pyramidObserverToViewer(resolved.projection, center);
+    return dot(n, toViewer) > 1e-5;
+  }
   return dot(n, viewDirectionWorld(resolved, figure)) < -1e-5;
 }
 
