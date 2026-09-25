@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { RotateCcw } from "lucide-react";
+import { Layers, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlotPreview } from "@/components/plotting/PlotPreview";
 import { PlotManualPanel } from "@/components/plotting/PlotManualPanel";
 import { PlotAiPanel } from "@/components/plotting/ai/PlotAiPanel";
+import { SpaceFaceDepthDebugDialog } from "@/components/plotting/space/SpaceFaceDepthDebugDialog";
 import { usePlotStore } from "@/lib/plotting/store";
+import { buildSpaceFaceDepthReport } from "@/lib/plotting/space/space-face-depth-report";
+import type { SpaceFaceDepthReport } from "@/lib/plotting/space/space-face-depth-report";
 
 export const Route = createFileRoute("/plotting")({
   head: () => ({
@@ -37,11 +40,23 @@ function PlottingPage() {
   const spaceTab = usePlotStore((state) => state.spaceTab);
   const setSpaceTab = usePlotStore((state) => state.setSpaceTab);
   const resetScene = usePlotStore((state) => state.resetScene);
+  const scene = usePlotStore((state) => state.scene);
+  const space3d = scene.space3d;
 
   const [aiSessionKey, setAiSessionKey] = useState(0);
+  const [faceDepthOpen, setFaceDepthOpen] = useState(false);
+  const [faceDepthReport, setFaceDepthReport] = useState<SpaceFaceDepthReport | null>(null);
+
   const isAi = inputMode === "ai";
   const isLine = spaceTab === "line";
   const isSpace = spaceTab === "space";
+  const canFaceDepthDebug = scene.space === "space" && !!space3d?.figure;
+
+  function openFaceDepthDebug() {
+    if (!space3d) return;
+    setFaceDepthReport(buildSpaceFaceDepthReport(space3d));
+    setFaceDepthOpen(true);
+  }
 
   function handleReset() {
     resetScene();
@@ -73,6 +88,21 @@ function PlottingPage() {
                 <TabsTrigger value="ai">ИИ-ввод</TabsTrigger>
               </TabsList>
             </Tabs>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!canFaceDepthDebug}
+              title={
+                canFaceDepthDebug
+                  ? "Снимок глубин граней многогранника"
+                  : "Доступно на вкладке «Пространство» с построенным телом"
+              }
+              onClick={openFaceDepthDebug}
+            >
+              <Layers className="size-4" />
+              Глубины граней
+            </Button>
             <Button type="button" variant="outline" size="sm" onClick={handleReset}>
               <RotateCcw className="size-4" />
               Сбросить
@@ -100,6 +130,11 @@ function PlottingPage() {
           </div>
         </div>
       </div>
+      <SpaceFaceDepthDebugDialog
+        open={faceDepthOpen}
+        onOpenChange={setFaceDepthOpen}
+        report={faceDepthReport}
+      />
     </div>
   );
 }

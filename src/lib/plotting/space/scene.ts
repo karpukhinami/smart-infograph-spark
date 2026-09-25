@@ -45,7 +45,7 @@ export const DEFAULT_SPACE_APPEARANCE: SpaceAppearance = {
   edgeWidth: DEFAULT_APPEARANCE.graphWidth,
   edgeColor: DEFAULT_APPEARANCE.axisColor,
   /** Единый шаблон пунктира (dash gap) для рёбер, прямых и границ сечений. */
-  hiddenDash: "8 6",
+  hiddenDash: "20 14",
   labelFontSize: DEFAULT_APPEARANCE.pointLabelFontSize,
   labelFontFamily: DEFAULT_APPEARANCE.pointLabelFontFamily,
   labelColor: DEFAULT_APPEARANCE.labelColor,

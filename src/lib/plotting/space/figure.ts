@@ -30,6 +30,18 @@ export function facesShareEdge(figure: SpaceFigure, faceIdA: string, faceIdB: st
   return shared >= 2;
 }
 
+/** Есть общая вершина (сравнение глубины по перекрытию не применяется). */
+export function facesShareVertex(figure: SpaceFigure, faceIdA: string, faceIdB: string): boolean {
+  const fa = faceById(figure, faceIdA);
+  const fb = faceById(figure, faceIdB);
+  if (!fa || !fb) return false;
+  const setA = new Set(fa.vertexIds);
+  for (const id of fb.vertexIds) {
+    if (setA.has(id)) return true;
+  }
+  return false;
+}
+
 /** Грани, смежные с ребром. */
 export function adjacentFaceIds(figure: SpaceFigure, edgeId: string): string[] {
   const edge = edgeById(figure, edgeId);

@@ -186,9 +186,8 @@ function drawSegmentWithVisibility(
     const p1 = projectWorld(seg.a, resolved, view, fit, figure);
     const p2 = projectWorld(seg.b, resolved, view, fit, figure);
     const dash = seg.visible ? "" : ` stroke-dasharray="${hiddenDash}"`;
-    const linecap = seg.visible ? "round" : "butt";
     parts.push(
-      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${color}" stroke-width="${width}" stroke-linecap="${linecap}"${dash}${opacityAttr}/>`,
+      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"${dash}${opacityAttr}/>`,
     );
     obstacles.push(lineObstacle(p1.x, p1.y, p2.x, p2.y, seg.visible ? "curve" : "helper"));
   }
@@ -1123,9 +1122,8 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     if (isEdgeCoveredOnScreen({ a: p1, b: p2 }, overlaySegments)) continue;
     const visible = isBodyEdgeVisibleForRender(edge.id, figure, resolved, data.view);
     const dash = visible ? "" : ` stroke-dasharray="${a.hiddenDash}"`;
-    const linecap = visible ? "round" : "butt";
     parts.push(
-      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${a.edgeColor}" stroke-width="${a.edgeWidth}" stroke-linecap="${linecap}"${dash}/>`,
+      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${a.edgeColor}" stroke-width="${a.edgeWidth}" stroke-linecap="round"${dash}/>`,
     );
     obstacles.push(lineObstacle(p1.x, p1.y, p2.x, p2.y, visible ? "curve" : "axis"));
   }
