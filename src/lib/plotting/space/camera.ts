@@ -574,6 +574,8 @@ export const DEFAULT_SPACE_VIEW: SpaceViewParams = {
   planeFillByDepth: true,
   showPlaneIntersections: false,
   planeFillDepthMode: "plane",
+  pointLabelsUseEdgeColor: true,
+  renderGrayscale: false,
 };
 
 export function fitProjection(

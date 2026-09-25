@@ -1609,7 +1609,7 @@ export const usePlotStore = create<PlotStore>((set, get) => ({
 
   updateSpacePlaneStyle: (id, patch) =>
     set((state) =>
-      patchSpaceData(state, (data) => ({
+      withSpaceData(state, (data) => ({
         ...data,
         planes: data.planes.map((p) =>
           p.id === id ? { ...p, style: { ...p.style, ...patch } } : p,

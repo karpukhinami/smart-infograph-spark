@@ -306,6 +306,10 @@ export interface SpaceViewParams {
   planeFillDepthMode?: PlaneFillDepthMode;
   /** Отладка: лучи зрения «за кадр» к условной точке обзора. */
   showViewConvergenceRays?: boolean;
+  /** Подписи доп. точек цветом рёбер многогранника (иначе — цветом точки). По умолчанию true. */
+  pointLabelsUseEdgeColor?: boolean;
+  /** Цветные заливки и линии — в градациях серого по яркости. */
+  renderGrayscale?: boolean;
 }
 
 export interface SpaceAppearance {

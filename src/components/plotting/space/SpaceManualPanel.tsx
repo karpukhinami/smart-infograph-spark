@@ -255,6 +255,18 @@ export function SpaceManualPanel() {
                   {YAW_SNAP_DEG}°).
                 </p>
               </div>
+              <div className="flex items-center justify-between rounded-md border border-border p-2">
+                <div className="space-y-0.5">
+                  <Label className="text-xs">В градациях серого</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Цветные заливки и линии — по яркости в серый (рёбра тела без изменений).
+                  </p>
+                </div>
+                <Switch
+                  checked={space3d.view.renderGrayscale ?? false}
+                  onCheckedChange={(checked) => updateSpaceView({ renderGrayscale: checked })}
+                />
+              </div>
               <div className="flex items-center justify-between">
                 <Label className="text-xs">Эллипс вращения</Label>
                 <Switch
@@ -290,6 +302,18 @@ export function SpaceManualPanel() {
               <CardTitle className="text-base">Точки</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="flex items-center justify-between rounded-md border border-border p-2">
+                <div className="space-y-0.5">
+                  <Label className="text-xs">Подписи точек цветом рёбер</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Включено — подписи как у многогранника; выключено — цветом точки.
+                  </p>
+                </div>
+                <Switch
+                  checked={space3d.view.pointLabelsUseEdgeColor !== false}
+                  onCheckedChange={(checked) => updateSpaceView({ pointLabelsUseEdgeColor: checked })}
+                />
+              </div>
               {space3d.points.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Дополнительные точки пока не добавлены.</p>
               ) : (

@@ -85,6 +85,8 @@ export type SpaceViewParamsJson = Pick<
   | "planeFillDepthMode"
   | "showRotationEllipse"
   | "showViewConvergenceRays"
+  | "pointLabelsUseEdgeColor"
+  | "renderGrayscale"
 >;
 
 function stripViewForExport(view: SpaceViewParams): SpaceViewParamsJson {
@@ -102,6 +104,8 @@ function stripViewForExport(view: SpaceViewParams): SpaceViewParamsJson {
     planeFillDepthMode: view.planeFillDepthMode,
     showRotationEllipse: view.showRotationEllipse,
     showViewConvergenceRays: view.showViewConvergenceRays,
+    pointLabelsUseEdgeColor: view.pointLabelsUseEdgeColor,
+    renderGrayscale: view.renderGrayscale,
   };
 }
 

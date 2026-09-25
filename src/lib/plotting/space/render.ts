@@ -25,6 +25,7 @@ import {
   type OcclusionContext,
 } from "./visibility";
 import { isSchoolExtrusionFigure } from "./figure";
+import { spaceDisplayColor, spacePointLabelColor } from "./space-display-color";
 import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
 import type { LineSplitSegment, SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
 import { add, dot, intersectPlanes, len, scale, sub, worldToLocal } from "./vec3";
@@ -305,15 +306,14 @@ function renderLabels(
 
   return layoutLabels(requests, obstacles, area, { fontSize: a.labelFontSize, allowBackdrop: false })
     .map((item) => {
-      const color =
-        figure.vertices.some((v) => v.id === item.id)
-          ? a.labelColor
-          : data.points.find((p) => p.id === item.id)?.style.color ?? a.labelColor;
+      const color = figure.vertices.some((v) => v.id === item.id)
+        ? a.labelColor
+        : spacePointLabelColor(item.id, data, a.edgeColor, a.labelColor);
       const text =
         figure.vertices.find((v) => v.id === item.id)?.label ??
         data.points.find((p) => p.id === item.id)?.label ??
         "";
-      return `<text x="${round(item.x)}" y="${round(item.y)}" text-anchor="${item.textAnchor}" font-family="${escapeText(a.labelFontFamily)}" font-size="${a.labelFontSize}" fill="${color}" font-style="italic">${escapeText(text)}</text>`;
+      return `<text x="${round(item.x)}" y="${round(item.y)}" text-anchor="${item.textAnchor}" font-family="${escapeText(a.labelFontFamily)}" font-size="${a.labelFontSize}" fill="${spaceDisplayColor(color, data.view)}" font-style="italic">${escapeText(text)}</text>`;
     })
     .join("");
 }
@@ -394,6 +394,7 @@ function renderLineObject(
   }
 
   const sw = line.style.width ?? data.appearance.lineWidth;
+  const lineColor = spaceDisplayColor(line.style.color, data.view);
   drawCarrierWithVisibility(
     origin,
     dir,
@@ -404,7 +405,7 @@ function renderLineObject(
     data.view,
     fit,
     occlusion,
-    line.style.color,
+    lineColor,
     sw,
     data.appearance.hiddenDash,
     parts,
@@ -424,7 +425,7 @@ function renderLineObject(
         pTip.y - pTail.y,
         data.appearance.arrowSize,
       );
-      parts.push(`<polygon points="${poly}" fill="${line.style.color}"/>`);
+      parts.push(`<polygon points="${poly}" fill="${lineColor}"/>`);
     }
   }
 }
@@ -448,7 +449,7 @@ function renderPlaneFillPolygon(
   const screenPts = vertices.map((w) => projectWorld(w, resolved, data.view, fit, figure));
   const poly = screenPts.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
   parts.push(
-    `<polygon points="${poly}" fill="${color}" fill-opacity="${fillOpacity}" stroke="none"/>`,
+    `<polygon points="${poly}" fill="${spaceDisplayColor(color, data.view)}" fill-opacity="${fillOpacity}" stroke="none"/>`,
   );
 }
 
@@ -476,7 +477,7 @@ function renderPlaneSectionEdges(
       data.view,
       fit,
       occlusion,
-      plane.style.color,
+      spaceDisplayColor(plane.style.color, data.view),
       edgeWidth,
       data.appearance.hiddenDash,
       parts,
@@ -523,7 +524,7 @@ function renderPlaneHelperLines(
         data.view,
         fit,
         occlusion,
-        plane.style.color,
+        spaceDisplayColor(plane.style.color, data.view),
         helperWidth,
         data.appearance.hiddenDash,
         parts,
@@ -579,7 +580,7 @@ function renderPlane(
 
   renderPlaneFillPolygon(
     section,
-    plane.style.color,
+    spaceDisplayColor(plane.style.color, data.view),
     data.appearance.planeFillOpacity,
     data,
     figure,
@@ -660,7 +661,7 @@ function renderPlanesByDepth(
     if (!plane) continue;
     renderPlaneFillPolygon(
       fragment.vertices,
-      fragment.color,
+      spaceDisplayColor(fragment.color, data.view),
       data.appearance.planeFillOpacity,
       data,
       figure,
@@ -686,7 +687,7 @@ function renderPlanesByDepth(
           data.view,
           fit,
           occlusion,
-          plane.style.color,
+          spaceDisplayColor(plane.style.color, data.view),
           width,
           data.appearance.hiddenDash,
           parts,
@@ -747,7 +748,7 @@ function renderAutomaticPlaneIntersections(
       const pa = projectWorld(a, resolved, data.view, fit, figure);
       const pb = projectWorld(b, resolved, data.view, fit, figure);
       parts.push(
-        `<line x1="${round(pa.x)}" y1="${round(pa.y)}" x2="${round(pb.x)}" y2="${round(pb.y)}" stroke="${first.style.color}" stroke-width="${width}" stroke-dasharray="${data.appearance.hiddenDash}" stroke-linecap="round"/>`,
+        `<line x1="${round(pa.x)}" y1="${round(pa.y)}" x2="${round(pb.x)}" y2="${round(pb.y)}" stroke="${spaceDisplayColor(first.style.color, data.view)}" stroke-width="${width}" stroke-dasharray="${data.appearance.hiddenDash}" stroke-linecap="round"/>`,
       );
       obstacles.push(lineObstacle(pa.x, pa.y, pb.x, pb.y, "helper"));
     }
@@ -1144,7 +1145,7 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     const px = pr.x * fit.scale + fit.cx;
     const py = pr.y * fit.scale + fit.cy;
     parts.push(
-      `<circle cx="${round(px)}" cy="${round(py)}" r="${a.pointRadius}" fill="${point.style.color}" stroke="${point.style.color}" stroke-width="2"/>`,
+      `<circle cx="${round(px)}" cy="${round(py)}" r="${a.pointRadius}" fill="${spaceDisplayColor(point.style.color, data.view)}" stroke="${spaceDisplayColor(point.style.color, data.view)}" stroke-width="2"/>`,
     );
   }
 

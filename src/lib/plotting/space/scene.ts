@@ -14,6 +14,7 @@ import {
   planeIntersectionSegmentRange,
   resolveLineCarrier,
 } from "./build";
+import { syncPointColorsFromPlanes } from "./space-display-color";
 import { cross, intersectPlanes, len, segmentPlaneIntersection, sub } from "./vec3";
 import type {
   LineRegion,
@@ -52,13 +53,7 @@ export const DEFAULT_SPACE_APPEARANCE: SpaceAppearance = {
   lineWidth: DEFAULT_APPEARANCE.graphWidth,
   lineExtension: 0.35,
   arrowSize: DEFAULT_APPEARANCE.arrowSize,
-  // Достаточно плотная заливка: при разбиении плоскости на фрагменты по
-  // глубине их экранные проекции нередко перекрываются (см. render.ts) —
-  // при полупрозрачной заливке 0.5 в зоне перекрытия оба цвета смешиваются
-  // почти поровну, и ближний фрагмент визуально не «побеждает» дальний.
-  // При такой непрозрачности верхний (ближний) фрагмент чётко перекрывает
-  // нижний, а сквозь заливку всё равно видны линии и точки чертежа.
-  planeFillOpacity: 0.82,
+  planeFillOpacity: 0.5,
 };
 
 export function createSpaceSceneData(): SpaceSceneData {
@@ -605,13 +600,15 @@ export function buildSpaceSceneData(data: SpaceSceneData): SpaceBuildReport {
 
   if (data.figure) built += data.figure.vertices.length + data.figure.edges.length;
 
+  const pointsSynced = syncPointColorsFromPlanes(points, planes, resolved);
+
   const viewFit = data.figure
     ? computeSpaceViewFit({ ...data, points, lines, planes }, data.appearance)
     : null;
   const view = viewFit ? { ...data.view, ...viewFit } : data.view;
 
   return {
-    data: { ...data, points, lines, planes, view },
+    data: { ...data, points: pointsSynced, lines, planes, view },
     built,
     errors,
   };
