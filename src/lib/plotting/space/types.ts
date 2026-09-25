@@ -294,7 +294,7 @@ export interface SpaceViewParams {
   oblique?: number;
   /** Режим видимости: school (фикс. ракурс) или legacy (окклюзия по экрану). */
   visibilityMode?: "school" | "legacy";
-  /** Заливка плоскостей с учётом глубины (разбиение по линиям пересечения). */
+  /** @deprecated всегда заливка по глубине; поле сохраняется при импорте старых сцен. */
   planeFillByDepth?: boolean;
   /** Показывать автоматические пунктирные линии пересечения плоскостей. */
   showPlaneIntersections?: boolean;

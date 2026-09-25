@@ -571,7 +571,7 @@ export const DEFAULT_SPACE_VIEW: SpaceViewParams = {
   depthLength: DEFAULT_DEPTH_LENGTH,
   heightLength: DEFAULT_HEIGHT_LENGTH,
   visibilityMode: "school",
-  planeFillByDepth: false,
+  planeFillByDepth: true,
   showPlaneIntersections: false,
   planeFillDepthMode: "plane",
 };

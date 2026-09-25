@@ -26,11 +26,26 @@ import {
 } from "./visibility";
 import { isSchoolExtrusionFigure } from "./figure";
 import { buildSchoolViewObserver, figureBodyCenterWorld } from "./pyramid-view";
-import type { SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
+import type { LineSplitSegment, SpaceFigure, SpaceLine, SpacePlane, SpaceSceneData, Vec3 } from "./types";
 import { add, dot, intersectPlanes, len, scale, sub, worldToLocal } from "./vec3";
 
 function round(n: number): string {
   return String(Number(n.toFixed(2)));
+}
+
+function mergeLineSplitSegments(segments: LineSplitSegment[]): LineSplitSegment[] {
+  if (segments.length < 2) return segments;
+  const out: LineSplitSegment[] = [{ ...segments[0]! }];
+  for (let i = 1; i < segments.length; i += 1) {
+    const cur = segments[i]!;
+    const prev = out[out.length - 1]!;
+    if (cur.visible === prev.visible && len(sub(cur.a, prev.b)) < 1e-6) {
+      prev.b = cur.b;
+    } else {
+      out.push({ ...cur });
+    }
+  }
+  return out;
 }
 
 /** Треугольный наконечник в конце вектора (как стрелка оси на координатной плоскости). */
@@ -154,12 +169,13 @@ function drawSegmentWithVisibility(
     ? inheritedBodyEdgeVisibility(aWorld, bWorld, figure, resolved, view) ??
       inheritedProjectedBodyEdgeVisibility(aWorld, bWorld, figure, resolved, view, fit)
     : null;
-  const segments =
+  const rawSegments =
     bodyEdgeVisibility !== null
       ? [{ a: aWorld, b: bWorld, visible: bodyEdgeVisibility }]
       : useSurfaceDepth
         ? splitLineByVisibility(aWorld, unit, 0, abLen, figure, resolved, view, occlusion)
         : splitLineForRender(aWorld, unit, 0, abLen, figure, resolved, view, occlusion);
+  const segments = mergeLineSplitSegments(rawSegments);
   const opacityAttr =
     strokeOpacity !== undefined && strokeOpacity < 1
       ? ` stroke-opacity="${strokeOpacity}"`
@@ -169,17 +185,15 @@ function drawSegmentWithVisibility(
     const p1 = projectWorld(seg.a, resolved, view, fit, figure);
     const p2 = projectWorld(seg.b, resolved, view, fit, figure);
     const dash = seg.visible ? "" : ` stroke-dasharray="${hiddenDash}"`;
+    const linecap = seg.visible ? "round" : "butt";
     parts.push(
-      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"${dash}${opacityAttr}/>`,
+      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${color}" stroke-width="${width}" stroke-linecap="${linecap}"${dash}${opacityAttr}/>`,
     );
     obstacles.push(lineObstacle(p1.x, p1.y, p2.x, p2.y, seg.visible ? "curve" : "helper"));
   }
 }
 
-const PYRAMID_CARRIER_MIN_STEPS = 6;
-const PYRAMID_CARRIER_MAX_STEPS = 28;
-
-/** Параметрическая прямая P(t)=origin+t·dir: на пирамиде проекция криволинейна, рисуем цепочкой коротких отрезков. */
+/** Параметрическая прямая P(t)=origin+t·dir с разбиением на видимые/скрытые участки. */
 function drawCarrierWithVisibility(
   origin: Vec3,
   dir: Vec3,
@@ -198,32 +212,6 @@ function drawCarrierWithVisibility(
 ): void {
   const span = t1 - t0;
   if (!(span > 1e-12)) return;
-
-  if (isSchoolExtrusionFigure(figure)) {
-    const steps = Math.min(
-      PYRAMID_CARRIER_MAX_STEPS,
-      Math.max(PYRAMID_CARRIER_MIN_STEPS, Math.ceil(span * 10)),
-    );
-    for (let i = 0; i < steps; i += 1) {
-      const ta = t0 + (span * i) / steps;
-      const tb = t0 + (span * (i + 1)) / steps;
-      drawSegmentWithVisibility(
-        add(origin, scale(dir, ta)),
-        add(origin, scale(dir, tb)),
-        figure,
-        resolved,
-        view,
-        fit,
-        occlusion,
-        color,
-        width,
-        hiddenDash,
-        parts,
-        obstacles,
-      );
-    }
-    return;
-  }
 
   drawSegmentWithVisibility(
     add(origin, scale(dir, t0)),
@@ -611,9 +599,6 @@ function pointSegDist(p: Vec3, a: Vec3, b: Vec3): number {
   return len(sub(p, add(a, scale(ab, t))));
 }
 
-/** Непрозрачность заливки плоскостей в режиме глубины. */
-const DEPTH_PLANE_FILL_OPACITY = 0.45;
-
 /**
  * Рисование плоскостей «художником» от дальних фрагментов к ближним.
  * Каждый фрагмент заливается и сразу получает свои рёбра: либо часть контура
@@ -676,7 +661,7 @@ function renderPlanesByDepth(
     renderPlaneFillPolygon(
       fragment.vertices,
       fragment.color,
-      DEPTH_PLANE_FILL_OPACITY,
+      data.appearance.planeFillOpacity,
       data,
       figure,
       resolved,
@@ -716,6 +701,11 @@ function renderPlanesByDepth(
     }
   }
 
+  for (const plane of visiblePlanes) {
+    const section = sections.get(plane.id);
+    if (!section) continue;
+    renderPlaneHelperLines(plane, section, data, figure, resolved, fit, occlusion, parts, obstacles);
+  }
 }
 
 function renderAutomaticPlaneIntersections(
@@ -1132,23 +1122,16 @@ export function renderSpaceSvg(data: SpaceSceneData): string | null {
     if (isEdgeCoveredOnScreen({ a: p1, b: p2 }, overlaySegments)) continue;
     const visible = isBodyEdgeVisibleForRender(edge.id, figure, resolved, data.view);
     const dash = visible ? "" : ` stroke-dasharray="${a.hiddenDash}"`;
+    const linecap = visible ? "round" : "butt";
     parts.push(
-      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${a.edgeColor}" stroke-width="${a.edgeWidth}" stroke-linecap="round"${dash}/>`,
+      `<line x1="${round(p1.x)}" y1="${round(p1.y)}" x2="${round(p2.x)}" y2="${round(p2.y)}" stroke="${a.edgeColor}" stroke-width="${a.edgeWidth}" stroke-linecap="${linecap}"${dash}/>`,
     );
     obstacles.push(lineObstacle(p1.x, p1.y, p2.x, p2.y, visible ? "curve" : "axis"));
   }
 
-  if (data.view.planeFillByDepth) {
-    renderPlanesByDepth(data, figure, resolved, fit, occlusion, parts, obstacles);
-  } else {
-    for (const plane of data.planes) {
-      renderPlane(plane, data, figure, resolved, fit, occlusion, parts, obstacles);
-    }
-  }
+  renderPlanesByDepth(data, figure, resolved, fit, occlusion, parts, obstacles);
   renderAutomaticPlaneIntersections(data, figure, resolved, fit, parts, obstacles);
-  if (data.view.planeFillByDepth) {
-    renderBodyEdgesInFrontOfPlanes(data, figure, resolved, fit, parts);
-  }
+  renderBodyEdgesInFrontOfPlanes(data, figure, resolved, fit, parts);
 
   for (const line of data.lines) {
     renderLineObject(line, data, figure, resolved, fit, occlusion, parts, obstacles);

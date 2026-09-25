@@ -276,18 +276,6 @@ export function SpaceManualPanel() {
                   onCheckedChange={(checked) => updateSpaceView({ showViewConvergenceRays: checked })}
                 />
               </div>
-              <div className="flex items-center justify-between rounded-md border border-border p-2">
-                <div className="space-y-0.5">
-                  <Label className="text-xs">Показывать линии пересечения</Label>
-                  <p className="text-[11px] text-muted-foreground">
-                    Только визуальный пунктир; новые точки и прямые не создаются.
-                  </p>
-                </div>
-                <Switch
-                  checked={space3d.view.showPlaneIntersections ?? false}
-                  onCheckedChange={(checked) => updateSpaceView({ showPlaneIntersections: checked })}
-                />
-              </div>
               {isSchoolExtrusion && (
                 <p className="text-[11px] text-muted-foreground">
                   Контур, в который вписано основание; угол «плохого» ребра задаёт наклон, как у
@@ -346,14 +334,14 @@ export function SpaceManualPanel() {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between rounded-md border border-border p-2">
                 <div className="space-y-0.5">
-                  <Label className="text-xs">Рассчитать глубину</Label>
+                  <Label className="text-xs">Показывать линии пересечения</Label>
                   <p className="text-[11px] text-muted-foreground">
-                    Заливка плоскостей по глубине; линия их пересечения показывается пунктиром.
+                    Пунктир по линии пересечения двух плоскостей; точки и прямые не создаются.
                   </p>
                 </div>
                 <Switch
-                  checked={space3d.view.planeFillByDepth ?? false}
-                  onCheckedChange={(checked) => updateSpaceView({ planeFillByDepth: checked })}
+                  checked={space3d.view.showPlaneIntersections ?? false}
+                  onCheckedChange={(checked) => updateSpaceView({ showPlaneIntersections: checked })}
                 />
               </div>
               {space3d.planes.length === 0 ? (
